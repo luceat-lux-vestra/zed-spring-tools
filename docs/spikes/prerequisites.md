@@ -185,6 +185,7 @@ Host audited: macOS 26.5.1 arm64.
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
+| S003 plan | Gate 0 review | Synthetic JDT bundle injection plan written; no S003 code or Java extension installed |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -196,7 +197,7 @@ Host audited: macOS 26.5.1 arm64.
 | Memory | Ready for local spike | 64 GiB installed; S002 Spring LS was observed at approximately 265-290 MiB RSS, while JDT usage remains unmeasured |
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
-| Official Zed Java extension | Not installed/configured | Intentionally excluded from S002; required and separately reviewed before S003/S004 |
+| Official Zed Java extension | Not installed/configured | S003 plan pins 6.8.21; install only in isolated data after Gate 0 and Gate A reviews |
 | Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
 | Local Node syntax checker | Ready | Node 26.5.0 available; not an end-user prerequisite |
 | GitHub access | Ready locally | Pinned Spring Tools tag resolved during audit |
@@ -211,8 +212,9 @@ Host audited: macOS 26.5.1 arm64.
 ### Ready now
 
 - Source-based platform boundary is identifiable.
-- Local macOS arm64 Zed, rustup, JDK, and disk are available; the pinned
-  artifact identity is recorded but the file must be reacquired after review.
+- Local macOS arm64 Zed, rustup, JDK, and disk are available. The pinned Spring
+  artifact is verified locally; S003 records fixed inputs but defers the full JDT
+  LS archive until after implementation review.
 - A shell-independent probe can use Zed's Node executable API instead of
   hard-coding a Node, Python, Java, or platform-shell path.
 
@@ -247,6 +249,22 @@ Host audited: macOS 26.5.1 arm64.
 - This is local macOS arm64 evidence only. Do not repeat S002 merely to imply
   multiplatform support; representative runs require JDK 21 and the same fixed
   revision and criteria if the result is needed for a later direction decision.
+
+### Required before S003 Gate A and Gate B
+
+- Review and approve the S003 synthetic-bundle-only plan before adding its
+  disposable adapter, bundle, fixture, or preparation tool.
+- Keep the official Java extension out of the user's normal Zed environment.
+  Install exactly version 6.8.21 only in isolated Gate B data after reviewing the
+  complete Gate A implementation diff.
+- Use only the fixed JDT LS 1.60.0, Java proxy v6.8.21, and Java debug 0.53.2
+  artifacts recorded in S003. Disable Lombok and managed update checks for the
+  run; do not assert a result from a mutable latest download.
+- Reacquire and verify the full JDT LS archive after implementation review. The
+  initial research download was stopped because the official endpoint was
+  abnormally slow, and its partial file was deleted.
+- Treat the Java proxy HTTP endpoint as an ignored-evidence test oracle only,
+  not as a supported inter-extension integration contract.
 
 ### Required before representative multiplatform evidence
 
