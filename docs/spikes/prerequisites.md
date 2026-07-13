@@ -184,7 +184,7 @@ Host audited: macOS 26.5.1 arm64.
 | --- | --- | --- |
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
-| S002 Gate A | Review | Disposable implementation and synthetic validation complete; no real artifact acquisition or Zed execution begun |
+| S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -193,8 +193,8 @@ Host audited: macOS 26.5.1 arm64.
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
-| Memory | Ready for local spike | 64 GiB installed; actual Spring/JDT peak and steady-state usage still requires measurement |
-| Spring VSIX | Reacquire before S002 Gate B | Pinned provenance, size, and digest are recorded; prior temporary local copy was not found during recheck |
+| Memory | Ready for local spike | 64 GiB installed; S002 Spring LS was observed at approximately 265-290 MiB RSS, while JDT usage remains unmeasured |
+| Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
 | Official Zed Java extension | Not installed/configured | Intentionally excluded from S002; required and separately reviewed before S003/S004 |
 | Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
@@ -233,16 +233,20 @@ Host audited: macOS 26.5.1 arm64.
   termination. Pinned and current upstream source enqueue `exit` and then call
   `child.kill()` after the writer finishes; carry this constraint into S002.
 
-### Required before S002 Gate B
+### S002 execution result
 
-- Review the properties-only, classpath-disabled disposable implementation and
-  its fixed fixtures without installing the Zed Java extension.
-- Accept the fixed local extraction path and cross-platform Java verifier as
-  the artifact-verification boundary; the Zed API cannot preflight an arbitrary
-  worktree-relative JAR path.
-- Keep real VSIX acquisition and Zed installation behind this Gate A review.
-- Treat JDK 25 as evidence for the local macOS run only; representative S002
-  runs still require JDK 21 on Linux x86_64 and Windows x86_64.
+- The reviewed properties-only, classpath-disabled implementation initialized
+  the verified Spring LS directly on Temurin JDK 25 without a Zed Java extension
+  or the VS Code-only JVM client flag.
+- Zed sent the mapped language ID and handled dynamic registrations, and no
+  classpath-listener request occurred. Completion and hover returned empty
+  results; duplicate-key and invalid-value diagnostics were also empty.
+- Spring LS returned the string `"OK"` instead of `null` for shutdown. Zed
+  logged a deserialization failure but still sent `exit` and initialized a
+  replacement process.
+- This is local macOS arm64 evidence only. Do not repeat S002 merely to imply
+  multiplatform support; representative runs require JDK 21 and the same fixed
+  revision and criteria if the result is needed for a later direction decision.
 
 ### Required before representative multiplatform evidence
 

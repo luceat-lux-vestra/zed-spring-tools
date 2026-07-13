@@ -1,10 +1,10 @@
 # S002: Spring Boot LS standard-LSP baseline without JDT classpath
 
-- Status: Gate A implemented and locally validated; awaiting review
+- Status: Refuted on macOS arm64 — Gate B complete
 - Date: 2026-07-14
 - Related research: R002, R004, R005
 - Depends on: S001
-- Implementation state: Disposable implementation complete; Gate B not started
+- Implementation state: Disposable spike retained; no production promotion
 
 ## Hypothesis
 
@@ -122,11 +122,10 @@ only identifies a client-mode dependency.
 | SHA-256 | `70943c4e434d469090f8cee54dacf1de10ec1161f92685581dc2ef6164971bb3` |
 | Server entry | `extension/language-server/spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar` |
 
-The VSIX was not found during the 2026-07-14 recheck of the user's indexed and
-common download/tool locations. Gate A did not assume the previous temporary
-copy still exists. After the Gate A review, reacquire the exact official asset
-into ignored local storage and verify the pinned size and digest before
-extraction.
+Gate B reacquired this exact official asset into ignored local storage. The
+preparation tool verified its pinned size and digest before extracting 204
+entries totaling 91,193,648 bytes and confirming the expected server JAR and
+license file. Neither the VSIX nor its extraction is committed.
 
 ## Inferences
 
@@ -139,7 +138,7 @@ extraction.
 3. Mapping `Plain Text` to `spring-boot-properties` isolates the server behavior
    without adding a production grammar or requiring the user's Java setup.
 
-## Unverified hypotheses
+## Hypotheses before execution
 
 1. The release server can initialize under Java 25 without the VS Code-only JVM
    client flag.
@@ -155,7 +154,7 @@ extraction.
 
 ## Environment
 
-Planned first execution environment:
+Actual first execution environment:
 
 | Component | Value | S002 use |
 | --- | --- | --- |
@@ -165,7 +164,7 @@ Planned first execution environment:
 | Java runtime | SDKMAN Temurin JDK 25.0.3 | Spring LS process only |
 | Java discovery | `Worktree::which("java")`, then `JAVA_HOME` fallback | No macOS-only discovery |
 | Rust | rustup stable 1.97.0 with `wasm32-wasip2` | Dev-extension build |
-| Spring Tools | Pinned values above | Must be reacquired and verified |
+| Spring Tools | Pinned values above | Reacquired and verified locally |
 
 Java 25 being the user's default is acceptable for this local run because the
 inspected launcher requires Java 21 or newer. It does not establish JDK 21
@@ -358,6 +357,87 @@ Constraint discovered during implementation:
 15. Record exact observations and classify the result. Do not promote spike code
     into product code.
 
+### Gate B confirmed observations
+
+Gate B ran on the declared macOS arm64 host on 2026-07-14:
+
+1. The official VSIX was verified as 82,759,143 bytes with SHA-256
+   `70943c4e434d469090f8cee54dacf1de10ec1161f92685581dc2ef6164971bb3`.
+   Safe extraction produced 204 entries totaling 91,193,648 bytes and verified
+   the expected server JAR and license file.
+2. `java -version` and `javac -version` both reported SDKMAN Temurin 25.0.3.
+   The isolated Zed 1.10.3 data directory contained no Java extension; only the
+   bundled HTML extension and the disposable S002 development extension were
+   present.
+3. Zed launched the verified JAR directly with the planned JVM argument vector.
+   The primary command omitted `-Dsts.lsp.client=vscode`. The server initialized
+   successfully in 1.868 seconds, so the diagnostic client-flag rerun was not
+   permitted or needed. The initial process reached approximately 265,280 KiB
+   resident memory during observation.
+4. The initialize request contained only
+   `{"enableJdtClasspath":false}` as custom initialization data. The response
+   advertised standard hover, definition, symbols, actions, inlay hints, and
+   related capabilities but no `serverInfo` identity. Server logs confirmed
+   that classpath listening remained disabled.
+5. Every fixture `didOpen` used `spring-boot-properties`. Zed answered the
+   server's dynamic completion, watched-file, workspace-folder, semantic-token,
+   and inlay-hint refresh registrations or requests. No method-not-found or
+   unhandled-method error was observed.
+6. The trace contained zero `sts/addClasspathListener` requests. This agrees
+   with the explicit classpath-disabled initialization and the server's
+   `enableClasspath=false` log messages.
+
+The fixed feature observations were:
+
+| Fixture | Exact protocol result | Outcome |
+| --- | --- | --- |
+| Duplicate-key control | Diagnostics `[]` for both `server.port` entries | Control did not produce the planned diagnostic |
+| Completion at `(0, 3)` | `{"isIncomplete":true,"items":[]}` | No `server.port` completion |
+| Hover at `(0, 1)` | `{"contents":[]}` | No description or type metadata |
+| Invalid integer value | Diagnostics `[]` for `server.port=not-a-number` | No type diagnostic |
+
+The completion fixture also received `PROP_SYNTAX_ERROR` for the incomplete
+text `ser`. That syntax-only parser result does not identify `server.port` and
+does not satisfy the metadata-aware success threshold. The server log explicitly
+reported zero completion candidates for the mapped language ID, so the empty
+completion response is not a UI-display ambiguity.
+
+### Restart and shutdown observations
+
+`editor: restart language server` sent `shutdown`, followed by `exit`, and
+replaced server PID 19948 with PID 23211. The replacement initialized in 1.945
+seconds, reopened all four fixtures with the mapped language ID, and reached
+approximately 289,936 KiB resident memory after about 51 seconds.
+
+On both restart and final application shutdown, Spring LS returned the JSON
+string `"OK"` as the shutdown result. Standard LSP shutdown expects `null`, so
+Zed rejected the response with `invalid type: string "OK", expected unit` and
+logged `Shutdown request failure`. Zed nevertheless sent `exit`; restart still
+created and initialized the replacement process. This is a confirmed protocol
+compatibility constraint, not the reason the metadata probes were empty.
+
+The isolated Zed instance and Spring LS were stopped, the development-extension
+link and generated WASM were removed, the user's two-set Korean input source was
+restored, and the normal non-isolated Zed application was reopened. A filtered
+314-line raw trace and UI screenshots remain only under ignored
+`tmp/s002-evidence/`; they include host paths and are not committed.
+
+### Result and inference
+
+**Refuted on macOS arm64.** Direct classpath-disabled Spring LS startup and
+standard LSP transport are feasible on this host, but Candidate A did not
+provide the minimum properties-language value required by the hypothesis. The
+three exact metadata-aware requests produced empty results, while trace evidence
+confirmed the expected language ID, direct request delivery, server-side
+processing, and successful dynamic registration. The failed duplicate control
+is an additional negative observation; classification does not depend on it
+because the metadata requests themselves have unambiguous protocol responses.
+
+This result is limited to Zed 1.10.3, the pinned Spring Tools artifact, Temurin
+JDK 25.0.3, and macOS arm64. It does not refute coordinated Candidates B-D or
+establish behavior on another JDK, operating system, architecture, project
+fixture, or with JDT-backed classpath data.
+
 ### Later representative runs
 
 After the macOS result is committed, repeat the same spike revision on Linux
@@ -411,9 +491,9 @@ can be evaluated.
   home-directory paths in committed evidence.
 - Do not remove failed or interrupted traces from the observation summary.
 
-## Remaining uncertainty after a Supported result
+## Remaining uncertainty
 
-Even Supported would not establish:
+This macOS result does not establish:
 
 - Java project awareness or coexistence with Zed's Java extension;
 - custom configuration metadata from a real project classpath;
@@ -423,19 +503,28 @@ Even Supported would not establish:
   publication; or
 - Linux, Windows, x86_64, or additional Arm64 support.
 
-## Next experiment
+## Blockers and constraints after Gate B
 
-If Supported, write and review S003 for one synthetic JDT LS bundle injected
-through the existing Zed Java adapter. That is the first point where the macOS
-Zed Java environment becomes a prerequisite.
+- Candidate A cannot pass the declared MVP threshold on the tested host without
+  changing the classpath-disabled premise or the pinned inputs.
+- The nonstandard shutdown result is a protocol compatibility defect even
+  though Zed can still replace the process.
+- Representative Linux and Windows hosts remain unavailable, so this result
+  cannot support or reject a multiplatform claim by itself.
+- S003 cannot execute locally until the official Zed Java extension environment
+  is separately installed, inspected, and approved for that spike.
 
-If Refuted, record Candidate A as non-viable for the tested properties baseline
-and continue to S003 only if the project still wants to evaluate the coordinated
-full-integration path independently.
+## Candidate next experiment
 
-## Gate A review checklist
+Candidate A is non-viable for the tested properties baseline. S003 should be
+written and reviewed only if the project still wants to evaluate the coordinated
+full-integration path independently. It would test one synthetic JDT LS bundle
+through the existing Zed Java adapter and therefore requires separate setup and
+review of the macOS Zed Java development environment before execution.
 
-Gate B must not begin until the reviewer accepts:
+## Gate A approval record
+
+The user approved Gate B after reviewing the Gate A implementation and accepted:
 
 - no Zed Java environment setup during S002;
 - properties-only scope using spike-only `Plain Text` language mapping;
