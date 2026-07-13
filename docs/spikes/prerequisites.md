@@ -187,6 +187,7 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
+| S005 plan | Reviewed | Three-arm callback-routing plan passed review; implementation and proxy source builds have not started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -214,8 +215,9 @@ Host audited: macOS 26.5.1 arm64.
 
 - Source-based platform boundary is identifiable.
 - Local macOS arm64 Zed, rustup, JDK, and disk are available. The pinned Spring
-  artifact is verified locally; S003's full fixed JDT LS, proxy, debug, and
-  synthetic bundle inputs are prepared under ignored local storage.
+  artifact is verified locally; S004's fixed JDT LS, official proxy, debug,
+  Spring bundle, and dependency-free fixture inputs remain under ignored local
+  storage for identity reverification.
 - A shell-independent probe can use Zed's Node executable API instead of
   hard-coding a Node, Python, Java, or platform-shell path.
 
@@ -289,8 +291,29 @@ Host audited: macOS 26.5.1 arm64.
   offline/reproducibility constraint, not a failed type-search condition.
 - Zed logged the already-known shutdown response/lifecycle limitation, but all
   isolated child processes were removed and normal Zed was restored. S004 is
-  Supported only on this macOS arm64/JDK 25 tuple; S005 still requires a written
-  plan and review.
+  Supported only on this macOS arm64/JDK 25 tuple; S005 planning is recorded
+  below.
+
+### S005 planning gate
+
+- The fixed Spring source sends classpath events from JDT LS through the
+  proposed `workspace/executeClientCommand` request. A non-batched event contains
+  project URI, name, deletion state, classpath, build descriptor, and Java core
+  options.
+- The current Java proxy has no branch for that method and forwards the request
+  to Zed. Source inspection alone cannot establish the runtime payload, Zed's
+  actual failure behavior, or result correlation through an instrumented proxy.
+- The reviewed S005 plan separates three arms: official release proxy, an
+  unmodified source build from the pinned Java extension commit, and the same
+  source build with one narrow disposable callback-routing patch. This avoids
+  attributing a compiler/source-build difference to the patch.
+- Spring Boot LS remains excluded. A worktree-local mock sink returns the exact
+  `"done"` value used by the fixed Spring consumer so S005 can test one callback
+  boundary without claiming an end-to-end integration.
+- No native source checkout, proxy build, S005 extension, patch, or runtime has
+  been added or executed. Gate A requires explicit continuation and remains
+  limited to a fixed-method runtime instrument, not a reusable
+  bridge/coordinator module.
 
 ### Required before representative multiplatform evidence
 
