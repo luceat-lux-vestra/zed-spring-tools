@@ -184,6 +184,7 @@ Host audited: macOS 26.5.1 arm64.
 | --- | --- | --- |
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
+| S002 plan | Review | Written; no S002 code or artifact acquisition has begun |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -193,9 +194,9 @@ Host audited: macOS 26.5.1 arm64.
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
 | Memory | Ready for local spike | 64 GiB installed; actual Spring/JDT peak and steady-state usage still requires measurement |
-| Spring VSIX | Ready for spikes | Official asset downloaded outside repo; SHA-256 matches GitHub |
+| Spring VSIX | Reacquire before S002 Gate B | Pinned provenance, size, and digest are recorded; prior temporary local copy was not found during recheck |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
-| Official Zed Java extension | Not installed | Not required for S001/S002; required before S003/S004 |
+| Official Zed Java extension | Not installed/configured | Intentionally excluded from S002; required and separately reviewed before S003/S004 |
 | Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
 | Local Node syntax checker | Ready | Node 26.5.0 available; not an end-user prerequisite |
 | GitHub access | Ready locally | Pinned Spring Tools tag resolved during audit |
@@ -230,6 +231,17 @@ Host audited: macOS 26.5.1 arm64.
   started a replacement server, but the probe did not observe `exit` before
   termination. Pinned and current upstream source enqueue `exit` and then call
   `child.kill()` after the writer finishes; carry this constraint into S002.
+
+### Required before S002 implementation
+
+- Approve the properties-only, classpath-disabled plan without installing the
+  Zed Java extension.
+- Approve the fixed local extraction path and cross-platform Java verifier for
+  the pinned official VSIX.
+- Keep the real VSIX acquisition and Zed installation behind the post-Gate A
+  implementation review.
+- Treat JDK 25 as evidence for the local macOS run only; representative S002
+  runs still require JDK 21 on Linux x86_64 and Windows x86_64.
 
 ### Required before representative multiplatform evidence
 
