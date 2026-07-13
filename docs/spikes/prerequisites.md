@@ -183,12 +183,12 @@ Host audited: macOS 26.5.1 arm64.
 | Prerequisite | Status | Evidence or action |
 | --- | --- | --- |
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
-| S001 plan | Review | Written; implementation not started |
+| S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
-| rustup | Ready | Stable rustc/cargo 1.96.1 installed |
-| Rust command selection | Action required | Shell currently selects Homebrew Cargo first; launch Zed with rustup-first PATH |
-| `wasm32-wasip2` | Action required | Not installed; add only after plan approval or let Zed add it |
-| Zed-managed Node | Unverified | API is available; actual path/version will be observed by S001 |
+| rustup | Ready | Stable rustc/cargo 1.97.0 installed |
+| Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
+| `wasm32-wasip2` | Ready | Installed in the active rustup toolchain |
+| Zed API-resolved Node | Ready locally | `/opt/homebrew/bin/node`, v26.5.0, darwin arm64 observed through S001 |
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
@@ -211,21 +211,25 @@ Host audited: macOS 26.5.1 arm64.
 
 - Source-based platform boundary is identifiable.
 - Local macOS arm64 Zed, rustup, JDK, disk, and pinned artifact are available.
-- A shell-independent probe can use Zed's managed Node binary instead of
-  user-installed Python, Node, or Java.
+- A shell-independent probe can use Zed's Node executable API instead of
+  hard-coding a Node, Python, Java, or platform-shell path.
 
-### Required before S001 implementation
+### Satisfied before S001 implementation
 
 - Accept this proposed platform boundary and validation levels.
-- Accept the dependency-free JavaScript probe using Zed's managed Node binary.
+- Accept the dependency-free JavaScript probe using Zed's Node executable API.
 - Accept rustup-first PATH use and possible `wasm32-wasip2` installation.
 
-### Required before S001 execution
+### S001 execution result
 
-- Review the implemented diff.
-- Verify the foreground Zed process sees rustup Cargo and resolves Zed's managed
-  Node binary. Java environment verification remains a separate S002 gate.
-- Record the exact Zed version and host tuple in the result.
+- The implemented diff was reviewed before execution.
+- Foreground Zed compiled and installed the extension and resolved Node through
+  the extension API. Java environment verification remains a separate S002
+  gate.
+- Zed 1.10.3 on macOS 26.5.1 arm64 sent `shutdown`, accepted its response, and
+  started a replacement server, but the probe did not observe `exit` before
+  termination. Pinned and current upstream source enqueue `exit` and then call
+  `child.kill()` after the writer finishes; carry this constraint into S002.
 
 ### Required before representative multiplatform evidence
 

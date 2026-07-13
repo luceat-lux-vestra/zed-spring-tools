@@ -2,4 +2,5 @@
 .zed/
 *.log
 tmp/
-
+spikes/**/target/
+spikes/**/extension/extension.wasm

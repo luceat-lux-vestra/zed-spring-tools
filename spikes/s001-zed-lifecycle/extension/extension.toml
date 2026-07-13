@@ -1,0 +1,11 @@
+id = "s001-lifecycle-probe"
+name = "S001 Lifecycle Probe"
+version = "0.0.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Disposable language-server lifecycle probe for S001."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.s001-lifecycle-probe]
+name = "S001 Lifecycle Probe"
+languages = ["Plain Text"]

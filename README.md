@@ -31,6 +31,7 @@ docs/
 ├── decisions/  # Decisions made from research and spike evidence
 ├── research/   # Source-based technical investigations
 └── spikes/     # Reproducible feasibility experiments
+spikes/          # Disposable experiment code; never production code
 ```
 
 No product code, build system, extension manifest, or product CI should be added

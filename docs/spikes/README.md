@@ -1,6 +1,9 @@
 # Spike Index
 
-Source-based research is complete. No spike has begun yet.
+Source-based research is complete. S001 has been executed on the local macOS
+arm64 host. Its strict graceful-exit hypothesis was refuted, while extension
+installation, initialization, `shutdown`, and replacement-process startup were
+observed successfully.
 
 Each spike still requires its own written plan and success/failure criteria
 before disposable code is added.
@@ -13,7 +16,7 @@ Tentative sequence:
 
 | ID | Experiment | Status |
 | --- | --- | --- |
-| [S001](001-zed-dev-extension-lifecycle.md) | Load a minimal local Zed extension and observe process lifecycle | Gate A approved |
+| [S001](001-zed-dev-extension-lifecycle.md) | Load a minimal local Zed extension and observe process lifecycle | Refuted on macOS arm64: probe did not observe `exit` before termination |
 | S002 | Run the Spring LS standard-LSP baseline with JDT classpath disabled | Proposed |
 | S003 | Inject one synthetic JDT LS bundle through a second adapter | Proposed |
 | S004 | Load pinned Spring JDT bundles and execute one command | Proposed |

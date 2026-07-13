@@ -1,0 +1,1 @@
+S001 Zed language-server lifecycle probe fixture.
