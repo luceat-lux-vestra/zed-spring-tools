@@ -1,10 +1,10 @@
 # S004: Pinned Spring JDT bundle command probe
 
-- Status: Gate A implemented, validated, and reviewed; Gate B not started
+- Status: Supported on macOS arm64 with JDK 25; representative platforms pending
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S003 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Gate A complete; Gate B requires explicit continuation
+- Implementation gate: Gate A and Gate B complete on the local tuple
 
 ## Hypothesis
 
@@ -224,7 +224,10 @@ paths, and they must remain distinct.
 5. The unchanged private proxy endpoint can observe one already-running JDT LS
    command, but it remains unsuitable as a product integration contract.
 
-## Unverified hypotheses
+## Pre-run unverified hypotheses
+
+The Gate B result below resolves these items for the tested macOS arm64/JDK 25
+tuple only. They remain unverified on every other desktop/JDK tuple.
 
 1. All five verified JARs resolve and activate together against JDT LS 1.60.0.
 2. Their classes have no runtime linkage incompatibility with the newer JDT,
@@ -245,7 +248,7 @@ paths, and they must remain distinct.
 
 ## Environment
 
-Planned first execution environment:
+Executed first environment:
 
 | Component | Fixed value | S004 use |
 | --- | --- | --- |
@@ -372,6 +375,100 @@ LS, the Java proxy, Maven, Gradle, or any UI automation.
    wrong working directory and failed before validation began. They were rerun
    from the extension directory or repository root, respectively, with no
    criterion or artifact change and then passed.
+
+## Gate B confirmed observations
+
+Gate B ran on the local macOS 26.5.1 arm64 host on 2026-07-14 with Zed
+1.10.3 build `20260713.002323`, the retained official Java extension 6.8.21,
+and SDKMAN Temurin JDK 25.0.3.
+
+1. The actual preparation transaction reverified all four fixed outer inputs,
+   extracted 141 JDT LS archive entries, staged exactly the five declared
+   Spring JARs, copied the dependency-free fixture, and left the fresh JDT
+   runtime without a local `configuration/` directory. Its distinct worktree
+   basename selected the planned `472711...2075` data-cache key rather than
+   S003's `0d0e44...e896` key.
+2. The isolated profile contained bundled HTML, Java 6.8.21, and only the S004
+   development extension after S003 was removed. The normal Zed extension and
+   settings directories were not modified. The Java settings continued to use
+   the fixed proxy and debug bundle, pointed at the fresh S004 JDT launcher,
+   and kept Lombok, JDK auto-download, and update checks disabled.
+3. On the first JDT LS initialize request, `bundles` contained six entries:
+   debug 0.53.2 followed by the five Spring paths exactly once and in release
+   order. No S003 synthetic path appeared. JDT LS identified itself as
+   1.60.0-SNAPSHOT, OSGi version `1.60.0.202606262232`, source commit `57ed41b`,
+   running on Temurin 25.0.3.
+4. The first JDT log reported all five Spring references installed and started,
+   with no attributable resolution, activation, linkage, classloading, or
+   extension-point error. Its command registry included
+   `sts.java.search.types`; the initialize response advertised that command and
+   did not advertise `s003.synthetic.ping`.
+5. JDT LS imported the one Maven project, reported workspace initialization in
+   4,835 ms, reached `ServiceReady`, and published zero diagnostics for the
+   unchanged fixture. Zed received the JDT initialize response in approximately
+   2.344 seconds. M2E fetched Maven model/tooling artifacts such as Plexus, ASM,
+   Commons IO, and QDox during the first import even though the fixture has no
+   project dependency or wrapper; this is an observed online-runtime constraint,
+   not evidence that a fixture dependency was resolved.
+6. The one permitted pre-restart proxy request used the fixed source-only
+   payload. It returned a one-element list containing
+   `dev.zed.spring.s004.S004OnlyProbe9F2C` with `clazz: true`. The full envelope
+   remains only in ignored evidence.
+7. One Zed language-server restart replaced the adapter, proxy, and JDT LS
+   processes. The replacement initialize request repeated the same six bundle
+   entries exactly once and in the same order. JDT LS again advertised
+   `sts.java.search.types`, imported the Maven project, reached `ServiceReady`,
+   and reported workspace initialization in 433 ms; Zed received the initialize
+   response in approximately 1.097 seconds.
+8. The one permitted post-restart request repeated the unchanged payload and
+   returned the same one-element structural result: the exact fixture `fqName`
+   with `clazz: true`. No other private-proxy request was sent.
+9. Point-in-time process RSS, recorded after each initialization rather than as
+   a benchmark, was:
+
+   | Run | S004 adapter | Java proxy | JDT LS |
+   | --- | ---: | ---: | ---: |
+   | Before restart | 47,280 KiB | 2,160 KiB | 1,301,760 KiB |
+   | After restart | 47,216 KiB | 2,128 KiB | 517,712 KiB |
+
+10. The isolated Zed instance was stopped, no S004 adapter, Java proxy, or S004
+    JDT data-cache process remained, and normal Zed was reopened on the
+    repository. The reusable isolated profile retains Java 6.8.21 and the S004
+    development extension as directed; all runtime artifacts and raw evidence
+    remain ignored.
+
+## Failed, interrupted, and corrected Gate B observations
+
+1. The first UI attempt to activate S003's Uninstall control did not take effect
+   because the multi-display screenshot and logical-coordinate scales differed.
+   The extension inventory proved that state was unchanged. A slower native
+   pointer event activated the same visible control; no artifact, setting,
+   payload, or hypothesis condition changed.
+2. On the restart, Zed logged that JDT LS returned `{}` for `shutdown`, where
+   Zed expected a unit/null response. The S004 lifecycle probe nevertheless
+   observed `shutdown`, `exit`, process stop with code 0, and a replacement
+   process. On final app quit the probe observed `shutdown` and its response but
+   not a later `exit`/stop record before Zed's app-quit timeout. All child
+   processes were gone after quit. This preserves the S001 lifecycle constraint
+   and did not prevent bundle, import, command, restart, or cleanup attribution.
+3. Gate B required no artifact-version, JDK, command, payload, fixture, bundle,
+   proxy, or injection correction. The earlier nested-JAR digest correction
+   remains the only fixed-input identity correction and is recorded under Gate
+   A observations.
+
+## Result
+
+The S004 hypothesis is **Supported for the tested macOS arm64 and JDK 25
+tuple**. The unmodified Java extension and proxy loaded the complete fixed
+Spring bundle set into the pinned JDT LS, the Spring handler searched the
+imported Java model and returned the unique source type, and the same behavior
+repeated after one language-server restart.
+
+This is not a multiplatform or product-feasibility decision. It does not make
+the Java proxy's private endpoint a supported integration API, and it does not
+establish the Spring classpath-listener callback path. It permits only a written
+and reviewed S005 callback-routing spike plan under the repository decision
+gate.
 
 ## Plan review gate before implementation
 
@@ -598,4 +695,6 @@ The later Gate A diff review confirmed that every added implementation file is
 under the approved disposable S004 tree, no production structure was added, the
 tool has no download or child-process path, generated outputs remain ignored,
 and the validated adapter contributes only the five fixed paths to `jdtls`.
-Gate A review outcome: **Ready for user review; Gate B has not started.**
+Gate A review outcome: **Ready for Gate B**, which then ran only after the
+user's explicit continuation. Gate B changed no committed implementation and
+met the predeclared Supported threshold on the local tuple.

@@ -186,7 +186,7 @@ Host audited: macOS 26.5.1 arm64.
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
-| S004 plan | Gate A reviewed | Disposable adapter, fixture, preparation self-tests, fixed-input dry preparation, and complete diff validated; Gate B not started |
+| S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -195,7 +195,7 @@ Host audited: macOS 26.5.1 arm64.
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
-| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, while S003 JDT LS point-in-time snapshots were approximately 587-1,264 MiB |
+| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, S003 JDT LS snapshots were approximately 587-1,264 MiB, and S004 JDT LS snapshots were approximately 506-1,271 MiB |
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
 | Official Zed Java extension | Ready in isolated S003 data | Exact 6.8.21 installation retained for repeatable research; normal Zed remains unchanged |
@@ -265,7 +265,7 @@ Host audited: macOS 26.5.1 arm64.
 - The Java proxy HTTP endpoint was used as an ignored-evidence test oracle only,
   not as a supported inter-extension integration contract.
 
-### S004 planning gate
+### S004 Gate A and Gate B result
 
 - The fixed Spring Tools `5.2.0.RELEASE` VSIX contributes exactly five JDT LS
   bundles. Their identities, order, manifests, and `sts.java.search.types`
@@ -273,19 +273,24 @@ Host audited: macOS 26.5.1 arm64.
 - Every declared required bundle and Gson package has a provider in the pinned
   JDT LS 1.60.0 plus the five-JAR set, and no contribution symbolic name collides
   with the base JDT LS plugins.
-- The Spring release build used a mutable JDT LS snapshot repository, so static
-  closure is not a binary-compatibility claim. S004 is planned to verify that
-  exact risk with one source-only command against an imported Maven fixture.
-- The reusable isolated profile may retain Java 6.8.21, but S003's development
-  link and synthetic path must be removed and shown absent before S004 runtime.
-  S004 must use a fresh extraction of the verified JDT archive and a uniquely
-  named runtime worktree so persisted OSGi configuration and the launcher's
-  basename-derived JDT data cache cannot contaminate the result.
-- Gate A disposable implementation and non-UI validation are complete. The
-  first fixed-input dry preparation safely exposed and corrected a mistaken
-  nested-JAR digest; the repeat passed with no retained runtime output. Gate B
-  Zed/UI execution has not started and requires a reviewed diff plus explicit
-  continuation.
+- The Spring release build used a mutable JDT LS snapshot repository, so the
+  static audit alone was not a compatibility claim. Gate B tested that exact
+  risk with the fixed source-only command against an imported Maven fixture.
+- S003's development link and synthetic path were removed. A fresh verified JDT
+  extraction and uniquely named worktree selected a distinct JDT data cache;
+  initialization retained debug 0.53.2 and added the five Spring paths exactly
+  once in release order.
+- All five Spring bundles installed and started without an attributable runtime
+  compatibility error. JDT LS advertised `sts.java.search.types`; before and
+  after one restart the fixed request returned the exact unique fixture type
+  with `clazz: true`.
+- M2E fetched its own Maven model/tooling artifacts during the first import even
+  though the fixture had no wrapper or project dependency. This remains an
+  offline/reproducibility constraint, not a failed type-search condition.
+- Zed logged the already-known shutdown response/lifecycle limitation, but all
+  isolated child processes were removed and normal Zed was restored. S004 is
+  Supported only on this macOS arm64/JDK 25 tuple; S005 still requires a written
+  plan and review.
 
 ### Required before representative multiplatform evidence
 
