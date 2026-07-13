@@ -1,11 +1,11 @@
 # S003: Cross-extension synthetic JDT LS bundle injection
 
-- Status: Gate B fixed artifacts prepared and validated; isolated runtime pending
+- Status: Supported on macOS arm64 with JDK 25; representative platforms pending
 - Date: 2026-07-14
 - Related research: R001, R003, R004, R005
 - Depends on: S002
-- Implementation state: Disposable Gate A implementation and Gate B artifact preparation
-  complete; isolated Zed execution not started
+- Implementation state: Disposable Gate A and local Gate B complete; no product
+  implementation authorized
 
 ## Hypothesis
 
@@ -146,20 +146,20 @@ The pinned runtime is JDT LS tag `v1.60.0`, source commit
 
 | Component | Fixed identity | Size | SHA-256 | Verification state |
 | --- | --- | ---: | --- | --- |
-| JDT LS | [`jdt-language-server-1.60.0-202606262232.tar.gz`](https://download.eclipse.org/jdtls/milestones/1.60.0/jdt-language-server-1.60.0-202606262232.tar.gz) | 50,925,681 bytes | `e94c303d8198f977930803582738771fd18c52c5492878410bf222b1aa81ef1d` | Size and digest published by Eclipse; full local download deferred |
+| JDT LS | [`jdt-language-server-1.60.0-202606262232.tar.gz`](https://download.eclipse.org/jdtls/milestones/1.60.0/jdt-language-server-1.60.0-202606262232.tar.gz) | 50,925,681 bytes | `e94c303d8198f977930803582738771fd18c52c5492878410bf222b1aa81ef1d` | Fixed official artifact downloaded, locally verified, and prepared under ignored `tmp/` |
 | Java proxy | [release v6.8.21 `java-lsp-proxy-darwin-aarch64.tar.gz`](https://github.com/zed-extensions/java/releases/download/v6.8.21/java-lsp-proxy-darwin-aarch64.tar.gz) | 350,984 bytes | `3b128f058eed29e7b7a30c7aaccd430e2964917e45f62e5052d8df676dccb5e5` | Fixed official asset downloaded and locally hashed under ignored `tmp/` |
 | Java debug | [release 0.53.2 `com.microsoft.java.debug.plugin-0.53.2.jar`](https://github.com/zed-industries/java-debug/releases/download/0.53.2/com.microsoft.java.debug.plugin-0.53.2.jar) | 3,107,682 bytes | `5275195905015ce786fc6318c8d039fef43a1fada1d03acdec24c69a3b9ba83c` | Fixed official asset downloaded and locally hashed under ignored `tmp/` |
 
 The JDT LS URL is the exact 1.60.0 milestone filename, not its mutable
 `latest.txt` selector. Eclipse publishes the recorded `.sha256` alongside the
 archive. The first local download attempt was abnormally slow and was stopped;
-the partial file was deleted and is not evidence. Gate B must reacquire the full
-archive and verify both exact size and digest before extraction.
+the partial file was deleted and is not evidence. Gate B later reacquired the
+full archive and verified both exact size and digest before extraction.
 
 The Java debug artifact's manifest reports bundle symbolic name
 `com.microsoft.java.debug.plugin` and version 0.53.2. The proxy archive contains
-one `java-lsp-proxy` executable. These two fixed research copies remain ignored
-and are not installed.
+one `java-lsp-proxy` executable. The fixed source copies and prepared runtime
+files remain ignored and are not redistributed by this repository.
 
 ## Inferences
 
@@ -445,15 +445,96 @@ proxy, or S003 development extension runtime was started during preparation.
     the same deterministic command result after restart.
 13. Record shutdown and `exit` behavior without requiring graceful process exit,
     following S001's lifecycle constraint.
-14. Stop the isolated instance, remove the development-extension link and
-    generated WASM, verify no probe, proxy, or JDT LS process remains, restore
-    any input-source change made for automation, and reopen normal Zed.
+14. Stop the isolated instance, verify no probe, proxy, or JDT LS process
+    remains, restore any input-source change made for automation, and reopen
+    normal Zed. Remove the development-extension link and generated WASM unless
+    the user explicitly directs that the reusable isolated environment remain.
 15. Summarize observations and classify the result. Do not promote any spike
     code or private endpoint use into production code.
 
 No retry may change artifact versions, Java-extension source, the synthetic
 command, or the hook mechanism. One documented correction is allowed only for a
 clear operator setup mistake such as an incorrect prepared absolute path.
+
+### Gate B confirmed observations
+
+Gate B ran on the local macOS 26.5.1 arm64 host on 2026-07-14 with Zed 1.10.3
+build `20260713.002323` and SDKMAN Temurin JDK 25.0.3.
+
+1. The isolated extension manager installed the official Java extension exactly
+   at 6.8.21. The isolated directory contained the bundled HTML extension, Java
+   6.8.21, and the S003 development extension. The user's normal extension
+   directory remained unchanged with only its pre-existing HTML and Kotlin
+   entries.
+2. The Java extension launched the prepared Java proxy and pinned JDT LS
+   1.60.0. JDT LS identified OSGi version `1.60.0.202606262232`, Git commit
+   `57ed41b`, Java 25.0.3, macOS, and aarch64. No managed JDT LS, debugger,
+   Lombok, or task-helper artifact appeared in the Java extension work area.
+3. The final initial initialization options contained exactly two bundle paths:
+   the fixed Java debug 0.53.2 bundle and the S003 synthetic bundle. Each path
+   occurred once and no Spring Tools path was present.
+4. JDT LS logged both fixed bundles as installed and started, then registered
+   `s003.synthetic.ping` as a static command. Its initialize response advertised
+   only that synthetic command in the initial execute-command capability. No
+   bundle install, resolution, activation, linkage, or extension-point error was
+   recorded.
+5. Initial JDT LS initialization completed in approximately 6.636 seconds. One
+   proxy-oracle request with an empty argument array returned an object
+   structurally equal to `{"spike":"s003","value":"ok-v1"}`.
+6. Zed's `editor: restart language server` command restarted both active Java
+   language servers rather than presenting a per-server selector. It replaced
+   the injector, proxy, and JDT LS processes. The replacement JDT LS initialize
+   options again contained the debug and synthetic paths exactly once, with no
+   Spring path; the response again advertised `s003.synthetic.ping` and
+   initialization completed in approximately 3.452 seconds.
+7. Exactly one post-restart proxy-oracle request returned the same fixed object.
+   The second JDT log retained `s003.synthetic.ping` as a static command and
+   recorded no bundle error. It did not repeat the first session's installed and
+   started messages because the JDT configuration area persisted across the
+   restart.
+8. Process snapshots showed approximately 46 MiB RSS for the Node injector and
+   2 MiB for the proxy in both sessions. JDT LS snapshots were approximately
+   1,264 MiB before restart and 587 MiB after restart; these are point-in-time
+   values, not steady-state memory claims.
+9. The restart sent `shutdown` and `exit` to both adapters. The injector observed
+   both and exited gracefully. JDT LS returned `{}` to shutdown, which Zed could
+   not deserialize as a unit result, but the old proxy/JDT processes stopped and
+   replacements initialized successfully. On final application shutdown, the
+   injector observed and answered `shutdown` but did not record `exit` before
+   process termination, consistent with the S001 lifecycle constraint.
+10. After the run, no injector, proxy, or JDT LS process remained. The normal Zed
+    application and the original input method were restored. At the user's
+    explicit direction, the ignored isolated directory, Java 6.8.21 installation,
+    and S003 development-extension link were retained to avoid repeated setup.
+
+### Gate B inference and classification
+
+The unchanged Java extension contributed the debug path, while the separately
+installed S003 adapter was the only configured source of the synthetic path.
+The final merged options, JDT installation/start records, static-command
+advertisement, deterministic proxy result, and successful restart therefore
+support the inference that Zed's cross-extension additional-initialization hook
+can augment the Java extension's JDT LS bundle list without modifying the Java
+extension or proxy.
+
+The S003 hypothesis is **Supported for the tested macOS arm64 and JDK 25 tuple**.
+This is feasibility evidence for the injection mechanism only, not a product or
+multiplatform support decision.
+
+### Gate B remaining runtime constraints
+
+- Zed's UI restart command restarted both Java adapters, so this run does not
+  show a UI path that restarts only `jdtls` while leaving the contributor adapter
+  process intact. It does show replacement proxy/JDT initialization with a fresh
+  contributor process and no duplicate bundle.
+- JDT LS's `{}` shutdown result remains a protocol-shape incompatibility with
+  Zed's expected unit result, although it did not prevent restart or attribution.
+- Final application shutdown again did not let the Node probe observe `exit`
+  before termination; S001 already established that graceful final exit cannot
+  be required.
+- Raw traces, screenshots, proxy response envelopes, process listings, and port
+  data remain only in ignored local evidence. Committed text contains only the
+  summarized observations above.
 
 ## Success criteria
 
@@ -509,13 +590,11 @@ insufficient to attribute the result.
   unrelated documents, or home-directory paths in committed evidence.
 - Preserve failed, interrupted, and corrected observations in the summary.
 
-## Blockers and constraints before execution
+## Remaining blockers and constraints
 
-- The official Java extension is not installed in either the user's normal Zed
-  setup or a fresh S003 isolated directory.
-- The full pinned JDT LS archive has not yet been locally acquired and verified.
 - The Java proxy HTTP endpoint and port-file layout are explicitly private and
-  may serve only as the S003 observation mechanism.
+  served only as the S003 observation mechanism. They are not a supported
+  integration contract.
 - S003 provides no evidence for Spring bundle compatibility or callback routing.
 - Linux x86_64 and Windows x86_64 execution hosts remain unavailable.
 

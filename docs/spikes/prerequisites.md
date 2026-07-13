@@ -185,7 +185,7 @@ Host audited: macOS 26.5.1 arm64.
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
-| S003 plan | Gate B preparation complete | Fixed inputs and synthetic bundle prepared; isolated Java extension/JDT LS execution not begun |
+| S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -194,10 +194,10 @@ Host audited: macOS 26.5.1 arm64.
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
-| Memory | Ready for local spike | 64 GiB installed; S002 Spring LS was observed at approximately 265-290 MiB RSS, while JDT usage remains unmeasured |
+| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, while S003 JDT LS point-in-time snapshots were approximately 587-1,264 MiB |
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
-| Official Zed Java extension | Not installed/configured | S003 plan pins 6.8.21; install only in isolated Gate B data |
+| Official Zed Java extension | Ready in isolated S003 data | Exact 6.8.21 installation retained for repeatable research; normal Zed remains unchanged |
 | Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
 | Local Node syntax checker | Ready | Node 26.5.0 available; not an end-user prerequisite |
 | GitHub access | Ready locally | Pinned Spring Tools tag resolved during audit |
@@ -250,20 +250,18 @@ Host audited: macOS 26.5.1 arm64.
   multiplatform support; representative runs require JDK 21 and the same fixed
   revision and criteria if the result is needed for a later direction decision.
 
-### Required before S003 Gate A and Gate B
+### S003 Gate A and Gate B result
 
-- Review and approve the S003 synthetic-bundle-only plan before adding its
-  disposable adapter, bundle, fixture, or preparation tool.
-- Keep the official Java extension out of the user's normal Zed environment.
-  Install exactly version 6.8.21 only in isolated Gate B data after reviewing the
-  complete Gate A implementation diff.
-- Use only the fixed JDT LS 1.60.0, Java proxy v6.8.21, and Java debug 0.53.2
-  artifacts recorded in S003. Disable Lombok and managed update checks for the
-  run; do not assert a result from a mutable latest download.
+- The S003 synthetic-bundle-only plan and complete Gate A diff were reviewed
+  before runtime execution.
+- The official Java extension remained out of the user's normal Zed environment;
+  exact version 6.8.21 is retained only in reusable isolated Gate B data.
+- The run used only fixed JDT LS 1.60.0, Java proxy v6.8.21, and Java debug 0.53.2
+  artifacts. Lombok, JDK auto-download, and managed update checks were disabled.
 - The full JDT LS archive was reacquired and verified after implementation
   review. Its local PAX metadata required the narrow, reviewed preparation-tool
   correction recorded in S003 before extraction succeeded.
-- Treat the Java proxy HTTP endpoint as an ignored-evidence test oracle only,
+- The Java proxy HTTP endpoint was used as an ignored-evidence test oracle only,
   not as a supported inter-extension integration contract.
 
 ### Required before representative multiplatform evidence

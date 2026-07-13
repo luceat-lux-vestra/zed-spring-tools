@@ -1,10 +1,10 @@
 # Spike Index
 
-Source-based research is complete. S001 and S002 have been executed on the local
-macOS arm64 host. S002 proved direct Spring LS startup and standard transport,
-but its limited-mode value hypothesis was refuted because all metadata-aware
-properties probes returned empty results. Spring LS also returned a nonstandard
-string result to the LSP shutdown request.
+Source-based research is complete. S001 through S003 have been executed on the
+local macOS arm64 host. S002 proved direct Spring LS startup and standard
+transport, but its limited-mode value hypothesis was refuted because all
+metadata-aware properties probes returned empty results. S003 supported the
+cross-extension synthetic JDT bundle-injection mechanism on the tested tuple.
 
 Each spike still requires its own written plan and success/failure criteria
 before disposable code is added.
@@ -19,7 +19,7 @@ Tentative sequence:
 | --- | --- | --- |
 | [S001](001-zed-dev-extension-lifecycle.md) | Load a minimal local Zed extension and observe process lifecycle | Refuted on macOS arm64: probe did not observe `exit` before termination |
 | [S002](002-spring-ls-standard-lsp-baseline.md) | Run the Spring LS standard-LSP baseline with JDT classpath disabled | Refuted on macOS arm64: transport worked, but metadata-aware results were empty |
-| [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Gate B fixed artifacts prepared; isolated Zed runtime pending |
+| [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Supported on macOS arm64/JDK 25; representative platforms pending |
 | S004 | Load pinned Spring JDT bundles and execute one command | Proposed |
 | S005 | Intercept and route one classpath callback in disposable proxy code | Proposed |
 
