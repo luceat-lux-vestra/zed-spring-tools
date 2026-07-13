@@ -1,10 +1,11 @@
 # S003: Cross-extension synthetic JDT LS bundle injection
 
-- Status: Gate A implemented and locally validated; awaiting review
+- Status: Gate B fixed artifacts prepared and validated; isolated runtime pending
 - Date: 2026-07-14
 - Related research: R001, R003, R004, R005
 - Depends on: S002
-- Implementation state: Disposable Gate A implementation complete; Gate B not started
+- Implementation state: Disposable Gate A implementation and Gate B artifact preparation
+  complete; isolated Zed execution not started
 
 ## Hypothesis
 
@@ -356,6 +357,51 @@ Constraint retained for Gate B:
   but compatibility with the fixed real JDT LS archive remains runtime evidence.
   If the verified archive uses a rejected record, Gate B must stop for a reviewed
   tool change rather than bypassing validation with a platform `tar` command.
+
+### Gate B preparation compatibility review
+
+Gate B stopped at the planned compatibility boundary on 2026-07-14. The three
+fixed inputs matched their recorded sizes and SHA-256 values, but the committed
+preparation tool rejected the first JDT LS archive record because it is a local
+PAX extended header (`typeflag x`). No JDT LS files were retained, no Java or
+development extension was installed, and Zed runtime execution did not start.
+
+Read-only inspection of the verified archive found 128 regular files and 13
+directories. Its local PAX metadata uses only `uid`, `gid`, and `mtime`; it does
+not override a path, link target, size, or other extraction-sensitive field.
+There are 141 `uid` records, 141 `gid` records, and 140 `mtime` records. The
+proxy archive contains one regular file and no PAX metadata.
+
+The reviewed correction is deliberately narrower than general PAX support:
+
+1. accept only a local `x` header immediately preceding one logical entry;
+2. parse length-prefixed records strictly and allow only `uid`, `gid`, and
+   `mtime` with numeric values;
+3. ignore those ownership/time values instead of applying host metadata;
+4. continue validating the following USTAR path, link field, size, type,
+   checksum, collision, and extraction limits independently;
+5. reject global PAX, path/link/size overrides, duplicate or malformed keys,
+   consecutive local headers, and a dangling local header; and
+6. count only logical file and directory entries in preparation evidence.
+
+The correction must add positive local-metadata coverage and negative override,
+global, malformed, duplicate, and dangling-header tests. Gate B may resume only
+after the complete tool diff and all Gate A validations pass again.
+
+The reviewed correction subsequently passed `javac --release 21 -Xlint:all
+-Werror`, the expanded preparation self-test, the wrong-input/no-output check,
+the Node self-test and piped lifecycle integration, Rust formatting and four
+native unit tests, locked `wasm32-wasip2` check and Clippy, and the locked
+release WASM build. Applying it to the verified inputs then prepared 141 JDT LS
+logical entries and one proxy entry. The generated synthetic bundle SHA-256 is
+`65106d63528b71527319d2e67902821cdd752dedf563c565340977c19fd37540`.
+
+One validation wrapper invocation stopped before the Node and Rust checks
+because it assigned to zsh's read-only `status` variable. Renaming only that
+wrapper variable to `result_code` allowed the unchanged validations to pass;
+the interruption did not alter an artifact, extension, hypothesis input, or
+runtime condition. No Java extension was installed and no Zed UI, JDT LS, Java
+proxy, or S003 development extension runtime was started during preparation.
 
 ### Gate B: fixed-artifact preparation and isolated Zed execution
 

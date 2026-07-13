@@ -74,8 +74,10 @@ public final class PrepareS003 {
     private static final int TAR_BLOCK_SIZE = 512;
     private static final int BUFFER_SIZE = 64 * 1024;
     private static final int MAX_ARCHIVE_ENTRIES = 50_000;
+    private static final int MAX_PAX_HEADER_BYTES = 16 * 1024;
     private static final long MAX_ENTRY_BYTES = 536_870_912L;
     private static final long MAX_EXTRACTED_BYTES = 1_073_741_824L;
+    private static final Set<String> ALLOWED_LOCAL_PAX_KEYS = Set.of("uid", "gid", "mtime");
 
     private static final ExpectedInputs OFFICIAL_INPUTS = new ExpectedInputs(
             new ExpectedArtifact(JDTLS_SIZE, JDTLS_SHA256),
@@ -226,6 +228,7 @@ public final class PrepareS003 {
         Set<String> seen = new HashSet<>();
         int entries = 0;
         long extractedBytes = 0;
+        boolean localPaxPending = false;
 
         try (InputStream raw = new BufferedInputStream(Files.newInputStream(archive));
                 InputStream gzip = new GZIPInputStream(raw, BUFFER_SIZE)) {
@@ -235,6 +238,9 @@ public final class PrepareS003 {
                     throw new IOException("tar archive ended without zero blocks");
                 }
                 if (isZeroBlock(header)) {
+                    if (localPaxPending) {
+                        throw new IOException("tar archive has a dangling local PAX header");
+                    }
                     byte[] second = readBlock(gzip);
                     if (second == null || !isZeroBlock(second)) {
                         throw new IOException("tar archive has an incomplete end marker");
@@ -247,11 +253,6 @@ public final class PrepareS003 {
                 if (!magic.startsWith("ustar")) {
                     throw new IOException("unsupported tar header format");
                 }
-                entries++;
-                if (entries > MAX_ARCHIVE_ENTRIES) {
-                    throw new IOException("tar archive contains too many entries");
-                }
-
                 String name = tarName(header);
                 long size = parseTarOctal(header, 124, 12, "size");
                 if (size > MAX_ENTRY_BYTES) {
@@ -260,6 +261,26 @@ public final class PrepareS003 {
                 byte type = header[156];
                 if (!tarString(header, 157, 100).isEmpty()) {
                     throw new IOException("tar links are unsupported");
+                }
+
+                if (type == 'x') {
+                    if (localPaxPending) {
+                        throw new IOException("consecutive local PAX headers are unsupported");
+                    }
+                    if (size > MAX_PAX_HEADER_BYTES) {
+                        throw new IOException("local PAX header exceeds the safety limit");
+                    }
+                    safeRelativePath(name, "PAX tar");
+                    validateLocalPax(readExactly(gzip, size));
+                    long padding = (TAR_BLOCK_SIZE - (size % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
+                    skipExactly(gzip, padding);
+                    localPaxPending = true;
+                    continue;
+                }
+
+                entries++;
+                if (entries > MAX_ARCHIVE_ENTRIES) {
+                    throw new IOException("tar archive contains too many entries");
                 }
                 Path relative = safeRelativePath(name, "tar");
                 String collisionKey = relative.toString()
@@ -302,9 +323,135 @@ public final class PrepareS003 {
 
                 long padding = (TAR_BLOCK_SIZE - (size % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
                 skipExactly(gzip, padding);
+                localPaxPending = false;
             }
         }
         return new TarStats(entries, extractedBytes);
+    }
+
+    private static void validateLocalPax(byte[] data) throws IOException {
+        if (data.length == 0) {
+            throw new IOException("local PAX header is empty");
+        }
+        Set<String> seenKeys = new HashSet<>();
+        int offset = 0;
+        while (offset < data.length) {
+            int space = offset;
+            long declaredLength = 0;
+            while (space < data.length && data[space] != ' ') {
+                int digit = data[space] - '0';
+                if (digit < 0 || digit > 9) {
+                    throw new IOException("local PAX record has an invalid length");
+                }
+                if (declaredLength > (MAX_PAX_HEADER_BYTES - digit) / 10L) {
+                    throw new IOException("local PAX record exceeds the safety limit");
+                }
+                declaredLength = declaredLength * 10 + digit;
+                if (declaredLength > MAX_PAX_HEADER_BYTES) {
+                    throw new IOException("local PAX record exceeds the safety limit");
+                }
+                space++;
+            }
+            if (space == offset || space >= data.length || data[space] != ' ') {
+                throw new IOException("local PAX record has no length delimiter");
+            }
+            int recordLength = Math.toIntExact(declaredLength);
+            int recordEnd;
+            try {
+                recordEnd = Math.addExact(offset, recordLength);
+            } catch (ArithmeticException error) {
+                throw new IOException("local PAX record length overflows", error);
+            }
+            if (recordLength <= space - offset + 3
+                    || recordEnd > data.length
+                    || data[recordEnd - 1] != '\n') {
+                throw new IOException("local PAX record length is inconsistent");
+            }
+
+            int equals = space + 1;
+            while (equals < recordEnd - 1 && data[equals] != '=') {
+                equals++;
+            }
+            if (equals == space + 1 || equals >= recordEnd - 1) {
+                throw new IOException("local PAX record has no key/value delimiter");
+            }
+            String key = ascii(data, space + 1, equals, "local PAX key");
+            if (!ALLOWED_LOCAL_PAX_KEYS.contains(key)) {
+                throw new IOException("unsupported local PAX key: " + key);
+            }
+            if (!seenKeys.add(key)) {
+                throw new IOException("duplicate local PAX key: " + key);
+            }
+            String value = ascii(data, equals + 1, recordEnd - 1, "local PAX value");
+            if ((key.equals("uid") || key.equals("gid")) && !isUnsignedDecimal(value)) {
+                throw new IOException("local PAX " + key + " must be an unsigned integer");
+            }
+            if (key.equals("mtime") && !isDecimalTimestamp(value)) {
+                throw new IOException("local PAX mtime must be a decimal timestamp");
+            }
+            offset = recordEnd;
+        }
+    }
+
+    private static String ascii(byte[] data, int start, int end, String label)
+            throws IOException {
+        if (start >= end) {
+            throw new IOException(label + " is empty");
+        }
+        for (int index = start; index < end; index++) {
+            if (data[index] < 0x20 || data[index] > 0x7e) {
+                throw new IOException(label + " contains a non-ASCII byte");
+            }
+        }
+        return new String(data, start, end - start, StandardCharsets.US_ASCII);
+    }
+
+    private static boolean isUnsignedDecimal(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            if (!Character.isDigit(value.charAt(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isDecimalTimestamp(String value) {
+        int offset = value.startsWith("-") ? 1 : 0;
+        if (offset == value.length()) {
+            return false;
+        }
+        boolean decimalPoint = false;
+        boolean digit = false;
+        for (int index = offset; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character == '.' && !decimalPoint && digit && index + 1 < value.length()) {
+                decimalPoint = true;
+            } else if (Character.isDigit(character)) {
+                digit = true;
+            } else {
+                return false;
+            }
+        }
+        return digit;
+    }
+
+    private static byte[] readExactly(InputStream input, long bytes) throws IOException {
+        if (bytes > Integer.MAX_VALUE) {
+            throw new IOException("tar metadata is too large to buffer");
+        }
+        byte[] result = new byte[Math.toIntExact(bytes)];
+        int offset = 0;
+        while (offset < result.length) {
+            int read = input.read(result, offset, result.length - offset);
+            if (read == -1) {
+                throw new IOException("truncated tar entry data");
+            }
+            offset += read;
+        }
+        return result;
     }
 
     private static byte[] readBlock(InputStream input) throws IOException {
@@ -691,6 +838,12 @@ public final class PrepareS003 {
             StubPlugins stubs = createStubPlugins(root);
             Path goodJdtls = root.resolve("jdtls.tar.gz");
             writeTarGzip(goodJdtls, List.of(
+                    TarTestEntry.pax(
+                            "./PaxHeaders.X/bin_jdtls",
+                            paxPayload(
+                                    "uid=1001380000",
+                                    "gid=1001380000",
+                                    "mtime=1782513530.2240000")),
                     TarTestEntry.file("bin/jdtls", "launcher\n".getBytes(StandardCharsets.UTF_8)),
                     TarTestEntry.file("bin/jdtls.bat", "@echo off\r\n".getBytes(StandardCharsets.UTF_8)),
                     TarTestEntry.file(
@@ -793,6 +946,87 @@ public final class PrepareS003 {
                             source,
                             root.resolve("duplicate-output"),
                             expectedFor(duplicate, goodProxy, goodDebug)));
+
+            Path paxPathOverride = root.resolve("pax-path-override.tar.gz");
+            writeTarGzip(paxPathOverride, List.of(
+                    TarTestEntry.pax(
+                            "./PaxHeaders.X/bin_jdtls",
+                            paxPayload("path=../escape")),
+                    TarTestEntry.file("bin/jdtls", new byte[] {1})));
+            expectPrepareFailure(
+                    "PAX path override",
+                    root.resolve("pax-path-override-output"),
+                    () -> prepare(
+                            paxPathOverride,
+                            goodProxy,
+                            goodDebug,
+                            source,
+                            root.resolve("pax-path-override-output"),
+                            expectedFor(paxPathOverride, goodProxy, goodDebug)));
+
+            Path globalPax = root.resolve("global-pax.tar.gz");
+            writeTarGzip(globalPax, List.of(new TarTestEntry(
+                    "./GlobalPaxHeaders.X/archive",
+                    paxPayload("uid=1001380000"),
+                    (byte) 'g')));
+            expectPrepareFailure(
+                    "global PAX header",
+                    root.resolve("global-pax-output"),
+                    () -> prepare(
+                            globalPax,
+                            goodProxy,
+                            goodDebug,
+                            source,
+                            root.resolve("global-pax-output"),
+                            expectedFor(globalPax, goodProxy, goodDebug)));
+
+            Path malformedPax = root.resolve("malformed-pax.tar.gz");
+            writeTarGzip(malformedPax, List.of(
+                    TarTestEntry.pax(
+                            "./PaxHeaders.X/bin_jdtls",
+                            "9 uid=1\n".getBytes(StandardCharsets.US_ASCII)),
+                    TarTestEntry.file("bin/jdtls", new byte[] {1})));
+            expectPrepareFailure(
+                    "malformed PAX record",
+                    root.resolve("malformed-pax-output"),
+                    () -> prepare(
+                            malformedPax,
+                            goodProxy,
+                            goodDebug,
+                            source,
+                            root.resolve("malformed-pax-output"),
+                            expectedFor(malformedPax, goodProxy, goodDebug)));
+
+            Path duplicatePaxKey = root.resolve("duplicate-pax-key.tar.gz");
+            writeTarGzip(duplicatePaxKey, List.of(
+                    TarTestEntry.pax(
+                            "./PaxHeaders.X/bin_jdtls",
+                            paxPayload("uid=1001380000", "uid=1001380000")),
+                    TarTestEntry.file("bin/jdtls", new byte[] {1})));
+            expectPrepareFailure(
+                    "duplicate PAX key",
+                    root.resolve("duplicate-pax-key-output"),
+                    () -> prepare(
+                            duplicatePaxKey,
+                            goodProxy,
+                            goodDebug,
+                            source,
+                            root.resolve("duplicate-pax-key-output"),
+                            expectedFor(duplicatePaxKey, goodProxy, goodDebug)));
+
+            Path danglingPax = root.resolve("dangling-pax.tar.gz");
+            writeTarGzip(danglingPax, List.of(TarTestEntry.pax(
+                    "./PaxHeaders.X/dangling", paxPayload("uid=1001380000"))));
+            expectPrepareFailure(
+                    "dangling PAX header",
+                    root.resolve("dangling-pax-output"),
+                    () -> prepare(
+                            danglingPax,
+                            goodProxy,
+                            goodDebug,
+                            source,
+                            root.resolve("dangling-pax-output"),
+                            expectedFor(danglingPax, goodProxy, goodDebug)));
 
             Path missingPlugin = root.resolve("missing-plugin.tar.gz");
             writeTarGzip(missingPlugin, List.of(
@@ -997,6 +1231,22 @@ public final class PrepareS003 {
         }
     }
 
+    private static byte[] paxPayload(String... fields) {
+        StringBuilder payload = new StringBuilder();
+        for (String field : fields) {
+            int length = field.length() + 3;
+            while (true) {
+                int adjusted = Integer.toString(length).length() + 1 + field.length() + 1;
+                if (adjusted == length) {
+                    break;
+                }
+                length = adjusted;
+            }
+            payload.append(length).append(' ').append(field).append('\n');
+        }
+        return payload.toString().getBytes(StandardCharsets.US_ASCII);
+    }
+
     private static void writeTarString(
             byte[] header,
             int offset,
@@ -1108,6 +1358,10 @@ public final class PrepareS003 {
     private record TarTestEntry(String name, byte[] data, byte type) {
         private static TarTestEntry file(String name, byte[] data) {
             return new TarTestEntry(name, data.clone(), (byte) '0');
+        }
+
+        private static TarTestEntry pax(String name, byte[] data) {
+            return new TarTestEntry(name, data.clone(), (byte) 'x');
         }
     }
 
