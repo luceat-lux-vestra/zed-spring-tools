@@ -1,10 +1,10 @@
 # S002: Spring Boot LS standard-LSP baseline without JDT classpath
 
-- Status: Plan awaiting review
+- Status: Gate A implemented and locally validated; awaiting review
 - Date: 2026-07-14
 - Related research: R002, R004, R005
 - Depends on: S001
-- Implementation state: Not started
+- Implementation state: Disposable implementation complete; Gate B not started
 
 ## Hypothesis
 
@@ -123,9 +123,10 @@ only identifies a client-mode dependency.
 | Server entry | `extension/language-server/spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar` |
 
 The VSIX was not found during the 2026-07-14 recheck of the user's indexed and
-common download/tool locations. Gate A must not assume the previous temporary
-copy still exists. After plan approval, reacquire the exact official asset into
-ignored local storage and verify the pinned size and digest before extraction.
+common download/tool locations. Gate A did not assume the previous temporary
+copy still exists. After the Gate A review, reacquire the exact official asset
+into ignored local storage and verify the pinned size and digest before
+extraction.
 
 ## Inferences
 
@@ -170,9 +171,9 @@ Java 25 being the user's default is acceptable for this local run because the
 inspected launcher requires Java 21 or newer. It does not establish JDK 21
 behavior or a Java 25 multiplatform support claim.
 
-## Planned disposable artifacts
+## Gate A disposable artifacts
 
-No S002 artifact exists yet. After plan approval, Gate A may add only:
+Gate A added only the approved disposable files:
 
 ```text
 spikes/s002-spring-ls-limited/
@@ -190,11 +191,11 @@ spikes/s002-spring-ls-limited/
     └── PrepareSpringTools.java
 ```
 
-The single-file Java preparation tool is spike infrastructure. It will accept a
-local VSIX path and destination, verify the exact byte count and SHA-256, reject
-unsafe ZIP paths, extract to a fresh ignored directory, and verify that exactly
-one expected server entry exists. It will not download, modify, or republish the
-asset.
+The single-file Java preparation tool is spike infrastructure. It accepts a
+local VSIX path and destination, verifies the exact byte count and SHA-256,
+rejects unsafe ZIP paths, extracts to a fresh ignored directory, and verifies
+that exactly one expected server entry exists. It does not download, modify, or
+republish the asset.
 
 Generated data remains ignored:
 
@@ -206,16 +207,16 @@ spikes/s002-spring-ls-limited/extension/target/
 spikes/s002-spring-ls-limited/extension/extension.wasm
 ```
 
-## Planned implementation behavior
+## Gate A implementation behavior
 
-The extension will:
+The extension:
 
 1. pin `zed_extension_api = "=0.7.0"` and register one spike-only language
    server for `Plain Text`;
 2. map `Plain Text` to LSP language ID `spring-boot-properties`;
 3. resolve Java through `Worktree::which("java")`, then a platform-aware
    `JAVA_HOME/bin/java` or `JAVA_HOME\\bin\\java.exe` fallback;
-4. locate only the fixed, verified extraction under
+4. constructs only the fixed, verified extraction path under
    `tmp/s002-artifacts/extracted/extension/language-server/`;
 5. return a direct command without a platform shell, with the pinned official
    launch arguments `-Xmx1024m`,
@@ -229,21 +230,26 @@ The extension will:
 8. implement no download, proxy, request interception, JDT integration, or
    product settings.
 
-The extension must fail with a clear message when Java, the verified extraction,
-or the expected JAR is absent. It must not scan arbitrary directories or accept
-an unverified JAR with a matching filename.
+The extension returns a clear error when Java discovery fails. The published
+Zed extension API 0.7.0 `Worktree` interface exposes root-path, environment, and
+executable-discovery operations but no arbitrary worktree-file existence check.
+Consequently, the preparation tool is the fail-closed verification boundary for
+the VSIX and expected JAR; if that prerequisite is bypassed or its output is
+removed later, direct `java -jar` startup reports the missing file. The
+extension does not scan arbitrary directories or accept a configurable JAR
+path. This constraint must be accepted or revised before Gate B.
 
 ## Fixture and observation matrix
 
 Every fixture is opened as `Plain Text` in the isolated Zed instance, but the
 LSP trace must show `spring-boot-properties` as its language ID.
 
-| Fixture | Action | Expected observation | Role |
+| Fixture | Fixed action or cursor | Expected observation | Role |
 | --- | --- | --- | --- |
-| `application-duplicate.properties` | Trigger validation after opening/editing | Both duplicate `server.port` keys receive an attributable duplicate-key diagnostic | Parser/transport control |
-| `application-completion.properties` | Invoke completion after `ser` | A completion identifies `server.port` | Metadata-aware value evidence |
-| `application-hover.properties` | Hover over `server.port=8080` key | Hover identifies `server.port` and provides type or descriptive metadata | Metadata-aware value evidence |
-| `application-invalid.properties` | Trigger validation for `server.port=not-a-number` | Diagnostic identifies an integer/type mismatch | Metadata-aware value evidence |
+| `application-duplicate.properties` | Open unchanged and wait for diagnostics; no cursor-dependent action | Both duplicate `server.port` keys receive an attributable duplicate-key diagnostic | Parser/transport control |
+| `application-completion.properties` | Invoke completion after `ser`: Zed line 1, column 4; LSP position `(0, 3)` | A completion identifies `server.port` | Metadata-aware value evidence |
+| `application-hover.properties` | Hover inside the key: Zed line 1, column 2; LSP position `(0, 1)` | Hover identifies `server.port` and provides type or descriptive metadata | Metadata-aware value evidence |
+| `application-invalid.properties` | Open unchanged and wait for diagnostics; no cursor-dependent action | Diagnostic identifies an integer/type mismatch | Metadata-aware value evidence |
 
 The exact fixture text and cursor coordinates must be committed in Gate A and
 must not be changed during Gate B to manufacture a passing result.
@@ -262,6 +268,8 @@ Before any S002 code or artifact acquisition:
 4. approve the `Plain Text` language mapping as spike-only infrastructure; and
 5. approve the Supported/Refuted threshold below.
 
+Gate 0 was accepted by the user on 2026-07-14 before S002 files were added.
+
 ### Gate A: disposable implementation, only after plan approval
 
 1. Add only the planned extension, four fixtures, and preparation tool.
@@ -277,6 +285,37 @@ Before any S002 code or artifact acquisition:
    warnings denied, and locked WASM build.
 7. Review the complete diff before obtaining the real VSIX or installing the
    development extension.
+
+### Gate A observations
+
+Confirmed on the local macOS arm64 development host on 2026-07-14:
+
+1. The disposable extension, four fixed fixtures, and single-file Java tool are
+   the only S002 source artifacts added. Existing ignore patterns already cover
+   build output, local artifacts, isolated Zed data, and evidence.
+2. The Rust manifest pins `zed_extension_api = "=0.7.0"`; its lockfile was
+   generated before locked checks.
+3. Four Rust unit tests passed for host-specific path joining, space and Korean
+   characters in a macOS path, macOS and Windows `JAVA_HOME` selection, missing
+   Java fallback, and the exact initialization JSON.
+4. The Java tool compiled with `javac --release 21 -Xlint:all`. Its self-test
+   passed in compiled-class and JDK 25 single-source modes. The test covers a
+   valid synthetic archive, wrong size, wrong digest, POSIX and backslash ZIP
+   traversal, missing expected layout, and an existing destination.
+5. Supplying `application-hover.properties` as the alleged VSIX returned exit
+   status 1 with an unexpected-size error and created no destination.
+6. `cargo fmt --check`, locked `wasm32-wasip2` check, Clippy with warnings
+   denied, and locked release WASM build passed.
+7. No real VSIX was acquired or extracted, no development extension was
+   installed, no Zed process was automated, and no Spring LS process was run.
+
+Constraint discovered during implementation:
+
+- Zed extension API 0.7.0 cannot perform the planned pre-launch existence check
+  for the worktree-relative JAR. Gate A therefore assigns artifact verification
+  to the fail-closed preparation tool and leaves a missing-after-preparation JAR
+  to fail through direct Java startup. This is an implementation constraint, not
+  evidence for or against the runtime hypothesis.
 
 ### Gate B: artifact preparation and local Zed execution
 
@@ -394,9 +433,9 @@ If Refuted, record Candidate A as non-viable for the tested properties baseline
 and continue to S003 only if the project still wants to evaluate the coordinated
 full-integration path independently.
 
-## Review checklist
+## Gate A review checklist
 
-Implementation must not begin until the reviewer accepts:
+Gate B must not begin until the reviewer accepts:
 
 - no Zed Java environment setup during S002;
 - properties-only scope using spike-only `Plain Text` language mapping;
@@ -405,5 +444,7 @@ Implementation must not begin until the reviewer accepts:
 - omission of the VS Code client flag in the primary run;
 - metadata-aware value as the minimum Supported threshold;
 - the S001 shutdown constraint; and
-- a second review after Gate A before real artifact acquisition and Zed
+- the preparation tool as the artifact-verification boundary given the Zed API
+  file-check constraint; and
+- the complete disposable diff before real artifact acquisition and Zed
   installation.

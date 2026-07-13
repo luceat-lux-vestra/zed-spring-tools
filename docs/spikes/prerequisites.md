@@ -184,7 +184,7 @@ Host audited: macOS 26.5.1 arm64.
 | --- | --- | --- |
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
-| S002 plan | Review | Written; no S002 code or artifact acquisition has begun |
+| S002 Gate A | Review | Disposable implementation and synthetic validation complete; no real artifact acquisition or Zed execution begun |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -211,7 +211,8 @@ Host audited: macOS 26.5.1 arm64.
 ### Ready now
 
 - Source-based platform boundary is identifiable.
-- Local macOS arm64 Zed, rustup, JDK, disk, and pinned artifact are available.
+- Local macOS arm64 Zed, rustup, JDK, and disk are available; the pinned
+  artifact identity is recorded but the file must be reacquired after review.
 - A shell-independent probe can use Zed's Node executable API instead of
   hard-coding a Node, Python, Java, or platform-shell path.
 
@@ -232,14 +233,14 @@ Host audited: macOS 26.5.1 arm64.
   termination. Pinned and current upstream source enqueue `exit` and then call
   `child.kill()` after the writer finishes; carry this constraint into S002.
 
-### Required before S002 implementation
+### Required before S002 Gate B
 
-- Approve the properties-only, classpath-disabled plan without installing the
-  Zed Java extension.
-- Approve the fixed local extraction path and cross-platform Java verifier for
-  the pinned official VSIX.
-- Keep the real VSIX acquisition and Zed installation behind the post-Gate A
-  implementation review.
+- Review the properties-only, classpath-disabled disposable implementation and
+  its fixed fixtures without installing the Zed Java extension.
+- Accept the fixed local extraction path and cross-platform Java verifier as
+  the artifact-verification boundary; the Zed API cannot preflight an arbitrary
+  worktree-relative JAR path.
+- Keep real VSIX acquisition and Zed installation behind this Gate A review.
 - Treat JDK 25 as evidence for the local macOS run only; representative S002
   runs still require JDK 21 on Linux x86_64 and Windows x86_64.
 

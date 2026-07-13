@@ -1,0 +1,14 @@
+id = "s002-spring-ls-limited"
+name = "S002 Spring LS Limited Mode"
+version = "0.0.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Disposable Spring Boot LS standard-LSP baseline for S002."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.s002-spring-boot-ls]
+name = "S002 Spring Boot LS"
+languages = ["Plain Text"]
+
+[language_servers.s002-spring-boot-ls.language_ids]
+"Plain Text" = "spring-boot-properties"
