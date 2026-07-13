@@ -1,0 +1,11 @@
+id = "s004-spring-jdt-command"
+name = "S004 Spring JDT Command Probe"
+version = "0.0.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Disposable Spring JDT bundle and command probe for S004."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.s004-spring-jdt-injector]
+name = "S004 Spring JDT Injector Probe"
+languages = ["Java"]

@@ -186,7 +186,7 @@ Host audited: macOS 26.5.1 arm64.
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
-| S004 plan | Ready for user review | Exact five-JAR Spring set, static dependency closure, fixture, command, and runtime criteria recorded; no implementation started |
+| S004 plan | Gate A reviewed | Disposable adapter, fixture, preparation self-tests, fixed-input dry preparation, and complete diff validated; Gate B not started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -281,8 +281,11 @@ Host audited: macOS 26.5.1 arm64.
   S004 must use a fresh extraction of the verified JDT archive and a uniquely
   named runtime worktree so persisted OSGi configuration and the launcher's
   basename-derived JDT data cache cannot contaminate the result.
-- No S004 implementation or UI execution has started. The complete plan awaits
-  user review and an explicit continuation.
+- Gate A disposable implementation and non-UI validation are complete. The
+  first fixed-input dry preparation safely exposed and corrected a mistaken
+  nested-JAR digest; the repeat passed with no retained runtime output. Gate B
+  Zed/UI execution has not started and requires a reviewed diff plus explicit
+  continuation.
 
 ### Required before representative multiplatform evidence
 

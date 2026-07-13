@@ -1,10 +1,10 @@
 # S004: Pinned Spring JDT bundle command probe
 
-- Status: Planned; implementation not started
+- Status: Gate A implemented, validated, and reviewed; Gate B not started
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S003 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Awaiting user review and explicit continuation
+- Implementation gate: Gate A complete; Gate B requires explicit continuation
 
 ## Hypothesis
 
@@ -139,8 +139,10 @@ The VSIX declares these five files, in this order:
 
 `jdt-ls-commons.jar` embeds `lib/commons-lsp-extensions.jar`, size 68,569
 bytes and SHA-256
-`11f2244eab790f0f201310d34447c127558b41cfee1ed3030ef7b808d860e15c`.
-The same file also exists at the VSIX JAR root, but it is not a separate
+`fd85cae1aab8fbe46ff042d46409808cf2944ce266b03ca84b33499585423708`.
+A separate 68,569-byte copy exists at the VSIX JAR root with SHA-256
+`11f2244eab790f0f201310d34447c127558b41cfee1ed3030ef7b808d860e15c`;
+the two copies are not byte-identical. The root copy is not a separate
 `javaExtensions` contribution and must not be injected a sixth time.
 
 ### Static compatibility audit
@@ -263,10 +265,10 @@ The local run supplies only macOS arm64/JDK 25 evidence. Representative evidence
 still requires the same fixed plan on macOS arm64, Linux x86_64, and Windows
 x86_64 with JDK 21; the available macOS host retains the additional JDK 25 run.
 
-## Planned disposable artifacts
+## Gate A disposable artifacts
 
-No file in this section may be added until this plan is reviewed and the user
-directs implementation to begin.
+After the plan review and the user's explicit continuation, Gate A added only
+the following disposable files:
 
 ```text
 spikes/s004-spring-jdt-command/
@@ -298,8 +300,9 @@ safely, and create a fresh ignored S004 JDT runtime. It will verify
 `package.json` and extract only the five declared Spring JARs into the uniquely
 named ignored runtime worktree. It will verify each JAR's size, digest, symbolic
 name, version, and required Java level before transactional activation. It will
-reject traversal, links, duplicates, unexpected layouts, undeclared JARs, and
-existing nonempty output.
+reject traversal, tar links, duplicates, unexpected layouts, and existing
+nonempty output. The verified package contribution order controls which five
+JARs are extracted; other legitimate VSIX JARs remain unextracted.
 
 The tool will also audit the fresh JDT plugin manifests for the required bundle
 providers and collision conditions listed above, then copy the committed fixture
@@ -313,6 +316,62 @@ active worktree's `.s004-artifacts/bundles/` directory for target language
 server `jdtls`. Its separate lifecycle probe exists only to make adapter startup
 and shutdown attributable. It will not start JDT LS, Spring LS, Maven, Gradle,
 or a coordinator.
+
+The published extension API 0.7.0 exposes text-file reads but no binary-file
+metadata or binary read operation. The adapter therefore cannot independently
+stat the five JARs. The preparation tool verifies and stages them as non-link
+regular files before the runtime worktree exists; JDT LS remains responsible for
+reporting a path removed or changed after preparation.
+
+## Gate A implementation observations
+
+Gate A was implemented and validated without starting Zed, JDT LS, Spring Boot
+LS, the Java proxy, Maven, Gradle, or any UI automation.
+
+1. The disposable Rust adapter contributes exactly the five release JAR paths,
+   in release order, only when its source server ID targets `jdtls`. Unit tests
+   cover macOS, Linux, Windows, spaces, Unicode, source/target filtering, and the
+   exact JSON array.
+2. The dependency-free Maven fixture contains only the fixed Java 21 compiler
+   property and the unique class
+   `dev.zed.spring.s004.S004OnlyProbe9F2C`; it declares no dependency, build,
+   plugin, wrapper, or repository.
+3. `PrepareS004.java` verifies the four fixed external inputs, safely extracts a
+   fresh JDT runtime with the locally observed PAX metadata, rejects mutable
+   `configuration/` state, extracts and verifies exactly the five declared
+   Spring bundles, audits exact JDT provider identities and collisions, and
+   transactionally stages the fixture and lifecycle probe under the unique
+   runtime-worktree basename.
+4. The preparation self-test passed its full synthetic transaction and negative
+   cases for wrong digest, traversal, tar link, case collision, malformed
+   bundle, missing provider, provider-version mismatch, symbolic-name collision,
+   contaminated JDT configuration, and existing destination. It also proved an
+   undeclared VSIX JAR is not extracted.
+5. The first fixed-input dry preparation stopped safely because this plan had
+   incorrectly assigned the root `commons-lsp-extensions.jar` digest to the
+   nested copy inside `jdt-ls-commons.jar`. No destination survived. Inspection
+   established that the equal-size root and nested files are not byte-identical;
+   their two corrected digests are now recorded above and enforced separately.
+6. After that documented identity correction, fixed-input dry preparation in a
+   system temporary directory passed: all four outer identities matched, 141
+   JDT archive entries were extracted, exactly five Spring bundles were staged,
+   the launcher was executable, and no `configuration/` directory existed. The
+   temporary outputs were removed immediately and no ignored repository runtime
+   state was created.
+7. `PrepareS004.java` and the fixture compiled with `javac --release 21
+   -Xlint:all -Werror`; the preparation and Node lifecycle self-tests passed;
+   the probe passed Node syntax checking; and the POM passed XML parsing plus a
+   structural zero-count check for dependencies, build, and repositories.
+8. `cargo fmt --check`, four locked native Rust tests, locked
+   `wasm32-wasip2` checking, native and WASI Clippy with warnings denied, and
+   locked Cargo metadata validation all passed. Generated Cargo target data
+   remained ignored.
+9. Non-hypothesis Gate A command corrections were retained: the initial format
+   check reported one Rust layout change and `cargo fmt` corrected it; one Cargo
+   metadata invocation and one combined final-validation invocation used the
+   wrong working directory and failed before validation began. They were rerun
+   from the extension directory or repository root, respectively, with no
+   criterion or artifact change and then passed.
 
 ## Plan review gate before implementation
 
@@ -354,8 +413,9 @@ no collision was found, and binary compatibility remains the S004 hypothesis.
 
 1. Add only the planned disposable S004 tree and required documentation/index
    updates.
-2. Make the adapter return the exact five bundle paths only for target `jdtls`;
-   reject missing or non-regular prepared files with a clear message.
+2. Make the adapter return the exact five bundle paths only for target `jdtls`.
+   Make the preparation tool reject missing, linked, or non-regular inputs and
+   outputs before the adapter can be installed against the staged worktree.
 3. Implement the fixed Maven fixture with Java release 21 and no dependency,
    plugin, repository, wrapper, or network requirement.
 4. Implement preparation self-tests for correct input plus wrong digest,
@@ -528,8 +588,14 @@ retain OSGi or project state even after removing the synthetic initialization
 path. The corrected plan reuses the installed Java extension but requires a
 fresh JDT extraction and a uniquely named ignored S004 runtime worktree.
 
-Review outcome: **Ready for user review; implementation has not started.** The
-main residual risk is deliberate and belongs to the hypothesis: release-source
-metadata cannot identify the precise JDT LS snapshot used to compile the Spring
-JARs. No plan correction can turn that into a confirmed fact; Gate B must test
-the fixed pairing.
+Initial plan review outcome: **Ready for user review; implementation had not
+started at that point.** The main residual risk is deliberate and belongs to the
+hypothesis: release-source metadata cannot identify the precise JDT LS snapshot
+used to compile the Spring JARs. No plan correction can turn that into a
+confirmed fact; Gate B must test the fixed pairing.
+
+The later Gate A diff review confirmed that every added implementation file is
+under the approved disposable S004 tree, no production structure was added, the
+tool has no download or child-process path, generated outputs remain ignored,
+and the validated adapter contributes only the five fixed paths to `jdtls`.
+Gate A review outcome: **Ready for user review; Gate B has not started.**
