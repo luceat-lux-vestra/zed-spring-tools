@@ -1,10 +1,10 @@
 # S003: Cross-extension synthetic JDT LS bundle injection
 
-- Status: Proposed — awaiting Gate 0 review
+- Status: Gate A implemented and locally validated; awaiting review
 - Date: 2026-07-14
 - Related research: R001, R003, R004, R005
 - Depends on: S002
-- Implementation state: Plan only; no S003 code or Java extension installed
+- Implementation state: Disposable Gate A implementation complete; Gate B not started
 
 ## Hypothesis
 
@@ -211,9 +211,9 @@ Java 25 is evidence for this local run only. Representative S003 evidence still
 requires JDK 21 on Linux x86_64 and Windows x86_64 if S003 later contributes to
 a direction decision.
 
-## Planned disposable artifacts
+## Gate A disposable artifacts
 
-Only after Gate 0 approval, Gate A may add:
+Gate A added only the approved disposable files:
 
 ```text
 spikes/s003-jdtls-synthetic-bundle/
@@ -242,7 +242,7 @@ spikes/s003-jdtls-synthetic-bundle/extension/extension.wasm
 ```
 
 The single-file Java preparation tool is spike infrastructure, not a product
-installer. It will:
+installer. It:
 
 1. accept only caller-supplied local paths for the three fixed artifacts;
 2. verify the exact sizes and SHA-256 values above before extraction;
@@ -258,8 +258,8 @@ installer. It will:
 9. print the prepared paths, entry counts, and digests without environment
    values or home-directory paths.
 
-The disposable Rust adapter will pin `zed_extension_api = "=0.7.0"`, register
-one secondary server for the existing `Java` language, and return additional
+The disposable Rust adapter pins `zed_extension_api = "=0.7.0"`, registers
+one secondary server for the existing `Java` language, and returns additional
 initialization JSON only when its own server ID and target ID exactly match the
 planned injector and `jdtls`. It will append one platform-aware absolute path:
 
@@ -267,8 +267,8 @@ planned injector and `jdtls`. It will append one platform-aware absolute path:
 {"bundles":["<worktree>/tmp/s003-artifacts/prepared/s003-synthetic-bundle.jar"]}
 ```
 
-Its own command will use Zed's managed Node path and a minimal lifecycle probe.
-It will not download files, inspect the Java extension work directory, call the
+Its own command uses Zed's managed Node path and a minimal lifecycle probe. It
+does not download files, inspect the Java extension work directory, call the
 proxy, start JDT LS, or add Spring behavior.
 
 The synthetic handler accepts only `s003.synthetic.ping`, rejects unexpected
@@ -296,6 +296,10 @@ Before any S003 source code, Java extension installation, or JDT LS extraction:
    and
 7. approve the Supported, Refuted, and Inconclusive thresholds below.
 
+Gate 0 was approved by the user on 2026-07-14 before S003 source files were
+added. The approval did not authorize Gate B artifact extraction, Java extension
+installation, or Zed runtime execution.
+
 ### Gate A: disposable implementation, only after plan approval
 
 1. Add only the planned adapter, lifecycle probe, synthetic bundle sources,
@@ -313,6 +317,45 @@ Before any S003 source code, Java extension installation, or JDT LS extraction:
    with warnings denied, and locked release WASM build.
 6. Review the complete diff before installing the Java extension, extracting
    the real JDT LS archive, or starting Zed Gate B.
+
+### Gate A confirmed observations
+
+Gate A ran on the local macOS arm64 development host on 2026-07-14:
+
+1. The disposable adapter, lifecycle probe, synthetic bundle metadata and Java
+   handler, fixed fixture, and single-file Java preparation tool are the only
+   S003 source artifacts added. Existing ignore rules already cover Rust output
+   and all local artifacts and evidence.
+2. The Rust manifest pins `zed_extension_api = "=0.7.0"`; its generated lockfile
+   contains 86 package records including the spike crate. Four unit tests passed
+   for exact source and target ID filtering, exactly-one bundle JSON, unknown
+   server rejection, and macOS/Linux/Windows path construction including spaces
+   and Korean text.
+3. The Node probe self-test passed split-frame, adjacent-frame,
+   `Content-Length`, and malformed-header cases. A piped initialize, shutdown,
+   and exit integration run returned the declared server identity and recorded a
+   graceful lifecycle.
+4. `PrepareS003.java` compiled with `javac --release 21 -Xlint:all -Werror` on
+   Temurin JDK 25.0.3. Its self-test prepared the committed bundle twice with the
+   same digest and rejected wrong size, wrong digest, tar traversal, tar links,
+   duplicate tar entries, a missing JDT plugin, ZIP traversal, invalid OSGi
+   metadata, Java compilation failure, and an existing destination.
+5. Supplying the fixed Java fixture as all three alleged external artifacts
+   returned exit status 1 for an unexpected size and created no destination.
+6. `cargo fmt --check`, native locked tests, locked `wasm32-wasip2` check,
+   Clippy with warnings denied, and a locked release WASM build passed. The
+   ignored release WASM is 226,209 bytes.
+7. No full JDT LS archive was acquired or extracted during Gate A. No Java
+   extension or S003 development extension was installed, no Zed UI was
+   automated, and no JDT LS, Java proxy, or S003 probe process was left running.
+
+Constraint retained for Gate B:
+
+- The preparation tool intentionally rejects PAX, GNU long-name, link, and other
+  unsupported tar records. Its parser was validated with generated USTAR input,
+  but compatibility with the fixed real JDT LS archive remains runtime evidence.
+  If the verified archive uses a rejected record, Gate B must stop for a reviewed
+  tool change rather than bypassing validation with a platform `tar` command.
 
 ### Gate B: fixed-artifact preparation and isolated Zed execution
 

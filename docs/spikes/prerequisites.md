@@ -185,7 +185,7 @@ Host audited: macOS 26.5.1 arm64.
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
-| S003 plan | Gate 0 review | Synthetic JDT bundle injection plan written; no S003 code or Java extension installed |
+| S003 plan | Gate A review | Disposable implementation and synthetic validation complete; no Java extension or JDT LS execution begun |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |

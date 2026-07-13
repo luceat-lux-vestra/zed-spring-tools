@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+  <extension point="org.eclipse.jdt.ls.core.delegateCommandHandler">
+    <delegateCommandHandler
+        class="dev.zed.spring.s003.SyntheticCommandHandler"
+        name="S003 Synthetic Command Handler">
+      <command id="s003.synthetic.ping" static="true"/>
+    </delegateCommandHandler>
+  </extension>
+</plugin>

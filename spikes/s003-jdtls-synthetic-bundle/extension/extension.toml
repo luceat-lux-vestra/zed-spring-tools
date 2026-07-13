@@ -1,0 +1,11 @@
+id = "s003-jdtls-synthetic-bundle"
+name = "S003 JDT LS Synthetic Bundle"
+version = "0.0.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Disposable cross-extension JDT LS bundle-injection probe for S003."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.s003-bundle-injector]
+name = "S003 Bundle Injector Probe"
+languages = ["Java"]

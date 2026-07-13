@@ -19,7 +19,7 @@ Tentative sequence:
 | --- | --- | --- |
 | [S001](001-zed-dev-extension-lifecycle.md) | Load a minimal local Zed extension and observe process lifecycle | Refuted on macOS arm64: probe did not observe `exit` before termination |
 | [S002](002-spring-ls-standard-lsp-baseline.md) | Run the Spring LS standard-LSP baseline with JDT classpath disabled | Refuted on macOS arm64: transport worked, but metadata-aware results were empty |
-| [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Proposed; Gate 0 plan review required |
+| [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Gate A implemented and validated; awaiting review |
 | S004 | Load pinned Spring JDT bundles and execute one command | Proposed |
 | S005 | Intercept and route one classpath callback in disposable proxy code | Proposed |
 
