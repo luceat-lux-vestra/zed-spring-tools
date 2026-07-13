@@ -5,11 +5,15 @@ Source-based research is complete. No spike has begun yet.
 Each spike still requires its own written plan and success/failure criteria
 before disposable code is added.
 
+The [prerequisite and platform matrix](prerequisites.md) is approved for
+feasibility work. Multiplatform claims require evidence from the declared
+OS/architecture matrix, not only the local macOS host.
+
 Tentative sequence:
 
 | ID | Experiment | Status |
 | --- | --- | --- |
-| S001 | Load a minimal local Zed extension and observe process lifecycle | Proposed |
+| [S001](001-zed-dev-extension-lifecycle.md) | Load a minimal local Zed extension and observe process lifecycle | Gate A approved |
 | S002 | Run the Spring LS standard-LSP baseline with JDT classpath disabled | Proposed |
 | S003 | Inject one synthetic JDT LS bundle through a second adapter | Proposed |
 | S004 | Load pinned Spring JDT bundles and execute one command | Proposed |

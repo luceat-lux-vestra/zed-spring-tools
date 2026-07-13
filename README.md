@@ -4,9 +4,13 @@ This repository is currently a technical feasibility workspace. Source-based
 research is complete, and reproducible runtime spikes are the next gate.
 
 The immediate goal is to determine how a Zed extension can run and coordinate
-JDT LS and the Spring Tools Language Server. Product architecture, implementation
-language, packaging, supported platforms, and the MVP are intentionally not yet
-fixed.
+JDT LS and the Spring Tools Language Server. Product architecture,
+implementation language, packaging, and the MVP are intentionally not yet fixed.
+
+The required desktop boundary is multiplatform: macOS, Linux, and Windows on
+Zed-supported x86_64 and arm64/Arm64 systems. Support claims still require
+runtime evidence from the full matrix defined in
+[the prerequisite document](docs/spikes/prerequisites.md).
 
 ## Current phase
 

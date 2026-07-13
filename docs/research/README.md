@@ -4,6 +4,9 @@
 - Completed on: 2026-07-14
 - Next gate: run the ordered feasibility spikes before any Go/Pivot decision or
   product scaffolding
+- Scope update: Zed SSH remote development and WSL-hosted remote projects are
+  deferred. Existing research observations about remote behavior are retained
+  for possible future work but are not initial spike or release requirements.
 
 ## Primary question
 

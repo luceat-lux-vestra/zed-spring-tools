@@ -56,6 +56,22 @@ For every completed spike:
 - list remaining uncertainty; and
 - do not promote spike code directly into production code.
 
+## Platform requirements
+
+- Treat macOS, Linux, and Windows on Zed-supported x86_64 and arm64/Arm64
+  systems as the required desktop boundary.
+- Do not infer multiplatform support from one operating system, architecture,
+  container, or compatibility layer.
+- Before a direction decision, obtain representative evidence on macOS arm64,
+  Linux x86_64, and Windows x86_64.
+- Before a public support claim, pass the full six-tuple desktop matrix and the
+  declared JDK compatibility matrix.
+- Zed SSH remote development and WSL-hosted remote projects are outside the
+  initial scope. Revisit them only after the local desktop matrix is stable and a
+  later decision explicitly adds them.
+- Keep commands shell-independent and use Zed platform, worktree, environment,
+  and executable-discovery APIs for host differences.
+
 ## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
@@ -76,4 +92,3 @@ document records one of these outcomes:
 - Pivot: a bridge, coordinator, installer, or another structure is required;
 - Limited: only a clearly bounded subset is feasible; or
 - Stop: the desired core capability is not realistically achievable.
-
