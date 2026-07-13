@@ -186,6 +186,7 @@ Host audited: macOS 26.5.1 arm64.
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
+| S004 plan | Ready for user review | Exact five-JAR Spring set, static dependency closure, fixture, command, and runtime criteria recorded; no implementation started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -263,6 +264,25 @@ Host audited: macOS 26.5.1 arm64.
   correction recorded in S003 before extraction succeeded.
 - The Java proxy HTTP endpoint was used as an ignored-evidence test oracle only,
   not as a supported inter-extension integration contract.
+
+### S004 planning gate
+
+- The fixed Spring Tools `5.2.0.RELEASE` VSIX contributes exactly five JDT LS
+  bundles. Their identities, order, manifests, and `sts.java.search.types`
+  contract are recorded in S004.
+- Every declared required bundle and Gson package has a provider in the pinned
+  JDT LS 1.60.0 plus the five-JAR set, and no contribution symbolic name collides
+  with the base JDT LS plugins.
+- The Spring release build used a mutable JDT LS snapshot repository, so static
+  closure is not a binary-compatibility claim. S004 is planned to verify that
+  exact risk with one source-only command against an imported Maven fixture.
+- The reusable isolated profile may retain Java 6.8.21, but S003's development
+  link and synthetic path must be removed and shown absent before S004 runtime.
+  S004 must use a fresh extraction of the verified JDT archive and a uniquely
+  named runtime worktree so persisted OSGi configuration and the launcher's
+  basename-derived JDT data cache cannot contaminate the result.
+- No S004 implementation or UI execution has started. The complete plan awaits
+  user review and an explicit continuation.
 
 ### Required before representative multiplatform evidence
 
