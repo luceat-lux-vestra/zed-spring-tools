@@ -7,8 +7,8 @@
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Next experiment: separately plan and review only the macOS application-launch
-  to fresh-JDT-data prerequisite; do not retry S006 in place
+- Next experiment: execute the separately reviewed S007 managed-local JDT data-
+  isolation prerequisite; do not retry S006 in place
 
 ## Hypothesis
 
@@ -643,10 +643,11 @@ JDT LS process, or real Spring Boot LS process was started.
   narrow authenticated routing mechanics. They do not support the S006
   user-visible completion hypothesis because neither real language server nor
   Zed participated.
-- The prepared data path matches the pinned JDT launcher source's
-  `XDG_CACHE_HOME/jdtls/jdtls-<SHA-1(cwd basename)>` rule. A Gate C preflight
-  must still prove the isolated Zed environment actually supplies that cache
-  root and uses the prepared path.
+- Gate B inferred that the prepared data path matched the pinned JDT launcher's
+  XDG rule. Exact Darwin-source review after Gate C disproved that inference:
+  the packaged launcher ignores `XDG_CACHE_HOME` on macOS and defaults below
+  `$HOME/Library/Caches`. This failed inference is preserved here rather than
+  presented as a confirmed fact.
 
 #### Failed and corrected conditions
 
@@ -997,10 +998,13 @@ the tested macOS arm64/JDK 25 tuple.
 - The closed adjacent library set is sufficient to remove the observed Spring
   child classloading failure on this tuple. It does not prove the S006 feature
   hypothesis.
-- The evidence shows that the JDT child inherited `JAVA_TOOL_OPTIONS` while its
-  launcher did not use the application-level `XDG_CACHE_HOME`. Which Zed or
-  macOS environment boundary changes or removes that one variable remains
-  unverified.
+- The evidence shows that the JDT child inherited `JAVA_TOOL_OPTIONS` while the
+  packaged launcher selected its Darwin host-cache default. Subsequent exact
+  source review confirms that this launcher branch does not read
+  `XDG_CACHE_HOME`, and the Java extension's custom-launcher branch does not add
+  `-data`. An unknown Zed/macOS environment boundary is therefore not required
+  to explain the result. Whether the embedded CLI supplies XDG to the official
+  managed-local Java-extension path remains a separate S007 runtime item.
 - The upstream lifecycle-command mismatch remains a possible topology blocker.
   Because the baseline/add/callback sequence never began, this run cannot decide
   whether the independently owned Spring process would continue successfully.
@@ -1017,12 +1021,14 @@ conditions was reached. S006 is closed as Inconclusive without a fresh
 repetition; repeating after another launch correction would exceed its explicit
 single-correction rule.
 
-The next candidate experiment is a new, narrow prerequisite spike. Before any
-Spring server, Spring bundle, proxy relay, or completion input participates, it
-should compare fixed macOS application-launch mechanisms and require the actual
-JDT `-data` argument to select a predeclared empty location in two fresh runs,
-with normal Zed restored afterward. Only Supported evidence from that experiment
-can justify a newly planned end-to-end spike; it must not reopen S006 in place.
+The next candidate experiment is S007, a separately reviewed narrow
+prerequisite spike. Before any Spring server, Spring bundle, proxy relay, or
+completion input participates, it stages one pinned JDT installation in the
+official Java extension's managed-local path, uses the embedded Zed CLI to
+supply a distinct XDG root for each run, and requires the extension's explicit
+`-data` argument to select the corresponding predeclared empty location in two
+fresh worktrees. Only Supported evidence from S007 can justify a newly planned
+end-to-end spike; it must not reopen S006 in place.
 
 ## Evidence and privacy rules
 
@@ -1073,9 +1079,9 @@ After S006 classification, do not start product scaffolding in the same task.
 - Then create a capability inventory for VS Code Spring Tools and prioritize the
   next smallest user-visible capability; do not describe the single completion
   as parity.
-- Because S006 is Inconclusive, plan only the isolated macOS launch-to-JDT-data
-  prerequisite experiment described above. Do not begin product scaffolding,
-  public-source release work, or a direction decision yet.
+- Because S006 is Inconclusive, execute only the reviewed S007 managed-local
+  JDT data-isolation prerequisite described above. Do not begin product
+  scaffolding, public-source release work, or a direction decision yet.
 
 ## Plan review checklist
 

@@ -11,7 +11,8 @@ architecture.
 Decision records in this directory must cite supporting research and spike
 results. The next expected decision remains the project direction gate: Go,
 Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
-its end-to-end hypothesis input, so a separately reviewed macOS launch-to-JDT-
-data prerequisite and a later attributable local PoC are still required.
+its end-to-end hypothesis input. S007 now records the reviewed managed-local
+JDT data-isolation prerequisite, but its implementation/runtime and a later
+attributable local PoC are still required.
 
 Use [template.md](template.md) after sufficient evidence exists.

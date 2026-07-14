@@ -191,6 +191,7 @@ Host audited: macOS 26.5.1 arm64.
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
 | S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
+| S007 plan | Reviewed; implementation not started | Managed-local JDT selection and two-run explicit data isolation only; Gate A remains closed pending an explicit continuation |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -204,7 +205,7 @@ Host audited: macOS 26.5.1 arm64.
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
 | Official Zed Java extension | Ready in isolated S003 data | Exact 6.8.21 installation retained for repeatable research; normal Zed remains unchanged |
-| Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
+| Zed CLI | Embedded CLI verified | No global command is installed; S007 fixes the signed app-embedded CLI by absolute path and hash |
 | Local Node syntax checker | Ready | Node 26.5.0 available; not an end-user prerequisite |
 | GitHub access | Ready locally | Pinned Spring Tools tag resolved during audit |
 | Linux execution host | Deferred | No runtime host is currently available; this does not block the local PoC or initial public source release |
@@ -376,9 +377,15 @@ Host audited: macOS 26.5.1 arm64.
   the properties fixture, so no completion, listener add, callback, project
   cache, or `server.port` hypothesis input occurred. It is Inconclusive rather
   than Refuted, and its explicit one-correction rule closes an in-place retry.
-- A separately reviewed prerequisite spike must first prove that a macOS app
-  launch selects a predeclared empty JDT data location in two fresh runs. The
-  local end-to-end PoC and project direction gate remain incomplete.
+- Exact post-run source review established that the fixed packaged JDT launcher
+  ignores `XDG_CACHE_HOME` on Darwin and the Java extension custom-launcher
+  branch does not add `-data`; an unknown application-environment boundary is
+  not needed to explain the result.
+- S007 has a reviewed plan to stage exactly one pinned JDT installation in the
+  official Java extension's managed-local path, use the embedded Zed CLI with
+  two distinct XDG roots and fresh worktrees, and attribute the explicit
+  `-data` path twice. Its implementation and runtime remain unopened. The local
+  end-to-end PoC and project direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 
