@@ -148,7 +148,7 @@ public final class PrepareS006 {
 
         String jdtHash = verifyArtifact(jdtInput, expected.jdtls());
         String vsixHash = verifyArtifact(vsixInput, expected.vsix());
-        verifyArtifact(debugInput, expected.debug());
+        String debugHash = verifyArtifact(debugInput, expected.debug());
         String sourceProxyHash = sha256(sourceInput);
         String instrumentedProxyHash = sha256(instrumentedInput);
         if (sourceProxyHash.equals(instrumentedProxyHash)) {
@@ -181,6 +181,9 @@ public final class PrepareS006 {
             extractTarGzip(jdtInput, artifactStage.resolve("jdtls"));
             makeExecutable(requireRegularFile(
                     artifactStage.resolve("jdtls/bin/jdtls"), "JDT launcher"));
+            String dataCacheName = "jdtls-" + sha1(expectedWorktreeName);
+            Files.createDirectories(
+                    artifactStage.resolve("jdt-data/jdtls").resolve(dataCacheName));
             Files.createDirectories(artifactStage.resolve("proxy"));
             Path stagedSourceProxy = artifactStage.resolve("proxy/source-java-lsp-proxy");
             Path stagedInstrumentedProxy = artifactStage.resolve(
@@ -201,10 +204,13 @@ public final class PrepareS006 {
             Files.createDirectories(probe);
             Files.copy(sourceRoot.resolve(PROXY_SOURCE), probe.resolve("spring_proxy.mjs"));
             copyTree(sourceRoot.resolve(FIXTURE_ROOT), worktreeStage);
-            writeSettings(artifactStage.resolve("isolated-settings.json"));
+            writeSettings(
+                    artifactStage.resolve("isolated-settings.json"), artifacts,
+                    Path.of(System.getProperty("java.home")));
             writeManifest(
                     artifactStage.resolve("s006-prepared-manifest.txt"),
-                    jdtHash, vsixHash, sourceProxyHash, instrumentedProxyHash, sha256(metadataInput));
+                    jdtHash, vsixHash, sourceProxyHash, instrumentedProxyHash,
+                    debugHash, sha256(metadataInput), dataCacheName, expected);
 
             moveFresh(artifactStage, artifacts);
             moved.add(artifacts);
@@ -358,9 +364,14 @@ public final class PrepareS006 {
         if (!properties.equals("ser\n")) throw new IOException("fixture properties content changed");
     }
 
-    private static void writeSettings(Path destination) throws IOException {
+    private static void writeSettings(
+            Path destination, Path finalArtifacts, Path javaHome) throws IOException {
         String settings = """
                 {
+                  "log": {
+                    "lsp": "trace",
+                    "project": "warn"
+                  },
                   "languages": {
                     "Java": {
                       "language_servers": ["jdtls", "s006-spring-boot-end-to-end"]
@@ -368,23 +379,58 @@ public final class PrepareS006 {
                     "Properties": {
                       "language_servers": ["s006-spring-boot-end-to-end"]
                     }
+                  },
+                  "lsp": {
+                    "jdtls": {
+                      "settings": {
+                        "java_home": %s,
+                        "jdtls_launcher": %s,
+                        "lsp_proxy_path": %s,
+                        "java_debug_jar": %s,
+                        "lombok_support": false,
+                        "jdk_auto_download": false,
+                        "check_updates": "never"
+                      }
+                    }
                   }
                 }
-                """;
+                """.formatted(
+                        jsonString(javaHome.toAbsolutePath().normalize().toString()),
+                        jsonString(finalArtifacts.resolve("jdtls/bin/jdtls").toString()),
+                        jsonString(finalArtifacts.resolve(
+                                "proxy/instrumented-java-lsp-proxy").toString()),
+                        jsonString(finalArtifacts.resolve("debug/java-debug.jar").toString()));
         Files.writeString(destination, settings, StandardCharsets.UTF_8);
     }
 
     private static void writeManifest(
             Path destination, String jdt, String vsix, String sourceProxy,
-            String instrumentedProxy, String metadata) throws IOException {
-        Files.writeString(destination,
+            String instrumentedProxy, String debug, String metadata,
+            String dataCacheName, ExpectedInputs expected) throws IOException {
+        StringBuilder manifest = new StringBuilder(
                 "jdtls=" + jdt + "\n"
                         + "vsix=" + vsix + "\n"
                         + "source-proxy=" + sourceProxy + "\n"
                         + "instrumented-proxy=" + instrumentedProxy + "\n"
+                        + "java-debug=" + debug + "\n"
                         + "metadata=" + metadata + "\n"
-                        + "source-commit=" + UPSTREAM_COMMIT + "\n",
-                StandardCharsets.UTF_8);
+                        + "source-commit=" + UPSTREAM_COMMIT + "\n"
+                        + "spring-server=" + expected.server().sha256() + "\n"
+                        + "jdt-data-cache=" + dataCacheName + "\n");
+        for (NamedArtifact bundle : expected.bundles()) {
+            manifest.append("spring-bundle-")
+                    .append(bundle.name()).append('=').append(bundle.spec().sha256()).append('\n');
+        }
+        Files.writeString(destination, manifest, StandardCharsets.UTF_8);
+    }
+
+    private static String jsonString(String value) throws IOException {
+        for (int index = 0; index < value.length(); index++) {
+            if (value.charAt(index) < 0x20) {
+                throw new IOException("JSON path contains a control character");
+            }
+        }
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     private static void copyTree(Path source, Path destination) throws IOException {
@@ -570,6 +616,16 @@ public final class PrepareS006 {
         return HexFormat.of().formatHex(digest.digest());
     }
 
+    private static String sha1(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-1 unavailable", error);
+        }
+    }
+
     private static String run(Path directory, String... command) throws Exception {
         Process process = new ProcessBuilder(command)
                 .directory(directory.toFile())
@@ -627,6 +683,10 @@ public final class PrepareS006 {
             expectFailure(() -> requireFreshDestination(route, "test destination"));
             require(safeArchiveTarget(root, "space/프로젝트/file").startsWith(root),
                     "Unicode archive path was rejected");
+            require(
+                    sha1("s006-gate-b-worktree-9f2c")
+                            .equals("551c6de9135e318529ad5c02825bdcbc10bbf77e"),
+                    "JDT data cache key changed");
         } finally {
             deleteRecursively(root);
         }

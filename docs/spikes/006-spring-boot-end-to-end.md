@@ -1,14 +1,14 @@
 # S006: Real Spring Boot LS classpath-to-completion PoC
 
-- Status: Gate A implementation and synthetic validation complete; Gate B not started
+- Status: Gate B fixed-source build and non-UI preparation complete; Gate C not started
 - Date: 2026-07-15
 - Related decision: D001
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Next gate: no fixed-source native build, artifact preparation, extension
-  installation, real language-server launch, or Zed execution until the Gate A
-  diff is accepted and an explicit continuation opens Gate B
+- Next gate: no extension installation, real language-server launch, or Zed
+  execution until the Gate B evidence is accepted and an explicit continuation
+  opens Gate C
 
 ## Hypothesis
 
@@ -303,7 +303,7 @@ retain the upstream proxy path.
 
 ## Planned disposable artifacts
 
-Only after Gate A is explicitly opened may it add:
+The reviewed disposable source tree after Gates A and B is:
 
 ```text
 spikes/s006-spring-boot-end-to-end/
@@ -328,8 +328,14 @@ spikes/s006-spring-boot-end-to-end/
 │       ├── Cargo.toml
 │       └── patch_contract.mjs
 └── tools/
-    └── PrepareS006.java
+    ├── PrepareS006.java
+    ├── empty-maven-settings.xml
+    └── process_smoke.mjs
 ```
+
+Gate A added the originally planned implementation and preparation tool. Gate B
+added only the empty Maven settings and fake-child process harness needed by its
+written fixed-dependency and non-UI process procedures.
 
 Generated JDT runtimes, Java source checkouts, proxy binaries, VSIX/JARs, Maven
 cache material, worktrees, route records, logs, profiles, screenshots, and raw
@@ -559,6 +565,128 @@ project metadata, build output, JDT configuration, host cache, or unknown
 artifact. It records aggregate hashes so the runtime gate can detect mutation.
 
 Gate B stops for another review. No real Zed launch is allowed in the same gate.
+
+### Gate B execution record: fixed inputs and fake-child processes
+
+Gate B was opened and completed on 2026-07-15 after the user's explicit
+continuation. All mutable outputs below remain ignored. No Zed process, real
+JDT LS process, or real Spring Boot LS process was started.
+
+#### Confirmed facts
+
+- Fresh control and instrumented checkouts both use Java-extension commit
+  `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`. The control remained clean. The
+  S006 patch applied with `git apply --check`, `git diff --check`, and no fuzz;
+  its complete changed-file set is exactly `proxy/src/main.rs` and the new
+  `proxy/src/s006_coordination.rs`.
+- The pinned upstream control identities are `ccf1d7c...1243` for `main.rs`,
+  `6390b49...f62` for `http.rs`, `8de3d12...437` for `Cargo.lock`, and
+  `c71d239...ab4` for the Apache-2.0 `LICENSE`. `proxy/Cargo.toml` identifies
+  non-published package `java-lsp-proxy` 6.8.12, edition 2021, Apache-2.0.
+- Both proxies built for `aarch64-apple-darwin` with the same rustup
+  Rust/Cargo 1.97.0, release profile, locked dependency graph, and source
+  commit. The 851,280-byte control binary is
+  `2c53fa08...1d33`, bit-for-bit equal to the retained S005 source build. The
+  958,496-byte S006 binary is distinct at `422bb95e...9eb`.
+- Locked native tests passed: the upstream control contains no proxy unit
+  tests, while the S006 build passed all six coordination tests.
+- Fresh Maven repository `tmp/s006-gate-b-m2-20260715/` was populated with
+  Maven 3.9.15, Temurin 25.0.3, the tracked empty settings file, the fixed Boot
+  3.5.5 fixture, and `maven-dependency-plugin:3.8.1:build-classpath`. Its compile
+  classpath has 20 JARs. The resolved 2,077,360-byte
+  `spring-boot-autoconfigure-3.5.5.jar` is `b12985e...794d` and its fixed
+  metadata entry contains exactly observable `server.port` data.
+- `PrepareS006` reverified the JDT archive `e94c303...f1d`, Spring VSIX
+  `70943c4...1bb3`, Java debug JAR `5275195...a83c`, Spring server
+  `ec922c5...c8e1`, and all five previously fixed Spring bundle sizes and
+  hashes. Its production path created only
+  `tmp/s006-gate-b-artifacts-20260715/` and
+  `tmp/s006-gate-b-worktree-20260715/` through one fresh transaction.
+- The preparation output contains an empty custom-launcher data path
+  `jdt-data/jdtls/jdtls-0705c021878636fac50441772a923f1955f2f893`, derived
+  from the exact worktree basename. It contains no mutable JDT
+  `configuration/`. The worktree contains no `.s006-state`, `target`,
+  `.project`, `.classpath`, or `.settings` state.
+- The generated isolated settings select Java servers in order `jdtls`, S006;
+  select only S006 for Properties; point at the prepared JDT launcher, S006
+  proxy, Java debug JAR, and Temurin 25; disable Lombok and JDK auto-download;
+  and set Java-extension update checks to `never`. The prepared manifest also
+  records the input, proxy, debug, metadata, server, bundle, source-commit, and
+  data-cache identities.
+- `process_smoke.mjs` passed three real process boundaries using generated fake
+  children only: unmodified Java-proxy stdio lifecycle; S006 Java-proxy
+  authenticated add-command HTTP round trip plus owned-route cleanup; and
+  Spring-proxy stdio lifecycle, child-exit evidence, and absence of a Spring
+  route. The temporary smoke directory was removed afterward.
+
+#### Primary source and retained evidence references
+
+- The two ignored checkouts are
+  `tmp/s006-gate-b-control-20260715/` and
+  `tmp/s006-gate-b-instrumented-20260715/`; the pinned upstream source and
+  license references remain those in the fixed-input table above.
+- Fixed dependency evidence is retained under
+  `tmp/s006-gate-b-maven-evidence-20260715/`; its classpath points only into the
+  fresh S006 Maven repository, not the host `~/.m2` repository.
+- Prepared identities are in
+  `tmp/s006-gate-b-artifacts-20260715/s006-prepared-manifest.txt`; exact runtime
+  settings are adjacent in `isolated-settings.json`. These ignored files are
+  local evidence, not distributable artifacts or support declarations.
+
+#### Inferences
+
+- Reproducing the earlier control hash on this host supports build equivalence
+  for the fixed local toolchain and source. It does not establish reproducible
+  builds on another host or architecture.
+- The fake-child process results support the executable boundaries and the
+  narrow authenticated routing mechanics. They do not support the S006
+  user-visible completion hypothesis because neither real language server nor
+  Zed participated.
+- The prepared data path matches the pinned JDT launcher source's
+  `XDG_CACHE_HOME/jdtls/jdtls-<SHA-1(cwd basename)>` rule. A Gate C preflight
+  must still prove the isolated Zed environment actually supplies that cache
+  root and uses the prepared path.
+
+#### Failed and corrected conditions
+
+1. Both first release builds succeeded, but the immediate hash command looked
+   under `proxy/target/`; this upstream workspace places target output at its
+   repository root. Evidence collection was corrected without rebuilding or
+   changing inputs.
+2. The Gate B settings/data-path addition first failed Java compilation because
+   of a `StringBuilder` construction error, and its synthetic SHA-1 assertion
+   used an incorrectly calculated value. Both were corrected before the
+   production preparation path ran; warning-as-error compilation and the
+   self-test then passed.
+3. The first freshness check expected the earlier example basename's cache key
+   instead of the selected `...-20260715` basename. The manifest and an
+   independent `shasum` agreed on `0705c021...`; the validation expectation was
+   corrected without changing prepared output.
+4. The first instrumented-process add smoke received HTTP 400 because it did
+   not create the required matching Spring route. Source review confirmed this
+   was the intended fail-closed condition. The corrected smoke created an exact
+   fake dynamic Spring route, proved the successful child round trip, and
+   removed it before shutdown.
+
+No real-server failure was observed in Gate B, and none of these corrections
+changed the fixed versions, command IDs, callback shape, route mechanism,
+fixture, or hypothesis.
+
+#### Unverified hypotheses, blockers, and next experiment
+
+- Real JDT import, bundle activation, Spring Boot LS startup, classpath listener
+  registration/callback, property-index readiness, and a Zed-originated
+  `server.port` completion remain runtime-verification items.
+- The prepared settings have not been consumed by Zed. The existing personal
+  Java extension, isolated S006 development extension, cache environment, and
+  stale process/route absence must be checked again immediately before launch.
+- macOS arm64/JDK 25 remains the only intended first runtime tuple. Linux,
+  Windows, other architectures, JDK 21, SSH remote development, and WSL remain
+  untested or out of initial scope as recorded above.
+- The next candidate experiment is Gate C exactly as written below. It requires
+  a new explicit continuation, a final preflight, and a warning that the user
+  must not use keyboard or mouse while the permitted UI automation controls
+  isolated Zed. Gate B alone does not open the direction-decision gate.
 
 ## Gate C: local Zed end-to-end runtime
 
@@ -797,7 +925,8 @@ points:
 6. Child and client-facing completion structures must match, so the disposable
    proxy cannot manufacture or rewrite `server.port`.
 
-All checklist items were satisfied at plan level. Gate A was subsequently
-opened, implemented, reviewed, and closed as recorded above. Gate B remains
-closed until a later explicit continuation; no prepared runtime, extension
-installation, real language-server execution, or Zed runtime has occurred.
+All checklist items were satisfied at plan level. Gates A and B were
+subsequently opened, implemented, reviewed, and closed as recorded above. A
+prepared ignored runtime now exists, but no extension installation, real
+language-server execution, or Zed runtime has occurred. Gate C remains closed
+until a later explicit continuation.
