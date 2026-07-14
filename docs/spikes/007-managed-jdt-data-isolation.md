@@ -1,13 +1,13 @@
 # S007: Managed-local JDT data isolation through the Zed CLI
 
-- Status: Gate A disposable implementation complete and reviewed; Gate B not
-  started
+- Status: Gate B fixed preparation and profile transition complete and
+  reviewed; Gate C not started
 - Date: 2026-07-15
 - Related decision: D001
 - Related research: R001, R003, R004
 - Depends on: S003-S005 Supported locally; S006 Inconclusive before hypothesis
   input
-- Implementation gate: Gate B closed until a later explicit continuation
+- Implementation gate: Gate C closed until a later explicit continuation
 
 ## Hypothesis
 
@@ -382,6 +382,98 @@ Gate B requires another explicit continuation after Gate A review. It may:
 
 Gate B stops before invoking the embedded CLI, opening Zed, starting the proxy
 or JDT, or controlling the UI.
+
+### Gate B preparation and review result
+
+Gate B completed on 2026-07-15 on the fixed macOS arm64/JDK 25 tuple. It did
+not invoke the embedded CLI, open isolated Zed, start a Java proxy/JDT process,
+or control the UI.
+
+#### Preserved state
+
+- The complete 27 MiB retained isolated profile was copied under ignored
+  `tmp/s007-gate-b-preserved-20260715T055520/profile-before/` before mutation.
+  File-by-file SHA-256 for 192 files, two link targets, and 82 directory names
+  matched the source profile.
+- The initial TAR-stream hashes of the source profile and identical copy did
+  not match even though `diff -qr` and the file/link/directory manifests did.
+  This failed comparison is retained; metadata-bearing TAR stream hashes were
+  rejected as the preservation identity rather than treated as content hashes.
+- All 15 pre-existing top-level ignored S006 paths remain in place. They
+  contain 9,492 regular files and one link; no regular-file or link timestamp
+  became newer than the pre-preservation boundary. The Java source checkout
+  remains clean at commit `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`.
+- The combined S006 TAR-stream hash also differed before and after even though
+  no file/link timestamp changed; only the checkout `.git` directory timestamp
+  changed when the preparation verifier ran `git status`. Both unreliable TAR
+  hashes and a current file-by-file SHA-256 manifest are retained. No S006
+  tracked source, Gate C evidence directory, log, screenshot, binary, or data
+  directory was removed or rewritten.
+
+#### Failed and corrected preparation
+
+1. The first real preparation invocation reverified its inputs and extracted
+   in a transaction, then failed before every final move with
+   `generated settings exceed S007 scope`. Source review found that
+   `verifySettings` rejected the substring `spring`, which also occurs in this
+   repository's `zed-spring-tools` path. All five intended destinations and the
+   transaction directory were absent afterward; the profile was unchanged.
+2. The failed observation is retained under ignored
+   `tmp/s007-gate-b-rejected-preparation-20260715T055520/`. The check was
+   narrowed to actual S006/Spring language-server identifiers, and a generated
+   path containing `zed-spring-tools` was added to the synthetic regression.
+   Warning-as-error Java 21 compilation and both compiled/source-mode self-tests
+   passed again.
+3. The corrected production invocation used five wholly new destination names
+   and completed. This is a preparation-only correction; it cannot contribute
+   a runtime success or erase the first failed invocation.
+
+#### Confirmed prepared and profile facts
+
+- The corrected production path reverified the full hashes recorded above for
+  JDT LS 1.60.0, official Java proxy, Java debug 0.53.2, installed Java 6.8.21
+  WASM/manifest, embedded Zed CLI, fixture, source commit, and Temurin
+  25.0.3+9.
+- Safe extraction produced 128 regular JDT files and deterministic tree
+  SHA-256
+  `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`.
+  The prepared `config_mac_arm` and single Equinox launcher were present.
+- Generated settings SHA-256 is
+  `bd83b4bbc5116e6d116ab5ba8d3e2f7b4a73110cc5b6e32a831779cbc117f87b`.
+  The active isolated settings are byte-identical and contain no custom
+  launcher or Spring server.
+- The isolated Java work directory now contains exactly one managed JDT
+  directory with the fixed build name. File-by-file hashes and directory lists
+  equal the prepared extraction. The active extension index SHA-256 is
+  `14b1ea782b1793f5ec2b2df43c8d0bfb2cc298cf3508103480e61387db06effa`.
+- The isolated index contains official Java 6.8.21 with `dev: false`; the S006
+  development entry/link is absent, as are all S003-S006 Java-relevant
+  development links. Its tracked source and prior ignored evidence remain.
+- Both prepared worktrees contain only the byte-identical package-free fixture.
+  Both XDG roots are empty; both expected data paths, both managed host
+  fallbacks, and both packaged-launcher host fallbacks are absent. The two
+  full-worktree SHA-1 keys and expected data paths differ.
+- The Java proxy record directory is empty and no JDT process exists. Normal
+  Zed remained running on its normal profile and was not controlled.
+- Point-in-time capacity was approximately 802 GiB free disk with 64 GiB
+  installed memory. Raw manifests, paths, file hashes, and resource output stay
+  under ignored Gate B evidence.
+
+One combined freshness command was also corrected: assigning an expected path
+to zsh's special `path` array removed commands from that subprocess's `PATH`.
+The subprocess ended without a profile/global environment change; the complete
+check was rerun with a non-special variable and passed.
+
+#### Remaining uncertainty
+
+- No runtime has proved that Zed selects this managed candidate, receives the
+  CLI-supplied XDG value, constructs the reviewed direct Java command, or uses
+  either expected data path.
+- `ServiceReady`, process cleanup, proxy-record cleanup, network/update absence
+  during startup, and normal-Zed restoration after isolated execution remain
+  Gate C requirements.
+
+Gate B is closed. Only a later explicit continuation may open Gate C.
 
 ## Gate C: two fresh local runtime runs
 

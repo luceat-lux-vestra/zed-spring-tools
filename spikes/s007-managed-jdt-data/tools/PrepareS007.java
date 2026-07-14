@@ -430,8 +430,9 @@ public final class PrepareS007 {
                 throw new IOException("generated settings are incomplete");
             }
         }
-        if (text.contains("jdtls_launcher") || text.contains("Properties")
-                || text.contains("spring")) {
+        if (text.contains("jdtls_launcher") || text.contains("\"Properties\"")
+                || text.contains("s006-spring-boot-end-to-end")
+                || text.contains("spring-boot-language-server")) {
             throw new IOException("generated settings exceed S007 scope");
         }
     }
@@ -1065,8 +1066,8 @@ public final class PrepareS007 {
         writeSettings(
                 settings,
                 root.resolve("JDK 25"),
-                root.resolve("proxy path/java-lsp-proxy"),
-                root.resolve("debug path/debug.jar"));
+                root.resolve("zed-spring-tools/proxy path/java-lsp-proxy"),
+                root.resolve("zed-spring-tools/debug path/debug.jar"));
         verifySettings(settings);
         require(!Files.readString(settings).contains("jdtls_launcher"),
                 "custom launcher leaked into settings");
