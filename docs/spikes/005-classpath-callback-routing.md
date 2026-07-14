@@ -1,6 +1,6 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Gate C completed; Inconclusive because Arm A lost its fresh-runtime condition and Arm C result propagation was not directly logged
+- Status: Gate D attribution-correction plan reviewed; Gate C remains Inconclusive and no corrected runtime has begun
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
@@ -118,6 +118,12 @@ The fixed Spring source is tag `5.2.0.RELEASE`, commit
   sends a non-batched callback with six arguments: project URI, project name,
   deleted flag, classpath, project-build descriptor, and Java core options. It
   logs success only after the client request returns.
+- [`Logger.java`](https://github.com/spring-projects/spring-tools/blob/18d1a975dbea4f9314fd736d0237bd9e23f243f9/headless-services/jdt-ls-extension/org.springframework.tooling.jdt.ls.commons/src/org/springframework/tooling/jdt/ls/commons/Logger.java)
+  enables its Eclipse-plugin debug path only when the JVM system property named
+  from the plugin bundle symbolic name plus `.DEBUG` is true. The fixed
+  `jdt-ls-extension.jar` manifest names that bundle
+  `org.springframework.tooling.jdt.ls.extension`; its local bytecode matches the
+  source and writes enabled debug messages through the Eclipse plugin log.
 - [`ClasspathListenerManager.java`](https://github.com/spring-projects/spring-tools/blob/18d1a975dbea4f9314fd736d0237bd9e23f243f9/headless-services/commons/commons-language-server/src/main/java/org/springframework/ide/vscode/commons/languageserver/java/ls/ClasspathListenerManager.java)
   shows the Spring LS side accepts both batched and non-batched payloads,
   requires at least six elements, and returns `"done"` after dispatching an
@@ -880,15 +886,221 @@ Linux, Windows, JDK 21, other architectures, remote development, Spring Boot LS,
 and the full product callback flow remain unverified. This result does not open
 the direction-decision or product-scaffolding gate.
 
-### Candidate attribution correction
+## Gate D attribution-correction plan
 
-Before another runtime attempt, amend and review this plan to define a fresh-arm
-repreparation check after extension installation and a non-invasive way to
-persist the Spring debug success or proxy-to-JDT response without changing the
-fixed request. A corrected run must use newly prepared arms, repeat the same
-three-arm order and exact one add/remove pair per arm, and receive explicit user
-continuation. No broader coordinator, product code, or platform claim is
-authorized by this Inconclusive result.
+Gate D is a correction of the two missing attribution facts, not a new
+hypothesis or an expanded spike. This plan was completed and reviewed on
+2026-07-14. No Gate D preparation, build, Zed launch, or runtime execution has
+begun. Another explicit user continuation is required.
+
+### Confirmed correction inputs and primary evidence
+
+- The retained isolated profile contains official Java extension 6.8.21 and
+  the S005 development extension, with no S003 or S004 development extension.
+  Its settings currently point at the routed Gate C arm. Gate D will verify
+  this state without reinstalling the extension before it prepares any arm.
+- Gate C left mutable JDT `configuration/` areas in all three prepared JDT
+  trees and host data-cache directories for all three fixed arm keys. The
+  rejected file-as-worktree launch also left the separately identified
+  `5b1d71800f6997faaf4a25a43ead7512f50b44ca` host cache. None is a fresh Gate D
+  input.
+- The ignored Gate C evidence includes all three JDT logs, the two final Zed
+  traces available for Arms B and C, sink JSONL, screenshots, and the recorded
+  failed setup observations. The accepted logs show the regular Spring
+  add/remove records; Arms A and B show `FAILED`, while Arm C has neither
+  `FAILED` nor an enabled debug success record.
+- Fixed Spring source at commit `18d1a975...` calls
+  `executeClientCommand`, retains the returned object, and only then passes
+  `executing callback <id> SUCCESS [<result>]` to its debug logger. The same
+  commit's logger reads
+  `org.springframework.tooling.jdt.ls.extension.DEBUG` for this bundle and
+  writes enabled messages to the Eclipse plugin log. `javap -c -p` and the
+  bundle manifest in each fixed Gate C arm reproduce those source facts.
+- No further proxy, adapter, sink, Spring bundle, JDT LS, Java-extension, or
+  fixture code change is necessary for the correction. The existing routed
+  proxy's locked tests continue to establish that a successful fixed sink
+  response is encoded with the original request ID; Gate D must add runtime
+  evidence that the waiting Spring call actually completed with `"done"`.
+
+### Correction inferences
+
+1. Launching all three arms with the same JVM observation property preserves
+   the proxy as the only intentional behavioral variable. Debug logging is
+   observational: it reveals messages already constructed by fixed Spring
+   code and does not change the callback method, ID, payload, result, route, or
+   correlation code.
+2. In Arm C, the conjunction of exactly one authenticated sink acceptance,
+   the sink's fixed `{"result":"done"}` response, and Spring's persisted
+   `SUCCESS [done]` means the synchronous JDT LS client request completed with
+   that result. Because JSON-RPC completes that pending call by response ID,
+   this is runtime evidence for the reviewed original-ID mapping rather than a
+   proxy-write-only observation.
+3. Reusing the installed isolated-profile extension before preparing new arms
+   removes the installation step that contaminated Gate C Arm A. Freshness
+   still requires independent checks of both the extracted runtime state and
+   Zed Java extension's real host data-cache path before each launch.
+
+These are plan-level inferences until Gate D supplies the corresponding runtime
+records.
+
+### Gate D unverified hypotheses and runtime checks
+
+- The isolated Zed launch will pass its controlled `JAVA_TOOL_OPTIONS` value to
+  JDT LS. A direct Temurin 25.0.3 launcher probe accepted the exact property,
+  but that did not test Zed process inheritance or start JDT LS.
+- The fixed Spring pre-execution debug message will persist in every arm's
+  Eclipse log, and Arm C will persist `SUCCESS [done]` after the routed response.
+- Archiving the four known caches and rerunning unchanged preparation will
+  reproduce the Gate B identities without hidden mutable state elsewhere.
+- Debug activation will add observation only and will not change the equivalent
+  Arm A/Arm B callback failure, listener timing, import, or cleanup behavior.
+- The retained installed S005 extension and directory-first launch will avoid a
+  new UI/setup correction. Any unexpected dialog or restored invalid worktree
+  remains a runtime blocker, not evidence of support or refutation.
+
+### Evidence preservation and fresh-arm preparation
+
+After explicit continuation, Gate D must perform these steps without launching
+isolated Zed or JDT LS:
+
+1. Verify no isolated Zed, S005 adapter, sink, Java proxy, or JDT LS process is
+   running. Inventory the retained profile's extension index, S005 development
+   link, settings, and the current Gate C generated paths before changing
+   anything.
+2. Create one ignored, timestamped Gate C preservation root under `tmp/`. Record
+   a sorted file inventory, sizes, SHA-256 digests for regular evidence files,
+   the three callback counts, relevant process absence, and the four known host
+   cache paths. Do not include route tokens, ports, opaque JSON-RPC IDs, or
+   protocol bodies in a committed file.
+3. Move, without deleting, `tmp/s005-artifacts/`, `tmp/s005-evidence/`, the
+   three Gate C worktrees, and only the three fixed-arm plus rejected-launch
+   JDT host cache directories into that preservation root. Verify the inventory
+   still resolves after the move. Do not touch unrelated S003/S004 caches,
+   source checkouts, the installed isolated extension, or the user's normal Zed
+   data.
+4. Reverify the exact pinned source checkouts, clean baseline source, the
+   reviewed two-file instrumented diff, rustup 1.97.0, both locked proxy binary
+   identities, and every S004 fixed input. Rebuild nothing. An identity failure
+   stops Gate D rather than authorizing a new version or dependency.
+5. Run the unchanged `PrepareS005` production path to create all three arms
+   again at their fixed basenames. Require the Gate B aggregate identities,
+   arm-specific proxies, identical fixture and bundle sets, distinct cache
+   keys, absent JDT `configuration/`, absent Eclipse project metadata/build
+   outputs, absent route/port records, and absent real host data caches.
+6. Verify the isolated profile still has only Java 6.8.21 plus S005 for Java,
+   then point its settings to Arm A while isolated Zed is stopped. The launch
+   target must be the Arm A directory, never the Java file. Opening the real
+   Java source is a separate action only after the planned worktree exists.
+
+Directory moves are preservation, not evidence deletion. If any move,
+inventory, identity, or preparation check is partial, Gate D stops before Zed
+launch and retains both old and partial-new material for diagnosis.
+
+### Non-invasive success-trace setup
+
+Launch the isolated Zed process for every arm from the same controlled shell
+environment with exactly:
+
+```text
+JAVA_TOOL_OPTIONS=-Dorg.springframework.tooling.jdt.ls.extension.DEBUG=true
+```
+
+Do not persist this value in the user's shell configuration, normal Zed
+settings, extension files, JDT launcher, or any fixed artifact. During the one
+fixed callback in each arm, require the pre-execution
+`executing callback <id> ...` debug message from the fixed Spring logger in
+addition to the normal bundle activation and `ServiceReady` evidence. This
+runtime check, rather than environment inheritance alone, confirms that the
+observation property reached that arm's JDT process. Arm C must additionally
+record the post-return `SUCCESS [done]` message.
+
+Apply the property equally to Arms A, B, and C. A control-arm change beyond
+additional debug messages is an attribution failure. Raw logs remain ignored;
+the committed result may quote only the fixed callback ID, `FAILED`,
+`SUCCESS [done]`, and structural counts.
+
+### Gate D runtime procedure
+
+1. Stop normal Zed, launch only the newly prepared Arm A directory under the
+   controlled environment, and open its unchanged real Java file separately.
+   Verify its exact worktree root, six bundle entries, import, `ServiceReady`,
+   zero final diagnostics, and recorded pre-launch freshness before sending a
+   request.
+2. Run Arm A once with exactly the Gate C add/remove pair and timing. Require
+   one authentic callback rejected by Zed as before, Spring `FAILED`, zero sink
+   callbacks, and the fixed 10-second post-remove observation. Stop and audit
+   cleanup before touching Arm B settings.
+3. Recheck Arm B's absent local `configuration/` and host data cache, point the
+   stopped profile to Arm B, and repeat the same procedure. Require parity with
+   Arm A before continuing.
+4. Recheck Arm C freshness, point the stopped profile to Arm C, and repeat once.
+   Require exactly one authenticated six-argument sink acceptance, the fixed
+   sink result, a JDT log entry exactly attributable as
+   `executing callback s005.classpath.callback.9f2c SUCCESS [done]`, no callback
+   failure, one successful remove, and no duplicate during the fixed interval.
+5. Preserve per-arm Zed/JDT/sink logs and a post-callback thread/process audit,
+   then verify route, proxy-port, adapter, sink, proxy, and JDT cleanup. Reopen
+   normal Zed without `JAVA_TOOL_OPTIONS` and retain the isolated profile as
+   previously directed.
+
+The existing Gate C UI-automation rule remains in force. CLI launch and log
+inspection do not require exclusive input. If an unexpected Zed dialog or
+chooser requires UI automation, tell the user not to use the keyboard or mouse
+immediately before automation and restore normal interaction immediately after
+it ends.
+
+### Gate D success, stop, and classification rules
+
+Gate D may replace the Gate C Inconclusive classification with Supported on the
+same tested tuple only when all original success criteria and all of these
+correction criteria hold:
+
+1. Gate C failed evidence remains preserved and inventoried.
+2. Each accepted arm has a newly prepared JDT extraction and no pre-launch
+   `configuration/`, Eclipse project state, build output, route, port record, or
+   arm-specific host data cache.
+3. The exact debug property is active in every arm and introduces no relevant
+   control difference.
+4. Arms A and B retain equivalent authentic failure behavior, while Arm C alone
+   records one structurally valid sink callback and Spring
+   `SUCCESS [done]` after that sink response.
+5. Every arm still has exactly one add/remove pair, fixed timing, attributable
+   removal, post-remove silence, and complete cleanup.
+
+There is no in-place setup correction or arm reuse in Gate D. If a wrong launch
+target, unexpected extension, pre-created mutable state, missing debug message,
+UI interruption, or partial cleanup occurs before classification, stop and
+classify the corrected attempt Inconclusive; preserve the evidence and do not
+continue to the next arm. A missing success trace with an otherwise accepted
+sink response is also Inconclusive because it repeats the evidence blocker.
+
+Refuted remains reserved for an original failure criterion that persists after
+freshness and debug activation are both proven. Gate D cannot authorize a
+different callback, artifact, version, patch, retry mechanism, coordinator,
+product scaffold, or platform claim.
+
+### Gate D plan review record
+
+The review confirmed that the correction changes only observation and runtime
+freshness:
+
+- the debug property is derived from fixed Spring source and bundle metadata,
+  and is applied symmetrically to all arms;
+- Spring success is stronger than a proxy egress trace because it is emitted
+  only after the synchronous client request returns its actual value;
+- previously failed evidence is preserved before generated paths are vacated;
+- both extracted `configuration/` state and the Java extension's real host
+  caches are checked, closing the Gate C freshness gap;
+- retaining the installed S005 extension removes the contaminating install
+  sequence without changing the extension under test;
+- no code, build, version, request, route, fixture, timing, arm order, or
+  product boundary changes; and
+- strict stop-on-contamination rules prevent another accepted arm from reusing
+  a rejected launch.
+
+The review found no reason to add proxy egress instrumentation. Doing so would
+change the instrumented binary and require a new implementation/build gate,
+while the fixed Spring debug path directly observes the needed completion.
 
 ## Success criteria
 

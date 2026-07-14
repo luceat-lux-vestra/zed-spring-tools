@@ -187,7 +187,7 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 plan | Gate C complete locally | Inconclusive on macOS arm64/JDK 25: callback routing passed structurally, but official-arm freshness and direct `"done"` propagation evidence were insufficient |
+| S005 plan | Gate D correction plan reviewed | Gate C remains Inconclusive on macOS arm64/JDK 25; corrected runtime awaits explicit continuation, fresh arms, and a Spring `SUCCESS [done]` trace |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -332,6 +332,12 @@ Host audited: macOS 26.5.1 arm64.
   equivalent direct proxy-to-JDT response trace were not preserved. The result
   therefore cannot prove original-ID result propagation at the required
   attribution level.
+- The Gate D attribution-correction plan is now reviewed but not executed. It
+  preserves the failed Gate C evidence, reprepares all three arms only after
+  confirming the retained S005 installation, checks both extracted JDT state
+  and the Java extension's actual host caches, and enables the fixed Spring
+  plugin debug property equally in all arms. Arm C must persist
+  `SUCCESS [done]`; no proxy or product code change is planned.
 - All isolated processes and private route/port records were removed and normal
   Zed was restored. The retained isolated profile contains Java 6.8.21 and the
   disposable S005 development extension. A reviewed fresh-arm and success-trace
