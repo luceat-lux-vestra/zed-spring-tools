@@ -1,10 +1,10 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Gate B complete and evidence reviewed; awaiting user continuation to Gate C
+- Status: Gate C completed; Inconclusive because Arm A lost its fresh-runtime condition and Arm C result propagation was not directly logged
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Gate C requires explicit user continuation
+- Implementation gate: Product scaffolding remains blocked; only a reviewed S005 attribution correction may continue
 
 ## Hypothesis
 
@@ -506,7 +506,7 @@ Implementation may begin only after review confirms all of the following:
    process-start smoke checks. Do not start Zed or JDT LS.
 6. Review the complete fixed-input and build evidence. Stop if Arm B or C uses an
    unlocked dependency, dirty source, unexpected upstream diff, or unverifiable
-   binary. Gate C requires another explicit user continuation.
+   binary. At that point, Gate C required another explicit user continuation.
 
 ### Gate C: isolated runtime execution
 
@@ -745,10 +745,150 @@ remain under ignored `tmp/` paths.
   Zed restoration; and
 - every representative or full platform/JDK tuple.
 
-Gate C requires a new explicit user continuation. Immediately before UI
-automation, the user must be told not to use the keyboard or mouse. Gate C must
-run the three arms in order, stop on an Arm B parity failure, restore normal Zed
-and user input afterward, and classify only the local macOS arm64/JDK 25 result.
+Gate C began after explicit user continuation. It ran all three arms in order,
+restored normal Zed and user input, and produced only local macOS arm64/JDK 25
+evidence.
+
+## Gate C runtime record
+
+Gate C executed on 2026-07-14 with Zed 1.10.3, Java extension 6.8.21,
+JDT LS 1.60.0, Spring Tools `5.2.0.RELEASE`, Temurin 25.0.3, and the three
+Gate B proxy binaries. Raw protocol envelopes, paths, ports, tokens, logs,
+screenshots, and process listings remain under ignored `tmp/` storage.
+
+### Confirmed Gate C facts
+
+- The retained isolated profile ended with only bundled HTML, the official Java
+  extension 6.8.21, and the reviewed S005 development extension. The S004
+  development link was removed. The user's normal extension profile was not
+  modified.
+- Each accepted arm used its planned worktree root and final six-entry
+  initialization array: one arm-local debug 0.53.2 JAR followed by the same five
+  Spring JARs in release order. JDT LS installed and started those entries,
+  advertised the Spring commands, imported the one Maven fixture, reached
+  `ServiceReady`, and reported zero diagnostics for the real Java fixture.
+- Arm A's official proxy and Arm B's source-built unmodified proxy each exposed
+  one authentic `workspace/executeClientCommand` request with the fixed callback
+  ID. Zed returned JSON-RPC `-32601` with `Unrecognized method` in both arms,
+  Spring recorded the callback as `FAILED`, and neither sink received a
+  callback. The add responses were `"ok"` in 0.025 and 0.027 seconds,
+  respectively.
+- The Arm A and Arm B failure method, error code, Spring stack, sink count, and
+  listener behavior were equivalent for this comparison. Their different
+  official/local build environments did not produce a relevant runtime
+  difference.
+- Arm C's instrumented proxy caused exactly one authenticated sink acceptance.
+  The unchanged request had the fixed method and command plus exactly six
+  arguments. Runtime assertions passed for project URI, project name, deletion
+  state, an owned main-Java source entry, Maven `pom.xml` build descriptor, and
+  all four fixed Java 21 compiler options. No rejection, duplicate, or internal
+  sink error was recorded. The add response was `"ok"` in 0.024 seconds.
+- Every arm returned `"ok"` for the fixed remove command and logged removal for
+  the fixed callback ID. After each response, the unchanged project was observed
+  for exactly 10 seconds. Sink callback counts remained 0, 0, and 1 for Arms A,
+  B, and C, so no post-remove duplicate was observed.
+- Point-in-time RSS, recorded after the callback rather than as a benchmark, was:
+
+  | Arm | Proxy | Sink | JDT LS |
+  | --- | ---: | ---: | ---: |
+  | A, official | 2,688 KiB | 53,600 KiB | 1,577,840 KiB |
+  | B, source | 2,576 KiB | 53,376 KiB | 1,308,960 KiB |
+  | C, routed | 2,992 KiB | 54,864 KiB | 1,299,984 KiB |
+
+- Final inspection found no S005 adapter, sink, proxy, or JDT LS process and no
+  arm route or proxy-port file. Normal Zed was reopened on the repository. The
+  isolated profile and its S005 development extension were retained, following
+  the user's earlier direction to reuse the isolated environment.
+
+### Runtime inference
+
+The Arm C sink handler records acceptance only after authentication and all six
+payload checks, then returns `{"result":"done"}`. The reviewed proxy maps only
+that exact successful response to the original JSON-RPC request ID. After the
+event, JDT LS had no classpath notification worker blocked in
+`executeClientCommand`, and Spring recorded no failure. Together these facts
+strongly support the inference that `"done"` returned to JDT LS.
+
+That inference is not promoted to a confirmed runtime fact. The expected Spring
+`executing callback ... SUCCESS [done]` message uses its debug logger, and the
+fixed run did not persist debug-level Spring output. The proxy also had no
+runtime egress trace. Consequently, the original-ID response and Spring success
+message were not observed directly.
+
+### Failed, interrupted, and corrected Gate C observations
+
+1. The first isolated launch passed the Java file itself as Zed's project path
+   before S004 had been removed. Zed therefore treated the file as the worktree,
+   S004 contributed nonexistent paths, and JDT LS logged bundle-load failures.
+   No S005 add or remove request was sent. The operator stopped all processes,
+   removed S004, installed S005, and relaunched the planned directory. However,
+   that rejected launch had already created Arm A's local JDT
+   `configuration/` area at 23:20; the accepted Arm A launch at 23:25 reused it.
+   Gate B had required a fresh extraction with no such area, so Arm A no longer
+   satisfied the fixed fresh-runtime condition.
+2. During that same setup correction, the first quick-open attempt created only
+   an unsaved empty root buffer. Closing it also closed the Zed window. The
+   existing isolated process and worktree were reopened through the CLI, and the
+   real `src/main/java` file then opened with its exact content and zero final
+   diagnostics. No disk file was created or modified, but the intermediate
+   buffer caused an attributable project diagnostic in Arm A's log.
+3. Zed app termination did not give the disposable sink enough time to record a
+   graceful `stop`. Arms A and B recorded `unexpected_eof`; Arm C observed a
+   shutdown LSP message but no final stop entry. Each proxy also left its numeric
+   port record, and Arm C left its authenticated route. After confirming that no
+   related process remained, the numeric port records and the structurally
+   verified Arm C-owned route were explicitly removed. This cleanup limitation
+   is retained rather than hidden.
+
+The first two items are one operator setup correction, not a change to the
+callback ID, mode, artifacts, arm order, payload assertions, or route mechanism.
+They nevertheless prevent the run from meeting the attribution bar because the
+accepted Arm A was not restored to its prepared fresh state before its one fixed
+request.
+
+### Gate C validation performed
+
+- Final Zed traces were checked for worktree roots, the exact six-entry arrays,
+  command advertisement, `ServiceReady`, real fixture open, zero final
+  diagnostics, control callbacks, and control responses.
+- Per-arm JDT logs were checked for bundle installation/start, Spring command
+  registration, add/remove handler records, control failures, project import,
+  and attributable errors. Copies remain in ignored evidence.
+- The sink JSONL was checked for exact callback count, authentication outcome,
+  method, command, six-position payload structure, and rejected/error events.
+- A post-callback JDT thread dump confirmed no worker remained blocked in the
+  classpath callback path; this is supporting evidence, not a substitute for the
+  missing success log.
+- All final process, route, and private port-file checks passed, normal Zed was
+  reopened, the repository worktree was inspected, and no raw evidence was
+  staged.
+
+### Gate C classification and remaining uncertainty
+
+S005 is **Inconclusive on the tested macOS arm64/JDK 25 tuple**. The run is not
+Refuted: both controls behaved equivalently, Arm C received one authentic and
+structurally valid callback, and removal succeeded without duplication. It is
+not Supported because two required attribution facts are missing:
+
+1. Arm A reused a JDT runtime configuration created by the rejected setup
+   launch rather than the fresh Gate B state.
+2. Arm C did not directly preserve a Spring `SUCCESS [done]` record or another
+   runtime trace proving that the sink result reached JDT LS under the original
+   request ID.
+
+Linux, Windows, JDK 21, other architectures, remote development, Spring Boot LS,
+and the full product callback flow remain unverified. This result does not open
+the direction-decision or product-scaffolding gate.
+
+### Candidate attribution correction
+
+Before another runtime attempt, amend and review this plan to define a fresh-arm
+repreparation check after extension installation and a non-invasive way to
+persist the Spring debug success or proxy-to-JDT response without changing the
+fixed request. A corrected run must use newly prepared arms, repeat the same
+three-arm order and exact one add/remove pair per arm, and receive explicit user
+continuation. No broader coordinator, product code, or platform claim is
+authorized by this Inconclusive result.
 
 ## Success criteria
 
@@ -885,7 +1025,7 @@ Spring Boot LS; raw payloads remain ignored; and the prospective patch remains
 a fixed-method runtime instrument rather than a reusable bridge/coordinator
 module.
 
-Plan review outcome: **Ready for user review; implementation has not started.**
-Gate A may begin only after explicit continuation and must itself receive a
-complete diff review before any real upstream checkout, fixed native build, or
+Plan review outcome at that time: **Ready for user review; implementation had
+not started.** Gate A subsequently began only after explicit continuation and
+received its complete diff review before the Gate B checkout, builds, and
 fixed-artifact preparation.

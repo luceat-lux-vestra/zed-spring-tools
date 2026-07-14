@@ -187,7 +187,7 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 Gate B | Complete | Exact source baseline and routed proxy passed locked arm64 builds; three fixed arms and non-UI smokes passed; Zed runtime has not started |
+| S005 plan | Gate C complete locally | Inconclusive on macOS arm64/JDK 25: callback routing passed structurally, but official-arm freshness and direct `"done"` propagation evidence were insufficient |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -197,7 +197,7 @@ Host audited: macOS 26.5.1 arm64.
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
-| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, S003 JDT LS snapshots were approximately 587-1,264 MiB, and S004 JDT LS snapshots were approximately 506-1,271 MiB |
+| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, S003 JDT LS snapshots were approximately 587-1,264 MiB, S004 JDT LS snapshots were approximately 506-1,271 MiB, and S005 JDT LS snapshots were approximately 1,269-1,541 MiB |
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
 | Official Zed Java extension | Ready in isolated S003 data | Exact 6.8.21 installation retained for repeatable research; normal Zed remains unchanged |
@@ -295,7 +295,7 @@ Host audited: macOS 26.5.1 arm64.
   Supported only on this macOS arm64/JDK 25 tuple; S005 planning is recorded
   below.
 
-### S005 plan and non-UI gates
+### S005 Gate A through Gate C result
 
 - The fixed Spring source sends classpath events from JDT LS through the
   proposed `workspace/executeClientCommand` request. A non-batched event contains
@@ -318,9 +318,25 @@ Host audited: macOS 26.5.1 arm64.
 - Gate B then verified the exact clean Java extension commit, built the
   unmodified and instrumented proxies with the same locked native conditions,
   prepared three fresh arms, and passed process-only proxy and sink smokes. It
-  did not open or automate Zed and did not start JDT LS. Gate C requires
-  explicit continuation and remains limited to the reviewed instrument, not a
-  reusable bridge/coordinator module.
+  did not open or automate Zed and did not start JDT LS.
+- Gate C confirmed equivalent official and source-built control behavior: both
+  delivered one authentic callback to Zed, received `-32601`, recorded Spring
+  failure, and delivered nothing to the sink. The instrumented arm delivered one
+  authenticated six-argument callback to the sink and passed every structural
+  assertion. All add/remove commands returned `"ok"`, and no duplicate appeared
+  during any fixed post-remove interval.
+- Gate C is Inconclusive rather than Supported. A rejected setup launch created
+  Arm A's JDT runtime configuration before the accepted control run, so the
+  official arm was no longer fresh. Arm C's sink returned the fixed `"done"`
+  result and Spring did not log failure, but debug-level `SUCCESS [done]` and an
+  equivalent direct proxy-to-JDT response trace were not preserved. The result
+  therefore cannot prove original-ID result propagation at the required
+  attribution level.
+- All isolated processes and private route/port records were removed and normal
+  Zed was restored. The retained isolated profile contains Java 6.8.21 and the
+  disposable S005 development extension. A reviewed fresh-arm and success-trace
+  correction is required before the direction decision; no product skeleton,
+  reusable bridge/coordinator, or multiplatform claim is authorized.
 
 ### Required before representative multiplatform evidence
 
