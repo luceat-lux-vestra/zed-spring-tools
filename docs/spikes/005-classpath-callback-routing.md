@@ -1,10 +1,10 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Gate D attribution-correction plan reviewed; Gate C remains Inconclusive and no corrected runtime has begun
-- Date: 2026-07-14
+- Status: Supported on the tested macOS arm64/JDK 25 tuple after Gate D; representative platforms remain unverified
+- Date: 2026-07-15
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Product scaffolding remains blocked; only a reviewed S005 attribution correction may continue
+- Implementation gate: Product scaffolding and the direction decision remain blocked pending representative Linux x86_64 and Windows x86_64 evidence
 
 ## Hypothesis
 
@@ -888,10 +888,10 @@ the direction-decision or product-scaffolding gate.
 
 ## Gate D attribution-correction plan
 
-Gate D is a correction of the two missing attribution facts, not a new
+Gate D was a correction of the two missing attribution facts, not a new
 hypothesis or an expanded spike. This plan was completed and reviewed on
-2026-07-14. No Gate D preparation, build, Zed launch, or runtime execution has
-begun. Another explicit user continuation is required.
+2026-07-14, then executed after explicit user continuation on 2026-07-15. The
+runtime record follows the review record below.
 
 ### Confirmed correction inputs and primary evidence
 
@@ -1102,6 +1102,138 @@ The review found no reason to add proxy egress instrumentation. Doing so would
 change the instrumented binary and require a new implementation/build gate,
 while the fixed Spring debug path directly observes the needed completion.
 
+## Gate D runtime record
+
+Gate D ran on 2026-07-15 with the same Zed 1.10.3, Java extension 6.8.21,
+JDT LS 1.60.0, Spring Tools `5.2.0.RELEASE`, Temurin 25.0.3, proxy binaries,
+fixture, callback, route, and timing conditions as Gate C. No UI automation,
+code change, rebuild, extension reinstall, or version substitution occurred.
+
+### Confirmed Gate D facts
+
+- Before repreparation, the complete Gate C generated tree and four known JDT
+  host caches were moved without deletion to one ignored preservation root.
+  Its 441 MiB inventory retains the three prior callback counts, 19 verified
+  core-evidence hashes, the rejected-launch cache, and the failed setup
+  observations. Three additional stale isolated-profile port records from
+  earlier S004/Gate C paths were found after runtime and moved into the same
+  preservation root; none named a Gate D arm or had a live owning process.
+- The clean baseline checkout remained at `9148b897...`; the instrumented
+  checkout still had exactly the reviewed two-file diff. Rust 1.97.0 and all
+  fixed input and proxy hashes matched Gate B. Unchanged `PrepareS005` recreated
+  all three JDT trees with aggregate SHA-256 `5c38d7...` and all three initial
+  worktrees with aggregate SHA-256 `f7f1bd...`, exactly matching Gate B.
+- Before every accepted launch, that arm had no JDT `configuration/`, host data
+  cache, Eclipse project metadata, build output, route, or arm-specific proxy
+  port record. The retained isolated profile already contained only official
+  Java 6.8.21 and the S005 development extension for this test, so no extension
+  installation step ran between preparation and Arm A.
+- Every arm launched from its directory and opened the unchanged real Java
+  source. The six-entry debug-plus-five-Spring bundle array, imported project,
+  advertised Spring commands, `ServiceReady`, and zero final diagnostics were
+  observed without bundle, project, classloading, or trust errors.
+- Every JDT process reported the exact
+  `org.springframework.tooling.jdt.ls.extension.DEBUG=true` observation
+  property. Each Spring log then recorded the same attributable pre-execution
+  callback line before its result, confirming debug activation inside that
+  arm rather than merely in its parent shell.
+- Arm A's official proxy and Arm B's unmodified source build each exposed one
+  authentic six-argument callback to Zed. Both received `Unrecognized method`,
+  recorded Spring `FAILED`, and delivered zero callbacks to the sink with zero
+  sink rejection or internal error. Their relevant behavior was equivalent.
+- Arm C's routed proxy delivered exactly one authenticated callback to the
+  sink. The accepted record has method `workspace/executeClientCommand`, the
+  fixed command, six arguments, project `s004-command-fixture`, and deletion
+  state `false`. Acceptance occurs only after the existing URI, source-entry,
+  Maven build-file, and four Java 21 option assertions pass. There was no
+  rejection, internal error, or duplicate.
+- After the sink returned its fixed `{"result":"done"}`, the Spring job
+  directly recorded
+  `executing callback s005.classpath.callback.9f2c SUCCESS [done]` and no
+  callback failure. Because that line occurs only after the synchronous JDT LS
+  client request returns, and the reviewed proxy maps the sink result to the
+  pending original request ID, Gate D directly closes the Gate C result-
+  propagation gap.
+- All three add requests and all three remove requests returned `"ok"`. Add
+  durations were 0.005995, 0.006506, and 0.006991 seconds; remove durations were
+  0.002461, 0.003800, and 0.002311 seconds. Every Spring log attributes removal
+  to the fixed callback ID. After each remove response, exactly 10 seconds
+  passed with sink counts unchanged at 0, 0, and 1.
+- Point-in-time post-callback RSS, retained as observations rather than a
+  benchmark, was:
+
+  | Arm | Proxy | Sink | JDT LS |
+  | --- | ---: | ---: | ---: |
+  | A, official | 2,576 KiB | 53,312 KiB | 1,562,480 KiB |
+  | B, source | 2,592 KiB | 53,616 KiB | 1,299,728 KiB |
+  | C, routed | 2,992 KiB | 54,688 KiB | 1,503,808 KiB |
+
+- Final inspection found no isolated adapter, sink, S005 proxy, JDT LS, arm
+  route, or arm proxy-port record. Normal Zed was reopened through the normal
+  profile without the observation property. The isolated profile and installed
+  S005 development extension remain reusable as previously directed.
+
+### Gate D validation performed
+
+- The Gate C preservation manifest and all 19 listed core-evidence hashes were
+  verified after the move. Callback counts remained 0, 0, and 1.
+- Pinned commits, clean/expected source status, patch applicability, toolchain
+  identity, source and routed proxy hashes, fixed artifacts, and preparation
+  output were checked before any isolated launch.
+- All three pre-launch freshness checks covered both extracted runtime state
+  and the Java extension's real `~/Library/Caches/jdtls` key; the later arm was
+  checked only after the preceding arm had stopped and cleaned up.
+- Per-arm JDT logs were checked for one add command, one pre-execution debug
+  line, the expected failure or success, one remove command, and absence of
+  unexpected bundle/classloading errors. Sink JSONL was checked for accepted,
+  rejected, internal-error, and post-remove counts.
+- The Arm C raw Zed trace preserves the exact worktree, six bundle entries,
+  observation-property pickup, `ServiceReady`, and empty diagnostics. Arms A
+  and B preserve their direct callback/failure traces in the execution record
+  and copied JDT logs; their sink logs remain ignored evidence.
+- Each arm's raw JDT and sink logs and the Arm C raw Zed trace have separate
+  SHA-256 values recorded in the ignored Gate D manifest. No raw evidence was
+  staged.
+
+### Failed and constrained Gate D observations
+
+1. Zed app termination again did not let the disposable sink and proxy remove
+   their owned route and numeric port record before process exit. In every arm,
+   process absence, route schema/command, exact arm port filename, and current
+   port value were verified before those two files were explicitly removed.
+   This is a retained graceful-cleanup limitation, not hidden success.
+2. The JDT shutdown response appeared as `{}` where Zed expected a unit value,
+   so Zed logged a shutdown-deserialization error and an app-will-quit timeout.
+   All relevant child processes still exited. This was after callback success,
+   remove success, and the fixed observation interval, and occurred in the
+   control arms as well as the routed arm; it does not prevent callback
+   attribution but remains a cleanup constraint.
+3. Arm A and Arm B Zed output was retained in the execution transcript rather
+   than copied to separate ignored Zed-log files. Their copied JDT logs directly
+   retain the authentic callback attempt, `Unrecognized method` exception,
+   `FAILED`, and removal, while their copied sink logs prove zero delivery. Arm
+   C additionally has a complete ignored Zed trace. This retention difference
+   does not remove a required behavioral fact but is recorded explicitly.
+
+No setup correction, retry, arm reuse, UI interruption, or hypothesis-input
+change occurred in Gate D.
+
+### Gate D classification and remaining uncertainty
+
+S005 is **Supported on the tested macOS arm64/JDK 25 tuple**. Gate D corrected
+both Gate C attribution blockers: all accepted arms were fresh, and Arm C
+directly persisted Spring `SUCCESS [done]` after the one authenticated sink
+response. The controls remained equivalent, listener removal succeeded, and
+no duplicate appeared.
+
+This result proves only the fixed callback seam through disposable, private
+proxy instrumentation. It does not prove Spring Boot LS startup, the opposite
+Spring-LS-to-JDT request direction, delivery into a real `JdtLsProjectCache`, a
+supported Java-extension interface, or an acceptable product architecture.
+Linux, Windows, x86_64, other architectures, JDK 21, remote development, WSL,
+and the full product flow remain unverified. The direction-decision and product-
+scaffolding gates therefore remain closed.
+
 ## Success criteria
 
 The hypothesis is Supported on the tested host only if all of these hold:
@@ -1199,8 +1331,10 @@ Even Supported would not establish:
 
 ## Candidate follow-up
 
-After S005, draft the direction decision from R001-R005 and S001-S005 evidence.
-Do not start product scaffolding in the same task.
+Before drafting the direction decision, obtain the repository-required
+representative evidence on Linux x86_64 and Windows x86_64 in addition to the
+existing macOS arm64 result. Plan that work separately and do not start product
+scaffolding in the same task.
 
 If S005 is Supported, the decision must explicitly address why successful
 test-only proxy interception still requires upstream coordination or a Pivot.

@@ -23,7 +23,7 @@ Tentative sequence:
 | [S002](002-spring-ls-standard-lsp-baseline.md) | Run the Spring LS standard-LSP baseline with JDT classpath disabled | Refuted on macOS arm64: transport worked, but metadata-aware results were empty |
 | [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Supported on macOS arm64/JDK 25; representative platforms pending |
 | [S004](004-spring-jdt-bundle-command.md) | Load pinned Spring JDT bundles and execute one command | Supported on macOS arm64/JDK 25; representative platforms pending |
-| [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Gate D correction plan reviewed; Gate C remains Inconclusive on macOS arm64/JDK 25 pending fresh arms and a Spring `SUCCESS [done]` trace |
+| [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; representative platforms pending |
 
 Use [template.md](template.md) before adding any spike code.
 

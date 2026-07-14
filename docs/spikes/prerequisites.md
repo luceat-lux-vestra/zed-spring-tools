@@ -187,7 +187,7 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 plan | Gate D correction plan reviewed | Gate C remains Inconclusive on macOS arm64/JDK 25; corrected runtime awaits explicit continuation, fresh arms, and a Spring `SUCCESS [done]` trace |
+| S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; representative platforms pending |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -295,7 +295,7 @@ Host audited: macOS 26.5.1 arm64.
   Supported only on this macOS arm64/JDK 25 tuple; S005 planning is recorded
   below.
 
-### S005 Gate A through Gate C result
+### S005 Gate A through Gate D result
 
 - The fixed Spring source sends classpath events from JDT LS through the
   proposed `workspace/executeClientCommand` request. A non-batched event contains
@@ -332,17 +332,18 @@ Host audited: macOS 26.5.1 arm64.
   equivalent direct proxy-to-JDT response trace were not preserved. The result
   therefore cannot prove original-ID result propagation at the required
   attribution level.
-- The Gate D attribution-correction plan is now reviewed but not executed. It
-  preserves the failed Gate C evidence, reprepares all three arms only after
-  confirming the retained S005 installation, checks both extracted JDT state
-  and the Java extension's actual host caches, and enables the fixed Spring
-  plugin debug property equally in all arms. Arm C must persist
-  `SUCCESS [done]`; no proxy or product code change is planned.
+- Gate D preserved the failed Gate C evidence, prepared three new arms only
+  after confirming the retained S005 installation, and verified both extracted
+  JDT state and the Java extension's actual host caches before each launch.
+  Equal debug activation left the two controls equivalent: both recorded
+  `FAILED` and delivered nothing to the sink. The routed arm delivered one
+  structurally valid callback and directly persisted Spring `SUCCESS [done]`.
+  S005 is therefore Supported on this local tuple.
 - All isolated processes and private route/port records were removed and normal
   Zed was restored. The retained isolated profile contains Java 6.8.21 and the
-  disposable S005 development extension. A reviewed fresh-arm and success-trace
-  correction is required before the direction decision; no product skeleton,
-  reusable bridge/coordinator, or multiplatform claim is authorized.
+  disposable S005 development extension. No product skeleton, reusable bridge/
+  coordinator, or multiplatform claim is authorized. Linux x86_64 and Windows
+  x86_64 representative evidence is required before the direction decision.
 
 ### Required before representative multiplatform evidence
 
