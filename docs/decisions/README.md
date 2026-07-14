@@ -12,7 +12,8 @@ Decision records in this directory must cite supporting research and spike
 results. The next expected decision remains the project direction gate: Go,
 Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
 its end-to-end hypothesis input. S007 now records the reviewed managed-local
-JDT data-isolation prerequisite, but its implementation/runtime and a later
-attributable local PoC are still required.
+JDT data-isolation prerequisite and completed disposable Gate A preparation,
+but its real preparation/runtime and a later attributable local PoC are still
+required.
 
 Use [template.md](template.md) after sufficient evidence exists.

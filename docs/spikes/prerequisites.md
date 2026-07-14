@@ -191,7 +191,7 @@ Host audited: macOS 26.5.1 arm64.
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
 | S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
-| S007 plan | Reviewed; implementation not started | Managed-local JDT selection and two-run explicit data isolation only; Gate A remains closed pending an explicit continuation |
+| S007 plan | Gate A complete and reviewed | Disposable fixture/preparation tool and synthetic checks passed; real preparation, retained-profile mutation, and runtime remain unopened |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -381,11 +381,13 @@ Host audited: macOS 26.5.1 arm64.
   ignores `XDG_CACHE_HOME` on Darwin and the Java extension custom-launcher
   branch does not add `-data`; an unknown application-environment boundary is
   not needed to explain the result.
-- S007 has a reviewed plan to stage exactly one pinned JDT installation in the
+- S007 has a reviewed plan and Gate A disposable preparation implementation to
+  stage exactly one pinned JDT installation in the
   official Java extension's managed-local path, use the embedded Zed CLI with
   two distinct XDG roots and fresh worktrees, and attribute the explicit
-  `-data` path twice. Its implementation and runtime remain unopened. The local
-  end-to-end PoC and project direction gate remain incomplete.
+  `-data` path twice. Synthetic preparation checks passed, but the production
+  preparation path, retained-profile transition, and runtime remain unopened.
+  The local end-to-end PoC and project direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

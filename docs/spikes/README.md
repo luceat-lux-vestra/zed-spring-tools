@@ -20,7 +20,9 @@ but the actual JDT process selected a fresh host cache rather than the reviewed
 prepared data path. It stopped before completion/add/callback input and is
 Inconclusive, not Refuted. Subsequent exact source review established that the
 fixed packaged JDT launcher ignores XDG on Darwin; S007 now has a reviewed plan
-to test the official Java extension's explicit managed-local data path twice.
+and reviewed Gate A disposable preparation implementation for testing the
+official Java extension's explicit managed-local data path twice. Its real
+preparation and runtime gates have not started.
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
 
@@ -34,7 +36,7 @@ Tentative sequence:
 | [S004](004-spring-jdt-bundle-command.md) | Load pinned Spring JDT bundles and execute one command | Supported on macOS arm64/JDK 25; other targets untested |
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
 | [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
-| [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Plan reviewed; implementation not started |
+| [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Gate A disposable implementation complete and reviewed; Gate B not started |
 
 Use [template.md](template.md) before adding any spike code.
 

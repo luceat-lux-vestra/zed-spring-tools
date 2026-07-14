@@ -1,12 +1,13 @@
 # S007: Managed-local JDT data isolation through the Zed CLI
 
-- Status: Plan reviewed; implementation not started
+- Status: Gate A disposable implementation complete and reviewed; Gate B not
+  started
 - Date: 2026-07-15
 - Related decision: D001
 - Related research: R001, R003, R004
 - Depends on: S003-S005 Supported locally; S006 Inconclusive before hypothesis
   input
-- Implementation gate: closed until a later explicit continuation opens Gate A
+- Implementation gate: Gate B closed until a later explicit continuation
 
 ## Hypothesis
 
@@ -293,6 +294,72 @@ Gate A stops after source review, synthetic tests, and `git diff --check`. It
 must not modify the retained profile, extract a real artifact through the
 production path, start Zed/JDT, or use UI automation.
 
+### Gate A implementation and review result
+
+Gate A completed on 2026-07-15 without running the production preparation path.
+It added only the reviewed package-free `S007Fixture.java` and
+`PrepareS007.java` under `spikes/s007-managed-jdt-data/`.
+
+#### Confirmed facts
+
+- `PrepareS007` uses only JDK APIs and has no downloader, network client,
+  mutable version lookup, wrapper, launcher replacement, proxy modification, or
+  Zed-extension code.
+- Its production path fixes and verifies the JDT archive, official proxy,
+  debug JAR, Java extension WASM/manifest, Java source commit, embedded CLI,
+  Temurin JDK, fixture, Java work directory, and five fresh output identities
+  before creating a transaction directory.
+- The TAR/GZIP reader bounds entries and bytes, verifies header checksums and
+  two-block termination, permits only regular files/directories plus narrow
+  local metadata PAX records, and rejects traversal, absolute/drive paths,
+  invalid UTF-8, control characters, duplicate entries, links, devices, global
+  or unsupported PAX data, missing runtime layout, and incomplete archives.
+- The generated settings select only `jdtls` for Java, pin the Java home,
+  proxy, and debug paths, disable Lombok/JDK auto-download, set update checks to
+  `never`, and contain no `jdtls_launcher` key.
+- The generated manifest records every fixed input hash, the deterministic JDT
+  tree identity, one planned managed candidate/config path, both absolute
+  worktree hashes, both XDG/data paths, both host-fallback shapes, and the
+  settings identity.
+- Warning-as-error compilation passed with Temurin 25.0.3 using
+  `javac --release 21 -Xlint:all -Werror`. The compiled-class self-test and Java
+  source-file-mode self-test both reported
+  `S007 preparation synthetic tests passed`; `git diff --check` also passed.
+
+#### Synthetic conditions exercised
+
+- safe required-layout extraction and deterministic tree hashing;
+- traversal, absolute path, symbolic-link, device, duplicate-entry,
+  unsupported-PAX, and entry-size rejection with failed-output cleanup;
+- a missing JDT layout and a second managed candidate;
+- full absolute-path rather than basename hashing, including an independent
+  fixed UTF-8 SHA-1 value and Unicode/space paths;
+- distinct run data identities and existing-destination rejection; and
+- Java-only settings without a custom launcher plus complete/incomplete
+  manifest controls.
+
+#### Unverified runtime and production items
+
+- The production preparation path has not been invoked against the real pinned
+  archive or retained profile, so real archive compatibility, its aggregate
+  tree hash, fixed-input revalidation, and transactional output are not yet
+  observed facts.
+- No managed JDT candidate, proxy, debug JAR, settings, worktree, XDG root, or
+  data path was staged for runtime use. The ignored
+  `tmp/s007-gate-a-classes/` contains only disposable local compilation output.
+- No Zed, Java proxy, or JDT process was started; no profile, normal setting,
+  host cache, S006 evidence, or global environment was changed.
+
+Gate A review found and corrected two boundary gaps before closure: the reader
+now rejects non-round-trippable UTF-8/control/drive-prefixed TAR paths and
+requires the standard two zero end blocks. Gate B remains closed.
+
+The first combined final-validation command passed compilation and both
+self-tests, then used `git check-ignore --quiet` with two path arguments, which
+Git rejects as command misuse. The check was rerun once per ignored compilation
+directory and both paths passed; this correction did not change source or test
+output.
+
 ## Gate B: fixed preparation and isolated-profile transition
 
 Gate B requires another explicit continuation after Gate A review. It may:
@@ -509,4 +576,5 @@ these changes:
    packaging, and multiplatform support claims outside this prerequisite.
 
 No S007 code, fixture, managed JDT staging, isolated-profile mutation, Zed
-launch, JDT process, or UI automation occurred during planning or review.
+launch, JDT process, or UI automation occurred during planning or plan review.
+The later Gate A implementation and review are recorded separately above.
