@@ -1,10 +1,10 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Gate A complete and diff reviewed; awaiting user continuation to Gate B
+- Status: Gate B complete and evidence reviewed; awaiting user continuation to Gate C
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Gate B requires explicit user continuation
+- Implementation gate: Gate C requires explicit user continuation
 
 ## Hypothesis
 
@@ -642,10 +642,113 @@ is confined to `spikes/s005-classpath-callback/` and remains disposable.
   behavior; and
 - every platform/JDK tuple outside the already-known local prerequisites.
 
-Gate B requires a new explicit user continuation. It may obtain or reuse only
-the exact clean upstream checkout, apply the reviewed patch to a separate
-ignored copy, perform locked native builds, and prepare the fixed arms. Gate B
-must stop for evidence review before any Zed UI execution.
+Gate B began only after a new explicit user continuation. It obtained the exact
+clean upstream checkout, applied the reviewed patch to a separate ignored copy,
+performed locked native builds, prepared the fixed arms, and stopped for this
+evidence review before any Zed UI execution.
+
+## Gate B implementation record
+
+Gate B completed on 2026-07-14 without opening Zed, starting JDT LS, installing
+the S005 extension, or changing the retained isolated Zed profile. All source
+trees, native binaries, prepared runtimes, worktrees, and raw smoke evidence
+remain under ignored `tmp/` paths.
+
+### Confirmed Gate B facts
+
+- The baseline checkout was fetched directly from
+  `https://github.com/zed-extensions/java.git` at detached commit
+  `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`. Its commit date is
+  2026-07-09, its working tree remained clean after the build, and all six
+  source/lock/license hashes fixed in Gate A matched.
+- The fixed source declares proxy package 6.8.12 and Apache-2.0. It contains no
+  `NOTICE` file at that commit. The separate instrumented checkout retained the
+  same commit, Cargo lock, and license and contained only modified
+  `proxy/src/main.rs` plus untracked `proxy/src/s005_callback.rs`.
+- Both source proxies used rustc 1.97.0 commit `2d8144b...`, cargo 1.97.0 commit
+  `c980f48...`, host/target `aarch64-apple-darwin`, the fixed Cargo lock,
+  release profile, and `CARGO_INCREMENTAL=0`.
+- The unmodified source build is 851,280 bytes with SHA-256
+  `2c53fa08b3e33b3d35e56d8aa9c3e7b1607148e01720b2861af787906a001d33`.
+  Its locked upstream test target contains zero tests and passed.
+- The instrumented build is 895,392 bytes with SHA-256
+  `8464afa22887301171446dcc1e2338c554fda27e1d5b2f8d86ae954883409595`.
+  Its five fixed callback tests passed against the complete upstream crate.
+- The official, source-built, and routed proxies are all arm64 Mach-O files
+  without quarantine. `codesign --verify --strict` accepts their embedded
+  linker-generated ad-hoc signatures; none has a Team ID, so this is not
+  distribution-signing evidence.
+- The official binary links `libSystem.B.dylib` current version 1351 while both
+  local source builds link current version 1356. This expected build-environment
+  difference reinforces that Gate C must test behavioral parity rather than
+  binary equality.
+- `PrepareS005` reverified the fixed JDT LS, Spring VSIX, official proxy, debug
+  bundle, source commit, and both built proxies and transactionally created all
+  three arms. Their proxy SHA-256 values exactly match the official, source,
+  and routed values above.
+- The three extracted JDT trees have aggregate content SHA-256
+  `5c38d7a59e8a9efba4ab7ae9dc4ae94e8c15734fd830d1ac4ef729287efb184c`
+  while their launcher files have three distinct inodes. The three initially
+  prepared worktrees had identical aggregate content SHA-256
+  `f7f1bd3f570fd4fe22d8977f8dbe7923889d2946387d1659b28d9e787e1676a3`.
+- Each arm has only its fixed SHA-1 data-cache directory, five verified Spring
+  bundles, the same Maven fixture and sink, no JDT `configuration` directory,
+  and no `.project`, `.classpath`, `.settings`, route record, or build output at
+  preparation audit time.
+
+### Gate B non-UI validation performed
+
+- The official, source-built, and routed proxies each started a `/usr/bin/true`
+  child, created their private loopback HTTP listener, observed child exit 0,
+  returned exit 0, and removed their port file. No JDT process was involved.
+- The prepared routed sink started under local Node 26.5.0, the same binary and
+  version previously observed through Zed's Node API, published a structurally
+  valid fresh route, answered LSP initialize and shutdown, received exit,
+  recorded a graceful stop with zero callbacks, and removed only its own route.
+  Its ignored JSONL contains no absolute home path, route port, or token.
+- The Gate A adapter tests, sink self-tests, patch contract, Java warning-as-error
+  compilation, and preparation self-test remained valid. The corrected patch
+  also passed apply-check against the complete clean baseline, complete-source
+  rustfmt, locked tests, and release build.
+- Final process inspection found no `java-lsp-proxy` or `jdtls` process and no
+  S005 route or port file. Normal Zed remained running and untouched.
+
+### Failed and corrected Gate B observations
+
+1. A shell audit used zsh's special `path` array as a loop variable, which
+   temporarily replaced `PATH` inside that one shell and prevented only the
+   trailing disk-capacity command from running. The exact artifact audit had
+   already completed; capacity and process checks were immediately rerun using
+   safe variable names and absolute utility paths.
+2. The first instrumented-scope assertion used `git diff --name-only`, which
+   omits untracked files, and the command group did not use fail-fast mode. No
+   source changed. All subsequent Gate B compound checks used
+   `set -euo pipefail`, and exact scope was reverified with
+   `git status --porcelain`; a second retry also avoided zsh's read-only
+   `status` variable.
+3. The first full-source instrumented `cargo fmt --check` found that the
+   inserted `s005_callback_root` assignment needed rustfmt line wrapping. It
+   stopped before test or build. The committed patch was corrected only for
+   that formatting, then rechecked against both the generated Gate A preimage
+   and complete clean upstream source before the successful locked build.
+
+### Still unverified after Gate B
+
+- whether the official and source-built unmodified proxies behave equivalently
+  for the real callback despite their different build environments;
+- whether Zed forwards, rejects, or times out the fixed callback in Arms A and B;
+- whether the fixed Spring listener emits the expected initial event and exact
+  six-position runtime payload;
+- whether Arm C returns the sink's `"done"` result under the original ID and
+  Spring records callback success;
+- listener removal, post-remove silence, real JDT/proxy/sink cleanup, and normal
+  Zed restoration; and
+- every representative or full platform/JDK tuple.
+
+Gate C requires a new explicit user continuation. Immediately before UI
+automation, the user must be told not to use the keyboard or mouse. Gate C must
+run the three arms in order, stop on an Arm B parity failure, restore normal Zed
+and user input afterward, and classify only the local macOS arm64/JDK 25 result.
 
 ## Success criteria
 

@@ -25,12 +25,13 @@ index cbb4aa1..9f2c005 100644
  use platform::spawn_parent_monitor;
  use serde_json::Value;
  use std::{
-@@ -51,6 +52,7 @@ fn main() {
+@@ -51,6 +52,8 @@ fn main() {
              .to_string_lossy()
              .trim_end_matches('/'),
      );
 -
-+    let s005_callback_root = env::current_dir().unwrap_or_else(|_| Path::new(workdir).to_path_buf());
++    let s005_callback_root =
++        env::current_dir().unwrap_or_else(|_| Path::new(workdir).to_path_buf());
 +
      // Spawn JDTLS (use shell on Windows for .bat files)
      let mut cmd = Command::new(bin);

@@ -187,7 +187,7 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 Gate A | Complete | Disposable adapter, sink, preparation tool, and fixed-method proxy patch passed synthetic diff review; real source builds have not started |
+| S005 Gate B | Complete | Exact source baseline and routed proxy passed locked arm64 builds; three fixed arms and non-UI smokes passed; Zed runtime has not started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -295,7 +295,7 @@ Host audited: macOS 26.5.1 arm64.
   Supported only on this macOS arm64/JDK 25 tuple; S005 planning is recorded
   below.
 
-### S005 planning gate
+### S005 plan and non-UI gates
 
 - The fixed Spring source sends classpath events from JDT LS through the
   proposed `workspace/executeClientCommand` request. A non-batched event contains
@@ -313,10 +313,14 @@ Host audited: macOS 26.5.1 arm64.
   boundary without claiming an end-to-end integration.
 - Gate A added the disposable S005 adapter, sink, preparation tool, and
   fixed-method patch and validated them only with generated fixtures. No real
-  native source checkout, fixed proxy build, fixed-arm preparation, Zed UI, or
-  JDT runtime has been acquired or executed. Gate B requires explicit
-  continuation and remains limited to the reviewed instrument, not a reusable
-  bridge/coordinator module.
+  native source checkout, fixed proxy build, or fixed-arm preparation occurred
+  in that gate.
+- Gate B then verified the exact clean Java extension commit, built the
+  unmodified and instrumented proxies with the same locked native conditions,
+  prepared three fresh arms, and passed process-only proxy and sink smokes. It
+  did not open or automate Zed and did not start JDT LS. Gate C requires
+  explicit continuation and remains limited to the reviewed instrument, not a
+  reusable bridge/coordinator module.
 
 ### Required before representative multiplatform evidence
 
