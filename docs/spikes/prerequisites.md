@@ -190,7 +190,7 @@ Host audited: macOS 26.5.1 arm64.
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart; other targets untested |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
-| S006 plan | Gate A complete; Gate B not started | Disposable adapter/proxies/fixture/preparation tool and synthetic contracts passed review; fixed-source build, preparation, and runtime remain closed |
+| S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -349,7 +349,7 @@ Host audited: macOS 26.5.1 arm64.
   Windows runtime validation after the local end-to-end PoC, direction decision,
   and initial public GitHub source release.
 
-### S006 reviewed plan and Gate A result
+### S006 Gate A through Gate C result
 
 - S006 narrows the local end-to-end PoC to one Maven Spring Boot `3.5.5`
   fixture and one visible `server.port` completion in Zed.
@@ -363,10 +363,22 @@ Host audited: macOS 26.5.1 arm64.
   Java proxy patch/contract harness, and preparation tool. Adapter Rust/WASM,
   Node protocol, patch Rust, and Java preparation synthetic checks passed after
   the intermediate compile/format/contract defects recorded in S006 were fixed.
-- No real artifact was prepared, no proxy was built from the actual checkout,
-  and no extension or language server was installed or launched. Gate B
-  fixed-source build/preparation and Gate C runtime each require a later
-  explicit continuation after review.
+- Gate B built the fixed source and instrumented proxies, resolved the pinned
+  Boot fixture, prepared fresh JDT/Spring inputs, and passed fake-child process
+  boundaries. It did not launch Zed or a real language server.
+- Gate C's first setup launch exposed that the executable Spring JAR required
+  its 168 adjacent VSIX libraries. The single documented setup correction added
+  exact manifest-closure extraction and synthetic rejection tests; the corrected
+  real Spring LS then initialized with classpath listening disabled, while JDT
+  installed six bundles, imported Maven, and reached `ServiceReady`.
+- The corrected launch still selected a newly created host JDT data path rather
+  than the reviewed prepared `XDG_CACHE_HOME` path. S006 stopped before opening
+  the properties fixture, so no completion, listener add, callback, project
+  cache, or `server.port` hypothesis input occurred. It is Inconclusive rather
+  than Refuted, and its explicit one-correction rule closes an in-place retry.
+- A separately reviewed prerequisite spike must first prove that a macOS app
+  launch selects a predeclared empty JDT data location in two fresh runs. The
+  local end-to-end PoC and project direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

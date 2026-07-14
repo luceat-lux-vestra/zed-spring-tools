@@ -1,14 +1,14 @@
 # S006: Real Spring Boot LS classpath-to-completion PoC
 
-- Status: Gate B fixed-source build and non-UI preparation complete; Gate C not started
+- Status: Inconclusive on macOS arm64/JDK 25 before hypothesis input; Gate C
+  closed after the one permitted setup-only correction
 - Date: 2026-07-15
 - Related decision: D001
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Next gate: no extension installation, real language-server launch, or Zed
-  execution until the Gate B evidence is accepted and an explicit continuation
-  opens Gate C
+- Next experiment: separately plan and review only the macOS application-launch
+  to fresh-JDT-data prerequisite; do not retry S006 in place
 
 ## Hypothesis
 
@@ -628,10 +628,11 @@ JDT LS process, or real Spring Boot LS process was started.
 - Fixed dependency evidence is retained under
   `tmp/s006-gate-b-maven-evidence-20260715/`; its classpath points only into the
   fresh S006 Maven repository, not the host `~/.m2` repository.
-- Prepared identities are in
-  `tmp/s006-gate-b-artifacts-20260715/s006-prepared-manifest.txt`; exact runtime
-  settings are adjacent in `isolated-settings.json`. These ignored files are
-  local evidence, not distributable artifacts or support declarations.
+- Prepared identities were originally created in
+  `tmp/s006-gate-b-artifacts-20260715/` and are now preserved under
+  `tmp/s006-gate-c-rejected-setup-20260715T0438/artifacts/`; exact runtime
+  settings are adjacent to its manifest. These ignored files are local
+  evidence, not distributable artifacts or support declarations.
 
 #### Inferences
 
@@ -687,6 +688,103 @@ fixture, or hypothesis.
   a new explicit continuation, a final preflight, and a warning that the user
   must not use keyboard or mouse while the permitted UI automation controls
   isolated Zed. Gate B alone does not open the direction-decision gate.
+
+## Gate C rejected setup launch and correction plan
+
+Gate C was opened on 2026-07-15 after the user's explicit continuation. The
+first isolated launch was rejected before any completion probe, Spring add
+request, or classpath callback. Its mutable state is preserved under ignored
+`tmp/s006-gate-c-rejected-setup-20260715T0438/`; it must not be reused as an
+accepted run.
+
+### Confirmed facts
+
+- The first direct application-binary launch exited before creating an isolated
+  Zed process or language-server evidence. Launching the same fixed application
+  through macOS application services succeeded. This was an operator launch
+  correction, not a language-server result.
+- JDT LS subsequently imported the fixed Maven fixture and installed and
+  started the Java debug bundle plus all five fixed Spring JDT bundles.
+- The real Spring child exited with code 1 before initialization. Its separated
+  stderr identifies `NoClassDefFoundError` for
+  `org.springframework.ide.vscode.commons.languageserver.java.JavaProjectFinder`.
+- The prepared Spring executable JAR manifest declares 168 relative
+  `lib/*.jar` class-path entries. The fixed, digest-verified VSIX contains those
+  168 adjacent regular JAR entries, but Gate B `PrepareS006` extracted only the
+  executable JAR and five JDT bundles. The missing adjacent runtime libraries
+  therefore explain the child startup failure without testing the S006
+  classpath-to-completion hypothesis.
+- The lazily started JDT process used the host Java-extension cache instead of
+  the prepared `XDG_CACHE_HOME` path. The launch environment had been removed
+  after Zed appeared but before the language servers were started, so the run
+  also failed the accepted-run freshness precondition.
+- The Spring proxy evidence contains only `spring-child-exit`; it contains no
+  Zed completion request, baseline result, listener-enable command, Spring
+  route, add request, callback, or post-cache probe.
+- After Maven import, the Spring JDT bundle sent
+  `workspace/executeClientCommand` for `vscode-spring-boot.ls.start`. The pinned
+  Spring Tools source shows that this command asks the VS Code extension host
+  to start Spring LS and register its classpath and Java-data services. Zed does
+  not implement that VS Code command, while the disposable S006 adapter already
+  owns the Spring LS process independently.
+
+### Primary source and retained evidence references
+
+- The executable JAR's `META-INF/MANIFEST.MF` and the fixed VSIX entries are
+  retained with the rejected worktree and the existing fixed input
+  respectively. Their previously reviewed SHA-256 identities remain
+  `ec922c5...c8e1` and `70943c4...1bb3`.
+- The rejected worktree retains separated Spring stderr, proxy JSONL, imported
+  project metadata, build output, and owned route state. The rejected artifact
+  directory, actual host JDT data, Java proxy record, and point-in-time Zed logs
+  are preserved beside it.
+- The lifecycle command is emitted by pinned
+  `JdtLsExtensionPlugin.java`; its VS Code handler is registered by pinned
+  `vscode-spring-boot/lib/Main.ts` at Spring Tools commit
+  `18d1a975dbea4f9314fd736d0237bd9e23f243f9`.
+
+### Inferences
+
+- Supplying the executable JAR's complete adjacent manifest class path should
+  remove this specific startup error. It does not establish that Spring LS will
+  initialize, accept the real callback, populate its cache, or return the target
+  completion.
+- Keeping the application launch environment until every isolated child exits
+  should make the fixed Java launcher choose the prepared cache. The new run
+  must verify the actual process and data paths rather than relying on this
+  inference.
+- The unhandled VS Code lifecycle command may be harmless to the independent
+  S006 Spring process, or it may expose an intrinsic topology gap. Gate C will
+  preserve it and determine whether it blocks the fixed experiment.
+
+### One permitted setup-only correction
+
+1. Keep the rejected state unchanged and prepare wholly new artifact,
+   worktree, JDT-data, route, process, and evidence paths.
+2. Narrowly change `PrepareS006` so it extracts all and only the 168 regular,
+   top-level JARs under the fixed VSIX `extension/language-server/lib/` path
+   beside the verified server JAR. Reject duplicates, nested or non-JAR
+   entries, entry-count drift, missing manifest entries, and unreferenced
+   extracted entries. Record the deterministic library-set digest and count in
+   the ignored manifest. The already pinned VSIX digest remains the binary
+   trust root.
+3. Add synthetic preparation tests for a closed server-manifest class path and
+   for missing, extra, and malformed library sets; rerun warning-as-error Java
+   compilation and all existing Gate A/B validations before production
+   preparation.
+4. Keep the fixed `XDG_CACHE_HOME`, JDK, Maven repository, and debug options in
+   the macOS launch environment until Zed and all isolated language-server
+   children have stopped. Verify the selected cache before any completion
+   input.
+5. Do not alter versions, fixture content, command IDs, callback shape, proxy
+   routing, completion logic, or success criteria. In particular, do not
+   intercept, suppress, or synthesize success for
+   `vscode-spring-boot.ls.start`; retain the observation and classify any
+   attributable blocker under the existing Gate C rules.
+
+This is the single setup-only correction permitted by the written plan. Any
+further setup defect, or any failure after hypothesis input begins, is recorded
+without another in-place correction.
 
 ## Gate C: local Zed end-to-end runtime
 
@@ -833,6 +931,99 @@ failed state and prepare a new worktree/cache. After any hypothesis input or
 protocol behavior begins, no in-place correction or retry is allowed; use the
 fresh repetition rule or record the result.
 
+## Gate C execution record: Inconclusive before hypothesis input
+
+Gate C used the single documented setup-only correction, then stopped before
+the first completion probe because the corrected launch still failed one fixed
+runtime-identity precondition. S006 is therefore Inconclusive, not Refuted, on
+the tested macOS arm64/JDK 25 tuple.
+
+### Confirmed facts
+
+- The corrected `PrepareS006` production path reverified every Gate B input and
+  created a wholly new worktree, artifact directory, and planned JDT data path.
+  It extracted 168 adjacent Spring server libraries, proved exact closure with
+  the executable JAR manifest, and recorded deterministic library-set SHA-256
+  `f1fe021...aeea56c` under the unchanged pinned VSIX identity.
+- Java warning-as-error compilation and the expanded preparation self-test
+  passed. The new tests accept a closed manifest/library set and reject missing,
+  extra, and nested entries. The Spring proxy syntax and complete synthetic
+  test passed; the adapter passed formatting, warnings-denied Clippy, five
+  locked tests, and the WASI check; all three fake-child process smokes passed.
+- The isolated profile used Zed `1.10.3+stable.324`, official Java extension
+  `6.8.21`, only the S006 development extension for Java/Properties, the fixed
+  Temurin JDK `25.0.3`, six exact debug-plus-Spring bundle paths, and the newly
+  prepared proxy/JDT paths.
+- The corrected real Spring child started in about 1.6 seconds, completed LSP
+  initialization, registered its classpath command, and directly logged
+  `classpathEnabled=false`. The earlier missing-class failure did not recur.
+- JDT installed all six contributed bundles, imported the fixed Maven project,
+  and emitted `ServiceReady`. The fixed Maven/debug `JAVA_TOOL_OPTIONS` was
+  present in JDT stderr.
+- The macOS launch environment reported the planned `XDG_CACHE_HOME` before and
+  throughout the isolated run, but the actual JDT process command selected a
+  newly created host-cache `-data` path instead of the empty prepared path. The
+  matching host cache had been absent at preflight, so no stale project was
+  reused, but the runtime identity no longer matched the reviewed plan.
+- After import, the Spring JDT bundle again sent the upstream
+  `vscode-spring-boot.ls.start` client command and Zed returned `-32601`. This
+  known VS Code lifecycle mismatch was preserved and was not intercepted or
+  rewritten.
+- The run stopped without opening `application.properties`. The Spring proxy
+  evidence file is empty with SHA-256 `e3b0c44...b855`; there was no completion
+  request, baseline response, listener enable, Spring route, add request,
+  classpath callback, cache event, readiness probe, or remove request.
+- The separated Spring stderr is retained at SHA-256
+  `3afa6c0...a278`; the actual JDT metadata log is retained at
+  `08534a5...38f5`. All isolated processes and owned records were removed, the
+  temporary launch environment was cleared, and normal Zed was restored without
+  the isolated profile.
+
+### Primary evidence references
+
+- The first rejected setup launch is retained under ignored
+  `tmp/s006-gate-c-rejected-setup-20260715T0438/`.
+- The corrected but Inconclusive run is retained under ignored
+  `tmp/s006-gate-c-inconclusive-run1-20260715T0449/`. It contains the prepared
+  manifest/settings, complete worktree and project state, empty proxy evidence,
+  Spring stderr, actual host JDT data, Java proxy record, isolated-profile
+  snapshot, and point-in-time Zed logs.
+- The tracked source remains the disposable preparation tool and S006 adapter,
+  proxy, fixture, and patch text. No private raw payload, absolute path, token,
+  port, classpath, binary, or third-party artifact is committed.
+
+### Inferences and unverified hypotheses
+
+- The closed adjacent library set is sufficient to remove the observed Spring
+  child classloading failure on this tuple. It does not prove the S006 feature
+  hypothesis.
+- The evidence shows that the JDT child inherited `JAVA_TOOL_OPTIONS` while its
+  launcher did not use the application-level `XDG_CACHE_HOME`. Which Zed or
+  macOS environment boundary changes or removes that one variable remains
+  unverified.
+- The upstream lifecycle-command mismatch remains a possible topology blocker.
+  Because the baseline/add/callback sequence never began, this run cannot decide
+  whether the independently owned Spring process would continue successfully.
+- The real Spring handler, project cache creation, property-index readiness,
+  `server.port` completion, callback correlation, listener removal, and fresh
+  repetition all remain untested by S006.
+
+### Classification and candidate next experiment
+
+The actual JDT data identity differed from the reviewed prepared runtime, so
+success criterion 1 and the required freshness attribution were insufficient.
+The fixed relay and completion hypothesis did not run, so none of the Refuted
+conditions was reached. S006 is closed as Inconclusive without a fresh
+repetition; repeating after another launch correction would exceed its explicit
+single-correction rule.
+
+The next candidate experiment is a new, narrow prerequisite spike. Before any
+Spring server, Spring bundle, proxy relay, or completion input participates, it
+should compare fixed macOS application-launch mechanisms and require the actual
+JDT `-data` argument to select a predeclared empty location in two fresh runs,
+with normal Zed restored afterward. Only Supported evidence from that experiment
+can justify a newly planned end-to-end spike; it must not reopen S006 in place.
+
 ## Evidence and privacy rules
 
 - Commit only the reviewed disposable source/patch/test text and summarized
@@ -882,8 +1073,9 @@ After S006 classification, do not start product scaffolding in the same task.
 - Then create a capability inventory for VS Code Spring Tools and prioritize the
   next smallest user-visible capability; do not describe the single completion
   as parity.
-- If Refuted or Inconclusive, plan only the evidence-backed correction or
-  architecture comparison that can change the direction outcome.
+- Because S006 is Inconclusive, plan only the isolated macOS launch-to-JDT-data
+  prerequisite experiment described above. Do not begin product scaffolding,
+  public-source release work, or a direction decision yet.
 
 ## Plan review checklist
 
@@ -926,7 +1118,8 @@ points:
    proxy cannot manufacture or rewrite `server.port`.
 
 All checklist items were satisfied at plan level. Gates A and B were
-subsequently opened, implemented, reviewed, and closed as recorded above. A
-prepared ignored runtime now exists, but no extension installation, real
-language-server execution, or Zed runtime has occurred. Gate C remains closed
-until a later explicit continuation.
+subsequently opened, implemented, reviewed, and closed as recorded above. Gate C
+later started the real fixed servers, used its one permitted setup correction,
+and stopped before hypothesis input when the actual JDT data path did not match
+the reviewed prepared runtime. The execution record above supersedes the former
+closed-gate note; S006 is now Inconclusive and closed.

@@ -13,13 +13,14 @@ Each spike still requires its own written plan and success/failure criteria
 before disposable code is added.
 
 The [prerequisite and platform matrix](prerequisites.md) is approved for
-feasibility work. S006 now has a reviewed local end-to-end PoC plan, a completed
-Gate A disposable implementation and synthetic validation, and a completed
-Gate B fixed-source build, pinned dependency resolution, fresh preparation, and
-fake-child process validation. Its next step is the separately gated real Zed
-execution in Gate C. Platform validation follows incrementally after the local
-PoC and initial public source release; multiplatform claims still require the
-declared matrix.
+feasibility work. S006 now has a reviewed local end-to-end PoC plan, completed
+Gate A disposable implementation and Gate B non-UI preparation. Gate C used its
+single setup-only correction: the corrected Spring LS and JDT import succeeded,
+but the actual JDT process selected a fresh host cache rather than the reviewed
+prepared data path. It stopped before completion/add/callback input and is
+Inconclusive, not Refuted. Platform validation follows incrementally after a
+later local PoC and initial public source release; multiplatform claims still
+require the declared matrix.
 
 Tentative sequence:
 
@@ -30,7 +31,7 @@ Tentative sequence:
 | [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Supported on macOS arm64/JDK 25; other targets untested |
 | [S004](004-spring-jdt-bundle-command.md) | Load pinned Spring JDT bundles and execute one command | Supported on macOS arm64/JDK 25; other targets untested |
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
-| [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Gate B fixed-source build and non-UI preparation complete; Gate C not started |
+| [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
 
 Use [template.md](template.md) before adding any spike code.
 

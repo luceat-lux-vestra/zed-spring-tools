@@ -22,6 +22,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -47,6 +49,8 @@ public final class PrepareS006 {
             "9148b8972c1b93fbe5512a9ecf0ba33c3182970d";
     private static final String SERVER_ENTRY =
             "extension/language-server/spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar";
+    private static final String SERVER_LIB_PREFIX = "extension/language-server/lib/";
+    private static final int EXPECTED_SERVER_LIBRARIES = 168;
     private static final String BUNDLE_PREFIX = "extension/jars/";
     private static final String METADATA_ENTRY = "META-INF/spring-configuration-metadata.json";
     private static final String FIXTURE_ROOT =
@@ -199,7 +203,8 @@ public final class PrepareS006 {
             Path bundles = worktreeStage.resolve(".s006-artifacts/bundles");
             Files.createDirectories(spring);
             Files.createDirectories(bundles);
-            extractSpringInputs(vsixInput, spring, bundles, expected);
+            SpringInputs springInputs = extractSpringInputs(
+                    vsixInput, spring, bundles, expected, EXPECTED_SERVER_LIBRARIES);
             Path probe = worktreeStage.resolve(".s006-artifacts/probe");
             Files.createDirectories(probe);
             Files.copy(sourceRoot.resolve(PROXY_SOURCE), probe.resolve("spring_proxy.mjs"));
@@ -210,7 +215,8 @@ public final class PrepareS006 {
             writeManifest(
                     artifactStage.resolve("s006-prepared-manifest.txt"),
                     jdtHash, vsixHash, sourceProxyHash, instrumentedProxyHash,
-                    debugHash, sha256(metadataInput), dataCacheName, expected);
+                    debugHash, sha256(metadataInput), dataCacheName, expected,
+                    springInputs);
 
             moveFresh(artifactStage, artifacts);
             moved.add(artifacts);
@@ -229,19 +235,25 @@ public final class PrepareS006 {
         }
     }
 
-    private static void extractSpringInputs(
+    private static SpringInputs extractSpringInputs(
             Path vsix,
             Path springDestination,
             Path bundleDestination,
-            ExpectedInputs expected) throws IOException {
+            ExpectedInputs expected,
+            int expectedLibraryCount) throws IOException {
         Map<String, DestinationSpec> selected = new LinkedHashMap<>();
+        Path server = springDestination.resolve(Path.of(SERVER_ENTRY).getFileName());
         selected.put(SERVER_ENTRY,
-                new DestinationSpec(springDestination.resolve(Path.of(SERVER_ENTRY).getFileName()), expected.server()));
+                new DestinationSpec(server, expected.server()));
         for (NamedArtifact bundle : expected.bundles()) {
             selected.put(BUNDLE_PREFIX + bundle.name(),
                     new DestinationSpec(bundleDestination.resolve(bundle.name()), bundle.spec()));
         }
-        Set<String> found = new HashSet<>();
+        Path libraryDestination = springDestination.resolve("lib");
+        Files.createDirectory(libraryDestination);
+        Set<String> selectedFound = new HashSet<>();
+        Set<String> librariesFound = new HashSet<>();
+        long extractedLibraryBytes = 0;
         try (ZipInputStream zip = new ZipInputStream(
                 new BufferedInputStream(Files.newInputStream(vsix)))) {
             int entries = 0;
@@ -250,19 +262,90 @@ public final class PrepareS006 {
                     throw new IOException("VSIX contains too many entries");
                 }
                 DestinationSpec destination = selected.get(entry.getName());
-                if (destination == null) {
+                if (destination != null) {
+                    if (entry.isDirectory() || !selectedFound.add(entry.getName())) {
+                        throw new IOException("duplicate or invalid selected VSIX entry");
+                    }
+                    copyBounded(zip, destination.path(), MAX_ENTRY_BYTES);
+                    verifyArtifact(destination.path(), destination.spec());
                     continue;
                 }
-                if (entry.isDirectory() || !found.add(entry.getName())) {
-                    throw new IOException("duplicate or invalid selected VSIX entry");
+                if (!entry.getName().startsWith(SERVER_LIB_PREFIX)) {
+                    continue;
                 }
-                copyBounded(zip, destination.path(), MAX_ENTRY_BYTES);
-                verifyArtifact(destination.path(), destination.spec());
+                String name = entry.getName().substring(SERVER_LIB_PREFIX.length());
+                if (entry.isDirectory() || !isTopLevelJar(name)
+                        || !librariesFound.add(name)) {
+                    throw new IOException("duplicate or invalid Spring server library entry");
+                }
+                Path destinationPath = safeArchiveTarget(libraryDestination, name);
+                copyBounded(zip, destinationPath, MAX_ENTRY_BYTES);
+                extractedLibraryBytes += Files.size(destinationPath);
+                if (extractedLibraryBytes > MAX_EXTRACTED_BYTES) {
+                    throw new IOException("Spring server libraries exceed the safety limit");
+                }
             }
         }
-        if (!found.equals(selected.keySet())) {
+        if (!selectedFound.equals(selected.keySet())) {
             throw new IOException("VSIX is missing a fixed Spring input");
         }
+        if (librariesFound.size() != expectedLibraryCount) {
+            throw new IOException("Spring server library count changed");
+        }
+        return verifyServerLibraryClosure(
+                server, libraryDestination, librariesFound, expectedLibraryCount);
+    }
+
+    private static SpringInputs verifyServerLibraryClosure(
+            Path server,
+            Path libraryDirectory,
+            Set<String> extractedLibraries,
+            int expectedLibraryCount) throws IOException {
+        String classPath;
+        try (JarFile jar = new JarFile(server.toFile(), false)) {
+            if (jar.getManifest() == null) {
+                throw new IOException("Spring server JAR has no manifest");
+            }
+            classPath = jar.getManifest().getMainAttributes()
+                    .getValue(Attributes.Name.CLASS_PATH);
+        }
+        if (classPath == null || classPath.isBlank()) {
+            throw new IOException("Spring server JAR has no manifest class path");
+        }
+        Set<String> referencedLibraries = new HashSet<>();
+        for (String entry : classPath.trim().split("\\s+")) {
+            if (!entry.startsWith("lib/")) {
+                throw new IOException("Spring server manifest has a non-library class path");
+            }
+            String name = entry.substring("lib/".length());
+            if (!isTopLevelJar(name) || !referencedLibraries.add(name)) {
+                throw new IOException("Spring server manifest has an invalid library entry");
+            }
+        }
+        if (referencedLibraries.size() != expectedLibraryCount
+                || !referencedLibraries.equals(extractedLibraries)) {
+            throw new IOException("Spring server manifest and extracted libraries differ");
+        }
+
+        MessageDigest digest = messageDigest("SHA-256");
+        for (String name : referencedLibraries.stream().sorted().toList()) {
+            Path library = requireRegularFile(
+                    libraryDirectory.resolve(name), "Spring server library");
+            updateDigest(digest, name);
+            digest.update((byte) 0);
+            updateDigest(digest, Long.toString(Files.size(library)));
+            digest.update((byte) 0);
+            updateDigest(digest, sha256(library));
+            digest.update((byte) '\n');
+        }
+        return new SpringInputs(
+                referencedLibraries.size(), HexFormat.of().formatHex(digest.digest()));
+    }
+
+    private static boolean isTopLevelJar(String name) {
+        return !name.isBlank() && name.endsWith(".jar")
+                && name.indexOf('/') < 0 && name.indexOf('\\') < 0
+                && name.indexOf('\0') < 0;
     }
 
     private static void extractTarGzip(Path archive, Path destination) throws IOException {
@@ -406,7 +489,8 @@ public final class PrepareS006 {
     private static void writeManifest(
             Path destination, String jdt, String vsix, String sourceProxy,
             String instrumentedProxy, String debug, String metadata,
-            String dataCacheName, ExpectedInputs expected) throws IOException {
+            String dataCacheName, ExpectedInputs expected,
+            SpringInputs springInputs) throws IOException {
         StringBuilder manifest = new StringBuilder(
                 "jdtls=" + jdt + "\n"
                         + "vsix=" + vsix + "\n"
@@ -416,6 +500,8 @@ public final class PrepareS006 {
                         + "metadata=" + metadata + "\n"
                         + "source-commit=" + UPSTREAM_COMMIT + "\n"
                         + "spring-server=" + expected.server().sha256() + "\n"
+                        + "spring-server-library-count=" + springInputs.count() + "\n"
+                        + "spring-server-library-set=" + springInputs.sha256() + "\n"
                         + "jdt-data-cache=" + dataCacheName + "\n");
         for (NamedArtifact bundle : expected.bundles()) {
             manifest.append("spring-bundle-")
@@ -603,12 +689,7 @@ public final class PrepareS006 {
     }
 
     private static String sha256(Path path) throws IOException {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException error) {
-            throw new IllegalStateException("SHA-256 unavailable", error);
-        }
+        MessageDigest digest = messageDigest("SHA-256");
         try (InputStream input = new BufferedInputStream(Files.newInputStream(path))) {
             byte[] buffer = new byte[BUFFER_SIZE];
             for (int read; (read = input.read(buffer)) >= 0;) digest.update(buffer, 0, read);
@@ -617,13 +698,21 @@ public final class PrepareS006 {
     }
 
     private static String sha1(String value) {
+        MessageDigest digest = messageDigest("SHA-1");
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        return HexFormat.of().formatHex(digest.digest(bytes));
+    }
+
+    private static MessageDigest messageDigest(String algorithm) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-            return HexFormat.of().formatHex(digest.digest(bytes));
+            return MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException error) {
-            throw new IllegalStateException("SHA-1 unavailable", error);
+            throw new IllegalStateException(algorithm + " unavailable", error);
         }
+    }
+
+    private static void updateDigest(MessageDigest digest, String value) {
+        digest.update(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String run(Path directory, String... command) throws Exception {
@@ -687,9 +776,84 @@ public final class PrepareS006 {
                     sha1("s006-gate-b-worktree-9f2c")
                             .equals("551c6de9135e318529ad5c02825bdcbc10bbf77e"),
                     "JDT data cache key changed");
+            testSpringLibraryExtraction(root);
         } finally {
             deleteRecursively(root);
         }
+    }
+
+    private static void testSpringLibraryExtraction(Path root) throws Exception {
+        Path server = root.resolve("server.jar");
+        writeServerJar(server, "lib/alpha.jar lib/beta.jar");
+        ExpectedInputs expected = syntheticExpected(server);
+        Map<String, byte[]> goodEntries = new LinkedHashMap<>();
+        goodEntries.put(SERVER_ENTRY, Files.readAllBytes(server));
+        goodEntries.put(SERVER_LIB_PREFIX + "alpha.jar", new byte[] {1});
+        goodEntries.put(SERVER_LIB_PREFIX + "beta.jar", new byte[] {2});
+        Path goodVsix = root.resolve("spring-good.vsix");
+        writeZip(goodVsix, goodEntries);
+        Path goodSpring = root.resolve("spring-good");
+        Path goodBundles = root.resolve("bundles-good");
+        Files.createDirectories(goodSpring);
+        Files.createDirectories(goodBundles);
+        SpringInputs extracted = extractSpringInputs(
+                goodVsix, goodSpring, goodBundles, expected, 2);
+        require(extracted.count() == 2 && extracted.sha256().length() == 64,
+                "Spring server library closure was not recorded");
+
+        Map<String, byte[]> missingEntries = new LinkedHashMap<>(goodEntries);
+        missingEntries.remove(SERVER_LIB_PREFIX + "beta.jar");
+        Path missingVsix = root.resolve("spring-missing.vsix");
+        writeZip(missingVsix, missingEntries);
+        Files.createDirectories(root.resolve("spring-missing"));
+        Files.createDirectories(root.resolve("bundles-missing"));
+        expectFailure(() -> extractSpringInputs(
+                missingVsix, root.resolve("spring-missing"),
+                root.resolve("bundles-missing"), expected, 2));
+
+        Path oneServer = root.resolve("server-one.jar");
+        writeServerJar(oneServer, "lib/alpha.jar");
+        Map<String, byte[]> extraEntries = new LinkedHashMap<>(goodEntries);
+        extraEntries.put(SERVER_ENTRY, Files.readAllBytes(oneServer));
+        Path extraVsix = root.resolve("spring-extra.vsix");
+        writeZip(extraVsix, extraEntries);
+        Files.createDirectories(root.resolve("spring-extra"));
+        Files.createDirectories(root.resolve("bundles-extra"));
+        expectFailure(() -> extractSpringInputs(
+                extraVsix, root.resolve("spring-extra"), root.resolve("bundles-extra"),
+                syntheticExpected(oneServer), 2));
+
+        Path nestedServer = root.resolve("server-nested.jar");
+        writeServerJar(nestedServer, "lib/alpha.jar lib/nested/beta.jar");
+        Map<String, byte[]> nestedEntries = new LinkedHashMap<>();
+        nestedEntries.put(SERVER_ENTRY, Files.readAllBytes(nestedServer));
+        nestedEntries.put(SERVER_LIB_PREFIX + "alpha.jar", new byte[] {1});
+        nestedEntries.put(SERVER_LIB_PREFIX + "nested/beta.jar", new byte[] {2});
+        Path nestedVsix = root.resolve("spring-nested.vsix");
+        writeZip(nestedVsix, nestedEntries);
+        Files.createDirectories(root.resolve("spring-nested"));
+        Files.createDirectories(root.resolve("bundles-nested"));
+        expectFailure(() -> extractSpringInputs(
+                nestedVsix, root.resolve("spring-nested"),
+                root.resolve("bundles-nested"), syntheticExpected(nestedServer), 2));
+    }
+
+    private static ExpectedInputs syntheticExpected(Path server) throws IOException {
+        return new ExpectedInputs(
+                new ArtifactSpec(-1, "unused"),
+                new ArtifactSpec(-1, "unused"),
+                new ArtifactSpec(-1, "unused"),
+                new ArtifactSpec(Files.size(server), sha256(server)),
+                List.of());
+    }
+
+    private static void writeServerJar(Path destination, String classPath) throws IOException {
+        String manifest = "Manifest-Version: 1.0\r\nClass-Path: "
+                + classPath + "\r\n\r\n";
+        Map<String, byte[]> entries = new LinkedHashMap<>();
+        entries.put("META-INF/MANIFEST.MF", manifest.getBytes(StandardCharsets.UTF_8));
+        entries.put("probe", new byte[] {1});
+        writeZip(destination, entries);
     }
 
     private static void writeZip(Path destination, Map<String, byte[]> entries) throws IOException {
@@ -742,6 +906,9 @@ public final class PrepareS006 {
     }
 
     private record DestinationSpec(Path path, ArtifactSpec spec) {
+    }
+
+    private record SpringInputs(int count, String sha256) {
     }
 
     private record ExpectedInputs(

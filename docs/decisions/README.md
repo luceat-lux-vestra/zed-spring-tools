@@ -9,7 +9,9 @@ architecture.
 | [D001](001-local-first-parity-and-publication.md) | Local-first capability parity and staged public development | Accepted |
 
 Decision records in this directory must cite supporting research and spike
-results. The next expected decision is the project direction gate: Go, Pivot,
-Limited, or Stop.
+results. The next expected decision remains the project direction gate: Go,
+Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
+its end-to-end hypothesis input, so a separately reviewed macOS launch-to-JDT-
+data prerequisite and a later attributable local PoC are still required.
 
 Use [template.md](template.md) after sufficient evidence exists.
