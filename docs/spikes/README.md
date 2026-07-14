@@ -13,8 +13,10 @@ Each spike still requires its own written plan and success/failure criteria
 before disposable code is added.
 
 The [prerequisite and platform matrix](prerequisites.md) is approved for
-feasibility work. The next spike should be a separately planned local end-to-end
-PoC using the real Spring Boot LS and Spring Java project-data path. Platform
+feasibility work. S006 now has a reviewed, implementation-gated local
+end-to-end PoC plan using the real Spring Boot LS and Spring Java project-data
+path. Its next step is Gate A disposable implementation and synthetic tests;
+real source preparation and Zed execution remain separately closed. Platform
 validation follows incrementally after the local PoC and initial public source
 release; multiplatform claims still require the declared matrix.
 
@@ -27,6 +29,7 @@ Tentative sequence:
 | [S003](003-jdtls-synthetic-bundle-injection.md) | Inject one synthetic JDT LS bundle through a second adapter | Supported on macOS arm64/JDK 25; other targets untested |
 | [S004](004-spring-jdt-bundle-command.md) | Load pinned Spring JDT bundles and execute one command | Supported on macOS arm64/JDK 25; other targets untested |
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
+| [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Plan reviewed; implementation has not started |
 
 Use [template.md](template.md) before adding any spike code.
 
