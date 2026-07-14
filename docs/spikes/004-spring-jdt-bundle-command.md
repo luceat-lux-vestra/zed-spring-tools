@@ -1,6 +1,6 @@
 # S004: Pinned Spring JDT bundle command probe
 
-- Status: Supported on macOS arm64 with JDK 25; representative platforms pending
+- Status: Supported on macOS arm64 with JDK 25; other platforms untested
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S003 Supported on the local macOS arm64/JDK 25 tuple
@@ -266,7 +266,9 @@ Executed first environment:
 
 The local run supplies only macOS arm64/JDK 25 evidence. Representative evidence
 still requires the same fixed plan on macOS arm64, Linux x86_64, and Windows
-x86_64 with JDK 21; the available macOS host retains the additional JDK 25 run.
+x86_64 with JDK 21 when platform validation begins; the available macOS host
+retains the additional JDK 25 run. D001, recorded after this run, no longer makes
+those hosts a prerequisite for the local direction decision.
 
 ## Gate A disposable artifacts
 

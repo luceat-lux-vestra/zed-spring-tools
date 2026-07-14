@@ -441,9 +441,10 @@ fixture, or with JDT-backed classpath data.
 ### Later representative runs
 
 After the macOS result is committed, repeat the same spike revision on Linux
-x86_64 and Windows x86_64 with JDK 21 before using S002 as direction-decision
-evidence. The three runs establish representative OS evidence only, not the full
-six-tuple support matrix.
+x86_64 and Windows x86_64 with JDK 21 when representative validation begins.
+The three runs establish representative OS evidence only, not the full six-tuple
+support matrix. D001, recorded after this run, no longer makes these repetitions
+a prerequisite for the local direction decision.
 
 ## Success criteria
 

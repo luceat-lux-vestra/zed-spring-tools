@@ -1,20 +1,27 @@
 # Zed Spring Tools
 
-This repository is currently a technical feasibility workspace. Source-based
-research is complete, and reproducible runtime spikes are the next gate.
+This repository is currently a technical feasibility and local PoC workspace.
+Source-based research and the S001-S005 macOS arm64 spike sequence are complete.
+The next gate is a basic local end-to-end PoC and a recorded product direction.
 
-The immediate goal is to determine how a Zed extension can run and coordinate
-JDT LS and the Spring Tools Language Server. Product architecture,
-implementation language, packaging, and the MVP are intentionally not yet fixed.
+The long-term product goal is capability parity with VS Code Spring Tools. A
+capability may use a Zed-native workflow instead of copying VS Code's UI, but it
+must not silently disappear from the target because the current Zed API lacks a
+surface. Such gaps remain tracked for an alternative design or upstream work.
 
-The required desktop boundary is multiplatform: macOS, Linux, and Windows on
-Zed-supported x86_64 and arm64/Arm64 systems. Support claims still require
-runtime evidence from the full matrix defined in
-[the prerequisite document](docs/spikes/prerequisites.md).
+Development is local-first: complete a useful macOS arm64 PoC, publish the source
+repository on GitHub with an experimental status, and then develop capabilities
+and platform validation in public. The extension is intended to be installable
+on every Zed-supported macOS, Linux, and Windows desktop, but untested platforms
+will remain explicitly unverified until the matrix in
+[the prerequisite document](docs/spikes/prerequisites.md) runs.
 
 ## Current phase
 
-Research complete; feasibility spikes next.
+Research and the local callback-routing feasibility sequence are complete. The
+current local evidence supports Spring bundle injection, a Spring JDT command,
+and one result-correlated classpath callback through disposable proxy
+instrumentation. It does not yet prove the real Spring Boot LS end-to-end flow.
 
 The work in this phase must:
 
@@ -22,7 +29,8 @@ The work in this phase must:
 - cite primary sources and relevant source-code locations;
 - record reproducible runtime observations;
 - identify client, server, distribution, and licensing constraints; and
-- produce enough evidence for a Go, Pivot, Limited, or Stop decision.
+- produce a local end-to-end PoC and enough evidence for a Go, Pivot, Limited,
+  or Stop decision.
 
 ## Repository layout
 
@@ -36,6 +44,11 @@ spikes/          # Disposable experiment code; never production code
 
 No product code, build system, extension manifest, or product CI should be added
 until the technical direction has been selected.
+
+An initial public GitHub source release is not a multiplatform support claim or
+a stable Zed Marketplace release. It requires a repository license, an evidence
+and secret audit, reproducible local instructions, and clear tested/untested
+labels; it must not include the Spring VSIX or extracted third-party binaries.
 
 ## Primary research question
 

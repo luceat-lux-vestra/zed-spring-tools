@@ -1,14 +1,15 @@
 # Feasibility prerequisites and platform matrix
 
 - Status: Approved for feasibility work
-- Last checked: 2026-07-14
-- Applies to: S001-S005 and the later product direction gate
+- Last checked: 2026-07-15
+- Applies to: local PoC work, staged public development, and later platform validation
 
 ## Purpose
 
-This document separates prerequisites for starting a local spike from the
-evidence required to claim multiplatform support. Passing on one macOS machine
-does not establish support for Linux, Windows, or another architecture.
+This document separates prerequisites for starting a local spike, publishing
+experimental source, making an extension installable by design, and claiming
+multiplatform runtime support. Passing on one macOS machine does not establish
+support for Linux, Windows, or another architecture.
 
 ## Proposed support boundary
 
@@ -39,23 +40,24 @@ depends on them.
 Enough to implement and execute a spike on one declared host. This proves only
 that host tuple.
 
-### Level 2: representative OS validation
+### Level 2: deferred representative OS validation
 
-Before a Go or Limited direction decision, the relevant spike must run on at
-least:
+After the local end-to-end PoC and initial public GitHub source release, run the
+relevant product revision on at least:
 
 - macOS aarch64;
 - Linux x86_64; and
 - Windows x86_64.
 
-S001 uses Zed's managed Node probe and does not require a JDK. For S002 and later
-server spikes, use JDK 21 on all three representative hosts and repeat on the
-available macOS host with JDK 25. This covers both the minimum server runtime and
-the current LTS used by the project owner without multiplying every early spike
+Use JDK 21 on all three representative hosts and retain or repeat the available
+macOS host with JDK 25. This covers both the minimum server runtime and the
+current runtime used by the project owner without multiplying every early
 combination.
 
 This catches the main process, path, environment, permissions, and line-ending
-differences early. It is not the final support matrix.
+differences. It is not the final support matrix and is not a prerequisite for
+the local direction decision, initial GitHub source publication, or an explicitly
+experimental installable preview.
 
 ### Level 3: full release matrix
 
@@ -185,9 +187,9 @@ Host audited: macOS 26.5.1 arm64.
 | Git research baseline | Ready | Commit `4ffce84` on `main` |
 | S001 plan | Gate B complete | Refuted on macOS arm64 because the probe observed `shutdown` but not `exit` before termination |
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
-| S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
-| S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; representative platforms pending |
+| S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart; other targets untested |
+| S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
+| S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -204,9 +206,9 @@ Host audited: macOS 26.5.1 arm64.
 | Zed CLI | Not installed | Optional for S001 because the app binary and UI are available |
 | Local Node syntax checker | Ready | Node 26.5.0 available; not an end-user prerequisite |
 | GitHub access | Ready locally | Pinned Spring Tools tag resolved during audit |
-| Linux execution host | Missing | Docker client exists but no active engine was observed; GUI Zed host still required for S001 parity |
-| Windows execution host | Missing | Obtain physical, VM, or CI-hosted Windows Zed environment |
-| Additional architecture hosts | Missing | Needed before full support claim |
+| Linux execution host | Deferred | No runtime host is currently available; this does not block the local PoC or initial public source release |
+| Windows execution host | Deferred | No runtime host is currently available; this does not block the local PoC or initial public source release |
+| Additional architecture hosts | Deferred | Needed before the corresponding support claim, not before an experimental installable preview |
 | Repository license | Missing | Required before publishing a Zed extension; choose a Zed-accepted license later |
 | Third-party license inventory | Blocked | Incomplete in inspected Spring release; blocks project-operated mirroring/repackaging |
 
@@ -342,10 +344,35 @@ Host audited: macOS 26.5.1 arm64.
 - All isolated processes and private route/port records were removed and normal
   Zed was restored. The retained isolated profile contains Java 6.8.21 and the
   disposable S005 development extension. No product skeleton, reusable bridge/
-  coordinator, or multiplatform claim is authorized. Linux x86_64 and Windows
-  x86_64 representative evidence is required before the direction decision.
+  coordinator, or multiplatform claim is authorized. D001 moves Linux and
+  Windows runtime validation after the local end-to-end PoC, direction decision,
+  and initial public GitHub source release.
 
-### Required before representative multiplatform evidence
+### Required before the initial public GitHub source release
+
+- Complete and document a reviewed local end-to-end PoC using the real Spring
+  Boot LS and real Spring Java project-data path.
+- Choose a Zed-accepted repository license.
+- Scan tracked content and history for secrets, private machine data, generated
+  binaries, and third-party artifacts.
+- Keep the Spring VSIX and extracted artifacts out of Git and document how users
+  supply or retrieve pinned inputs.
+- Make the README identify macOS arm64/JDK as tested and every other target as
+  untested.
+- Preserve reproducible setup, known failures, limitations, and the absence of
+  a stable support promise.
+
+### Required before an experimental Zed Marketplace preview
+
+- Record a Go/Pivot/Limited/Stop direction decision from the local evidence.
+- Review the production extension manifest and implementation after that
+  decision permits scaffolding.
+- Verify a clean local install and compliant pinned artifact acquisition.
+- Keep the extension package platform-neutral and do not add unnecessary OS or
+  architecture restrictions.
+- Clearly label the preview experimental and list its exact tested tuple.
+
+### Required before representative multiplatform validation
 
 - Provision Linux x86_64 and Windows x86_64 test hosts with supported Zed and a
   JDK 21+.
@@ -354,10 +381,8 @@ Host audited: macOS 26.5.1 arm64.
 - Repeat the same spike revision and success criteria on all three OS families.
 - Install JDK 21 on each representative host and retain the local JDK 25 run.
 
-### Required before publication
+### Required before stable multiplatform support claims
 
-- Record a Go/Pivot/Limited decision from spike evidence.
-- Select a Zed-accepted license for extension code.
 - Resolve or legally review the Spring third-party inventory before any
   repackaging or mirroring.
 - Pass all six local desktop tuples.
@@ -387,17 +412,20 @@ All sources were accessed on 2026-07-14.
 - [Spring Tools `5.2.0.RELEASE`](https://github.com/spring-projects/spring-tools/releases/tag/5.2.0.RELEASE)
   — pinned official VSIX input.
 
-## Review decisions requested
+## Recorded review decisions
 
 1. Accept the six desktop tuples as the required release matrix.
-2. Accept representative validation on macOS arm64, Linux x86_64, and Windows
-   x86_64 before the project direction decision.
+2. Keep all six tuples as installation targets, but defer Linux and Windows
+   runtime validation until after the local PoC and initial public source
+   release. Untested targets receive no support claim.
 3. Require a JDK 21+ from the user instead of bundling a JVM during feasibility
    work.
 4. Replace the S001 Python probe with a dependency-free JavaScript probe launched
    by Zed's managed Node binary.
 5. Treat JDK 21 and JDK 25 as the initial tested server-runtime versions; add
    other Java versions only through the compatibility matrix.
+6. Target VS Code Spring Tools capability parity over time and publish the
+   project source after a basic local end-to-end PoC.
 
 Remote development is not a pending review decision; it is recorded as deferred
 from the initial scope.

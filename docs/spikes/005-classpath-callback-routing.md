@@ -1,10 +1,10 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Supported on the tested macOS arm64/JDK 25 tuple after Gate D; representative platforms remain unverified
+- Status: Supported on the tested macOS arm64/JDK 25 tuple after Gate D; other platforms remain untested
 - Date: 2026-07-15
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Product scaffolding and the direction decision remain blocked pending representative Linux x86_64 and Windows x86_64 evidence
+- Implementation gate: Product scaffolding remains blocked pending a reviewed local end-to-end PoC and a recorded direction decision; multiplatform runtime testing is deferred
 
 ## Hypothesis
 
@@ -355,9 +355,11 @@ The planned worktree basenames map to distinct default JDT data-cache keys:
 | C | `s005-routed-worktree-9f2c` | `6df57e0fe15486a4087ff8c5008582dfaa9c9686` |
 
 This run supplies only macOS arm64/JDK 25 evidence. Representative validation
-still requires macOS arm64, Linux x86_64, and Windows x86_64 with JDK 21 before
-a Go or Limited direction decision, and the full six-tuple/JDK matrix before a
-public support claim. Remote development and WSL remain excluded.
+still requires macOS arm64, Linux x86_64, and Windows x86_64 with JDK 21 when
+platform validation begins, and the full six-tuple/JDK matrix remains required
+before a public support claim. D001, recorded after this plan, removes the
+representative-platform prerequisite from the local direction decision. Remote
+development and WSL remain excluded.
 
 ## Proposed disposable artifacts
 
@@ -1231,8 +1233,9 @@ proxy instrumentation. It does not prove Spring Boot LS startup, the opposite
 Spring-LS-to-JDT request direction, delivery into a real `JdtLsProjectCache`, a
 supported Java-extension interface, or an acceptable product architecture.
 Linux, Windows, x86_64, other architectures, JDK 21, remote development, WSL,
-and the full product flow remain unverified. The direction-decision and product-
-scaffolding gates therefore remain closed.
+and the full product flow remain unverified. Under D001, the missing full local
+product flow and direction decision keep product scaffolding closed; missing
+multiplatform runtime evidence does not block local PoC planning or the decision.
 
 ## Success criteria
 
@@ -1331,10 +1334,15 @@ Even Supported would not establish:
 
 ## Candidate follow-up
 
-Before drafting the direction decision, obtain the repository-required
-representative evidence on Linux x86_64 and Windows x86_64 in addition to the
-existing macOS arm64 result. Plan that work separately and do not start product
-scaffolding in the same task.
+Before product scaffolding, plan and review one narrow local end-to-end PoC that
+starts the real Spring Boot LS, exercises the real Spring Java project-data path,
+and demonstrates one attributable Spring feature. Use its result with R001-R005
+and S001-S005 for the direction decision. Do not start product scaffolding in
+the same task.
+
+Linux and Windows runtime validation follows incrementally after the local PoC
+and initial public GitHub source release. Keep those platforms as installation
+targets and label them untested until their evidence exists.
 
 If S005 is Supported, the decision must explicitly address why successful
 test-only proxy interception still requires upstream coordination or a Pivot.

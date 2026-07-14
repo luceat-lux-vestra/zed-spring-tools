@@ -1,6 +1,6 @@
 # S003: Cross-extension synthetic JDT LS bundle injection
 
-- Status: Supported on macOS arm64 with JDK 25; representative platforms pending
+- Status: Supported on macOS arm64 with JDK 25; other platforms untested
 - Date: 2026-07-14
 - Related research: R001, R003, R004, R005
 - Depends on: S002
@@ -209,8 +209,9 @@ Planned first execution environment:
 | Rust | rustup stable 1.97.0 with `wasm32-wasip2` | Disposable adapter build |
 
 Java 25 is evidence for this local run only. Representative S003 evidence still
-requires JDK 21 on Linux x86_64 and Windows x86_64 if S003 later contributes to
-a direction decision.
+requires JDK 21 on Linux x86_64 and Windows x86_64 when platform validation
+begins. D001, recorded after this run, no longer makes that evidence a
+prerequisite for the local direction decision.
 
 ## Gate A disposable artifacts
 

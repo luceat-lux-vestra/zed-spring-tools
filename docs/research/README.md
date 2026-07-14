@@ -2,8 +2,15 @@
 
 - Phase status: Complete
 - Completed on: 2026-07-14
-- Next gate: run the ordered feasibility spikes before any Go/Pivot decision or
-  product scaffolding
+- Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
+  required JDT/Spring coordination seams on that tested tuple
+- Next gate: plan and run one basic local end-to-end PoC before the product
+  direction decision and initial public GitHub source release
+- Goal update: long-term capability parity with VS Code Spring Tools, using
+  equivalent Zed-native workflows where editor surfaces differ
+- Delivery update: platform-neutral installation remains a design target, while
+  Linux and Windows runtime validation moves after the local PoC and initial
+  public source release
 - Scope update: Zed SSH remote development and WSL-hosted remote projects are
   deferred. Existing research observations about remote behavior are retained
   for possible future work but are not initial spike or release requirements.

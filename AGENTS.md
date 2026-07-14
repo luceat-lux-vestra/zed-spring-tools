@@ -2,8 +2,23 @@
 
 ## Current phase
 
-This repository is in technical feasibility research. Do not treat it as a
-product implementation repository yet.
+This repository is in local technical feasibility and end-to-end PoC research.
+Do not treat it as a product implementation repository yet.
+
+## Product goal and delivery strategy
+
+- The long-term product goal is capability parity with VS Code Spring Tools.
+  Track every user-visible capability and either reproduce it in Zed, provide an
+  equivalent Zed-native workflow, or retain a documented blocker and upstream
+  dependency. The goal does not require pixel-identical VS Code UI.
+- Complete a basic end-to-end PoC on the available macOS arm64 host before the
+  initial public GitHub source release.
+- Develop in public after that local PoC and expand capability coverage
+  incrementally. An experimental public repository or preview must state the
+  exact tested host and must not imply unverified support.
+- Keep the extension package installable by design on every Zed-supported
+  desktop platform. Runtime validation and supported-platform claims may follow
+  after the initial local PoC and public source release.
 
 ## Allowed work
 
@@ -59,11 +74,16 @@ For every completed spike:
 ## Platform requirements
 
 - Treat macOS, Linux, and Windows on Zed-supported x86_64 and arm64/Arm64
-  systems as the required desktop boundary.
+  systems as the long-term desktop boundary and installation target.
 - Do not infer multiplatform support from one operating system, architecture,
   container, or compatibility layer.
-- Before a direction decision, obtain representative evidence on macOS arm64,
-  Linux x86_64, and Windows x86_64.
+- A local macOS arm64 PoC may support the direction decision and initial public
+  GitHub source release. Lack of Linux or Windows test hosts is not a blocker for
+  those two milestones.
+- Platform-neutral extension code, platform-aware paths and executable
+  discovery, and the absence of unnecessary manifest restrictions are required
+  from the first product implementation. Untested targets must be labeled
+  `untested`, not `unsupported` or `supported`.
 - Before a public support claim, pass the full six-tuple desktop matrix and the
   declared JDK compatibility matrix.
 - Zed SSH remote development and WSL-hosted remote projects are outside the
@@ -85,8 +105,9 @@ For every completed spike:
 
 ## Decision gate
 
-Product scaffolding can begin only after the evidence supports and a decision
-document records one of these outcomes:
+Product scaffolding can begin only after local evidence supports and a decision
+document records one of these outcomes. Multiplatform runtime evidence is not a
+prerequisite for this direction decision:
 
 - Go: a Zed-extension-centered MVP is feasible;
 - Pivot: a bridge, coordinator, installer, or another structure is required;
