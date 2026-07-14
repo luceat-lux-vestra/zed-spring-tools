@@ -1,0 +1,11 @@
+[package]
+name = "s006-spring-boot-end-to-end"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "=0.7.0"

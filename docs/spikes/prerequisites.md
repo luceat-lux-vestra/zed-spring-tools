@@ -190,7 +190,7 @@ Host audited: macOS 26.5.1 arm64.
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart; other targets untested |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
-| S006 plan | Reviewed; Gate A not started | Real Spring Boot LS classpath-to-`server.port` completion PoC is fully planned; implementation, preparation, and runtime gates remain closed |
+| S006 plan | Gate A complete; Gate B not started | Disposable adapter/proxies/fixture/preparation tool and synthetic contracts passed review; fixed-source build, preparation, and runtime remain closed |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -349,7 +349,7 @@ Host audited: macOS 26.5.1 arm64.
   Windows runtime validation after the local end-to-end PoC, direction decision,
   and initial public GitHub source release.
 
-### S006 reviewed plan
+### S006 reviewed plan and Gate A result
 
 - S006 narrows the local end-to-end PoC to one Maven Spring Boot `3.5.5`
   fixture and one visible `server.port` completion in Zed.
@@ -359,10 +359,14 @@ Host audited: macOS 26.5.1 arm64.
 - The disposable coordination routes are loopback-only, authenticated,
   owner-checked, exact-command, bounded, and incapable of synthesizing the JDT
   or Spring success result. Completion structures must also pass unchanged.
-- Gate A may add only the reviewed disposable implementation and synthetic
-  tests. It may not download/build the real proxy inputs, install the extension,
-  start real language servers, or launch Zed. Gate B preparation and Gate C
-  runtime each require a later explicit continuation after review.
+- Gate A added only the reviewed disposable adapter, fixture, Spring proxy,
+  Java proxy patch/contract harness, and preparation tool. Adapter Rust/WASM,
+  Node protocol, patch Rust, and Java preparation synthetic checks passed after
+  the intermediate compile/format/contract defects recorded in S006 were fixed.
+- No real artifact was prepared, no proxy was built from the actual checkout,
+  and no extension or language server was installed or launched. Gate B
+  fixed-source build/preparation and Gate C runtime each require a later
+  explicit continuation after review.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

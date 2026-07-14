@@ -1,0 +1,844 @@
+S006-Research-Instrument: authenticated Spring/JDT coordination probe
+Upstream-Commit: 9148b8972c1b93fbe5512a9ecf0ba33c3182970d
+Upstream-License: Apache-2.0
+Changed-Files: proxy/src/main.rs, proxy/src/s006_coordination.rs
+
+diff --git a/proxy/src/main.rs b/proxy/src/main.rs
+index cbb4aa1..a006001 100644
+--- a/proxy/src/main.rs
++++ b/proxy/src/main.rs
+@@ -1,14 +1,15 @@
+ mod completions;
+ mod decompile;
+ mod http;
+ mod log;
+ mod lsp;
+ mod platform;
+-
++mod s006_coordination;
++
+ use completions::{is_completion_response, process_completions, sanitize_resolved_completion};
+ use decompile::{rewrite_jdt_in_strings, rewrite_jdt_locations};
+ use http::handle_http;
+-use lsp::{parse_lsp_content, raw_has_id, write_raw, write_to_stdout, LspReader};
++use lsp::{encode_lsp, parse_lsp_content, raw_has_id, write_raw, write_to_stdout, LspReader};
+ use platform::spawn_parent_monitor;
+ use serde_json::Value;
+ use std::{
+@@ -48,6 +49,8 @@ fn main() {
+             .to_string_lossy()
+             .trim_end_matches('/'),
+     );
++    let s006_worktree_root =
++        env::current_dir().unwrap_or_else(|_| Path::new(workdir).to_path_buf());
+-
++
+     // Spawn JDTLS (use shell on Windows for .bat files)
+     let mut cmd = Command::new(bin);
+@@ -97,6 +100,20 @@ fn main() {
+-
++
+     let id_counter = Arc::new(AtomicU64::new(1));
+-
++
++    // S006 research instrumentation: publish one authenticated, exact-command route.
++    let _s006_route = s006_coordination::start_java_route(
++        &s006_worktree_root,
++        Arc::clone(&child_stdin),
++        Arc::clone(&pending),
++        Arc::clone(&id_counter),
++        Arc::clone(&alive),
++        &proxy_id,
++    )
++    .unwrap_or_else(|_| {
++        lsp_error!("S006 Java coordination route could not start");
++        process::exit(1);
++    });
++
+     // Track definition/typeDefinition/implementation and documentation request IDs
+     // so their responses can be intercepted and rewritten.
+     let tracked_ids: Arc<Mutex<HashMap<Value, TrackedKind>>> = Arc::new(Mutex::new(HashMap::new()));
+@@ -154,6 +171,9 @@ fn main() {
+     let decompile_pending = Arc::clone(&pending);
+     let decompile_counter = Arc::clone(&id_counter);
+     let decompile_proxy_id = proxy_id.clone();
++    let s006_callback_writer = Arc::clone(&child_stdin);
++    let s006_callback_root = s006_worktree_root.clone();
++    let s006_callback_inflight = Arc::new(AtomicBool::new(false));
+     thread::spawn(move || {
+         let mut reader = LspReader::new(BufReader::new(child_stdout));
+         while alive_out.load(Ordering::Relaxed) {
+@@ -169,6 +189,33 @@ fn main() {
+                         continue;
+                     };
+-
++
++                    // S006 research instrumentation: route only a dynamic Spring classpath callback.
++                    if s006_coordination::is_s006_callback_request(&msg) {
++                        let writer = Arc::clone(&s006_callback_writer);
++                        let root = s006_callback_root.clone();
++                        let inflight = Arc::clone(&s006_callback_inflight);
++                        if inflight.swap(true, Ordering::AcqRel) {
++                            let response = s006_coordination::busy_response(&msg);
++                            let encoded = encode_lsp(&response);
++                            let mut target = writer.lock().unwrap();
++                            let _ = target.write_all(encoded.as_bytes());
++                            let _ = target.flush();
++                        } else {
++                            thread::spawn(move || {
++                                let response =
++                                    s006_coordination::route_callback_response(&msg, &root);
++                                let encoded = encode_lsp(&response);
++                                {
++                                    let mut target = writer.lock().unwrap();
++                                    let _ = target.write_all(encoded.as_bytes());
++                                    let _ = target.flush();
++                                }
++                                inflight.store(false, Ordering::Release);
++                            });
++                        }
++                        continue;
++                    }
++
+                     // Route responses to pending HTTP requests
+                     if let Some(id) = msg.get("id") {
+                         if let Some(tx) = pending_out.lock().unwrap().remove(id) {
+diff --git a/proxy/src/s006_coordination.rs b/proxy/src/s006_coordination.rs
+new file mode 100644
+index 0000000..a006002
+--- /dev/null
++++ b/proxy/src/s006_coordination.rs
+@@ -0,0 +1,733 @@
++// S006 research instrumentation added downstream on 2026-07-15.
++// Upstream work: zed-extensions/java, Apache-2.0, commit
++// 9148b8972c1b93fbe5512a9ecf0ba33c3182970d.
++// This exact-command probe is not a reusable proxy or public protocol.
++
++use serde::{Deserialize, Serialize};
++use serde_json::{json, Value};
++use std::{
++    collections::HashMap,
++    fs::{self, OpenOptions},
++    io::{self, BufRead, BufReader, Read, Write},
++    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
++    path::{Path, PathBuf},
++    process::ChildStdin,
++    sync::{
++        atomic::{AtomicBool, AtomicU64, Ordering},
++        mpsc, Arc, Mutex,
++    },
++    thread,
++    time::{Duration, SystemTime},
++};
++
++#[cfg(unix)]
++use std::fs::File;
++
++const CALLBACK_METHOD: &str = "workspace/executeClientCommand";
++const EXECUTE_COMMAND: &str = "workspace/executeCommand";
++const CALLBACK_PREFIX: &str = "sts4.classpath.";
++const ADD_COMMAND: &str = "sts.java.addClasspathListener";
++const REMOVE_COMMAND: &str = "sts.java.removeClasspathListener";
++const JAVA_ROUTE_RELATIVE: &str = ".s006-state/java-route.json";
++const SPRING_ROUTE_RELATIVE: &str = ".s006-state/spring-route.json";
++const SOURCE_COMMIT: &str = "9148b8972c1b93fbe5512a9ecf0ba33c3182970d";
++const ROUTE_SCHEMA: u8 = 1;
++const ROUTE_MAX_BYTES: u64 = 4096;
++const ROUTE_MAX_AGE: Duration = Duration::from_secs(15 * 60);
++const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
++const MAX_HTTP_BODY_BYTES: usize = 1024 * 1024;
++const ERROR_CODE: i32 = -32006;
++const ERROR_MESSAGE: &str = "S006 coordination failed";
++
++#[derive(Serialize)]
++#[serde(rename_all = "camelCase")]
++struct JavaRoute<'a> {
++    schema: u8,
++    port: u16,
++    token: &'a str,
++    owner: &'a str,
++    proxy: &'static str,
++    source_commit: &'static str,
++}
++
++#[derive(Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++struct SpringRoute {
++    schema: u8,
++    callback_command_id: String,
++    port: u16,
++    token: String,
++    owner: String,
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct JdtCommandRequest {
++    token: String,
++    command: String,
++    arguments: Vec<Value>,
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct CallbackResponse {
++    result: Value,
++}
++
++pub struct JavaRouteGuard {
++    path: PathBuf,
++    token: String,
++    owner: String,
++}
++
++#[derive(Debug)]
++pub struct CoordinationError;
++
++impl From<()> for CoordinationError {
++    fn from(_: ()) -> Self {
++        Self
++    }
++}
++
++impl Drop for JavaRouteGuard {
++    fn drop(&mut self) {
++        remove_owned_java_route(&self.path, &self.token, &self.owner);
++    }
++}
++
++pub fn start_java_route(
++    worktree_root: &Path,
++    writer: Arc<Mutex<ChildStdin>>,
++    pending: Arc<Mutex<HashMap<Value, mpsc::Sender<Value>>>>,
++    counter: Arc<AtomicU64>,
++    alive: Arc<AtomicBool>,
++    proxy_id: &str,
++) -> Result<JavaRouteGuard, CoordinationError> {
++    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(|_| ())?;
++    listener.set_nonblocking(true).map_err(|_| ())?;
++    let port = listener.local_addr().map_err(|_| ())?.port();
++    let token = random_secret()?;
++    let owner = random_secret()?;
++    let route_path = worktree_root.join(JAVA_ROUTE_RELATIVE);
++    write_java_route(&route_path, port, &token, &owner)?;
++
++    let thread_token = token.clone();
++    let thread_root = worktree_root.to_path_buf();
++    let thread_proxy_id = proxy_id.to_owned();
++    let inflight = Arc::new(AtomicBool::new(false));
++    thread::spawn(move || {
++        while alive.load(Ordering::Relaxed) {
++            match listener.accept() {
++                Ok((stream, address)) if address.ip() == IpAddr::V4(Ipv4Addr::LOCALHOST) => {
++                    let writer = Arc::clone(&writer);
++                    let pending = Arc::clone(&pending);
++                    let counter = Arc::clone(&counter);
++                    let token = thread_token.clone();
++                    let root = thread_root.clone();
++                    let proxy_id = thread_proxy_id.clone();
++                    let inflight = Arc::clone(&inflight);
++                    thread::spawn(move || {
++                        if inflight.swap(true, Ordering::AcqRel) {
++                            write_http_error(stream);
++                            return;
++                        }
++                        handle_command_http(
++                            stream, writer, pending, counter, &proxy_id, &root, &token,
++                        );
++                        inflight.store(false, Ordering::Release);
++                    });
++                }
++                Ok((stream, _)) => write_http_error(stream),
++                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
++                    thread::sleep(Duration::from_millis(25));
++                }
++                Err(_) => break,
++            }
++        }
++    });
++
++    Ok(JavaRouteGuard {
++        path: route_path,
++        token,
++        owner,
++    })
++}
++
++pub fn is_s006_callback_request(message: &Value) -> bool {
++    message.get("method").and_then(Value::as_str) == Some(CALLBACK_METHOD)
++        && valid_request_id(message.get("id"))
++        && message
++            .get("params")
++            .and_then(|params| params.get("command"))
++            .and_then(Value::as_str)
++            .is_some_and(|command| command.starts_with(CALLBACK_PREFIX))
++}
++
++pub fn route_callback_response(request: &Value, worktree_root: &Path) -> Value {
++    match route_callback(request, worktree_root, REQUEST_TIMEOUT) {
++        Ok(result) => json!({
++            "jsonrpc": "2.0",
++            "id": request.get("id").cloned().unwrap_or(Value::Null),
++            "result": result,
++        }),
++        Err(()) => error_response(request),
++    }
++}
++
++pub fn busy_response(request: &Value) -> Value {
++    error_response(request)
++}
++
++fn handle_command_http(
++    mut stream: TcpStream,
++    writer: Arc<Mutex<ChildStdin>>,
++    pending: Arc<Mutex<HashMap<Value, mpsc::Sender<Value>>>>,
++    counter: Arc<AtomicU64>,
++    proxy_id: &str,
++    worktree_root: &Path,
++    expected_token: &str,
++) {
++    let _ = stream.set_read_timeout(Some(REQUEST_TIMEOUT));
++    let _ = stream.set_write_timeout(Some(REQUEST_TIMEOUT));
++    let result = read_http_request(&stream)
++        .and_then(|body| serde_json::from_slice::<JdtCommandRequest>(&body).map_err(|_| ()))
++        .and_then(|request| {
++            validate_jdt_command(&request, worktree_root, expected_token)?;
++            execute_jdt_command(request, writer, pending, counter, proxy_id)
++        });
++    match result {
++        Ok(value) => write_http_json(&mut stream, &json!({ "result": value })),
++        Err(()) => write_http_error(stream),
++    }
++}
++
++fn validate_jdt_command(
++    request: &JdtCommandRequest,
++    worktree_root: &Path,
++    expected_token: &str,
++) -> Result<(), ()> {
++    if request.token != expected_token
++        || !matches!(request.command.as_str(), ADD_COMMAND | REMOVE_COMMAND)
++        || request.arguments.len() != 1
++    {
++        return Err(());
++    }
++    let callback = request.arguments[0].as_str().ok_or(())?;
++    let route = load_spring_route(worktree_root)?;
++    if callback != route.callback_command_id {
++        return Err(());
++    }
++    Ok(())
++}
++
++fn execute_jdt_command(
++    request: JdtCommandRequest,
++    writer: Arc<Mutex<ChildStdin>>,
++    pending: Arc<Mutex<HashMap<Value, mpsc::Sender<Value>>>>,
++    counter: Arc<AtomicU64>,
++    proxy_id: &str,
++) -> Result<Value, ()> {
++    let sequence = counter.fetch_add(1, Ordering::Relaxed);
++    let id = Value::String(format!("{proxy_id}-s006-{sequence}"));
++    let (sender, receiver) = mpsc::channel();
++    pending.lock().map_err(|_| ())?.insert(id.clone(), sender);
++    let message = json!({
++        "jsonrpc": "2.0",
++        "id": id,
++        "method": EXECUTE_COMMAND,
++        "params": {
++            "command": request.command,
++            "arguments": request.arguments,
++        }
++    });
++    let encoded = encode_lsp(&message)?;
++    let sent = writer.lock().map_err(|_| ()).and_then(|mut target| {
++        target.write_all(&encoded).map_err(|_| ())?;
++        target.flush().map_err(|_| ())
++    });
++    if sent.is_err() {
++        pending.lock().map_err(|_| ())?.remove(&id);
++        return Err(());
++    }
++    match receiver.recv_timeout(REQUEST_TIMEOUT) {
++        Ok(response) => response.get("result").cloned().ok_or(()),
++        Err(_) => {
++            pending.lock().map_err(|_| ())?.remove(&id);
++            if let Ok(cancel) = encode_lsp(&json!({
++                "jsonrpc": "2.0",
++                "method": "$/cancelRequest",
++                "params": { "id": id }
++            })) {
++                if let Ok(mut target) = writer.lock() {
++                    let _ = target.write_all(&cancel);
++                    let _ = target.flush();
++                }
++            }
++            Err(())
++        }
++    }
++}
++
++fn route_callback(request: &Value, worktree_root: &Path, timeout: Duration) -> Result<Value, ()> {
++    if !is_s006_callback_request(request) {
++        return Err(());
++    }
++    let params = request.get("params").ok_or(())?;
++    let command = params.get("command").and_then(Value::as_str).ok_or(())?;
++    let arguments = params
++        .get("arguments")
++        .and_then(Value::as_array)
++        .ok_or(())?;
++    if params.as_object().map(|value| value.len()) != Some(2) || arguments.len() != 6 {
++        return Err(());
++    }
++    let route = load_spring_route(worktree_root)?;
++    if command != route.callback_command_id {
++        return Err(());
++    }
++    let body = serde_json::to_vec(&json!({
++        "token": route.token,
++        "method": CALLBACK_METHOD,
++        "params": params,
++    }))
++    .map_err(|_| ())?;
++    let response = post_callback(route.port, &body, timeout)?;
++    let callback: CallbackResponse = serde_json::from_slice(&response).map_err(|_| ())?;
++    Ok(callback.result)
++}
++
++fn post_callback(port: u16, body: &[u8], timeout: Duration) -> Result<Vec<u8>, ()> {
++    if body.len() > MAX_HTTP_BODY_BYTES {
++        return Err(());
++    }
++    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
++    let mut stream = TcpStream::connect_timeout(&address, timeout).map_err(|_| ())?;
++    stream.set_read_timeout(Some(timeout)).map_err(|_| ())?;
++    stream.set_write_timeout(Some(timeout)).map_err(|_| ())?;
++    write!(
++        stream,
++        "POST /s006-callback HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++        body.len()
++    )
++    .map_err(|_| ())?;
++    stream.write_all(body).map_err(|_| ())?;
++    stream.flush().map_err(|_| ())?;
++    read_http_response(&mut stream)
++}
++
++fn read_http_request(stream: &TcpStream) -> Result<Vec<u8>, ()> {
++    let mut reader = BufReader::new(stream);
++    let mut request_line = String::new();
++    reader.read_line(&mut request_line).map_err(|_| ())?;
++    if request_line != "POST /s006-jdt-command HTTP/1.1\r\n" {
++        return Err(());
++    }
++    let mut content_length = None;
++    let mut content_type = false;
++    loop {
++        let mut line = String::new();
++        reader.read_line(&mut line).map_err(|_| ())?;
++        if line == "\r\n" {
++            break;
++        }
++        if line.len() > 8192 || !line.ends_with("\r\n") {
++            return Err(());
++        }
++        let (name, value) = line[..line.len() - 2].split_once(':').ok_or(())?;
++        if name.eq_ignore_ascii_case("content-length") {
++            if content_length.is_some() {
++                return Err(());
++            }
++            content_length = Some(value.trim().parse::<usize>().map_err(|_| ())?);
++        } else if name.eq_ignore_ascii_case("content-type") {
++            content_type = value.trim() == "application/json";
++        } else if name.eq_ignore_ascii_case("transfer-encoding") {
++            return Err(());
++        }
++    }
++    let length = content_length
++        .filter(|length| *length > 0 && *length <= MAX_HTTP_BODY_BYTES)
++        .ok_or(())?;
++    if !content_type {
++        return Err(());
++    }
++    let mut body = vec![0; length];
++    reader.read_exact(&mut body).map_err(|_| ())?;
++    Ok(body)
++}
++
++fn read_http_response(stream: &mut TcpStream) -> Result<Vec<u8>, ()> {
++    let mut bytes = Vec::new();
++    stream
++        .take((MAX_HTTP_BODY_BYTES + 16 * 1024 + 1) as u64)
++        .read_to_end(&mut bytes)
++        .map_err(|_| ())?;
++    if bytes.len() > MAX_HTTP_BODY_BYTES + 16 * 1024 {
++        return Err(());
++    }
++    let separator = bytes
++        .windows(4)
++        .position(|window| window == b"\r\n\r\n")
++        .ok_or(())?;
++    let header = std::str::from_utf8(&bytes[..separator]).map_err(|_| ())?;
++    let mut lines = header.split("\r\n");
++    if lines.next() != Some("HTTP/1.1 200 OK") {
++        return Err(());
++    }
++    let mut content_length = None;
++    let mut content_type = false;
++    for line in lines {
++        let (name, value) = line.split_once(':').ok_or(())?;
++        if name.eq_ignore_ascii_case("content-length") {
++            if content_length.is_some() {
++                return Err(());
++            }
++            content_length = Some(value.trim().parse::<usize>().map_err(|_| ())?);
++        } else if name.eq_ignore_ascii_case("content-type") {
++            content_type = value.trim() == "application/json";
++        }
++    }
++    let body = bytes[separator + 4..].to_vec();
++    if !content_type || content_length != Some(body.len()) {
++        return Err(());
++    }
++    Ok(body)
++}
++
++fn write_http_json(stream: &mut TcpStream, value: &Value) {
++    let Ok(body) = serde_json::to_vec(value) else {
++        return;
++    };
++    let _ = write!(
++        stream,
++        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++        body.len()
++    );
++    let _ = stream.write_all(&body);
++    let _ = stream.flush();
++}
++
++fn write_http_error(mut stream: TcpStream) {
++    let body = br#"{"error":"S006 coordination failed"}"#;
++    let _ = write!(
++        stream,
++        "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++        body.len()
++    );
++    let _ = stream.write_all(body);
++    let _ = stream.flush();
++}
++
++fn load_spring_route(worktree_root: &Path) -> Result<SpringRoute, ()> {
++    let path = worktree_root.join(SPRING_ROUTE_RELATIVE);
++    let metadata = fs::symlink_metadata(&path).map_err(|_| ())?;
++    if !metadata.file_type().is_file()
++        || metadata.file_type().is_symlink()
++        || metadata.len() == 0
++        || metadata.len() > ROUTE_MAX_BYTES
++        || !route_is_fresh(metadata.modified().map_err(|_| ())?, SystemTime::now())
++    {
++        return Err(());
++    }
++    let route: SpringRoute =
++        serde_json::from_slice(&fs::read(path).map_err(|_| ())?).map_err(|_| ())?;
++    if route.schema != ROUTE_SCHEMA
++        || !valid_callback_id(&route.callback_command_id)
++        || route.port == 0
++        || !valid_secret(&route.token)
++        || !valid_secret(&route.owner)
++    {
++        return Err(());
++    }
++    Ok(route)
++}
++
++fn write_java_route(path: &Path, port: u16, token: &str, owner: &str) -> Result<(), ()> {
++    let parent = path.parent().ok_or(())?;
++    fs::create_dir_all(parent).map_err(|_| ())?;
++    let mut options = OpenOptions::new();
++    options.write(true).create_new(true);
++    #[cfg(unix)]
++    {
++        use std::os::unix::fs::OpenOptionsExt;
++        options.mode(0o600);
++    }
++    let mut file = options.open(path).map_err(|_| ())?;
++    let result = (|| {
++        serde_json::to_writer(
++            &mut file,
++            &JavaRoute {
++                schema: ROUTE_SCHEMA,
++                port,
++                token,
++                owner,
++                proxy: "java-lsp-proxy-s006",
++                source_commit: SOURCE_COMMIT,
++            },
++        )
++        .map_err(|_| ())?;
++        file.write_all(b"\n").map_err(|_| ())?;
++        file.sync_all().map_err(|_| ())
++    })();
++    drop(file);
++    if result.is_err() {
++        let _ = fs::remove_file(path);
++    }
++    result
++}
++
++fn remove_owned_java_route(path: &Path, token: &str, owner: &str) {
++    let Ok(metadata) = fs::symlink_metadata(path) else {
++        return;
++    };
++    if !metadata.file_type().is_file()
++        || metadata.file_type().is_symlink()
++        || metadata.len() > ROUTE_MAX_BYTES
++    {
++        return;
++    }
++    let Some(value) = fs::read(path)
++        .ok()
++        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
++    else {
++        return;
++    };
++    if value.get("token").and_then(Value::as_str) == Some(token)
++        && value.get("owner").and_then(Value::as_str) == Some(owner)
++    {
++        let _ = fs::remove_file(path);
++    }
++}
++
++fn route_is_fresh(modified: SystemTime, now: SystemTime) -> bool {
++    now.duration_since(modified)
++        .is_ok_and(|age| age <= ROUTE_MAX_AGE)
++}
++
++fn valid_request_id(id: Option<&Value>) -> bool {
++    matches!(id, Some(Value::String(_)))
++        || matches!(id, Some(Value::Number(number)) if number.as_i64().is_some() || number.as_u64().is_some())
++}
++
++fn valid_callback_id(value: &str) -> bool {
++    value.strip_prefix(CALLBACK_PREFIX).is_some_and(|suffix| {
++        suffix.len() == 8 && suffix.bytes().all(|byte| byte.is_ascii_alphabetic())
++    })
++}
++
++fn valid_secret(value: &str) -> bool {
++    value.len() == 64
++        && value
++            .bytes()
++            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
++}
++
++fn random_secret() -> Result<String, ()> {
++    let mut bytes = [0u8; 32];
++    fill_random(&mut bytes)?;
++    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
++}
++
++#[cfg(unix)]
++fn fill_random(bytes: &mut [u8]) -> Result<(), ()> {
++    File::open("/dev/urandom")
++        .and_then(|mut file| file.read_exact(bytes))
++        .map_err(|_| ())
++}
++
++#[cfg(windows)]
++fn fill_random(bytes: &mut [u8]) -> Result<(), ()> {
++    #[link(name = "bcrypt")]
++    extern "system" {
++        #[allow(non_snake_case)]
++        fn BCryptGenRandom(
++            algorithm: *mut core::ffi::c_void,
++            buffer: *mut u8,
++            length: u32,
++            flags: u32,
++        ) -> i32;
++    }
++    const BCRYPT_USE_SYSTEM_PREFERRED_RNG: u32 = 2;
++    let status = unsafe {
++        BCryptGenRandom(
++            std::ptr::null_mut(),
++            bytes.as_mut_ptr(),
++            bytes.len().try_into().map_err(|_| ())?,
++            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
++        )
++    };
++    if status == 0 {
++        Ok(())
++    } else {
++        Err(())
++    }
++}
++
++fn encode_lsp(value: &Value) -> Result<Vec<u8>, ()> {
++    let body = serde_json::to_vec(value).map_err(|_| ())?;
++    let mut result = format!("Content-Length: {}\r\n\r\n", body.len()).into_bytes();
++    result.extend_from_slice(&body);
++    Ok(result)
++}
++
++fn error_response(request: &Value) -> Value {
++    json!({
++        "jsonrpc": "2.0",
++        "id": request.get("id").cloned().unwrap_or(Value::Null),
++        "error": { "code": ERROR_CODE, "message": ERROR_MESSAGE }
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn temp_root() -> PathBuf {
++        let nonce = SystemTime::now()
++            .duration_since(std::time::UNIX_EPOCH)
++            .unwrap()
++            .as_nanos();
++        let root =
++            std::env::temp_dir().join(format!("s006-rust-test-{}-{nonce}", std::process::id()));
++        fs::create_dir(&root).unwrap();
++        root
++    }
++
++    fn callback(id: Value, command: &str) -> Value {
++        json!({
++            "jsonrpc": "2.0",
++            "id": id,
++            "method": CALLBACK_METHOD,
++            "params": {
++                "command": command,
++                "arguments": ["file:///fixture", "fixture", false, {"entries": []}, null, {}]
++            }
++        })
++    }
++
++    #[test]
++    fn identifies_only_dynamic_s006_callback_requests() {
++        assert!(is_s006_callback_request(&callback(
++            json!(7),
++            "sts4.classpath.AbCdEfGh"
++        )));
++        assert!(is_s006_callback_request(&callback(
++            json!("seven"),
++            "sts4.classpath.ZyXwVuTs"
++        )));
++        assert!(!is_s006_callback_request(&callback(
++            json!(null),
++            "sts4.classpath.AbCdEfGh"
++        )));
++        assert!(!is_s006_callback_request(&callback(
++            json!(7),
++            "other.command"
++        )));
++    }
++
++    #[test]
++    fn validates_secrets_callbacks_and_freshness() {
++        assert!(valid_secret(&"a".repeat(64)));
++        assert!(!valid_secret(&"A".repeat(64)));
++        assert!(valid_callback_id("sts4.classpath.AbCdEfGh"));
++        assert!(!valid_callback_id("sts4.classpath.12345678"));
++        let now = std::time::UNIX_EPOCH + Duration::from_secs(1000);
++        assert!(route_is_fresh(now - Duration::from_secs(2), now));
++        assert!(!route_is_fresh(now + Duration::from_secs(2), now));
++    }
++
++    #[test]
++    fn writes_exclusive_java_route_and_preserves_foreign_replacement() {
++        let root = temp_root();
++        let route = root.join("route.json");
++        let token = "a".repeat(64);
++        let owner = "b".repeat(64);
++        write_java_route(&route, 1234, &token, &owner).unwrap();
++        assert!(write_java_route(&route, 1235, &token, &owner).is_err());
++        remove_owned_java_route(&route, &token, &"c".repeat(64));
++        assert!(route.exists());
++        remove_owned_java_route(&route, &token, &owner);
++        assert!(!route.exists());
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    #[test]
++    fn routes_callback_and_propagates_exact_sink_result_and_original_id() {
++        let root = temp_root();
++        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
++        let port = listener.local_addr().unwrap().port();
++        let callback_id = "sts4.classpath.AbCdEfGh";
++        let token = "d".repeat(64);
++        let route = json!({
++            "schema": 1,
++            "callbackCommandId": callback_id,
++            "port": port,
++            "token": token,
++            "owner": "e".repeat(64),
++        });
++        fs::create_dir(root.join(".s006-state")).unwrap();
++        fs::write(
++            root.join(SPRING_ROUTE_RELATIVE),
++            serde_json::to_vec(&route).unwrap(),
++        )
++        .unwrap();
++        let expected = json!({"source": "real-spring-child", "value": "done"});
++        let expected_clone = expected.clone();
++        let server = thread::spawn(move || {
++            let (mut stream, _) = listener.accept().unwrap();
++            let body = read_http_request_for_test(&stream).unwrap();
++            let request: Value = serde_json::from_slice(&body).unwrap();
++            assert_eq!(request["token"], token);
++            assert_eq!(request["method"], CALLBACK_METHOD);
++            write_http_json(&mut stream, &json!({"result": expected_clone}));
++        });
++        let request = callback(json!("original-jdt-id"), callback_id);
++        let response = route_callback_response(&request, &root);
++        server.join().unwrap();
++        assert_eq!(response["id"], "original-jdt-id");
++        assert_eq!(response["result"], expected);
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    fn read_http_request_for_test(stream: &TcpStream) -> Result<Vec<u8>, ()> {
++        let mut reader = BufReader::new(stream);
++        let mut first = String::new();
++        reader.read_line(&mut first).map_err(|_| ())?;
++        assert_eq!(first, "POST /s006-callback HTTP/1.1\r\n");
++        let mut length = None;
++        loop {
++            let mut line = String::new();
++            reader.read_line(&mut line).map_err(|_| ())?;
++            if line == "\r\n" {
++                break;
++            }
++            if let Some(value) = line.strip_prefix("Content-Length: ") {
++                length = value.trim().parse::<usize>().ok();
++            }
++        }
++        let mut body = vec![0; length.ok_or(())?];
++        reader.read_exact(&mut body).map_err(|_| ())?;
++        Ok(body)
++    }
++
++    #[test]
++    fn rejects_wrong_callback_shape_without_synthesizing_done() {
++        let root = temp_root();
++        let request = callback(json!(41), "sts4.classpath.AbCdEfGh");
++        let response = route_callback_response(&request, &root);
++        assert_eq!(response["id"], 41);
++        assert_eq!(response["error"]["code"], ERROR_CODE);
++        assert!(response.get("result").is_none());
++        assert_eq!(busy_response(&request)["id"], 41);
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    #[test]
++    fn generates_distinct_lowercase_secrets() {
++        let first = random_secret().unwrap();
++        let second = random_secret().unwrap();
++        assert!(valid_secret(&first));
++        assert!(valid_secret(&second));
++        assert_ne!(first, second);
++    }
++}

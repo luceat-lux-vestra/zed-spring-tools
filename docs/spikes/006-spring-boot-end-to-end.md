@@ -1,14 +1,14 @@
 # S006: Real Spring Boot LS classpath-to-completion PoC
 
-- Status: Plan reviewed; implementation has not started
+- Status: Gate A implementation and synthetic validation complete; Gate B not started
 - Date: 2026-07-15
 - Related decision: D001
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Implementation gate: no S006 code, build, preparation, Zed launch, or runtime
-  execution until this complete plan is reviewed and an explicit continuation
-  opens Gate A
+- Next gate: no fixed-source native build, artifact preparation, extension
+  installation, real language-server launch, or Zed execution until the Gate A
+  diff is accepted and an explicit continuation opens Gate B
 
 ## Hypothesis
 
@@ -434,6 +434,103 @@ Gate A stops after tests and a complete diff review. No real checkout, build,
 artifact preparation, extension installation, or Zed launch is allowed in the
 same gate.
 
+## Gate A result: disposable implementation and synthetic validation
+
+Gate A was opened and completed on 2026-07-15. This result validates the
+reviewed disposable source and synthetic contracts only. It does not classify
+the S006 end-to-end hypothesis, prove that the real servers compose, or make a
+product or platform support claim.
+
+### Implemented artifacts
+
+- A platform-neutral Zed WASM adapter registers the single fixed S006 server
+  for Java and Properties, resolves Zed-managed Node plus Java without a shell,
+  returns `enableJdtClasspath: false`, and contributes the five fixed bundles
+  only to `jdtls` in release order.
+- The fixed Maven fixture uses Boot `3.5.5`, Java 21, one application class, one
+  starter dependency, and `application.properties` containing only `ser`.
+- The Spring stdio proxy frames fragmented/coalesced JSON-RPC, keeps unrelated
+  traffic raw, verifies the exact opened fixture/language ID/text/position,
+  controls the baseline-enable-callback-readiness-disable state machine, and
+  preserves structural completion digests.
+- The Spring proxy uses separate loopback-only Java and Spring route records
+  with exact fields, fresh random tokens and owners, bounded age/size/timeouts,
+  exclusive creation, owner-checked cleanup, fixed errors, and no logged token,
+  port, classpath, URI, environment, or absolute path.
+- The Java proxy patch targets only commit `9148b897...`, adds one S006 module
+  plus minimal `main.rs` hooks, publishes the authenticated Java route, exposes
+  only the fixed add/remove commands, and intercepts only a currently published
+  `sts4.classpath.` callback. The Spring child's actual result and original JDT
+  request ID are preserved; the patch contains no fixed successful result.
+- `PrepareS006` verifies the fixed artifact identities, clean upstream commit,
+  distinct proxy binaries, pinned Boot metadata coordinate and `server.port`,
+  safe selected VSIX/TAR extraction, fresh destinations, exact fixture, and
+  isolated Java/Properties server ordering before a future Gate B transaction.
+
+All implementation remains under `spikes/s006-spring-boot-end-to-end/`. No
+production extension skeleton, bridge, coordinator, installer, packaging, CI,
+third-party binary, generated WASM, or runtime evidence is tracked.
+
+### Synthetic validation performed
+
+- `cargo fmt --check`, locked Clippy with warnings denied, and five locked Rust
+  unit tests passed for the adapter; `cargo check --target wasm32-wasip2` also
+  passed with rustup 1.97.0. The lockfile was resolved offline from the existing
+  local Cargo cache.
+- Node 26.5.0 syntax checking and the Spring proxy self-test passed. The test
+  covers fragmented/coalesced frames, numeric/string and internal IDs,
+  cancellation, unrelated pass-through, exact did-open baseline attribution,
+  non-empty-baseline rejection, Java-first and Spring-first route readiness,
+  add/remove shapes, dynamic callback validation, concurrent callback rejection,
+  out-of-order child results, readiness/post-completion structural equality,
+  route field/symlink/age/token/owner/duplicate checks, foreign replacement
+  preservation, timeout, and disable transition.
+- The patch contract verified the exact upstream `main.rs` SHA-256, applied the
+  patch with Git whitespace checking to a synthetic copy, formatted and linted
+  the added Rust module with warnings denied, and passed six locked unit tests.
+  Its callback test returns a nested marker from the fake Spring endpoint and
+  proves that exact value—not synthesized `"done"`—reaches the original JDT ID.
+- `javac --release 21 -Xlint:all -Werror` and the `PrepareS006 --self-test`
+  passed. Synthetic metadata ZIP, safe/unsafe TAR, Unicode/space paths, missing
+  metadata, and existing-destination rejection were exercised.
+- The complete tracked diff passed `git diff --check`. Generated targets,
+  synthetic trees/classes, the retained upstream source, and all prior raw
+  evidence remain ignored.
+
+### Failed observations and review corrections
+
+The intermediate failures were retained here rather than omitted:
+
+1. The first Java compilation failed `-Werror` on one redundant integer cast;
+   the cast was removed and compilation/self-test then passed.
+2. Early patch-contract runs rejected an incorrect new-file hunk count, Rust
+   formatting differences, a missing borrow/test constant qualification, and a
+   public unit-error result flagged by Clippy. The patch and explicit error type
+   were corrected before the final passing contract.
+3. A later patch-contract run caught formatting introduced while adding pending
+   cleanup/cancellation; the stored patch was reformatted and revalidated.
+4. Manual diff review found an untested kebab-case-to-camelCase CLI mapping bug
+   for the two route paths, possible duplicate shutdown cleanup, a partial route
+   file on write failure, and a pending JDT request on write failure. Each was
+   fixed and covered or revalidated before Gate A closed.
+
+These were Gate A implementation defects, not real Spring/JDT runtime results.
+No failed observation was deleted to make the gate pass.
+
+### Remaining uncertainty and Gate B boundary
+
+- No real Spring VSIX, JDT archive, Boot dependency, Java proxy binary, or
+  prepared worktree was consumed by the Gate A production path.
+- The patch was not applied to or built inside the real Java extension checkout;
+  the contract used its verified `main.rs` only as a read-only preimage and
+  applied the patch in a temporary synthetic tree.
+- No real Spring Boot LS, JDT LS, Zed profile, extension installation, UI
+  automation, classpath event, property index, or `server.port` completion ran.
+- Gate B must still verify every retained input, apply and review the complete
+  patch against the clean fixed checkout, build equivalent source/instrumented
+  proxies, exercise the preparation production path and fake-child process
+  smokes, and stop again before Zed.
+
 ## Gate B: fixed source build and preparation
 
 Gate B requires explicit continuation after the full Gate A diff is reviewed.
@@ -700,6 +797,7 @@ points:
 6. Child and client-facing completion structures must match, so the disposable
    proxy cannot manufacture or rewrite `server.port`.
 
-All checklist items are satisfied at plan level. Gate A remains closed until a
-later explicit continuation; this review added no spike code, build output,
-prepared runtime, extension installation, or runtime execution.
+All checklist items were satisfied at plan level. Gate A was subsequently
+opened, implemented, reviewed, and closed as recorded above. Gate B remains
+closed until a later explicit continuation; no prepared runtime, extension
+installation, real language-server execution, or Zed runtime has occurred.
