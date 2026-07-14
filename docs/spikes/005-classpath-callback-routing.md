@@ -1,10 +1,10 @@
 # S005: One Spring JDT classpath callback routing probe
 
-- Status: Plan reviewed; awaiting user review and continuation
+- Status: Gate A complete and diff reviewed; awaiting user continuation to Gate B
 - Date: 2026-07-14
 - Related research: R002, R003, R004, R005
 - Depends on: S004 Supported on the local macOS arm64/JDK 25 tuple
-- Implementation gate: Gate A requires explicit user continuation
+- Implementation gate: Gate B requires explicit user continuation
 
 ## Hypothesis
 
@@ -355,8 +355,8 @@ public support claim. Remote development and WSL remain excluded.
 
 ## Proposed disposable artifacts
 
-No file below may be added until plan review passes and the user explicitly
-continues to Gate A.
+Gate A added only the reviewed disposable tree below after plan review and
+explicit continuation.
 
 ```text
 spikes/s005-classpath-callback/
@@ -551,6 +551,101 @@ No retry may change the callback ID, event mode, mock result, payload assertions
 fixture, Spring/JDT/Java/Zed versions, source commit, toolchain, arm order, or
 route mechanism. One documented correction is allowed only for an operator
 setup mistake that does not change a hypothesis condition.
+
+## Gate A implementation record
+
+Gate A completed on 2026-07-14 without acquiring, mutating, or building the
+real Java extension source checkout and without opening Zed. The implementation
+is confined to `spikes/s005-classpath-callback/` and remains disposable.
+
+### Confirmed Gate A facts
+
+- `PrepareS005.java` fixes the S004 JDT LS, Spring VSIX, official proxy, debug
+  bundle, Java extension commit, six upstream file identities, three worktree
+  basenames, and three cache keys. Its production path rejects linked inputs,
+  dirty or non-top-level source checkouts, mismatched identities, existing or
+  overlapping destinations, and identical source/routed proxy binaries.
+- Its generated-fixture self-test prepares three independent JDT extractions,
+  data-cache directories, proxy/debug copies, Spring bundle sets, Maven fixture
+  copies, and sink copies under one rollback-capable transaction.
+- The adapter resolves Node through Zed, uses argument arrays and the worktree
+  environment, contributes the exact five Spring bundles only to `jdtls`, and
+  uses host-specific path construction covered for macOS, Linux, and Windows
+  forms.
+- The Node sink binds only IPv4 loopback, creates a fresh 256-bit token,
+  atomically publishes a schema-1 route without overwriting an existing record,
+  requests mode 0600 where the host supports POSIX permissions, verifies the
+  exact method/command and six payload positions, accepts one callback, returns
+  `{"result":"done"}`, and removes only its own route record.
+- `instrumented_proxy.patch` changes only pinned `proxy/src/main.rs` and adds
+  `proxy/src/s005_callback.rs`. The main-loop change diverts only the fixed
+  request to one bounded in-flight worker; unrelated messages retain the
+  upstream branches. The module preserves integer or string request IDs,
+  forwards unchanged params, enforces loopback/schema/token/freshness/size/time
+  bounds, and returns fixed error `-32005` without path or token details.
+- `proxy/UPSTREAM.md` records the fixed source commit, extension/source package
+  versions, Apache-2.0 provenance, patch targets, research-only scope, and Gate B
+  application boundary.
+
+### Gate A validation performed
+
+- Node syntax and sink self-tests passed, including split/adjacent LSP frames,
+  payload validation, atomic no-overwrite publication, owned-route cleanup,
+  token mismatch, malformed HTTP input, successful result, and duplicate
+  callback rejection.
+- The extension passed locked native unit tests, formatting, Clippy with
+  warnings denied, and an optimized `wasm32-wasip1` build. The generated WASM
+  remains ignored and was not installed.
+- The patch contract test reconstructed a generated upstream preimage, applied
+  the patch with Git whitespace checking, extracted only the added Rust module,
+  and passed locked formatting, Clippy-with-warnings-denied, and five Rust tests.
+  Those tests covered integer/string IDs, notifications and unrelated methods,
+  unchanged params, success correlation, malformed route data, sink errors,
+  altered results, timeout, stale/future route timestamps, and non-sensitive
+  errors.
+- `PrepareS005.java` compiled with `--release 21 -Xlint:all -Werror` on JDK
+  25.0.3 and passed its generated tar/VSIX/git/source-tree self-test.
+- Repository diff, ignored-output, scope, fixed-ID, and privacy checks passed.
+
+### Failed and corrected Gate A observations
+
+1. The first Node check used a repository-relative path after already changing
+   into the extension directory, so Node looked for a duplicated path. The
+   corrected command used the local `probe/` path; no implementation condition
+   changed.
+2. The first synthetic patch applications rejected incorrect manually written
+   unified-diff line counts and hunk positions. The patch contract exposed each
+   mismatch; the headers were corrected against the pinned source locations and
+   the final patch applies with Git whitespace checking.
+3. The first Java self-test compared `/var` and `/private/var` spellings as raw
+   absolute paths on macOS. The corrected check still rejects a linked checkout
+   itself but compares Git top-level identity through canonical paths.
+4. The first WASI build found only `wasm32-wasip2` installed. The official
+   rustup `wasm32-wasip1` standard-library target was added, after which the
+   unchanged locked Zed extension build passed.
+5. Review found that the initial sink self-test exercised authentication and
+   validation helpers but not the HTTP handler's duplicate branch. An in-memory
+   HTTP fixture was added before the final validation.
+6. Final review found that the preparation tool's nominal Git timeout began
+   only after synchronous output draining. Output is now size-bounded and
+   drained on a Java 21 virtual thread so the process timeout remains effective;
+   the warning-as-error compile and self-test passed again.
+
+### Still unverified after Gate A
+
+- the patch against the complete clean upstream checkout rather than the
+  generated preimage;
+- locked Arm B and Arm C native builds from the fixed source tree;
+- official/source-built proxy behavioral parity;
+- all fixed real artifact preparation and proxy binary identities;
+- Zed, JDT LS, Spring bundle, callback, listener-removal, and cleanup runtime
+  behavior; and
+- every platform/JDK tuple outside the already-known local prerequisites.
+
+Gate B requires a new explicit user continuation. It may obtain or reuse only
+the exact clean upstream checkout, apply the reviewed patch to a separate
+ignored copy, perform locked native builds, and prepare the fixed arms. Gate B
+must stop for evidence review before any Zed UI execution.
 
 ## Success criteria
 

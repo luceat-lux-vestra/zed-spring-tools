@@ -187,10 +187,11 @@ Host audited: macOS 26.5.1 arm64.
 | S002 plan | Gate B complete | Refuted on macOS arm64: direct startup and transport worked, but all metadata-aware properties probes were empty |
 | S003 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; synthetic injection and command repeated after restart |
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart |
-| S005 plan | Reviewed | Three-arm callback-routing plan passed review; implementation and proxy source builds have not started |
+| S005 Gate A | Complete | Disposable adapter, sink, preparation tool, and fixed-method proxy patch passed synthetic diff review; real source builds have not started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
+| Rust WASI target | Ready | Official rustup `wasm32-wasip1` target installed; locked S005 release build passed |
 | `wasm32-wasip2` | Ready | Installed in the active rustup toolchain |
 | Zed API-resolved Node | Ready locally | `/opt/homebrew/bin/node`, v26.5.0, darwin arm64 observed through S001 |
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
@@ -310,9 +311,11 @@ Host audited: macOS 26.5.1 arm64.
 - Spring Boot LS remains excluded. A worktree-local mock sink returns the exact
   `"done"` value used by the fixed Spring consumer so S005 can test one callback
   boundary without claiming an end-to-end integration.
-- No native source checkout, proxy build, S005 extension, patch, or runtime has
-  been added or executed. Gate A requires explicit continuation and remains
-  limited to a fixed-method runtime instrument, not a reusable
+- Gate A added the disposable S005 adapter, sink, preparation tool, and
+  fixed-method patch and validated them only with generated fixtures. No real
+  native source checkout, fixed proxy build, fixed-arm preparation, Zed UI, or
+  JDT runtime has been acquired or executed. Gate B requires explicit
+  continuation and remains limited to the reviewed instrument, not a reusable
   bridge/coordinator module.
 
 ### Required before representative multiplatform evidence

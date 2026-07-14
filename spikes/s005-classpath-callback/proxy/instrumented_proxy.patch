@@ -1,0 +1,473 @@
+S005-Research-Instrument: fixed classpath callback routing probe
+Upstream-Commit: 9148b8972c1b93fbe5512a9ecf0ba33c3182970d
+Upstream-License: Apache-2.0
+Changed-Files: proxy/src/main.rs, proxy/src/s005_callback.rs
+
+diff --git a/proxy/src/main.rs b/proxy/src/main.rs
+index cbb4aa1..9f2c005 100644
+--- a/proxy/src/main.rs
++++ b/proxy/src/main.rs
+@@ -1,14 +1,15 @@
+ mod completions;
+ mod decompile;
+ mod http;
+ mod log;
+ mod lsp;
+ mod platform;
+-
++mod s005_callback;
++
+ use completions::{is_completion_response, process_completions, sanitize_resolved_completion};
+ use decompile::{rewrite_jdt_in_strings, rewrite_jdt_locations};
+ use http::handle_http;
+-use lsp::{parse_lsp_content, raw_has_id, write_raw, write_to_stdout, LspReader};
++use lsp::{encode_lsp, parse_lsp_content, raw_has_id, write_raw, write_to_stdout, LspReader};
+ use platform::spawn_parent_monitor;
+ use serde_json::Value;
+ use std::{
+@@ -51,6 +52,7 @@ fn main() {
+             .to_string_lossy()
+             .trim_end_matches('/'),
+     );
+-
++    let s005_callback_root = env::current_dir().unwrap_or_else(|_| Path::new(workdir).to_path_buf());
++
+     // Spawn JDTLS (use shell on Windows for .bat files)
+     let mut cmd = Command::new(bin);
+@@ -154,6 +156,9 @@ fn main() {
+     let decompile_pending = Arc::clone(&pending);
+     let decompile_counter = Arc::clone(&id_counter);
+     let decompile_proxy_id = proxy_id.clone();
++    let callback_writer = Arc::clone(&child_stdin);
++    let callback_root = s005_callback_root.clone();
++    let callback_inflight = Arc::new(AtomicBool::new(false));
+     thread::spawn(move || {
+         let mut reader = LspReader::new(BufReader::new(child_stdout));
+         while alive_out.load(Ordering::Relaxed) {
+@@ -169,8 +174,33 @@ fn main() {
+                     let Some(mut msg) = parse_lsp_content(&raw) else {
+                         write_raw(&mut io::stdout().lock(), &raw);
+                         continue;
+                     };
+-
++                    // S005 research instrumentation: answer only the fixed Spring callback.
++                    if s005_callback::is_fixed_callback_request(&msg) {
++                        let writer = Arc::clone(&callback_writer);
++                        let root = callback_root.clone();
++                        let inflight = Arc::clone(&callback_inflight);
++                        if inflight.swap(true, Ordering::AcqRel) {
++                            let response = s005_callback::busy_response(&msg);
++                            let encoded = encode_lsp(&response);
++                            let mut target = writer.lock().unwrap();
++                            let _ = target.write_all(encoded.as_bytes());
++                            let _ = target.flush();
++                        } else {
++                            thread::spawn(move || {
++                                let response = s005_callback::route_response(&msg, &root);
++                                let encoded = encode_lsp(&response);
++                                {
++                                    let mut target = writer.lock().unwrap();
++                                    let _ = target.write_all(encoded.as_bytes());
++                                    let _ = target.flush();
++                                }
++                                inflight.store(false, Ordering::Release);
++                            });
++                        }
++                        continue;
++                    }
++
+                     // Route responses to pending HTTP requests
+                     if let Some(id) = msg.get("id") {
+                         if let Some(tx) = pending_out.lock().unwrap().remove(id) {
+diff --git a/proxy/src/s005_callback.rs b/proxy/src/s005_callback.rs
+new file mode 100644
+index 0000000..9f2c006
+--- /dev/null
++++ b/proxy/src/s005_callback.rs
+@@ -0,0 +1,386 @@
++// S005 research instrumentation added downstream on 2026-07-14.
++// Upstream work: zed-extensions/java, Apache-2.0, commit
++// 9148b8972c1b93fbe5512a9ecf0ba33c3182970d.
++// This fixed-method probe is not a reusable proxy or public protocol.
++
++use serde::Deserialize;
++use serde_json::{json, Value};
++use std::{
++    fs,
++    io::{Read, Write},
++    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
++    path::{Path, PathBuf},
++    time::{Duration, SystemTime},
++};
++
++const CALLBACK_METHOD: &str = "workspace/executeClientCommand";
++const CALLBACK_ID: &str = "s005.classpath.callback.9f2c";
++const ROUTE_RELATIVE: &str = ".s005-artifacts/callback-route.json";
++const ROUTE_SCHEMA: u8 = 1;
++const ROUTE_MAX_BYTES: u64 = 4096;
++const ROUTE_MAX_AGE: Duration = Duration::from_secs(15 * 60);
++const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
++const MAX_HTTP_RESPONSE_BYTES: u64 = 1024 * 1024;
++const ERROR_CODE: i32 = -32005;
++const ERROR_MESSAGE: &str = "S005 callback route is unavailable";
++
++#[derive(Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++struct RouteRecord {
++    schema: u8,
++    callback_command_id: String,
++    port: u16,
++    token: String,
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct SinkResponse {
++    result: String,
++}
++
++pub fn is_fixed_callback_request(message: &Value) -> bool {
++    message.get("method").and_then(Value::as_str) == Some(CALLBACK_METHOD)
++        && valid_request_id(message.get("id"))
++        && message
++            .get("params")
++            .and_then(|params| params.get("command"))
++            .and_then(Value::as_str)
++            == Some(CALLBACK_ID)
++}
++
++pub fn route_response(request: &Value, worktree_root: &Path) -> Value {
++    route_response_with_timeout(request, worktree_root, REQUEST_TIMEOUT)
++}
++
++pub fn busy_response(request: &Value) -> Value {
++    error_response(request)
++}
++
++fn route_response_with_timeout(request: &Value, worktree_root: &Path, timeout: Duration) -> Value {
++    let result = route_callback(request, worktree_root, timeout);
++    match result {
++        Ok(value) => json!({
++            "jsonrpc": "2.0",
++            "id": request.get("id").cloned().unwrap_or(Value::Null),
++            "result": value,
++        }),
++        Err(()) => error_response(request),
++    }
++}
++
++fn route_callback(request: &Value, worktree_root: &Path, timeout: Duration) -> Result<Value, ()> {
++    if !is_fixed_callback_request(request) {
++        return Err(());
++    }
++    let route = load_route(worktree_root)?;
++    let body = serde_json::to_vec(&json!({
++        "token": route.token,
++        "method": CALLBACK_METHOD,
++        "params": request.get("params").cloned().ok_or(())?,
++    }))
++    .map_err(|_| ())?;
++
++    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), route.port);
++    let mut stream = TcpStream::connect_timeout(&address, timeout).map_err(|_| ())?;
++    stream.set_read_timeout(Some(timeout)).map_err(|_| ())?;
++    stream.set_write_timeout(Some(timeout)).map_err(|_| ())?;
++    write!(
++        stream,
++        "POST /s005-callback HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++        body.len()
++    )
++    .map_err(|_| ())?;
++    stream.write_all(&body).map_err(|_| ())?;
++    stream.flush().map_err(|_| ())?;
++
++    let mut response = Vec::new();
++    stream
++        .take(MAX_HTTP_RESPONSE_BYTES + 1)
++        .read_to_end(&mut response)
++        .map_err(|_| ())?;
++    if response.len() as u64 > MAX_HTTP_RESPONSE_BYTES {
++        return Err(());
++    }
++    let body = parse_http_response(&response)?;
++    let sink: SinkResponse = serde_json::from_slice(body).map_err(|_| ())?;
++    if sink.result != "done" {
++        return Err(());
++    }
++    Ok(Value::String(sink.result))
++}
++
++fn load_route(worktree_root: &Path) -> Result<RouteRecord, ()> {
++    let route_path = route_path(worktree_root);
++    let metadata = fs::symlink_metadata(&route_path).map_err(|_| ())?;
++    if !metadata.file_type().is_file()
++        || metadata.file_type().is_symlink()
++        || metadata.len() > ROUTE_MAX_BYTES
++        || !route_is_fresh(metadata.modified().map_err(|_| ())?, SystemTime::now())
++    {
++        return Err(());
++    }
++    let bytes = fs::read(route_path).map_err(|_| ())?;
++    let route: RouteRecord = serde_json::from_slice(&bytes).map_err(|_| ())?;
++    if route.schema != ROUTE_SCHEMA
++        || route.callback_command_id != CALLBACK_ID
++        || route.port == 0
++        || route.token.len() != 64
++        || !route.token.bytes().all(|byte| byte.is_ascii_hexdigit())
++    {
++        return Err(());
++    }
++    Ok(route)
++}
++
++fn route_path(worktree_root: &Path) -> PathBuf {
++    worktree_root.join(ROUTE_RELATIVE)
++}
++
++fn route_is_fresh(modified: SystemTime, now: SystemTime) -> bool {
++    now.duration_since(modified)
++        .map(|age| age <= ROUTE_MAX_AGE)
++        .unwrap_or(false)
++}
++
++fn parse_http_response(response: &[u8]) -> Result<&[u8], ()> {
++    let separator = response
++        .windows(4)
++        .position(|window| window == b"\r\n\r\n")
++        .ok_or(())?;
++    let header = std::str::from_utf8(&response[..separator]).map_err(|_| ())?;
++    let mut lines = header.split("\r\n");
++    if lines.next() != Some("HTTP/1.1 200 OK") {
++        return Err(());
++    }
++    let mut content_length = None;
++    for line in lines {
++        let Some((name, value)) = line.split_once(':') else {
++            return Err(());
++        };
++        if name.eq_ignore_ascii_case("content-length") {
++            if content_length.is_some() {
++                return Err(());
++            }
++            content_length = Some(value.trim().parse::<usize>().map_err(|_| ())?);
++        }
++    }
++    let body = &response[separator + 4..];
++    if content_length != Some(body.len()) {
++        return Err(());
++    }
++    Ok(body)
++}
++
++fn valid_request_id(id: Option<&Value>) -> bool {
++    match id {
++        Some(Value::String(_)) => true,
++        Some(Value::Number(number)) => number.as_i64().is_some() || number.as_u64().is_some(),
++        _ => false,
++    }
++}
++
++fn error_response(request: &Value) -> Value {
++    json!({
++        "jsonrpc": "2.0",
++        "id": request.get("id").cloned().unwrap_or(Value::Null),
++        "error": {
++            "code": ERROR_CODE,
++            "message": ERROR_MESSAGE,
++        }
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::{
++        env, fs,
++        io::{BufRead, BufReader},
++        net::TcpListener,
++        process, thread,
++        time::{SystemTime, UNIX_EPOCH},
++    };
++
++    fn request(id: Value) -> Value {
++        json!({
++            "jsonrpc": "2.0",
++            "id": id,
++            "method": CALLBACK_METHOD,
++            "params": {
++                "command": CALLBACK_ID,
++                "arguments": ["unchanged", 1, false, {}, {}, {}],
++            }
++        })
++    }
++
++    fn temp_root(label: &str) -> PathBuf {
++        let nonce = SystemTime::now()
++            .duration_since(UNIX_EPOCH)
++            .unwrap()
++            .as_nanos();
++        let root = env::temp_dir().join(format!("s005-proxy-{label}-{}-{nonce}", process::id()));
++        fs::create_dir_all(root.join(".s005-artifacts")).unwrap();
++        root
++    }
++
++    fn write_route(root: &Path, port: u16, token: &str) {
++        fs::write(
++            route_path(root),
++            serde_json::to_vec(&json!({
++                "schema": ROUTE_SCHEMA,
++                "callbackCommandId": CALLBACK_ID,
++                "port": port,
++                "token": token,
++            }))
++            .unwrap(),
++        )
++        .unwrap();
++    }
++
++    fn receive_request(mut stream: TcpStream) -> Value {
++        let mut reader = BufReader::new(stream.try_clone().unwrap());
++        let mut first = String::new();
++        reader.read_line(&mut first).unwrap();
++        assert_eq!(first, "POST /s005-callback HTTP/1.1\r\n");
++        let mut content_length = None;
++        loop {
++            let mut line = String::new();
++            reader.read_line(&mut line).unwrap();
++            if line == "\r\n" {
++                break;
++            }
++            if let Some(value) = line.strip_prefix("Content-Length: ") {
++                content_length = Some(value.trim().parse::<usize>().unwrap());
++            }
++        }
++        let mut body = vec![0; content_length.unwrap()];
++        reader.read_exact(&mut body).unwrap();
++        let value = serde_json::from_slice(&body).unwrap();
++        stream.flush().unwrap();
++        value
++    }
++
++    fn start_sink(
++        status: &'static str,
++        response: &'static str,
++    ) -> (u16, thread::JoinHandle<Value>) {
++        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
++        let port = listener.local_addr().unwrap().port();
++        let handle = thread::spawn(move || {
++            let (mut stream, _) = listener.accept().unwrap();
++            let body = receive_request(stream.try_clone().unwrap());
++            write!(
++                stream,
++                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
++                response.len()
++            )
++            .unwrap();
++            stream.flush().unwrap();
++            body
++        });
++        (port, handle)
++    }
++
++    #[test]
++    fn classifies_only_fixed_requests_with_integer_or_string_ids() {
++        assert!(is_fixed_callback_request(&request(json!(7))));
++        assert!(is_fixed_callback_request(&request(json!("seven"))));
++        let mut notification = request(json!(7));
++        notification.as_object_mut().unwrap().remove("id");
++        assert!(!is_fixed_callback_request(&notification));
++        let mut unrelated = request(json!(7));
++        unrelated["method"] = json!("window/showMessage");
++        assert!(!is_fixed_callback_request(&unrelated));
++        let mut command = request(json!(7));
++        command["params"]["command"] = json!("other");
++        assert!(!is_fixed_callback_request(&command));
++    }
++
++    #[test]
++    fn successful_route_preserves_id_params_and_done_result() {
++        let root = temp_root("success");
++        let token = "a".repeat(64);
++        let (port, sink) = start_sink("200 OK", r#"{"result":"done"}"#);
++        write_route(&root, port, &token);
++        let original = request(json!("request-9f2c"));
++        let response = route_response(&original, &root);
++        let delivered = sink.join().unwrap();
++        assert_eq!(delivered["token"], token);
++        assert_eq!(delivered["method"], CALLBACK_METHOD);
++        assert_eq!(delivered["params"], original["params"]);
++        assert_eq!(response["id"], "request-9f2c");
++        assert_eq!(response["result"], "done");
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    #[test]
++    fn rejects_bad_route_schema_token_sink_status_and_result() {
++        let root = temp_root("errors");
++        fs::write(
++            route_path(&root),
++            r#"{"schema":1,"callbackCommandId":"s005.classpath.callback.9f2c","port":1,"token":"bad","extra":true}"#,
++        )
++        .unwrap();
++        let response =
++            route_response_with_timeout(&request(json!(9)), &root, Duration::from_millis(20));
++        assert_eq!(response["error"]["code"], ERROR_CODE);
++        assert_eq!(response["id"], 9);
++
++        let token = "b".repeat(64);
++        let (port, sink) = start_sink("500 Internal Server Error", r#"{"error":"no"}"#);
++        write_route(&root, port, &token);
++        assert_eq!(
++            route_response(&request(json!(10)), &root)["error"]["code"],
++            ERROR_CODE
++        );
++        sink.join().unwrap();
++
++        let (port, sink) = start_sink("200 OK", r#"{"result":"changed"}"#);
++        write_route(&root, port, &token);
++        assert_eq!(
++            route_response(&request(json!(11)), &root)["error"]["code"],
++            ERROR_CODE
++        );
++        sink.join().unwrap();
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    #[test]
++    fn bounds_timeout_and_rejects_stale_or_future_routes() {
++        let root = temp_root("timeout");
++        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
++        write_route(
++            &root,
++            listener.local_addr().unwrap().port(),
++            &"c".repeat(64),
++        );
++        let sleeper = thread::spawn(move || {
++            let (_stream, _) = listener.accept().unwrap();
++            thread::sleep(Duration::from_millis(80));
++        });
++        let response =
++            route_response_with_timeout(&request(json!(12)), &root, Duration::from_millis(10));
++        assert_eq!(response["error"]["code"], ERROR_CODE);
++        sleeper.join().unwrap();
++        let now = SystemTime::now();
++        assert!(route_is_fresh(now - Duration::from_secs(1), now));
++        assert!(!route_is_fresh(
++            now - ROUTE_MAX_AGE - Duration::from_secs(1),
++            now
++        ));
++        assert!(!route_is_fresh(now + Duration::from_secs(1), now));
++        fs::remove_dir_all(root).unwrap();
++    }
++
++    #[test]
++    fn route_path_is_worktree_relative_and_error_is_nonsensitive() {
++        assert_eq!(
++            route_path(Path::new("/work tree/프로젝트")),
++            Path::new("/work tree/프로젝트/.s005-artifacts/callback-route.json")
++        );
++        let response = busy_response(&request(json!("id")));
++        assert_eq!(response["error"]["message"], ERROR_MESSAGE);
++        assert!(!response.to_string().contains("/work tree"));
++    }
++}
