@@ -7,8 +7,8 @@
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Next experiment: attribute S007's unexpected tooling metadata and define a
-  new reviewed prerequisite; do not retry S006 or S007 in place
+- Next experiment: execute the separately reviewed S008 fixed-input managed-JDT
+  prerequisite after its implementation gates; do not retry S006/S007 in place
 
 ## Hypothesis
 
@@ -1024,10 +1024,12 @@ single-correction rule.
 
 S007 subsequently tested the narrow managed-local prerequisite. Its first run
 used the predeclared XDG data path and reached `ServiceReady`, but the fresh XDG
-root also gained unattributed Gradle version metadata and a proxy record
-remained after shutdown. S007 therefore stopped before Run 2 and is
-Inconclusive. The next candidate work is source-only attribution followed by a
-new reviewed prerequisite plan; neither S006 nor S007 may be retried in place.
+root also gained Gradle version metadata and a proxy record remained after
+shutdown. S007 therefore stopped before Run 2 and is Inconclusive. R006
+attributed the catalog to Buildship's cache-miss request and identified a
+separate Java task-helper latest-release path. S008 now contains the reviewed
+fixed-helper/catalog, minimal-profile two-run plan; neither S006 nor S007 may be
+retried in place.
 
 ## Evidence and privacy rules
 
@@ -1078,10 +1080,9 @@ After S006 classification, do not start product scaffolding in the same task.
 - Then create a capability inventory for VS Code Spring Tools and prioritize the
   next smallest user-visible capability; do not describe the single completion
   as parity.
-- Because both S006 and S007 are Inconclusive, attribute S007's tooling/update
-  and cleanup gaps and review a new prerequisite plan before any further
-  runtime. Do not begin product scaffolding, public-source release work, or a
-  direction decision yet.
+- Because both S006 and S007 are Inconclusive, implement and review S008's
+  fixed-input prerequisite gates before any further runtime. Do not begin
+  product scaffolding, public-source release work, or a direction decision yet.
 
 ## Plan review checklist
 

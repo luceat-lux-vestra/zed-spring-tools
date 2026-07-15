@@ -4,7 +4,7 @@
   started
 - Date: 2026-07-16
 - Related decision: D001
-- Related research: R001, R003, R004
+- Related research: R001, R003, R004, R006
 - Depends on: S003-S005 Supported locally; S006 Inconclusive before hypothesis
   input
 - Implementation gate: Gate C closed; any correction requires a new written
@@ -625,29 +625,31 @@ were not satisfied.
   `d3f901ea959ebe4d6f2ff970c0939f8c7cbe7efb774536b13e0d6631070fd96c`.
   No unknown extension entry was added.
 
-### Unexpected state and source references
+### Unexpected state and later source attribution
 
 - Run 1's initially empty XDG root gained
   `tooling/gradle/versions.json` at 04:15:09. It is 415,493 bytes with SHA-256
   `6583154ec821d7dee9976ab21406bc8fe9d07d1f94d2de22dbe785536166d550`.
   The file is a large Gradle release/version catalog containing current build
-  records and `services.gradle.org` download and checksum URLs. This is
-  confirmed runtime-created metadata; the exact producer and whether a network
-  request produced it were not captured.
+  records and `services.gradle.org` download and checksum URLs. R006 later
+  attributed it to the fixed Buildship cache-miss request: JDT unconditionally
+  starts Buildship, whose background loader requests the Gradle versions
+  endpoint and stores its response at this exact XDG path.
 - The exact Java extension
   [`task.rs`](https://github.com/zed-extensions/java/blob/9148b8972c1b93fbe5512a9ecf0ba33c3182970d/src/task.rs)
   overrides task-helper acquisition. When no configured or local helper is
   usable, it proceeds to `fetch_latest_version` and a GitHub release lookup
   even after `should_use_local_or_download(...).unwrap_or(None)` returns no
-  path. Therefore `check_updates: "never"` alone is not source evidence that a
-  missing task helper cannot cause a lookup. No task-helper binary appeared in
-  the managed work directory, and this source path is not proven to have
-  created the Gradle catalog.
+  path. Therefore `check_updates: "never"` does not prevent the separate
+  task-helper latest-release lookup. R006 confirmed that Zed's host API issues a
+  GitHub releases request for this call. No task-helper binary appeared in the
+  managed work directory; this branch did not create the Gradle catalog.
 - The isolated startup log also recorded ChatGPT subscription authentication
   failure and a Copilot credential-format warning before JDT started. They are
-  unrelated to the Java data-path success, but they prevent attributing
-  observed startup network behavior to one component without a dedicated
-  trace.
+  unrelated to the Java data-path success and prevented log-only attribution at
+  Gate C. R006's exact source path plus distinct embedded/runtime catalog
+  identities later resolved the Gradle-file owner without attributing those
+  provider warnings to JDT.
 - Immediately after shutdown, one check appeared to show an empty proxy-record
   directory. A later stable check found one five-byte Run 1 record, SHA-256
   `b94dd0542...146b4c`, still present. Its content is retained only in ignored
@@ -659,15 +661,17 @@ were not satisfied.
   isolated launch arguments, proxy, or JDT process remained, and the user-input
   restriction was released.
 
-### Inferences and unresolved attribution
+### Later confirmed attribution and remaining uncertainty
 
-- The Gradle catalog's current release data and download URLs make an
-  update/network-derived origin plausible, but neither its writer nor an
-  outbound request is proven. It must not be described as a confirmed Java
-  extension download or as confirmed JDT behavior.
-- The task-helper source establishes an independent lookup risk when the helper
-  is missing. It does not establish that this branch ran or that it owns the
-  Gradle file.
+- R006 compared the distinct embedded/runtime catalog identities with the exact
+  JDT/Buildship control flow. The runtime file is a confirmed successful
+  Buildship remote versions response, not a Java extension or task-helper
+  download.
+- The Java task-helper lookup branch was entered because no local helper
+  existed. The retained evidence does not establish whether its GitHub query or
+  subsequent asset step succeeded, failed, or used an HTTP-layer cache.
+- The fixed proxy attempts route removal only after its JDT child wait and
+  ignores removal errors. The exact reason S007's record remained is unresolved.
 - Because Gate C required absence of any lookup, update, or download
   contribution, the retained evidence cannot prove that success condition.
   The late proxy record also leaves required cleanup unsatisfied.
@@ -714,15 +718,12 @@ private absolute path, binary, or third-party artifact.
 
 ## Candidate next experiment
 
-- First perform source-only attribution of the Gradle catalog owner and the
-  Java task-helper acquisition path. Preserve the distinction between a
-  possible lookup and a captured network request.
-- If the missing inputs can be pinned and preseeded without product code, write
-  a new narrow prerequisite plan using verified tooling/task-helper artifacts
-  and explicit cleanup criteria. Otherwise plan a comparison of the smallest
-  evidence-supported explicit-data mechanism.
-- Do not rerun S007 in place, start Spring, or reopen S006 until that new plan
-  is reviewed. The direction decision remains gated.
+- R006 completed source attribution. S008 now records the reviewed new
+  prerequisite plan using a fixed source-built task helper, fixed embedded
+  Gradle catalog, minimal Java-only profile, two new runtime inputs, and
+  explicit route cleanup after process absence.
+- Do not rerun S007 in place, start Spring, or reopen S006. S008 Gate A requires
+  a later explicit continuation, and the direction decision remains gated.
 
 ## Plan review checklist
 

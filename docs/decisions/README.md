@@ -13,9 +13,10 @@ results. The next expected decision remains the project direction gate: Go,
 Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
 its end-to-end hypothesis input. S007 now records the reviewed managed-local
 JDT data-isolation prerequisite and one real Run 1. The exact direct data path
-worked and reached `ServiceReady`, but unattributed Gradle metadata and
+worked and reached `ServiceReady`, but a Buildship cache-miss request and
 incomplete proxy-record cleanup made S007 Inconclusive; Run 2 was not started.
-Source attribution, a new reviewed prerequisite plan, and a later attributable
-local PoC are still required.
+R006 completed source attribution, and S008 now has a reviewed fixed-helper,
+fixed-catalog, minimal-profile two-run plan. Its implementation/runtime and a
+later attributable local PoC are still required.
 
 Use [template.md](template.md) after sufficient evidence exists.

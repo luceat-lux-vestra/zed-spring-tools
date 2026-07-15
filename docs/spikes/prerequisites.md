@@ -192,6 +192,8 @@ Host audited: macOS 26.5.1 arm64.
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
 | S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
 | S007 plan | Gate C closed Inconclusive | Run 1 used the exact managed-local data path and reached `ServiceReady`; unexpected Gradle metadata and a leftover proxy record prevented attribution/cleanup, so Run 2 was not started |
+| R006 attribution | Complete | Buildship's cache-miss request created the Gradle catalog; Java task-helper entered a separate latest-release path; proxy record removal is best effort after child exit |
+| S008 plan | Reviewed; Gate A closed | Preseed one fixed source-built helper and one fixed catalog per XDG root in a new minimal profile, then prove two distinct managed data paths |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -350,7 +352,7 @@ Host audited: macOS 26.5.1 arm64.
   Windows runtime validation after the local end-to-end PoC, direction decision,
   and initial public GitHub source release.
 
-### S006 Gate A through Gate C result
+### S006 result and subsequent managed-JDT prerequisites
 
 - S006 narrows the local end-to-end PoC to one Maven Spring Boot `3.5.5`
   fixture and one visible `server.port` completion in Zed.
@@ -385,12 +387,19 @@ Host audited: macOS 26.5.1 arm64.
   extension's managed-local path and opened Gate C with two distinct XDG roots
   and fresh worktrees. Run 1's proxy/JVM arguments used exactly the expected
   direct `-data` path and reached `ServiceReady` in about three seconds without
-  a host fallback. The fresh XDG root also gained an unattributed current
-  Gradle version catalog, and one private proxy record remained after shutdown.
+  a host fallback. The fresh XDG root also gained a current Gradle version
+  catalog, and one private proxy record remained after shutdown.
   Because no-update attribution and cleanup were insufficient, Run 2 was not
-  started and S007 is Inconclusive. A new source-attribution investigation and
-  reviewed prerequisite plan are required before another runtime attempt. The
-  local end-to-end PoC and project direction gate remain incomplete.
+  started and S007 is Inconclusive.
+- R006 then attributed the catalog to fixed Buildship's unconditional startup
+  and cache-miss request, identified the Java extension's separate task-helper
+  latest-release branch, and confirmed that proxy record removal occurs only
+  after child wait with ignored removal errors. S008 now has a reviewed plan to
+  build and preseed the helper from the exact source commit, preseed the exact
+  JDT-embedded catalog in two new XDG roots, use a new minimal profile, and
+  separate mandatory process exit from explicit route cleanup. Gate A remains
+  closed until explicit continuation. The local end-to-end PoC and project
+  direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

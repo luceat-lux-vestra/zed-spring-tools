@@ -1,11 +1,12 @@
 # Research Index
 
-- Phase status: Complete
-- Completed on: 2026-07-14
+- Phase status: Core research complete; targeted R006 follow-up complete
+- Last completed on: 2026-07-16
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
-  required JDT/Spring coordination seams on that tested tuple
-- Next gate: plan and run one basic local end-to-end PoC before the product
-  direction decision and initial public GitHub source release
+  required coordination seams, while S006-S007 are Inconclusive and S008 is
+  plan-reviewed but not implemented
+- Next gate: implement the separately reviewed S008 prerequisite after explicit
+  continuation, then plan one attributable local end-to-end PoC
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -29,6 +30,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R003](003-jdtls-execution-and-zed-integration.md) | JDT LS execution and workspace model | Complete | Runtime, initialization, and workspace constraints |
 | [R004](004-integration-structure-candidates.md) | Integration structure candidates | Complete | Comparison of direct, dual-server, and coordinator models |
 | [R005](005-distribution-and-licensing.md) | Distribution and licensing | Complete | Pinned-download strategy and publication constraints |
+| [R006](006-s007-startup-lookup-attribution.md) | Attribute S007 startup lookups and cleanup behavior | Complete | Buildship owns the Gradle request; task-helper latest lookup and proxy cleanup conditions identified |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -42,5 +44,7 @@ Research is sufficient for feasibility spikes when it identifies:
 - unresolved claims that require runtime verification; and
 - the smallest experiment that can distinguish the leading candidates.
 
-R001-R005 satisfy this documentation gate. They do not establish production
-feasibility; that decision depends on runtime evidence from S001-S005.
+R001-R005 satisfy the original documentation gate. R006 is a targeted source
+follow-up to S007 and defines S008's fixed preseed conditions. None establishes
+production feasibility; the direction decision still requires an attributable
+local end-to-end result.

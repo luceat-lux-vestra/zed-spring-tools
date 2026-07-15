@@ -1,8 +1,10 @@
 # Zed Spring Tools
 
 This repository is currently a technical feasibility and local PoC workspace.
-Source-based research and the S001-S005 macOS arm64 spike sequence are complete.
-The next gate is a basic local end-to-end PoC and a recorded product direction.
+Source-based research and the S001-S005 macOS arm64 feasibility sequence are
+complete. S006 and S007 are Inconclusive, R006 has attributed the remaining
+startup lookup paths, and the next gate is the reviewed S008 fixed-input
+managed-JDT prerequisite before a new local end-to-end PoC plan.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -22,6 +24,7 @@ Research and the local callback-routing feasibility sequence are complete. The
 current local evidence supports Spring bundle injection, a Spring JDT command,
 and one result-correlated classpath callback through disposable proxy
 instrumentation. It does not yet prove the real Spring Boot LS end-to-end flow.
+S008 is planned and reviewed but has no implementation or runtime evidence yet.
 
 The work in this phase must:
 
