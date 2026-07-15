@@ -1,7 +1,7 @@
 # Feasibility prerequisites and platform matrix
 
 - Status: Approved for feasibility work
-- Last checked: 2026-07-15
+- Last checked: 2026-07-16
 - Applies to: local PoC work, staged public development, and later platform validation
 
 ## Purpose
@@ -191,7 +191,7 @@ Host audited: macOS 26.5.1 arm64.
 | S004 plan | Gate B complete locally | Supported on macOS arm64/JDK 25; five pinned Spring JDT bundles and the imported-project command repeated after restart; other targets untested |
 | S005 plan | Gate D complete locally | Supported on macOS arm64/JDK 25; fresh controls, one routed callback, and direct Spring `SUCCESS [done]` passed; other targets untested |
 | S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
-| S007 plan | Gate B complete and reviewed | Corrected fixed preparation, one managed JDT candidate, Java-only profile, and two fresh run inputs verified; runtime remains unopened |
+| S007 plan | Gate C closed Inconclusive | Run 1 used the exact managed-local data path and reached `ServiceReady`; unexpected Gradle metadata and a leftover proxy record prevented attribution/cleanup, so Run 2 was not started |
 | Zed | Ready locally | 1.10.3, build `20260713.002323` |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -381,13 +381,15 @@ Host audited: macOS 26.5.1 arm64.
   ignores `XDG_CACHE_HOME` on Darwin and the Java extension custom-launcher
   branch does not add `-data`; an unknown application-environment boundary is
   not needed to explain the result.
-- S007 has a reviewed plan and Gate A disposable preparation implementation to
-  stage exactly one pinned JDT installation in the
-  official Java extension's managed-local path, use the embedded Zed CLI with
-  two distinct XDG roots and fresh worktrees, and attribute the explicit
-  `-data` path twice. Gate B corrected one preserved path-validation defect,
-  then verified the fixed production preparation, one managed candidate,
-  Java-only profile, and two fresh run inputs. Runtime remains unopened. The
+- S007 staged exactly one pinned JDT installation in the official Java
+  extension's managed-local path and opened Gate C with two distinct XDG roots
+  and fresh worktrees. Run 1's proxy/JVM arguments used exactly the expected
+  direct `-data` path and reached `ServiceReady` in about three seconds without
+  a host fallback. The fresh XDG root also gained an unattributed current
+  Gradle version catalog, and one private proxy record remained after shutdown.
+  Because no-update attribution and cleanup were insufficient, Run 2 was not
+  started and S007 is Inconclusive. A new source-attribution investigation and
+  reviewed prerequisite plan are required before another runtime attempt. The
   local end-to-end PoC and project direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.

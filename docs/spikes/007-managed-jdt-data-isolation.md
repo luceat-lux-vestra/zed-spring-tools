@@ -1,13 +1,14 @@
 # S007: Managed-local JDT data isolation through the Zed CLI
 
-- Status: Gate B fixed preparation and profile transition complete and
-  reviewed; Gate C not started
-- Date: 2026-07-15
+- Status: Inconclusive on macOS arm64/JDK 25 after Gate C Run 1; Run 2 not
+  started
+- Date: 2026-07-16
 - Related decision: D001
 - Related research: R001, R003, R004
 - Depends on: S003-S005 Supported locally; S006 Inconclusive before hypothesis
   input
-- Implementation gate: Gate C closed until a later explicit continuation
+- Implementation gate: Gate C closed; any correction requires a new written
+  prerequisite plan and review
 
 ## Hypothesis
 
@@ -477,7 +478,9 @@ Gate B is closed. Only a later explicit continuation may open Gate C.
 
 ## Gate C: two fresh local runtime runs
 
-Gate C requires an explicit continuation after Gate B review.
+Gate C opened after explicit continuation following Gate B review. Its planned
+procedure is retained below; the Run 1 result and closed classification are
+recorded after the criteria.
 
 ### Shared preflight
 
@@ -583,6 +586,102 @@ input, timeout cause, cleanup, or required evidence is insufficient. A network
 attempt, stale cache, unexpected extension, duplicate server, UI interruption,
 or hidden correction is never deleted to obtain Supported.
 
+## Gate C Run 1 result and classification
+
+Gate C opened on 2026-07-16 after explicit continuation. Shared preflight
+passed, Run 1 reached the core managed-local launch observation, and the gate
+then stopped without starting Run 2. S007 is **Inconclusive** on the fixed
+macOS arm64/JDK 25 tuple. It is not Refuted because the direct managed JDT path,
+explicit expected data argument, and `ServiceReady` all worked in Run 1. It is
+not Supported because the two-run, no-update-contribution, and cleanup criteria
+were not satisfied.
+
+### Confirmed runtime facts
+
+- Shared preflight matched the fixed JDT archive, proxy, debug bundle, Java
+  extension WASM/manifest, embedded CLI, fixture, prepared settings, and active
+  isolated-profile index identities. Exactly one managed JDT candidate was
+  present; both XDG roots, expected data paths, host fallbacks, and the proxy
+  record directory were fresh; no proxy or JDT process existed.
+- Normal Zed was stopped before the exact embedded CLI launched the isolated
+  profile with Run 1's inherited XDG root and worktree. Bounded UI automation
+  opened only `S007Fixture.java`; no edit, completion, command, task, build,
+  debug, or Spring action was invoked.
+- The Zed start log and actual process arguments agreed: official proxy
+  SHA-256 `53ed618c...0076` started the fixed Temurin JDK directly with the
+  fixed Equinox launcher, `config_mac_arm`, and exactly one `-data` equal to
+  Run 1's precomputed path. Neither `bin/jdtls`, `jdtls.py`, a second data
+  argument, another JDT installation, nor either host fallback appeared.
+- The proxy and JDT started at 04:15:07 local time and JDT reported
+  `ServiceReady` at 04:15:10. The retained post-run data path contains 28
+  regular files and occupies approximately 44 MiB. A process snapshot recorded
+  approximately 2 MiB proxy RSS and 1.24 GiB JDT RSS.
+- Run 1 did not create either reviewed host fallback or refer to Run 2's data.
+  Run 2's XDG root remains empty and its worktree still contains only the
+  fixed fixture, so the unused input remains fresh.
+- The isolated settings remained byte-identical to Gate B. Zed rewrote the
+  semantically identical extension index without its final newline, changing
+  only the post-run byte hash to
+  `d3f901ea959ebe4d6f2ff970c0939f8c7cbe7efb774536b13e0d6631070fd96c`.
+  No unknown extension entry was added.
+
+### Unexpected state and source references
+
+- Run 1's initially empty XDG root gained
+  `tooling/gradle/versions.json` at 04:15:09. It is 415,493 bytes with SHA-256
+  `6583154ec821d7dee9976ab21406bc8fe9d07d1f94d2de22dbe785536166d550`.
+  The file is a large Gradle release/version catalog containing current build
+  records and `services.gradle.org` download and checksum URLs. This is
+  confirmed runtime-created metadata; the exact producer and whether a network
+  request produced it were not captured.
+- The exact Java extension
+  [`task.rs`](https://github.com/zed-extensions/java/blob/9148b8972c1b93fbe5512a9ecf0ba33c3182970d/src/task.rs)
+  overrides task-helper acquisition. When no configured or local helper is
+  usable, it proceeds to `fetch_latest_version` and a GitHub release lookup
+  even after `should_use_local_or_download(...).unwrap_or(None)` returns no
+  path. Therefore `check_updates: "never"` alone is not source evidence that a
+  missing task helper cannot cause a lookup. No task-helper binary appeared in
+  the managed work directory, and this source path is not proven to have
+  created the Gradle catalog.
+- The isolated startup log also recorded ChatGPT subscription authentication
+  failure and a Copilot credential-format warning before JDT started. They are
+  unrelated to the Java data-path success, but they prevent attributing
+  observed startup network behavior to one component without a dedicated
+  trace.
+- Immediately after shutdown, one check appeared to show an empty proxy-record
+  directory. A later stable check found one five-byte Run 1 record, SHA-256
+  `b94dd0542...146b4c`, still present. Its content is retained only in ignored
+  evidence because it is a private runtime port. The proxy and JDT processes
+  themselves exited.
+- Normal-Zed restoration through the first application-open command returned
+  without starting a process. The preserved correction used a new application
+  instance and restored normal Zed within the bounded recovery procedure. No
+  isolated launch arguments, proxy, or JDT process remained, and the user-input
+  restriction was released.
+
+### Inferences and unresolved attribution
+
+- The Gradle catalog's current release data and download URLs make an
+  update/network-derived origin plausible, but neither its writer nor an
+  outbound request is proven. It must not be described as a confirmed Java
+  extension download or as confirmed JDT behavior.
+- The task-helper source establishes an independent lookup risk when the helper
+  is missing. It does not establish that this branch ran or that it owns the
+  Gradle file.
+- Because Gate C required absence of any lookup, update, or download
+  contribution, the retained evidence cannot prove that success condition.
+  The late proxy record also leaves required cleanup unsatisfied.
+
+### Gate closure and retained evidence
+
+After a real proxy/JDT start, the plan permits no setup correction. Run 2 was
+therefore deliberately not started, and no in-place retry can contribute to a
+Supported result. Raw logs, process arguments, XDG contents, profile snapshots,
+hashes, and the private proxy record remain under ignored
+`tmp/s007-gate-c-run1-20260716T041407/` and the preserved Run 1 paths. The empty
+Run 2 inputs remain unchanged. Committed text contains no raw port, token,
+private absolute path, binary, or third-party artifact.
+
 ## Evidence and privacy rules
 
 - Keep the pinned archive, extracted JDT runtime/data, proxy/debug binaries,
@@ -615,15 +714,15 @@ or hidden correction is never deleted to obtain Supported.
 
 ## Candidate next experiment
 
-- If Supported, write and review a new end-to-end spike that reuses the proven
-  managed-local preparation and two-run data isolation, then independently
-  reevaluates the Spring lifecycle command before any completion input.
-- If Refuted, compare only the smallest explicit `-data` alternatives supported
-  by evidence: first a narrow upstream Java-extension configuration change,
-  then a disposable wrapper only if the upstream surface cannot express the
-  requirement.
-- If Inconclusive, correct only the named attribution or freshness gap in a new
-  plan. Do not add Spring to the same retry.
+- First perform source-only attribution of the Gradle catalog owner and the
+  Java task-helper acquisition path. Preserve the distinction between a
+  possible lookup and a captured network request.
+- If the missing inputs can be pinned and preseeded without product code, write
+  a new narrow prerequisite plan using verified tooling/task-helper artifacts
+  and explicit cleanup criteria. Otherwise plan a comparison of the smallest
+  evidence-supported explicit-data mechanism.
+- Do not rerun S007 in place, start Spring, or reopen S006 until that new plan
+  is reviewed. The direction decision remains gated.
 
 ## Plan review checklist
 

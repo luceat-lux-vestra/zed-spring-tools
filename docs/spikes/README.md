@@ -19,11 +19,12 @@ single setup-only correction: the corrected Spring LS and JDT import succeeded,
 but the actual JDT process selected a fresh host cache rather than the reviewed
 prepared data path. It stopped before completion/add/callback input and is
 Inconclusive, not Refuted. Subsequent exact source review established that the
-fixed packaged JDT launcher ignores XDG on Darwin; S007 now has a reviewed plan
-and reviewed Gate A disposable preparation implementation for testing the
-official Java extension's explicit managed-local data path twice. Its real
-preparation and isolated-profile transition now passed Gate B after one
-preserved preparation-only correction; runtime Gate C has not started.
+fixed packaged JDT launcher ignores XDG on Darwin; S007 then tested the
+official Java extension's explicit managed-local path. Gate C Run 1 used the
+precomputed data path and reached `ServiceReady`, but a fresh XDG root also
+gained unattributed Gradle version metadata and a proxy record remained after
+shutdown. Run 2 was deliberately not started, so S007 is Inconclusive and a
+new prerequisite plan is required before another runtime attempt.
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
 
@@ -37,7 +38,7 @@ Tentative sequence:
 | [S004](004-spring-jdt-bundle-command.md) | Load pinned Spring JDT bundles and execute one command | Supported on macOS arm64/JDK 25; other targets untested |
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
 | [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
-| [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Gate B fixed preparation/profile transition complete and reviewed; Gate C not started |
+| [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Inconclusive on macOS arm64/JDK 25 after Run 1: expected direct data path worked, but update/network attribution and cleanup were insufficient; Run 2 not started |
 
 Use [template.md](template.md) before adding any spike code.
 

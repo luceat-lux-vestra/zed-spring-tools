@@ -12,8 +12,10 @@ Decision records in this directory must cite supporting research and spike
 results. The next expected decision remains the project direction gate: Go,
 Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
 its end-to-end hypothesis input. S007 now records the reviewed managed-local
-JDT data-isolation prerequisite and completed disposable Gate A preparation,
-plus Gate B fixed preparation/profile transition, but its two-run runtime and a
-later attributable local PoC are still required.
+JDT data-isolation prerequisite and one real Run 1. The exact direct data path
+worked and reached `ServiceReady`, but unattributed Gradle metadata and
+incomplete proxy-record cleanup made S007 Inconclusive; Run 2 was not started.
+Source attribution, a new reviewed prerequisite plan, and a later attributable
+local PoC are still required.
 
 Use [template.md](template.md) after sufficient evidence exists.

@@ -7,8 +7,8 @@
 - Related research: R001, R002, R003, R004, R005
 - Depends on: S002 Refuted in limited mode; S003, S004, and S005 Supported on
   the local macOS arm64/JDK 25 tuple
-- Next experiment: execute the separately reviewed S007 managed-local JDT data-
-  isolation prerequisite; do not retry S006 in place
+- Next experiment: attribute S007's unexpected tooling metadata and define a
+  new reviewed prerequisite; do not retry S006 or S007 in place
 
 ## Hypothesis
 
@@ -1003,8 +1003,9 @@ the tested macOS arm64/JDK 25 tuple.
   source review confirms that this launcher branch does not read
   `XDG_CACHE_HOME`, and the Java extension's custom-launcher branch does not add
   `-data`. An unknown Zed/macOS environment boundary is therefore not required
-  to explain the result. Whether the embedded CLI supplies XDG to the official
-  managed-local Java-extension path remains a separate S007 runtime item.
+  to explain the result. S007 later confirmed that the embedded CLI supplies
+  the reviewed XDG root to the official managed-local Java-extension path on
+  this tuple, but its broader two-run attribution remained Inconclusive.
 - The upstream lifecycle-command mismatch remains a possible topology blocker.
   Because the baseline/add/callback sequence never began, this run cannot decide
   whether the independently owned Spring process would continue successfully.
@@ -1021,14 +1022,12 @@ conditions was reached. S006 is closed as Inconclusive without a fresh
 repetition; repeating after another launch correction would exceed its explicit
 single-correction rule.
 
-The next candidate experiment is S007, a separately reviewed narrow
-prerequisite spike. Before any Spring server, Spring bundle, proxy relay, or
-completion input participates, it stages one pinned JDT installation in the
-official Java extension's managed-local path, uses the embedded Zed CLI to
-supply a distinct XDG root for each run, and requires the extension's explicit
-`-data` argument to select the corresponding predeclared empty location in two
-fresh worktrees. Only Supported evidence from S007 can justify a newly planned
-end-to-end spike; it must not reopen S006 in place.
+S007 subsequently tested the narrow managed-local prerequisite. Its first run
+used the predeclared XDG data path and reached `ServiceReady`, but the fresh XDG
+root also gained unattributed Gradle version metadata and a proxy record
+remained after shutdown. S007 therefore stopped before Run 2 and is
+Inconclusive. The next candidate work is source-only attribution followed by a
+new reviewed prerequisite plan; neither S006 nor S007 may be retried in place.
 
 ## Evidence and privacy rules
 
@@ -1079,9 +1078,10 @@ After S006 classification, do not start product scaffolding in the same task.
 - Then create a capability inventory for VS Code Spring Tools and prioritize the
   next smallest user-visible capability; do not describe the single completion
   as parity.
-- Because S006 is Inconclusive, execute only the reviewed S007 managed-local
-  JDT data-isolation prerequisite described above. Do not begin product
-  scaffolding, public-source release work, or a direction decision yet.
+- Because both S006 and S007 are Inconclusive, attribute S007's tooling/update
+  and cleanup gaps and review a new prerequisite plan before any further
+  runtime. Do not begin product scaffolding, public-source release work, or a
+  direction decision yet.
 
 ## Plan review checklist
 
