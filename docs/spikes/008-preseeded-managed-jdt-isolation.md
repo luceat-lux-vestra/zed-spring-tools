@@ -1,11 +1,11 @@
 # S008: Preseeded managed-JDT isolation with attributed startup inputs
 
-- Status: Plan reviewed; Gate A not started
+- Status: Gate A implementation and synthetic review complete; Gate B not started
 - Date: 2026-07-16
 - Related decision: D001
 - Related research: R003, R004, R006
 - Depends on: S007 Inconclusive after one core-path success
-- Implementation gate: Gate A closed until a later explicit continuation
+- Implementation gate: Gate B closed until a later explicit continuation
 
 ## Hypothesis
 
@@ -377,3 +377,94 @@ Reviewed on 2026-07-16 before implementation. The review:
 
 No S008 code, fixture, helper build, profile, catalog copy, runtime path, Zed
 launch, JDT process, or UI automation occurred during planning or review.
+
+## Gate A implementation and synthetic review result
+
+Gate A completed on 2026-07-16 and added only the two disposable artifacts
+authorized by this plan:
+
+- `spikes/s008-preseeded-managed-jdt/fixture/S008Fixture.java`; and
+- `spikes/s008-preseeded-managed-jdt/tools/PrepareS008.java`.
+
+### Confirmed implementation facts
+
+1. The preparation tool uses only JDK APIs and contains no downloader, network
+   client, product extension manifest, Rust product module, launcher, wrapper,
+   coordinator, installer, or Spring artifact.
+2. Production preparation requires the fixed clean Java source commit, Cargo
+   lockfile and task-helper manifest hashes, exact managed JDT tree, core and
+   Buildship JARs, exact official Java extension tree, proxy, debug JAR,
+   embedded CLI, Temurin 25.0.3+9, fixture, and a caller-supplied executable
+   thin Mach-O arm64 task helper.
+3. The tool reads the JDT core JAR with `ZipFile`, validates every entry name,
+   rejects traversal and duplicate normalized identities, accepts only the
+   exact catalog entry shape, and verifies its 413,663-byte fixed digest before
+   retaining either catalog copy.
+4. The generated profile has an explicit allowlist for one fixed settings
+   file, one Java-only index, the exact official Java install tree, one exact
+   managed JDT tree, one helper selection path, an empty proxy route directory,
+   and the preparation manifest. Top-level databases, threads, provider state,
+   logs, unrelated extensions, previous-spike paths, helper siblings, second
+   JDT candidates, and nonempty proxy records fail verification.
+5. All five destinations must be distinct, absent direct children of the
+   repository's ignored `tmp/` directory. The tool stages them in one temporary
+   transaction, removes already-moved outputs on a later move failure, and
+   always removes the transaction directory.
+6. Each staged worktree contains only the fixed fixture. Each staged XDG root
+   contains only `tooling/gradle/versions.json`. Run identities use SHA-1 of the
+   full normalized worktree path, preserve the two host-fallback shapes, and
+   require all expected data and fallback paths to be absent.
+7. The manifest records the source/build inputs, binary and tree hashes,
+   task-helper size and architecture, Java and `javac` hashes, settings/index
+   hashes, complete profile allowlist, both catalog paths and preparation
+   mtimes, both data/fallback paths, and every declared freshness constraint.
+
+### Validation performed
+
+On Temurin JDK 25.0.3+9, the source compiled successfully for the Java 21 API
+boundary with:
+
+```text
+javac --release 21 -Xlint:all -Werror -d tmp/s008-gate-a-classes \
+  spikes/s008-preseeded-managed-jdt/tools/PrepareS008.java
+```
+
+Both compiled-class mode and Java source-file mode reported
+`S008 preparation synthetic tests passed`. The tests cover:
+
+- exact catalog extraction plus wrong identity, duplicate-normalized-entry,
+  and traversal rejection;
+- minimal-profile allowlisting, helper selection shape, helper siblings,
+  second JDT candidates, retained proxy records, and unexpected root state;
+- full normalized path hashing with spaces and Unicode, XDG independence, and
+  distinct run keys;
+- existing-output rejection and rollback after a partially moved transaction;
+  and
+- exact manifest-key completeness and truncation rejection.
+
+`git diff --check` also passed. Read-only comparison of two separately retained
+official Java 6.8.21 installs produced the same fixed tree digest recorded by
+the tool. The retained S007 managed JDT tree independently reproduced its
+already-recorded fixed digest.
+
+### Runtime verification still required
+
+- Gate A did not invoke the production preparation path against the real
+  inputs, so the composed real profile/index behavior remains unverified.
+- No real helper was built, and no claim is made yet that the fixed source build
+  produces the required executable or that the Java extension selects it.
+- No real catalog was copied or refreshed, no Zed/CLI/proxy/JDT process was
+  started, and no UI automation occurred.
+- Catalog cache use, absence of the two attributed lookup contributions,
+  direct `-data` selection, `ServiceReady`, two-run isolation, proxy cleanup,
+  and normal-Zed restoration all remain Gate C runtime questions.
+- Linux, Windows, x86_64, JDK 21, remote development, WSL, and every public
+  support claim remain outside this result.
+
+### Gate A conclusion and next gate
+
+The Gate A implementation is ready for the separately authorized Gate B fixed
+helper build and real preparation. This is an implementation-readiness result,
+not evidence for the S008 runtime hypothesis. Gate B remains closed until an
+explicit continuation and must stop before any CLI, Zed, proxy, JDT, or UI
+action.
