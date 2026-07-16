@@ -194,6 +194,8 @@ Host audited: macOS 26.5.1 arm64.
 | S007 plan | Gate C closed Inconclusive | Run 1 used the exact managed-local data path and reached `ServiceReady`; unexpected Gradle metadata and a leftover proxy record prevented attribution/cleanup, so Run 2 was not started |
 | R006 attribution | Complete | Buildship's cache-miss request created the Gradle catalog; Java task-helper entered a separate latest-release path; proxy record removal is best effort after child exit |
 | S008 plan | Gate C closed Inconclusive | Both fixed-input runs used distinct exact managed-local data paths and reached `ServiceReady`; automatic HTML/editor/provider initialization broke minimal-profile attribution |
+| R007 attribution | Complete | Trust and HTML were fixed defaults; Copilot bypassed custom Zed data through XDG config fallback; native-agent provider enumeration caused the ChatGPT warning |
+| S009 plan | Reviewed; Gate A closed | One fixed-input JDT run with isolated trust/extension/AI/XDG controls; no implementation or runtime yet |
 | Zed | Ready locally | Installed app 1.11.3; S008 runtime pinned and verified the signed 1.10.3 Apple Silicon DMG without replacing the installed app |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -399,8 +401,13 @@ Host audited: macOS 26.5.1 arm64.
   data paths. Both automatic route deletions failed but ordered explicit cleanup
   passed after process absence. Zed also auto-installed HTML, created unrelated
   editor state, and emitted provider-auth warnings in the fresh profile, so the
-  strict result is Inconclusive. A new profile-attribution spike is required;
+  strict result is Inconclusive. A new profile-attribution spike was required;
   the local end-to-end PoC and project direction gate remain incomplete.
+- R007 attributed the trust modal and HTML install to defaults, the Copilot
+  warning to its independent XDG config path, and the ChatGPT warning to native-
+  agent provider enumeration. S009 now has a reviewed one-run plan using only
+  isolated trust/extension/AI/XDG controls plus the fixed S008 JDT inputs. Gate
+  A remains closed until explicit continuation.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

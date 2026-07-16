@@ -1,13 +1,14 @@
 # Research Index
 
-- Phase status: Core research complete; targeted R006 follow-up complete
+- Phase status: Core research complete; targeted R006-R007 follow-up complete
 - Last completed on: 2026-07-17
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
   fixed-input direct managed-JDT runs both reached `ServiceReady`, but fresh-
-  profile extension/provider initialization prevented strict attribution
-- Next gate: write and review a new profile-attribution spike, then plan one
-  attributable local end-to-end PoC
+  profile extension/provider initialization prevented strict attribution. R007
+  attributed those paths and S009 is planned/reviewed but not implemented
+- Next gate: implement S009 Gate A after explicit continuation, then review its
+  preparation before any runtime
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -32,6 +33,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R004](004-integration-structure-candidates.md) | Integration structure candidates | Complete | Comparison of direct, dual-server, and coordinator models |
 | [R005](005-distribution-and-licensing.md) | Distribution and licensing | Complete | Pinned-download strategy and publication constraints |
 | [R006](006-s007-startup-lookup-attribution.md) | Attribute S007 startup lookups and cleanup behavior | Complete | Buildship owns the Gradle request; task-helper latest lookup and proxy cleanup conditions identified |
+| [R007](007-s008-profile-startup-attribution.md) | Attribute S008 isolated-profile startup state | Complete | Trust/HTML are defaults; Copilot crosses the custom profile via XDG; AI disable guards provider enumeration |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -48,5 +50,6 @@ Research is sufficient for feasibility spikes when it identifies:
 R001-R005 satisfy the original documentation gate. R006 is a targeted source
 follow-up to S007 and defined S008's fixed preseed conditions. S008 proved those
 inputs can reach the two direct managed data paths, but its profile-attribution
-conditions did not hold. None establishes production feasibility; the direction
-decision still requires an attributable local end-to-end result.
+conditions did not hold. R007 attributed that gap and defines S009's controls.
+None establishes production feasibility; the direction decision still requires
+an attributable local end-to-end result.

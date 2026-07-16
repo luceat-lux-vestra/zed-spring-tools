@@ -19,7 +19,9 @@ R006 completed source attribution. S008 then completed two fixed-helper/catalog
 runs: both exact direct data paths reached `ServiceReady`, but the fresh profile
 auto-installed an extension, created unrelated editor state, and emitted
 provider-auth warnings. S008 is therefore Inconclusive rather than Refuted. A
-new profile-attribution spike and a later attributable local PoC are still
-required.
+controlled profile-attribution run and a later attributable local PoC are still
+required. R007 has now attributed the profile paths, and S009 is planned and
+reviewed as that single controlled prerequisite run. It has no implementation
+or runtime evidence yet.
 
 Use [template.md](template.md) after sufficient evidence exists.

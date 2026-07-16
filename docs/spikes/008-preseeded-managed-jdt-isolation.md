@@ -729,10 +729,9 @@ Linux, Windows, x86_64, JDK 21, remote development, WSL, Spring startup, Spring
 completion/add/callback behavior, product scaffolding, publication, and every
 public support claim remain untested or outside S008.
 
-The next experiment must be a new reviewed spike, not another S008 retry. It
-should first determine whether a reproducible Zed 1.10.3 launch configuration
-can suppress or separately attribute the trust flow, automatic HTML install,
-and global provider/auth initialization without importing normal-profile state.
-Only after that attribution gap is closed should a separate end-to-end Spring
-plan reuse the now-demonstrated fixed helper/catalog and two-run direct-data
-procedure.
+The next experiment must be a new reviewed spike, not another S008 retry. R007
+has now source-attributed the trust flow, automatic HTML install, Copilot XDG
+config lookup, and native-agent provider enumeration. S009 records the resulting
+one-run control plan. Only after that plan passes should a separate end-to-end
+Spring plan reuse the now-demonstrated fixed helper/catalog and two-run direct-
+data procedure.
