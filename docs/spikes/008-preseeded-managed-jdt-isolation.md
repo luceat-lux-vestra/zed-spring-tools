@@ -1,11 +1,11 @@
 # S008: Preseeded managed-JDT isolation with attributed startup inputs
 
-- Status: Gate B real preparation complete with retained pre-runtime corrections; Gate C not started
-- Date: 2026-07-16
+- Status: Gate C closed Inconclusive after two core-path successes
+- Date: 2026-07-17
 - Related decision: D001
 - Related research: R003, R004, R006
 - Depends on: S007 Inconclusive after one core-path success
-- Implementation gate: Gate C closed until a later explicit continuation
+- Implementation gate: closed; any correction requires a new reviewed spike
 
 ## Hypothesis
 
@@ -215,7 +215,9 @@ required by Gate A is preparation, not a Gate C runtime run.
 
 ## Gate C: two bounded runtime runs
 
-Gate C requires a new explicit continuation after Gate B review.
+Gate C required a new explicit continuation after Gate B review. That
+continuation was authorized and executed on 2026-07-17; the result is recorded
+below.
 
 ### Shared preflight
 
@@ -617,3 +619,120 @@ not support for the S008 runtime hypothesis. Gate C requires a new explicit
 continuation and must begin by reviewing this result, establishing a fresh
 normal-Zed/log boundary, remounting the signed fixed app, and reverifying every
 prepared identity before any UI restriction or runtime input.
+
+## Gate C runtime result
+
+Gate C completed on 2026-07-17 on the local macOS 26.5.1 arm64/Temurin
+25.0.3+9 tuple. Both corrected runs reached `ServiceReady` through the fixed
+managed-local path and distinct explicit data paths. S008 is nevertheless
+**Inconclusive**, not Supported or Refuted, because the supposedly minimal
+profile acquired unplanned extension and editor/provider state and emitted
+provider-authentication warnings. Those observations violate the attribution
+conditions fixed before runtime.
+
+### Fixed preflight and runtime identities
+
+- The pinned 143,545,589-byte Zed 1.10.3 Apple Silicon DMG again reproduced
+  SHA-256 `717ab148...1a0`, mounted read-only, passed deep/strict code-signature
+  validation, and was accepted as notarized. Runtime used only its bundle-local
+  CLI. The installed Zed 1.11.3 app was not replaced or modified.
+- The selected 542,960-byte arm64 helper remained at the exact accepted
+  source-commit path and reproduced SHA-256 `e9b1028b...e0e7`. Exactly one
+  helper and one managed JDT 1.60.0 candidate existed.
+- Each run's 413,663-byte Gradle catalog was recopied from the fixed
+  `f91a3840...4d02` source and had its mtime refreshed once immediately before
+  launch. Content, size, and that run-specific mtime remained unchanged through
+  startup and shutdown. Neither XDG root gained a `tooling/gradle/checksums`
+  directory.
+- The corrected profile settings reproduced SHA-256 `21178faa...2b64` and
+  selected only the fixed proxy, Temurin 25.0.3, pinned managed JDT/configuration
+  and launcher, with JDK auto-download disabled and updates set to `never`.
+  Both worktrees retained only the byte-fixed fixture.
+
+All raw paths, commands, logs, screenshots, route files, and generated data
+remain under ignored `tmp/s008-gate-c-*` evidence. The summary below redacts
+private absolute paths and opaque command arguments.
+
+### Preserved pre-child failure and allowed correction
+
+The first foreground Run 1 launch opened a fresh Zed profile into an
+`Unrecognized Project` trust dialog. Restricted mode explicitly disabled
+language servers, so the initial bounded project-opening action left the editor
+blank and no proxy or JDT child appeared. The run also revealed that Zed had
+already created database, thread, prompt, and external-agent registry state,
+installed the HTML extension, changed the prepared Java-only index, and emitted
+Copilot credential-format and ChatGPT subscription-authentication warnings.
+
+This was a named UI/trust precondition before any real child, so the plan's one
+pre-child correction was used. The failed profile/worktrees/XDG destinations,
+screenshots, foreground log, and post-timeout inventory were preserved. A new
+profile, two new worktrees, two new XDG roots, and new expected data identities
+were prepared and independently reverified. Only the current worktree was
+trusted; the option to trust every project below the parent temporary directory
+was not selected. No setup correction occurred after a proxy or JDT child
+started.
+
+### Two corrected managed-JDT runs
+
+| Observation | Corrected Run 1 | Corrected Run 2 |
+| --- | --- | --- |
+| Fixture opening | Java source visibly opened after trust approval and bounded project-panel input | Java source visibly opened after trust approval and bounded file-picker input |
+| Proxy/JVM | One fixed proxy and one Temurin 25.0.3 JVM | One fixed proxy and one Temurin 25.0.3 JVM |
+| JDT/config/launcher | Fixed JDT 1.60.0, `config_mac_arm`, and Equinox 1.7.200 | Same fixed identities |
+| `-data` | Exactly one argument equal to Run 1's precomputed path | Exactly one argument equal to Run 2's different precomputed path |
+| Readiness | LSP start 05:47:53 KST; `ServiceReady` 05:47:56 | LSP start 05:54:34 KST; `ServiceReady` 05:54:36 |
+| Live JVM RSS | Approximately 1.66 GiB | Approximately 1.62 GiB |
+| Final isolated state | 28 files, 45,731,840 allocated bytes, only at Run 1's expected path | 28 files, 45,731,840 allocated bytes, only at Run 2's expected path |
+| Shutdown | Zed, proxy, and JVM absent within 10 seconds | Zed, proxy, and JVM absent within 1 second |
+| Route cleanup | One 5-byte record remained after the stable wait; preserved, then explicitly removed after process absence | Same behavior with the Run 2 record; preserved, then explicitly removed after process absence |
+
+The actual JVM argument vectors contained no `jdtls.py`, packaged `bin/jdtls`,
+host fallback, duplicate `-data`, or other-run data path. Run 1's 28-file
+content-hash set was unchanged before and during Run 2. No helper installation
+artifact, helper-download/latest-release error, catalog mutation, Gradle
+checksum cache, worktree metadata, or worktree build output was observed. These
+facts establish two direct core-path successes and show that neither fixed input
+was necessarily bypassed. They do not claim system-wide network silence.
+
+### Minimal-profile divergence and classification
+
+The corrected profile was structurally minimal before launch, but Zed 1.10.3
+did not preserve that identity at runtime. It installed the HTML extension and
+changed `extensions/index.json` from the reviewed Java-only hash to
+`d3f901ea...d96c`. It also created global/stable databases, a thread database,
+prompt-library data, an external-agent registry, language/debug/prettier/node
+state, and other editor runtime directories. Both corrected launches emitted
+the same Copilot credential-format warning and ChatGPT subscription-auth error
+from the shared fresh profile. The project-trust modal and extra bounded UI
+action were also absent from the reviewed runtime assumptions.
+
+Those facts trigger the explicit Inconclusive rule for minimal-profile identity
+and unexpected provider behavior. They prevent Supported even though the
+managed JDT hypothesis's direct path worked twice. They do not trigger Refuted:
+neither run selected another JDT or data path, reused the other run's data,
+required a host fallback, required a remote catalog response, or failed to
+reach `ServiceReady`.
+
+Automatic proxy-record deletion failed independently in both runs. Mandatory
+process absence and ordered explicit cleanup passed, so this observation is not
+itself a core-path failure. It remains a product-lifecycle constraint for later
+work.
+
+### Restoration, remaining uncertainty, and next experiment
+
+After Run 2, the fixed isolated app and every proxy/JDT child were absent, both
+route records had been preserved and explicitly removed, and the fixed image
+was detached. Normal Zed 1.11.3 was restored from `/Applications` without
+isolated arguments and remained running after detachment.
+
+Linux, Windows, x86_64, JDK 21, remote development, WSL, Spring startup, Spring
+completion/add/callback behavior, product scaffolding, publication, and every
+public support claim remain untested or outside S008.
+
+The next experiment must be a new reviewed spike, not another S008 retry. It
+should first determine whether a reproducible Zed 1.10.3 launch configuration
+can suppress or separately attribute the trust flow, automatic HTML install,
+and global provider/auth initialization without importing normal-profile state.
+Only after that attribution gap is closed should a separate end-to-end Spring
+plan reuse the now-demonstrated fixed helper/catalog and two-run direct-data
+procedure.

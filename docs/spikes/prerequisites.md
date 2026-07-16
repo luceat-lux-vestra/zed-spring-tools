@@ -1,7 +1,7 @@
 # Feasibility prerequisites and platform matrix
 
 - Status: Approved for feasibility work
-- Last checked: 2026-07-16
+- Last checked: 2026-07-17
 - Applies to: local PoC work, staged public development, and later platform validation
 
 ## Purpose
@@ -193,8 +193,8 @@ Host audited: macOS 26.5.1 arm64.
 | S006 plan | Gate C closed Inconclusive | Corrected Spring LS startup and JDT import succeeded, but actual JDT data used a fresh host cache instead of the reviewed prepared path; no completion/add/callback input ran |
 | S007 plan | Gate C closed Inconclusive | Run 1 used the exact managed-local data path and reached `ServiceReady`; unexpected Gradle metadata and a leftover proxy record prevented attribution/cleanup, so Run 2 was not started |
 | R006 attribution | Complete | Buildship's cache-miss request created the Gradle catalog; Java task-helper entered a separate latest-release path; proxy record removal is best effort after child exit |
-| S008 plan | Reviewed; Gate A closed | Preseed one fixed source-built helper and one fixed catalog per XDG root in a new minimal profile, then prove two distinct managed data paths |
-| Zed | Ready locally | 1.10.3, build `20260713.002323` |
+| S008 plan | Gate C closed Inconclusive | Both fixed-input runs used distinct exact managed-local data paths and reached `ServiceReady`; automatic HTML/editor/provider initialization broke minimal-profile attribution |
+| Zed | Ready locally | Installed app 1.11.3; S008 runtime pinned and verified the signed 1.10.3 Apple Silicon DMG without replacing the installed app |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
 | Rust WASI target | Ready | Official rustup `wasm32-wasip1` target installed; locked S005 release build passed |
@@ -203,7 +203,7 @@ Host audited: macOS 26.5.1 arm64.
 | JDK 21+ | Ready locally | SDKMAN Temurin JDK 25.0.3; `java` and `javac` verified for S002+ |
 | Java discovery | Conditional | `$JAVA_HOME` works; `/usr/libexec/java_home` does not see the SDKMAN JDK |
 | Disk | Ready locally | Approximately 577 GiB available during audit |
-| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, S003 JDT LS snapshots were approximately 587-1,264 MiB, S004 JDT LS snapshots were approximately 506-1,271 MiB, and S005 JDT LS snapshots were approximately 1,269-1,541 MiB |
+| Memory | Measured locally | 64 GiB installed; S002 Spring LS used approximately 265-290 MiB RSS, S003 JDT LS snapshots were approximately 587-1,264 MiB, S004 JDT LS snapshots were approximately 506-1,271 MiB, S005 JDT LS snapshots were approximately 1,269-1,541 MiB, and S008 JDT LS snapshots were approximately 1.62-1.66 GiB |
 | Spring VSIX | Verified locally | Pinned 82,759,143-byte artifact and SHA-256 verified; retained only in ignored local storage and not redistributable from this repository |
 | Native libraries in VSIX | None observed | 204-entry archive inspected for common native suffixes |
 | Official Zed Java extension | Ready in isolated S003 data | Exact 6.8.21 installation retained for repeatable research; normal Zed remains unchanged |
@@ -394,12 +394,13 @@ Host audited: macOS 26.5.1 arm64.
 - R006 then attributed the catalog to fixed Buildship's unconditional startup
   and cache-miss request, identified the Java extension's separate task-helper
   latest-release branch, and confirmed that proxy record removal occurs only
-  after child wait with ignored removal errors. S008 now has a reviewed plan to
-  build and preseed the helper from the exact source commit, preseed the exact
-  JDT-embedded catalog in two new XDG roots, use a new minimal profile, and
-  separate mandatory process exit from explicit route cleanup. Gate A remains
-  closed until explicit continuation. The local end-to-end PoC and project
-  direction gate remain incomplete.
+  after child wait with ignored removal errors. S008 built and preseeded the
+  exact helper/catalog and reached `ServiceReady` twice through distinct exact
+  data paths. Both automatic route deletions failed but ordered explicit cleanup
+  passed after process absence. Zed also auto-installed HTML, created unrelated
+  editor state, and emitted provider-auth warnings in the fresh profile, so the
+  strict result is Inconclusive. A new profile-attribution spike is required;
+  the local end-to-end PoC and project direction gate remain incomplete.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

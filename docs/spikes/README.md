@@ -25,10 +25,14 @@ precomputed data path and reached `ServiceReady`, but a fresh XDG root also
 gained Gradle version metadata and a proxy record remained after shutdown. Run
 2 was deliberately not started, so S007 is Inconclusive. R006 attributed the
 catalog to Buildship's cache-miss request and found a separate Java task-helper
-latest-release lookup. S008 now has a reviewed plan, a fixed source-built task
-helper, and a completed real minimal-profile preparation. Two rejected
-pre-runtime preparations and an unattributed normal-Zed restart are retained;
-no isolated Zed/proxy/JDT run has started.
+latest-release lookup. S008 built and preseeded both fixed inputs, then executed
+two corrected isolated runs. Each selected the fixed proxy/JDK/JDT, used exactly
+one distinct precomputed `-data`, and reached `ServiceReady`; helper/catalog
+bytes stayed fixed and Run 1 data was unchanged during Run 2. The initially
+fresh profile nevertheless auto-installed HTML, created unrelated editor state,
+and emitted Copilot/ChatGPT authentication warnings. S008 is therefore
+Inconclusive under its strict attribution criteria, not Refuted. A new reviewed
+profile-attribution spike is required before a Spring end-to-end plan.
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
 
@@ -43,7 +47,7 @@ Tentative sequence:
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
 | [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
 | [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Inconclusive on macOS arm64/JDK 25 after Run 1: expected direct data path worked, but update/network attribution and cleanup were insufficient; Run 2 not started |
-| [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Gate B real preparation complete with retained corrections; Gate C not started |
+| [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Inconclusive on macOS arm64/JDK 25 after two direct-path successes: fresh-profile extension/provider state violated attribution; other targets untested |
 
 Use [template.md](template.md) before adding any spike code.
 

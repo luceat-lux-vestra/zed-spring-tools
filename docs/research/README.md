@@ -1,12 +1,13 @@
 # Research Index
 
 - Phase status: Core research complete; targeted R006 follow-up complete
-- Last completed on: 2026-07-16
+- Last completed on: 2026-07-17
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
-  required coordination seams, while S006-S007 are Inconclusive and S008 is
-  plan-reviewed but not implemented
-- Next gate: implement the separately reviewed S008 prerequisite after explicit
-  continuation, then plan one attributable local end-to-end PoC
+  required coordination seams, while S006-S008 are Inconclusive. S008's two
+  fixed-input direct managed-JDT runs both reached `ServiceReady`, but fresh-
+  profile extension/provider initialization prevented strict attribution
+- Next gate: write and review a new profile-attribution spike, then plan one
+  attributable local end-to-end PoC
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -45,6 +46,7 @@ Research is sufficient for feasibility spikes when it identifies:
 - the smallest experiment that can distinguish the leading candidates.
 
 R001-R005 satisfy the original documentation gate. R006 is a targeted source
-follow-up to S007 and defines S008's fixed preseed conditions. None establishes
-production feasibility; the direction decision still requires an attributable
-local end-to-end result.
+follow-up to S007 and defined S008's fixed preseed conditions. S008 proved those
+inputs can reach the two direct managed data paths, but its profile-attribution
+conditions did not hold. None establishes production feasibility; the direction
+decision still requires an attributable local end-to-end result.
