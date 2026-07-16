@@ -48,6 +48,8 @@ public final class PrepareS008 {
             "056ece24f7bb2feb0676898b31be2a6d81b23bf0cf34bc6e03ac07fb7ba85906";
     private static final String PROFILE_ALLOWLIST = String.join(";",
             "config/settings.json",
+            "fixed/java-lsp-proxy",
+            "fixed/com.microsoft.java.debug.plugin-0.53.2.jar",
             "extensions/index.json",
             "extensions/installed/java/**",
             "extensions/work/java/jdtls/" + JDT_BUILD_DIRECTORY + "/**",
@@ -346,7 +348,23 @@ public final class PrepareS008 {
 
             Path settings = profileStage.resolve("config/settings.json");
             Files.createDirectories(settings.getParent());
-            writeSettings(settings, jdk, proxy, debug);
+            Path fixedProxy = profileStage.resolve("fixed/java-lsp-proxy");
+            Path fixedDebug = profileStage.resolve(
+                    "fixed/com.microsoft.java.debug.plugin-0.53.2.jar");
+            Files.createDirectories(fixedProxy.getParent());
+            Files.copy(proxy, fixedProxy);
+            Files.copy(debug, fixedDebug);
+            makeExecutable(fixedProxy);
+            if (!sha256(fixedProxy).equals(proxyHash)
+                    || !sha256(fixedDebug).equals(debugHash)) {
+                throw new IOException("staged fixed Java artifact identity changed");
+            }
+            writeSettings(
+                    settings,
+                    jdk,
+                    outputProfile.resolve("fixed/java-lsp-proxy"),
+                    outputProfile.resolve(
+                            "fixed/com.microsoft.java.debug.plugin-0.53.2.jar"));
             verifySettings(settings);
 
             Path index = profileStage.resolve("extensions/index.json");
@@ -404,7 +422,12 @@ public final class PrepareS008 {
             writeManifest(manifestPath, manifest);
             verifyManifest(manifestPath);
             verifyMinimalProfile(
-                    profileStage, installedTreeHash, jdtTreeHash, helperHash);
+                    profileStage,
+                    installedTreeHash,
+                    jdtTreeHash,
+                    helperHash,
+                    proxyHash,
+                    debugHash);
             verifyFixtureOnly(worktree1Stage);
             verifyFixtureOnly(worktree2Stage);
             verifyCatalogOnly(xdg1Stage);
@@ -524,17 +547,29 @@ public final class PrepareS008 {
         try (Stream<ProcessHandle> processes = ProcessHandle.allProcesses()) {
             boolean found = processes.anyMatch(process -> {
                 ProcessHandle.Info info = process.info();
-                String command = info.command().orElse("");
-                String arguments = String.join(" ", info.arguments().orElse(new String[0]));
-                String combined = command + " " + arguments;
-                return combined.contains("java-lsp-proxy")
-                        || combined.contains("org.eclipse.jdt.ls.core")
-                        || combined.contains("org.eclipse.equinox.launcher_");
+                return isRuntimeProcess(
+                        info.command().orElse(""),
+                        info.arguments().orElse(new String[0]));
             });
             if (found) {
                 throw new IOException("an existing Java proxy or JDT process prevents preparation");
             }
         }
+    }
+
+    private static boolean isRuntimeProcess(String command, String[] arguments) {
+        Path commandPath = Path.of(command);
+        Path fileName = commandPath.getFileName();
+        String executable = fileName == null ? "" : fileName.toString();
+        if (executable.equals("java-lsp-proxy")) {
+            return true;
+        }
+        if (!executable.equals("java") && !executable.equals("java.exe")) {
+            return false;
+        }
+        String joined = String.join(" ", arguments);
+        return joined.contains("org.eclipse.jdt.ls.core")
+                || joined.contains("org.eclipse.equinox.launcher_");
     }
 
     private static RunPaths runPaths(Path worktree, Path xdg) {
@@ -834,9 +869,27 @@ public final class PrepareS008 {
             Path profile,
             String installedTreeHash,
             String jdtTreeHash,
-            String helperHash) throws IOException {
-        requireNames(profile, Set.of("config", "extensions", "s008-prepared-manifest.txt"));
+            String helperHash,
+            String proxyHash,
+            String debugHash) throws IOException {
+        requireNames(
+                profile,
+                Set.of("config", "fixed", "extensions", "s008-prepared-manifest.txt"));
         requireNames(profile.resolve("config"), Set.of("settings.json"));
+        Path fixed = profile.resolve("fixed");
+        requireNames(
+                fixed,
+                Set.of("java-lsp-proxy", "com.microsoft.java.debug.plugin-0.53.2.jar"));
+        Path fixedProxy = requireRegularFile(
+                fixed.resolve("java-lsp-proxy"), "staged fixed Java proxy");
+        Path fixedDebug = requireRegularFile(
+                fixed.resolve("com.microsoft.java.debug.plugin-0.53.2.jar"),
+                "staged fixed Java debug bundle");
+        if (!sha256(fixedProxy).equals(proxyHash)
+                || !Files.isExecutable(fixedProxy)
+                || !sha256(fixedDebug).equals(debugHash)) {
+            throw new IOException("staged fixed Java artifact selection changed");
+        }
         requireNames(profile.resolve("extensions"), Set.of("index.json", "installed", "work"));
         requireNames(profile.resolve("extensions/installed"), Set.of("java"));
         Path installed = requireDirectory(
@@ -1136,6 +1189,7 @@ public final class PrepareS008 {
             testCatalogExtraction(root);
             testCatalogRejection(root);
             testPathsAndFreshness(root);
+            testProcessIdentification();
             testProfileAllowlist(root);
             testTransactionCleanup(root);
             testManifestCompleteness(root);
@@ -1199,6 +1253,23 @@ public final class PrepareS008 {
         expectFailure(() -> requireFreshDestination(existing, "synthetic output"));
     }
 
+    private static void testProcessIdentification() {
+        require(isRuntimeProcess("/fixed/java-lsp-proxy", new String[0]),
+                "proxy executable was not identified");
+        require(isRuntimeProcess(
+                "/fixed/jdk/bin/java",
+                new String[] {"-jar", "org.eclipse.equinox.launcher_1.7.0.jar"}),
+                "JDT Java process was not identified");
+        require(!isRuntimeProcess(
+                "/fixed/jdk/bin/java",
+                new String[] {"PrepareS008", "/fixed/input/java-lsp-proxy"}),
+                "preparation input path was misidentified as a live proxy");
+        require(!isRuntimeProcess(
+                "/bin/zsh",
+                new String[] {"-c", "inspect org.eclipse.jdt.ls.core"}),
+                "non-Java inspection command was misidentified as JDT");
+    }
+
     private static void testProfileAllowlist(Path root) throws Exception {
         Path installed = root.resolve("source-installed");
         Files.createDirectories(installed.resolve("languages/java"));
@@ -1216,9 +1287,16 @@ public final class PrepareS008 {
         Path profile = root.resolve("profile");
         Files.createDirectories(profile.resolve("config"));
         Files.createDirectories(profile.resolve("extensions"));
+        Path fixedProxy = profile.resolve("fixed/java-lsp-proxy");
+        Path fixedDebug = profile.resolve(
+                "fixed/com.microsoft.java.debug.plugin-0.53.2.jar");
+        Files.createDirectories(fixedProxy.getParent());
+        Files.writeString(fixedProxy, "proxy", StandardCharsets.UTF_8);
+        Files.writeString(fixedDebug, "debug", StandardCharsets.UTF_8);
+        makeExecutable(fixedProxy);
         writeSettings(
                 profile.resolve("config/settings.json"),
-                root.resolve("JDK 25"), root.resolve("proxy path"), root.resolve("debug jar"));
+                root.resolve("JDK 25"), fixedProxy, fixedDebug);
         Files.writeString(
                 profile.resolve("extensions/index.json"), JAVA_ONLY_INDEX, StandardCharsets.UTF_8);
         copyTree(installed, profile.resolve("extensions/installed/java"));
@@ -1234,25 +1312,32 @@ public final class PrepareS008 {
         String installedHash = treeSha256(installed);
         String jdtHash = treeSha256(jdt);
         String helperHash = sha256(helper);
-        verifyMinimalProfile(profile, installedHash, jdtHash, helperHash);
+        String proxyHash = sha256(fixedProxy);
+        String debugHash = sha256(fixedDebug);
+        verifyMinimalProfile(
+                profile, installedHash, jdtHash, helperHash, proxyHash, debugHash);
 
         Files.createDirectory(profile.resolve("threads"));
-        expectFailure(() -> verifyMinimalProfile(profile, installedHash, jdtHash, helperHash));
+        expectFailure(() -> verifyMinimalProfile(
+                profile, installedHash, jdtHash, helperHash, proxyHash, debugHash));
         Files.delete(profile.resolve("threads"));
 
         Path sibling = helper.getParent().resolve("other-helper");
         Files.writeString(sibling, "unexpected", StandardCharsets.UTF_8);
-        expectFailure(() -> verifyMinimalProfile(profile, installedHash, jdtHash, helperHash));
+        expectFailure(() -> verifyMinimalProfile(
+                profile, installedHash, jdtHash, helperHash, proxyHash, debugHash));
         Files.delete(sibling);
 
         Path secondJdt = profile.resolve("extensions/work/java/jdtls/other-jdt");
         Files.createDirectory(secondJdt);
-        expectFailure(() -> verifyMinimalProfile(profile, installedHash, jdtHash, helperHash));
+        expectFailure(() -> verifyMinimalProfile(
+                profile, installedHash, jdtHash, helperHash, proxyHash, debugHash));
         Files.delete(secondJdt);
 
         Path route = profile.resolve("extensions/work/java/proxy/12345");
         Files.writeString(route, "route", StandardCharsets.UTF_8);
-        expectFailure(() -> verifyMinimalProfile(profile, installedHash, jdtHash, helperHash));
+        expectFailure(() -> verifyMinimalProfile(
+                profile, installedHash, jdtHash, helperHash, proxyHash, debugHash));
         Files.delete(route);
     }
 

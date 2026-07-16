@@ -25,10 +25,10 @@ precomputed data path and reached `ServiceReady`, but a fresh XDG root also
 gained Gradle version metadata and a proxy record remained after shutdown. Run
 2 was deliberately not started, so S007 is Inconclusive. R006 attributed the
 catalog to Buildship's cache-miss request and found a separate Java task-helper
-latest-release lookup. S008 now has a reviewed plan and a completed Gate A
-disposable preparation tool to preseed both fixed inputs in a new minimal
-profile and repeat the managed data-path observation twice. The real helper
-build and preparation have not started.
+latest-release lookup. S008 now has a reviewed plan, a fixed source-built task
+helper, and a completed real minimal-profile preparation. Two rejected
+pre-runtime preparations and an unattributed normal-Zed restart are retained;
+no isolated Zed/proxy/JDT run has started.
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
 
@@ -43,7 +43,7 @@ Tentative sequence:
 | [S005](005-classpath-callback-routing.md) | Intercept and route one classpath callback in disposable proxy code | Supported on macOS arm64/JDK 25 after fresh Gate D controls and a direct Spring `SUCCESS [done]`; other targets untested |
 | [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
 | [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Inconclusive on macOS arm64/JDK 25 after Run 1: expected direct data path worked, but update/network attribution and cleanup were insufficient; Run 2 not started |
-| [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Gate A implementation and synthetic review complete; Gate B not started |
+| [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Gate B real preparation complete with retained corrections; Gate C not started |
 
 Use [template.md](template.md) before adding any spike code.
 

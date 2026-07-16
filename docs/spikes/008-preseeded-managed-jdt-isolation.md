@@ -1,11 +1,11 @@
 # S008: Preseeded managed-JDT isolation with attributed startup inputs
 
-- Status: Gate A implementation and synthetic review complete; Gate B not started
+- Status: Gate B real preparation complete with retained pre-runtime corrections; Gate C not started
 - Date: 2026-07-16
 - Related decision: D001
 - Related research: R003, R004, R006
 - Depends on: S007 Inconclusive after one core-path success
-- Implementation gate: Gate B closed until a later explicit continuation
+- Implementation gate: Gate C closed until a later explicit continuation
 
 ## Hypothesis
 
@@ -209,7 +209,9 @@ Gate B requires a new explicit continuation after Gate A review. It may:
    and
 6. preserve capacity, process-space, normal-Zed, and all preparation evidence.
 
-Gate B stops before any CLI, isolated Zed, proxy, JDT, or UI action.
+Gate B stops before any project-opening or foreground CLI invocation, isolated
+Zed start, proxy/JDT start, or UI action. The version-only CLI identity check
+required by Gate A is preparation, not a Gate C runtime run.
 
 ## Gate C: two bounded runtime runs
 
@@ -401,11 +403,12 @@ authorized by this plan:
    exact catalog entry shape, and verifies its 413,663-byte fixed digest before
    retaining either catalog copy.
 4. The generated profile has an explicit allowlist for one fixed settings
-   file, one Java-only index, the exact official Java install tree, one exact
-   managed JDT tree, one helper selection path, an empty proxy route directory,
-   and the preparation manifest. Top-level databases, threads, provider state,
-   logs, unrelated extensions, previous-spike paths, helper siblings, second
-   JDT candidates, and nonempty proxy records fail verification.
+   file, fixed byte-identical proxy/debug inputs, one Java-only index, the exact
+   official Java install tree, one exact managed JDT tree, one helper selection
+   path, an empty proxy route directory, and the preparation manifest. Top-level
+   databases, threads, provider state, logs, unrelated extensions,
+   previous-spike paths, helper siblings, second JDT candidates, and nonempty
+   proxy records fail verification.
 5. All five destinations must be distinct, absent direct children of the
    repository's ignored `tmp/` directory. The tool stages them in one temporary
    transaction, removes already-moved outputs on a later move failure, and
@@ -465,6 +468,152 @@ already-recorded fixed digest.
 
 The Gate A implementation is ready for the separately authorized Gate B fixed
 helper build and real preparation. This is an implementation-readiness result,
-not evidence for the S008 runtime hypothesis. Gate B remains closed until an
-explicit continuation and must stop before any CLI, Zed, proxy, JDT, or UI
-action.
+not evidence for the S008 runtime hypothesis.
+
+## Gate B fixed helper build and real preparation result
+
+Gate B completed on 2026-07-16 on the local macOS arm64/Temurin 25.0.3+9
+tuple. It produced the real helper and final prepared inputs, but it did not
+open either fixture in Zed, start an isolated project session, start the Java
+proxy or JDT, refresh a catalog for a runtime run, or control the UI.
+
+### Fixed Zed artifact recovery
+
+The installed Zed app had automatically advanced from the planned 1.10.3 to
+1.11.3 before Gate B. It was not downgraded, replaced, or modified. No local
+copy of the fixed 1.10.3 CLI remained, so Gate B downloaded only the pinned
+official
+[Zed v1.10.3 Apple Silicon DMG](https://github.com/zed-industries/zed/releases/download/v1.10.3/Zed-aarch64.dmg)
+on 2026-07-16 under ignored `tmp/` evidence. The release API reported, and the
+download independently matched, size 143,545,589 and SHA-256
+`717ab14826889b83ffb46992b5155cf3e32e801805044d5d739d893ffb19a1a0`.
+
+Read-only mounting verified the APFS image checksum. `codesign --verify --deep
+--strict` passed for identifier `dev.zed.Zed`, Team ID `MQ55VZLNZQ`, and the
+Zed Industries Developer ID chain; `spctl` accepted it as a notarized Developer
+ID app. Its bundle-local CLI reproduced the planned 3,570,560-byte SHA-256
+`f1dad0ae519a201fc784c54369252c4a4ca2e13f2411707018ed8a95653d8215`
+and reported Zed 1.10.3. The image was detached after preparation. The
+downloaded DMG and one copied-out CLI remain ignored evidence; the copied-out
+CLI is not a valid runtime launch input because it lacks its containing bundle.
+
+### Helper build facts
+
+- The clean source remained at commit
+  `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`, Git tree
+  `fa498e0a79edcff6d59976af7c16a719fc9a1772`, with the fixed Cargo lockfile
+  and task-helper manifest hashes.
+- The active rustup toolchain was `stable-aarch64-apple-darwin`: Rust 1.97.0
+  commit `2d8144b7880597b6e6d3dfd63a9a9efae3f533d3` and Cargo 1.97.0 commit
+  `c980f4866141969fab6254a680546a277789d6f0`.
+- `cargo build --release --locked -p java-task-helper` used a wholly new ignored
+  `CARGO_TARGET_DIR`, completed without a lockfile/source change, and produced
+  one 542,960-byte Mach-O 64-bit arm64 executable. `file`, `lipo`, and `otool`
+  independently identified arm64; SHA-256 is
+  `e9b1028b2fa5201c787bf2b22849a9ff11d0859fc5745fd59aaa20e77846e0e7`.
+
+### Preserved preparation corrections
+
+1. Pre-invocation review found that the original process scan searched every
+   process argument for `java-lsp-proxy`, which could misclassify the
+   preparation process's own input path. It now accepts the proxy executable
+   name exactly and limits JDT argument matching to Java executables. Synthetic
+   tests cover both positive runtime identities and the two false-positive
+   shapes. No production destination existed when this was corrected.
+2. The first production invocation used the byte-fixed CLI copied outside its
+   app bundle. Its version command returned exit code 1 before transaction
+   creation. All five destinations and every transaction path remained absent.
+   The failed copied CLI is retained under ignored evidence.
+3. The second invocation used the signed read-only bundle-local CLI and passed
+   its identity check, then correctly rejected settings that still referenced
+   the retained S007 proxy/debug paths. It failed before final movement and left
+   all five newly named destinations and transaction paths absent.
+4. The correction did not weaken previous-spike rejection. The tool now copies
+   the exact official proxy and debug JAR into an explicit `fixed/` profile
+   allowlist and writes settings against those final S008-local paths. Compiled
+   and source-mode synthetic tests passed again before a third invocation used
+   wholly new final destination names.
+
+One independent `jq` validation expression and one Ruby assertion expression
+also had command-syntax errors after successful preparation. Neither mutated
+evidence. Corrected expressions were rerun and passed; these command failures
+do not contribute to the preparation result.
+
+### Confirmed final preparation facts
+
+- The final profile contains 153 regular files, 31 directories, and no
+  symlinks. Its roots are only `config`, `fixed`, `extensions`, and the
+  49-key preparation manifest. There is no database, threads, provider/account
+  state, unrelated extension, previous-spike path, log, prior JDT data, or
+  proxy route record.
+- The staged official Java 6.8.21 tree is byte-for-byte equal to its retained
+  input and independently reproduces tree SHA-256
+  `58e1155d9a6339790470e0b1ac31e49a7fd771a0412b168b22165433347fae68`.
+  The single managed JDT tree is byte-for-byte equal to its input and reproduces
+  `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`.
+- The fixed profile proxy, debug JAR, and helper reproduce SHA-256 values
+  `53ed618c...0076`, `52751959...a83c`, and `e9b1028b...e0e7`. The proxy and
+  helper are executable, exactly one helper selection path exists, and exactly
+  one managed JDT candidate exists.
+- Settings SHA-256 is
+  `0624babd5fa25f4a9491e33bf61073e5b9b42832fb451b2081d893e96dad392b`.
+  It selects only `jdtls`, points to the final S008-local fixed proxy/debug,
+  disables Lombok and JDK auto-download, sets `check_updates: "never"`, and
+  contains no custom launcher or previous-spike/Spring server path.
+- Preflight index SHA-256 is
+  `a734897946e174c3e2b63058bec95b98c281da9fa28726eacc5881d46b70e6eb`.
+  Independent JSON parsing found only official Java 6.8.21 with `dev: false`
+  and only Java/Properties language entries.
+- Each worktree contains only the fixed fixture at SHA-256
+  `056ece24f7bb2feb0676898b31be2a6d81b23bf0cf34bc6e03ac07fb7ba85906`.
+  Each XDG root contains only one 413,663-byte catalog at fixed SHA-256
+  `f91a3840...4d02`; the two full-path run keys and expected data paths differ.
+- Both expected data paths, both managed host fallbacks, both packaged-launcher
+  fallbacks, and the empty proxy directory's records were absent. No proxy or
+  JDT process existed. Independent manifest checks matched 13 fixed/dynamic
+  identities, all 49 required keys, both run shapes, and every freshness rule.
+- Approximately 800 GiB disk remained free and the host has 64 GiB memory.
+  Source status remained clean after every build and verification.
+
+### Normal-Zed observation and inference
+
+Normal Zed was running from the installed 1.11.3 `/Applications` bundle at
+preflight. Its process identity changed during the early copied-out-CLI
+verification sequence, and the replacement normal process reported a start
+time of 23:40:28 KST. The installed CLI remained byte-identical at SHA-256
+`9289fa39...6975`, still reported 1.11.3, had no isolated arguments, and was
+still running normally after the fixed DMG was detached.
+
+The copied-out 1.10.3 CLI attempt may have contributed to that normal-app
+restart, but the available process evidence cannot prove causation. Therefore
+Gate B does not claim uninterrupted normal-Zed process identity. It does
+confirm that no fixed 1.10.3 isolated project, proxy, JDT, or UI run began and
+that the installed app was not replaced. Gate C must establish a new normal-Zed
+baseline and log boundary before it deliberately stops the normal app.
+
+### Runtime verification still required
+
+- No runtime has shown that Java 6.8.21 selects the staged helper, bypasses its
+  latest-release contribution, or uses the fresh embedded Gradle catalog
+  without the attributed remote contribution.
+- Neither run has started; direct command/JDK/JDT selection, exact `-data`,
+  `ServiceReady`, data isolation, catalog stability, process exit, route
+  cleanup, and normal-Zed restoration remain unverified.
+- The catalogs' preparation mtimes are not runtime-freshness evidence. Gate C
+  must reverify their bytes and refresh each copy exactly once immediately
+  before its corresponding run.
+- Gate C must remount and reverify the pinned signed 1.10.3 DMG and use only its
+  bundle-local CLI. It must never use the installed 1.11.3 CLI or the retained
+  copied-out 1.10.3 CLI.
+- Linux, Windows, x86_64, JDK 21, remote development, WSL, and public support
+  claims remain untested or outside scope.
+
+### Gate B conclusion and next gate
+
+The final fixed helper and preparation outputs are ready for Gate C preflight.
+The two rejected preparation paths and the unexplained normal-Zed restart are
+retained constraints, not erased successes. This remains preparation evidence,
+not support for the S008 runtime hypothesis. Gate C requires a new explicit
+continuation and must begin by reviewing this result, establishing a fresh
+normal-Zed/log boundary, remounting the signed fixed app, and reverifying every
+prepared identity before any UI restriction or runtime input.
