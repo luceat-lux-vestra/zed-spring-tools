@@ -57,10 +57,17 @@ Extracted mechanically from `extension/package.json` inside the pinned VSIX
 
 ### Spring Boot language server's advertised LSP capabilities
 
-Observed in the `initialize` result during the M2 closure run and retained in
-`tmp/m2-close-20260717/evidence/zed-log-capture.txt`. The Spring server is
-identified by its `sts.vscode-spring-boot.*` commands; the JDT LS `initialize`
-result in the same capture is a different server and is not this list.
+Observed in the `initialize` result during the M2 closure run. The capture is
+retained locally under the ignored path
+`tmp/m2-close-20260717/evidence/zed-log-capture.txt` and is deliberately absent
+from the published tree, because `tmp/` holds runtime profiles, logs, routes, and
+screenshots that must never enter Git. A reader without that file regenerates the
+observation with the reproduction steps at the end of this document rather than
+taking this list on trust.
+
+The Spring server is identified by its `sts.vscode-spring-boot.*` commands; the
+JDT LS `initialize` result in the same capture is a different server and is not
+this list.
 
 `hoverProvider`, `codeLensProvider` (resolve), `codeActionProvider` (resolve,
 kinds), `definitionProvider`, `implementationProvider`, `referencesProvider`,
