@@ -143,7 +143,7 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | --- | --- | --- |
 | Start Spring Boot Language Server on demand | `planned` | `vscode-spring-boot.ls.start`. **Known debt**: the coordinator does not handle this client request. |
 | Java type resolution for the server | `planned` | `sts/javaType`. **Known debt**: unhandled by the coordinator. |
-| Classpath listening | `verified` | `sts.vscode-spring-boot.enableClasspathListening` driven by the coordinator; observed registering and removing during the M2 gate run. **Warm-cache caveat**: on a cold first launch the bridge bundle races the artifact download and does not register, so classpath listening fails until a Zed restart. See [R012](research/012-cold-cache-bridge-bundle-race.md). |
+| Classpath listening | `verified` | `sts.vscode-spring-boot.enableClasspathListening` driven by the coordinator; observed registering and removing during the M2 gate run. **Install-ordering caveat**: if the extension is installed while a Java project is already open, `jdtls` does not pick up the bridge until Zed restarts; when the extension is present before the Java server starts it registers fine, cold cache included. See [S014](spikes/014-jdtls-bundle-startup-ordering.md). |
 | Missing / incompatible Java diagnostic | `implemented` | Contract-tested; the runtime observation is still outstanding from M2 step 7. |
 | Embedded language syntax highlighting | `planned` | Setting `boot-java.embedded-syntax-highlighting`; VSIX contributes four grammars. |
 | Java reconcilers | `planned` | Setting `boot-java.java.reconcilers`; `boot-java.scan-java-test-sources.on`. |

@@ -44,7 +44,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R009](009-unmodified-java-companion-boundary.md) | Attribute the unmodified official-Java companion boundary | Complete | Bundle contribution and JDT requests work; reverse callback requires an owned bridge and runtime verification |
 | [R010](010-experimental-public-source-audit.md) | Audit the experimental public-source boundary | Complete | Reachable history is source-only and pattern-clean; license, author identity, and namespace require owner decisions |
 | [R011](011-vscode-spring-tools-capability-surface.md) | Enumerate the VS Code Spring Tools capability surface | Complete | 15 commands, 18 settings, 4 languages, and 13 advertised LSP capabilities derived from the pinned release; seeds the capability inventory |
-| [R012](012-cold-cache-bridge-bundle-race.md) | Cold-cache bridge/bundle startup race | Confirmed; fix undecided | jdtls starts before the downloaded bundles exist, so the bridge never registers on a cold first launch; a restart warms the cache and it works. Caveats the M2 gate |
+| [R012](012-cold-cache-bridge-bundle-race.md) | Bridge/bundle startup ordering (mis-titled cold-cache) | Superseded by S014 | First concluded a cold-cache race; S014 corrected it to an install-ordering issue. jdtls that starts before the extension is installed is not re-queried for the bridge; a cold cache with the extension pre-installed works |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
