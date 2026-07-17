@@ -1,11 +1,11 @@
 # S009: Source-controlled isolated-profile JDT startup
 
-- Status: Planned and reviewed; Gate A not started
+- Status: Gate A complete and reviewed; Gate B not started
 - Date: 2026-07-17
 - Related decision: D001
 - Related research: R003, R006, R007
 - Depends on: S008 Inconclusive after two direct-path successes
-- Implementation gate: Gate A requires a later explicit continuation
+- Implementation gate: Gate B requires a later explicit continuation
 
 ## Hypothesis
 
@@ -145,8 +145,8 @@ Spring artifact, binary, or generated profile is tracked.
 
 ## Gate A: preparation implementation and synthetic review
 
-Gate A requires a later explicit continuation. `PrepareS009.java` must use only
-JDK APIs and must:
+Gate A was explicitly authorized on 2026-07-17. `PrepareS009.java` uses only JDK
+APIs and must:
 
 1. verify the fixed source/artifact/tree/binary identities inherited from S008,
    including the exact retained helper and catalog source;
@@ -335,6 +335,55 @@ is preserved as Inconclusive rather than removed to obtain Supported.
 - If Inconclusive, correct only the named evidence or attribution gap in a new
   plan; do not add Spring to the same run.
 
+## Gate A implementation and review record
+
+Gate A completed on 2026-07-17 without passing any fixed S008 artifact through
+the preparation path or creating a real S009 destination. The disposable
+implementation adds only the two files allowed by this plan:
+
+- `spikes/s009-attributed-isolated-profile/fixture/S009Fixture.java`; and
+- `spikes/s009-attributed-isolated-profile/tools/PrepareS009.java`.
+
+Confirmed by code review and synthetic execution:
+
+1. the preparation path verifies the inherited source commit, clean checkout,
+   source manifests, fixed JDT/plugins/catalog source, Java extension tree,
+   proxy, debug bundle, embedded Zed CLI, Temurin runtime, and the retained
+   542,960-byte helper with its exact digest and arm64 Mach-O header;
+2. it stages one profile, fixture-only worktree, and four distinct XDG roots in
+   one rollback-capable transaction, with only the catalog in XDG cache;
+3. settings are accepted only by exact byte composition and include trust-all,
+   HTML auto-install false, Java auto-update false, top-level AI disable, and
+   the inherited fixed Java/JDT controls;
+4. profile structure, Java-only index, single JDT/helper candidates, empty
+   route, fresh destinations/runtime paths, allowed core runtime roots, and
+   prohibited credential/provider/prior-spike state are checked separately;
+5. the manifest records fixed file sizes/hashes, tree hashes, catalog source,
+   settings/index/worktree identities, all XDG and expected/fallback paths,
+   boolean controls, token-variable absence flags without values, and cleanup/
+   restoration requirements; and
+6. synthetic tests cover settings weakening/extra fields, Java index mutation,
+   catalog extraction attacks, spaces/Unicode full-path hashing, independent
+   XDG roots, existing and symlink outputs, token-variable presence, process
+   identification, prohibited profile candidates, rollback, and manifest
+   truncation/weakening.
+
+Validation on Temurin 25.0.3+9:
+
+```text
+javac --release 21 -Xlint:all -Werror ... PrepareS009.java S009Fixture.java
+java -cp <classes> PrepareS009 --self-test
+S009 preparation synthetic tests passed
+java spikes/s009-attributed-isolated-profile/tools/PrepareS009.java --self-test
+S009 preparation synthetic tests passed
+```
+
+Still unverified: the ignored fixed inputs have not been passed through this
+new tool, no real profile/worktree/XDG destination or manifest exists, token
+absence has not been checked for a real launch environment, and Zed, proxy, and
+JDT have not been started. Those are Gate B and Gate C concerns. Gate B remains
+closed pending explicit continuation.
+
 ## Plan review record
 
 Reviewed on 2026-07-17 before implementation. The review:
@@ -357,6 +406,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. kept Spring, product scaffolding, publication, and multiplatform claims
    outside S009.
 
-No S009 disposable code, generated profile, new runtime destination, Zed/JDT
-process, or UI action has been created or executed. Gate A remains closed until
-a later explicit continuation.
+Gate A's disposable code and synthetic tests now exist. No generated real
+profile, new runtime destination, fixed-input preparation, Zed/JDT process, or
+UI action has been created or executed. Gate B remains closed until a later
+explicit continuation.

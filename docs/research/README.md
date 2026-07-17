@@ -6,9 +6,10 @@
   required coordination seams, while S006-S008 are Inconclusive. S008's two
   fixed-input direct managed-JDT runs both reached `ServiceReady`, but fresh-
   profile extension/provider initialization prevented strict attribution. R007
-  attributed those paths and S009 is planned/reviewed but not implemented
-- Next gate: implement S009 Gate A after explicit continuation, then review its
-  preparation before any runtime
+  attributed those paths; S009 Gate A preparation code and synthetic review are
+  complete, with no real preparation or runtime yet
+- Next gate: execute and independently review S009 Gate B real preparation only
+  after explicit continuation, before any runtime
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while

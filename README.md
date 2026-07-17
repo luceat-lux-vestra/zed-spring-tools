@@ -5,8 +5,9 @@ Source-based research and the S001-S005 macOS arm64 feasibility sequence are
 complete. S006-S008 are Inconclusive. S008 nevertheless demonstrated the fixed
 managed-JDT direct path twice with distinct isolated data; its strict result was
 limited by unexpected fresh-profile extension/provider initialization. R007 has
-now attributed those startup paths, and S009 is planned and reviewed as one
-controlled prerequisite run before a new local end-to-end PoC plan.
+now attributed those startup paths. S009 Gate A has a reviewed transactional
+preparation tool and synthetic controls for one prerequisite run; real
+preparation and runtime have not started.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -30,7 +31,8 @@ data paths. It does not yet prove the real Spring Boot LS end-to-end flow. S008
 closed Inconclusive because a fresh Zed profile did not retain its reviewed
 minimal extension/provider identity even though both JDT runs reached
 `ServiceReady`. R007 identified source-supported isolated-profile controls;
-S009 Gate A is the next implementation gate and has not started.
+S009 Gate A is complete and reviewed. Gate B real preparation is the next gate
+and requires a separate explicit continuation before any runtime.
 
 The work in this phase must:
 
