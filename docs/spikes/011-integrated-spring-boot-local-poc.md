@@ -1,6 +1,6 @@
 # S011: Integrated Spring Boot local PoC
 
-- Status: Plan reviewed; implementation not started
+- Status: Pre-runtime verification passed; bounded runtime not started
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: S003-S005 and S010 Supported; S006-S009 retained as
@@ -130,3 +130,41 @@ protocol code, replaced S006's invalid Darwin launcher/data assumption with the
 Supported S010 managed-JDT path, retained the before/after completion control,
 required real Zed-originated evidence, preserved strict fresh-state and
 no-synthesis rules, and excluded every production or multiplatform claim.
+
+## Preparation and pre-runtime verification record
+
+The reviewed disposable preparation implementation was completed on
+2026-07-17 without adding product scaffolding or changing the S006 protocol
+code. `PrepareS011` accepts only fixed local inputs and transactionally creates
+the isolated profile, Spring fixture worktree, four XDG roots, and evidence
+root. It verifies component-model WASM headers, exact Java/JDT/proxy/adapter/
+Spring/JDK identities, the closed 168-library server class path, five bundle
+hashes, the Java-plus-S006 extension index, the one allowed development link,
+fresh runtime paths, empty state/evidence/routes, token absence, and process
+absence.
+
+The final ignored preparation roots use profile
+`tmp/s011-profile-final-20260717`, Unicode/space worktree
+`tmp/s011 Spring Boot PoC 한글 20260717`, the four corresponding
+`tmp/s011-xdg-*-final-20260717` roots, and
+`tmp/s011-evidence-final-20260717`. The derived JDT data suffix is
+`ce1ccd15725f4635025436e2e97c010844f0f048`; both its data directory and
+`configuration` child were absent after preparation. The combined extension
+index SHA-256 is `89cc4dadeaaf9a2e582bb0927b1abbc7c0dbf11b7c2d47919f528746c29bc9`.
+
+Pre-runtime checks passed with Temurin 25.0.3 and Rust 1.97.0: Java
+warning-as-error compilation and the S011/S006 preparation self-tests; Node
+syntax and complete Spring-proxy self-test; S006 adapter formatting, five
+locked tests, warnings-denied Clippy and `wasm32-wasip2` check; instrumented
+Java-proxy formatting, six locked tests and warnings-denied Clippy; JSON
+parsing, fixed hashes, allowlists, symlink target, and absence of runtime
+processes. No Zed, JDT, Spring child, completion request, callback, or UI
+automation has run for S011 yet.
+
+One pre-runtime correction is retained: the first S011 preparation rejected an
+incorrect manually expanded Spring library-set digest copied from an earlier
+abbreviated prose reference. The tool constant was corrected to the exact
+fresh S006 manifest value
+`f1fe021fac5e94bd394ee2be1792dd385b5ce30bd527c67e7c7e77d87aeea56c`;
+the wholly fresh final roots were created only after that verification passed.
+No hypothesis input or server process had started.
