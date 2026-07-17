@@ -195,7 +195,7 @@ Host audited: macOS 26.5.1 arm64.
 | R006 attribution | Complete | Buildship's cache-miss request created the Gradle catalog; Java task-helper entered a separate latest-release path; proxy record removal is best effort after child exit |
 | S008 plan | Gate C closed Inconclusive | Both fixed-input runs used distinct exact managed-local data paths and reached `ServiceReady`; automatic HTML/editor/provider initialization broke minimal-profile attribution |
 | R007 attribution | Complete | Trust and HTML were fixed defaults; Copilot bypassed custom Zed data through XDG config fallback; native-agent provider enumeration caused the ChatGPT warning |
-| S009 plan | Gate B complete; Gate C closed | One fixed-input isolated profile/worktree/four-XDG set passed independent identity and freshness review; no runtime yet |
+| S009 plan | Gate C closed Inconclusive | Trust/HTML/provider controls, exact direct data, and `ServiceReady` passed; runtime-created Equinox `configuration/` state changed the fixed JDT tree identity |
 | Zed | Ready locally | Installed app 1.11.3; S008 runtime pinned and verified the signed 1.10.3 Apple Silicon DMG without replacing the installed app |
 | rustup | Ready | Stable rustc/cargo 1.97.0 installed |
 | Rust command selection | Ready | Login shell selects `~/.cargo/bin` shims before Homebrew |
@@ -407,8 +407,9 @@ Host audited: macOS 26.5.1 arm64.
   warning to its independent XDG config path, and the ChatGPT warning to native-
   agent provider enumeration. S009 now has a reviewed one-run plan using only
   isolated trust/extension/AI/XDG controls plus the fixed S008 JDT inputs. Gate
-  B's single real preparation and independent review are complete; Gate C's
-  bounded runtime remains closed until explicit continuation.
+  C's single runtime passed those controls and exact direct `ServiceReady`, but
+  is Inconclusive because Equinox created mutable `configuration/` state inside
+  the fixed JDT distribution. Source attribution and a new spike plan are next.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

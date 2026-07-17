@@ -1,11 +1,11 @@
 # S009: Source-controlled isolated-profile JDT startup
 
-- Status: Gate B complete and reviewed; Gate C not started
+- Status: Inconclusive on macOS arm64/JDK 25 after Gate C
 - Date: 2026-07-17
 - Related decision: D001
 - Related research: R003, R006, R007
 - Depends on: S008 Inconclusive after two direct-path successes
-- Implementation gate: Gate C requires a later explicit continuation
+- Implementation gate: Closed; any follow-up requires a new reviewed investigation
 
 ## Hypothesis
 
@@ -205,7 +205,7 @@ input occurs.
 
 ## Gate C: one bounded attributed runtime
 
-Gate C requires a final explicit continuation after Gate B review:
+Gate C was explicitly authorized on 2026-07-17 after Gate B review:
 
 1. Warn the user only if unexpected UI automation becomes necessary. Under the
    hypothesis, no UI input restriction is needed because the CLI receives both
@@ -466,9 +466,134 @@ Gate B is complete and the single prepared input set is ready for Gate C. This
 is preparation evidence only. It does not prove settings application, direct
 fixture opening, warning absence, exact runtime process arguments, `-data`
 selection, `ServiceReady`, catalog stability, post-run profile identity,
-shutdown, route cleanup, or normal-Zed restoration. Gate C remains closed until
-an explicit continuation and must use this exact prepared set without a setup
-correction after any proxy or JDT child starts.
+shutdown, route cleanup, or normal-Zed restoration. At Gate B close, Gate C
+remained closed until an explicit continuation and had to use this exact
+prepared set without a setup correction after any proxy or JDT child started.
+
+## Gate C runtime result
+
+Gate C completed one bounded run on 2026-07-17 on macOS 26.5.1 arm64 with
+Temurin 25.0.3+9. The profile controls and direct managed-JDT path worked, but
+the result is **Inconclusive**, not Supported or Refuted, because the runtime
+created a mutable Equinox `configuration/` tree inside the fixed managed-JDT
+distribution and therefore violated success criterion 6's unchanged-JDT-tree
+identity.
+
+No retry or setup correction was used. Raw screenshots, generated profile/data,
+and other runtime evidence remain under ignored `tmp/s009-gate-c-*` and the
+Gate B destinations.
+
+### Launch, fixture, and timing facts
+
+- The fixed DMG was mounted read-only again, and its checksum, signature,
+  notarization, bundle-local CLI hash, and Zed 1.10.3 version were reverified.
+  Both Copilot token variables remained absent by presence-only checks.
+- Normal installed Zed 1.11.3 stopped gracefully in two seconds. The final
+  prelaunch shared-log boundary was 2026-07-17 10:54:55 KST at byte 767,697 of
+  the existing `Zed.log`; its inode remained 121592491.
+- The fixed catalog was re-extracted from the fixed JDT core, copied with its
+  source mtime, and then explicitly refreshed exactly once immediately before
+  launch. The 413,663-byte copy retained SHA-256 `f91a3840...4d02` and mtime
+  `1784253295987` ms through shutdown.
+- The foreground CLI launched at 10:55:17 KST with the prepared user-data root,
+  all four XDG roots, both token variables unset, `--new`, the worktree, and
+  the contained fixture. No `HOME` or normal-setting change was made.
+- `S009Fixture.java` was visibly open without a trust modal or any UI input by
+  10:55:27. The screenshot showed the package-free source and Java language
+  status. No unexpected correction or UI automation occurred.
+- One fixed proxy and one Temurin JVM appeared at 10:55:23. `ServiceReady` was
+  logged at 10:55:25, eight seconds after launch and two seconds after the JDT
+  child appeared.
+
+### Runtime path and control evidence
+
+- The JVM vector selected the fixed JDT 1.60.0 tree, `config_mac_arm`, Equinox
+  1.7.200 launcher, and exactly one `-data` equal to the manifest's normalized-
+  full-path value. It contained no `jdtls.py`, packaged `bin/jdtls`, host
+  fallback, duplicate data argument, or other JDT candidate. Live JVM RSS was
+  approximately 1,245,936 KiB.
+- Real JDT state existed only at the expected XDG-cache path: 27 files, 21
+  directories, and 41,808 KiB allocated. Both host fallback paths stayed
+  absent. XDG config, data, and state remained empty.
+- The isolated log interval was bytes 767,697 through 803,697, SHA-256
+  `9ec6c66c...5901`. It contained the `ServiceReady` notification and zero
+  Copilot `auth.db`, ChatGPT Subscription, not-trusted, or restricted-mode
+  matches.
+- HTML remained absent. The extension index remained semantically Java-only at
+  official version 6.8.21 with `dev: false` and Java/Properties entries. Zed
+  rewrote only its JSON formatting, changing the byte hash from
+  `a7348979...e6eb` to `8b416957...cb68` without adding or updating an
+  extension. Exact settings retained SHA-256 `3d248a2c...81d7f`.
+- The post-run profile roots were only the prepared roots plus the source-
+  expected `db`, `debug_adapters`, `hang_traces`, `languages`, `node`,
+  `prettier`, and `threads` state. No `external_agents` registry, provider,
+  credential/account/token file, prior-spike path, HTML tree, or copied normal
+  state was found. The single symlink was Prettier's internal executable link.
+- Proxy, debug bundle, helper, catalog, settings, and worktree fixture hashes
+  remained fixed. No helper install/download error, Gradle checksum cache,
+  project metadata, or worktree build output appeared.
+
+The initial screenshot also showed a transient `Downloading Zed Update...`
+status and a macOS notification that updates were not installed. The mounted
+application was read-only, no installed-app replacement occurred, and no update
+artifact was found in the reviewed direct cache boundary. S009 does not claim
+network silence, so this is preserved as a constraint rather than used to hide
+or overturn the result.
+
+### Shutdown, route cleanup, and restoration
+
+- The isolated app was asked to quit at 10:58:59. Its foreground CLI returned
+  exit code 0, and the actual isolated Zed/proxy/JVM processes were absent.
+- One five-byte proxy route record remained after a stable wait, matching the
+  known best-effort cleanup behavior. It was preserved by size/hash, then
+  explicitly removed only after process absence; the route directory is empty.
+- Normal `/Applications` Zed 1.11.3 was restored without isolated arguments in
+  one second at 10:59:56. Its CLI retained SHA-256 `9289fa39...6975`. No fixed
+  Zed, proxy, or JDT process remained, and the fixed image was detached.
+
+Two independent validation commands initially reported false failures: one
+parser assumed the wrong `ps` column for the proxy executable, and one shutdown
+poll matched its own shell command because the profile path appeared in that
+command. Neither mutated runtime state. Exact-executable parsers reran after
+each error and confirmed proxy 1/JVM 1 while live and zero isolated processes
+after shutdown. Because the faulty shutdown poll obscured the precise exit
+instant, the final absence is confirmed but the exact sub-10-second exit
+latency is not independently established. The failed observations are retained
+rather than discarded.
+
+### Preserved JDT-tree identity failure
+
+The prepared JDT tree reproduced SHA-256 `b64b2372...f7583` before launch.
+After shutdown its tree SHA-256 was `86fae105...e383`. Recursive comparison
+found exactly one shape difference: the prepared runtime tree gained
+`configuration/`; no pre-existing distribution file differed from the fixed
+input.
+
+That directory contains 87 files, 20 directories, and 11,480 KiB allocated,
+including Equinox `org.eclipse.osgi` extracted bundle data and runtime registry
+files. The preserved S008 corrected profile also contains a runtime-created
+JDT `configuration/` tree, so this is not evidence that the new trust/XDG/AI
+controls broke JDT. It is evidence that S009's whole-distribution immutability
+assumption was too strong or that the writable Equinox configuration area was
+not separately attributed. This explanation is an inference until fixed-source
+review confirms the configuration-area selection.
+
+Success criterion 6 nevertheless required the JDT identity to remain unchanged.
+Supported is therefore unavailable. The explicit Refuted cases also did not
+occur: trust, HTML, provider suppression, Java/JDT startup, direct data
+selection, and `ServiceReady` all behaved as hypothesized. Under the stated
+classification rule for an unexpected, not-yet-source-attributed runtime path,
+S009 is Inconclusive.
+
+### Required next investigation
+
+Do not retry S009 or add Spring to this preserved profile. The next task should
+source-review the fixed Java/JDT launcher and Equinox configuration-area
+selection, distinguish immutable distribution files from expected extracted
+configuration cache, and write a new narrow spike plan. Only a reviewed new
+experiment may decide whether that cache should be relocated, predeclared as
+mutable, or treated as a bounded derived identity before the Spring end-to-end
+PoC plan resumes.
 
 ## Plan review record
 
@@ -492,7 +617,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. kept Spring, product scaffolding, publication, and multiplatform claims
    outside S009.
 
-Gate A's disposable code and Gate B's ignored real preparation now exist. No
-fixture opening, catalog runtime refresh, fixed Zed launch, proxy/JDT process,
-normal-Zed stop, or UI action has occurred. Gate C remains closed until a later
-explicit continuation.
+Gate A's disposable code, Gate B's ignored preparation, and Gate C's single
+runtime evidence now exist. S009 is closed Inconclusive. No retry, Spring
+runtime, product scaffold, publication step, or platform claim is authorized by
+this result.

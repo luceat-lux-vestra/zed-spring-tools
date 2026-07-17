@@ -6,10 +6,11 @@
   required coordination seams, while S006-S008 are Inconclusive. S008's two
   fixed-input direct managed-JDT runs both reached `ServiceReady`, but fresh-
   profile extension/provider initialization prevented strict attribution. R007
-  attributed those paths; S009 Gate B produced and independently reviewed one
-  fixed-input isolated preparation set, with no runtime yet
-- Next gate: execute S009 Gate C's one bounded attributed runtime only after
-  explicit continuation
+  attributed those paths. S009 then passed the profile controls and direct JDT
+  startup but closed Inconclusive because the runtime created an unplanned
+  Equinox `configuration/` tree inside the fixed JDT distribution
+- Next gate: source-review the fixed Java/JDT/Equinox configuration-area
+  selection, then write and review a new narrow spike plan
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
