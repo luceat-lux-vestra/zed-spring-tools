@@ -2,8 +2,8 @@
 .zed/
 *.log
 tmp/
-spikes/**/target/
+target/
+*.class
 spikes/**/extension/extension.wasm
-/target/
 /extension.wasm
 /artifacts/
