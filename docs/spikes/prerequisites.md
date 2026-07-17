@@ -409,7 +409,11 @@ Host audited: macOS 26.5.1 arm64.
   isolated trust/extension/AI/XDG controls plus the fixed S008 JDT inputs. Gate
   C's single runtime passed those controls and exact direct `ServiceReady`, but
   is Inconclusive because Equinox created mutable `configuration/` state inside
-  the fixed JDT distribution. Source attribution and a new spike plan are next.
+  the fixed JDT distribution. R008 attributed that state to Equinox's default
+  private configuration selection: the shared platform config is only a parent,
+  while a writable install receives `<install>/configuration`. S010 now has a
+  reviewed one-run plan for an explicit private path below the worktree-scoped
+  JDT data directory. Gate A has not started and requires explicit continuation.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

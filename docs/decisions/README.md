@@ -24,7 +24,9 @@ required. R007 has now attributed the profile paths, and S009 is planned and
 reviewed as that single controlled prerequisite run. S009 passed its trust,
 HTML, provider, direct-path, and `ServiceReady` runtime checks, but is
 Inconclusive because Equinox added mutable `configuration/` state inside the
-fixed JDT tree. A source-attributed configuration-area boundary and a new
-reviewed spike are required before the local Spring PoC resumes.
+fixed JDT tree. R008 has now source-attributed that boundary: shared
+configuration remains a parent while the omitted writable private area defaults
+inside the install. S010 is planned and reviewed to relocate only that private
+state; Gate A and the local Spring PoC remain unopened.
 
 Use [template.md](template.md) after sufficient evidence exists.

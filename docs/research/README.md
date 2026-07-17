@@ -1,6 +1,6 @@
 # Research Index
 
-- Phase status: Core research complete; targeted R006-R007 follow-up complete
+- Phase status: Core research complete; targeted R006-R008 follow-up complete
 - Last completed on: 2026-07-17
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
@@ -8,9 +8,10 @@
   profile extension/provider initialization prevented strict attribution. R007
   attributed those paths. S009 then passed the profile controls and direct JDT
   startup but closed Inconclusive because the runtime created an unplanned
-  Equinox `configuration/` tree inside the fixed JDT distribution
-- Next gate: source-review the fixed Java/JDT/Equinox configuration-area
-  selection, then write and review a new narrow spike plan
+  Equinox `configuration/` tree inside the fixed JDT distribution. R008
+  attributed that tree to Equinox's writable private-configuration default
+- Next gate: S010 Gate A disposable one-property Java-extension patch, only
+  after explicit continuation
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -36,6 +37,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R005](005-distribution-and-licensing.md) | Distribution and licensing | Complete | Pinned-download strategy and publication constraints |
 | [R006](006-s007-startup-lookup-attribution.md) | Attribute S007 startup lookups and cleanup behavior | Complete | Buildship owns the Gradle request; task-helper latest lookup and proxy cleanup conditions identified |
 | [R007](007-s008-profile-startup-attribution.md) | Attribute S008 isolated-profile startup state | Complete | Trust/HTML are defaults; Copilot crosses the custom profile via XDG; AI disable guards provider enumeration |
+| [R008](008-equinox-private-configuration-area.md) | Attribute S009 Equinox private configuration state | Complete | Shared config is only a parent; writable install defaults private state to `<install>/configuration` |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -53,5 +55,7 @@ R001-R005 satisfy the original documentation gate. R006 is a targeted source
 follow-up to S007 and defined S008's fixed preseed conditions. S008 proved those
 inputs can reach the two direct managed data paths, but its profile-attribution
 conditions did not hold. R007 attributed that gap and defines S009's controls.
-None establishes production feasibility; the direction decision still requires
-an attributable local end-to-end result.
+S009 passed those controls but exposed Equinox private state inside the fixed
+JDT tree. R008 attributed that state and defines S010's one-property relocation
+test. None establishes production feasibility; the direction decision still
+requires an attributable local end-to-end result.
