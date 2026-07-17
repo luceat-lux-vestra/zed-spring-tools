@@ -2,7 +2,7 @@
 
 - Inventory version: 4
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-17
+- Last updated: 2026-07-18
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md)
 - Only tested tuple: macOS 26.5.1 arm64, Zed 1.10.3, official Java extension
   6.8.21, Temurin JDK 25.0.3
@@ -85,8 +85,8 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | Shared properties metadata reload | `planned` | `sts/common-properties/reload`; setting `boot-java.common.properties-metadata`. |
 | Convert `.properties` to `.yaml` | `planned` | `sts/boot/props-to-yaml`. Needs a Zed command surface. |
 | Convert `.yaml` to `.properties` | `planned` | `sts/boot/yaml-to-props`. Needs a Zed command surface. |
-| `spring-factories` language support | `planned` | Declared by the VSIX; this project has no mapping for it. |
-| `jpa-query-properties` language support | `planned` | Declared by the VSIX; this project has no mapping for it. |
+| `spring-factories` language support | `planned` | VSIX associates `*.factories` and `META-INF/spring.factories` with a distinct language. Zed reaches a server only for files it classifies as a mapped language, and file classification needs a `languages/<name>/config.toml` with `path_suffixes` and a **required grammar** — the API has no grammar-less file-association surface. So this needs a language-plus-grammar contribution, which an extension *can* add; it is additional work, not a Zed API block. Until then, `.factories` files reach no server. |
+| `jpa-query-properties` language support | `planned` | VSIX pattern is `jpa-named-queries.properties`. Because that is a `.properties` file, Zed already routes it to this server as the `Properties` language, so it is **not** unhandled — but the language id sent is `spring-boot-properties`, not `jpa-query-properties`. Whether Spring keys JPA-query support off the filename (works today) or the language id (degraded) is unverified. Sending a distinct id for one filename requires defining a separate Zed language, same grammar constraint as above. |
 | Completion prefix elision | `planned` | Setting `boot-java.properties.completions.elide-prefix`. |
 
 ## Workstream 2 — symbols, navigation, and Boot project discovery

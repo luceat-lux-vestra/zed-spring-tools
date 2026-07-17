@@ -198,12 +198,26 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
    (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`,
    `dap-locator-create-scenario`, `run-dap-locator`), so run/debug is not
    assumed blocked.
-5. The pinned release is not the newest Spring Tools. This inventory is versioned
+5. **File-to-language association works differently, and needs a grammar.** The
+   VSIX declares four languages by VS Code `filenamePatterns` globs
+   (`application*.properties`, `*.factories`, `jpa-named-queries.properties`, …).
+   Zed instead routes a file to a language server only when it classifies the
+   file as one of the server's mapped languages, and that classification comes
+   from a `languages/<name>/config.toml` with `path_suffixes` (no globs) and a
+   required grammar. The extension world exports no grammar-less file-association
+   surface. Consequences: every `.properties` file — not only `application*` —
+   reaches this server as `Properties`, which is a harmless superset;
+   `jpa-named-queries.properties` reaches it but as language id
+   `spring-boot-properties`; and `*.factories` reaches no server until a
+   language-plus-grammar is contributed. None of this is a Zed API block, because
+   an extension may contribute languages and grammars; it is additional work.
+6. The pinned release is not the newest Spring Tools. This inventory is versioned
    against `5.2.0.RELEASE` and must be re-derived when the pin moves.
 
-Sources for 2 and 3: `zed_extension_api` 0.7.0 `wit/since_v0.6.0/extension.wit`,
-and `docs/src/extensions/developing-extensions.md` in `zed-industries/zed`,
-accessed 2026-07-17.
+Sources for 2, 3, and 5: `zed_extension_api` 0.7.0 `wit/since_v0.6.0/extension.wit`,
+and `docs/src/extensions/developing-extensions.md` and
+`docs/src/extensions/languages.md` in `zed-industries/zed`, accessed
+2026-07-17/18.
 
 ## Candidate next experiments
 
