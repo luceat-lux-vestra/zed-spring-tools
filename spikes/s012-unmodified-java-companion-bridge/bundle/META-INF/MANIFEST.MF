@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: S012 Unmodified Java Companion Bridge
+Bundle-SymbolicName: dev.zed.spring.s012.bridge
+Bundle-Version: 0.0.1
+Bundle-Activator: dev.zed.spring.s012.BridgePlugin
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.jdt.ls.core,
+ org.springframework.tooling.jdt.ls.commons
+Import-Package: com.google.gson,
+ org.osgi.framework

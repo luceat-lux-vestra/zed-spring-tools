@@ -1,6 +1,6 @@
 # S012: Unmodified Java companion bridge
 
-- Status: Planned and reviewed; implementation not started
+- Status: Gate A implemented and synthetically verified; Gate B not started
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: R009, D002, proposed D003, and S011
@@ -90,6 +90,100 @@ Before any real Zed runtime:
    fixed release inputs and reject any Java source checkout, patched proxy, or
    configured replacement proxy in the runtime profile; and
 6. review the complete Gate A diff before preparing Gate B.
+
+## Gate A implementation and verification record
+
+Gate A was implemented on 2026-07-17 only under
+`spikes/s012-unmodified-java-companion-bridge/`. It contains no Zed extension
+manifest, production scaffold, official Java source, Rust proxy patch, copied
+S005/S006 callback relay, second JDT LS launcher, or binary artifact. Generated
+classes and the bridge JAR remain under ignored `tmp/` roots.
+
+### Confirmed implementation facts
+
+- One OSGi bundle registers only
+  `zed.spring.bridge.addClasspathListener` and
+  `zed.spring.bridge.removeClasspathListener`. It reuses the exported fixed
+  Spring `ReusableClasspathListenerHandler`; no Spring source was copied.
+- Registration requires an exact schema, non-batched bridge delivery, an
+  explicit loopback HTTP endpoint, a 32-to-256-character credential, a
+  64-hex-character worktree identity, and an exact callback identity.
+- The Node coordinator permits only those two commands through the official
+  proxy request endpoint, rejects symlinked or malformed port records, bounds
+  request time and response size, and does not include remote error text in its
+  own errors.
+- The direct event route requires bearer authentication and the same worktree
+  identity, validates the correlated event and exact six-argument shape, and
+  returns only the Spring handler result.
+- The Spring mapper accepts the real Spring-side batched add shape, registers
+  one non-batched bridge listener, forwards the unchanged six arguments to the
+  same callback command on the Spring child, and removes the exact registration.
+  This is an intentional transport translation, not a synthesized classpath.
+- OSGi stop removes known listeners and clears registrations and credentials.
+  Actual Equinox activation and stop behavior remain a Gate B/C runtime item.
+
+### Fixed compile inputs and output
+
+The host toolchain was Temurin `java`/`javac` 25.0.3. Sources were compiled with
+`--release 21` because the manifest declares `JavaSE-21`. The fixed inputs used
+by Gate A were:
+
+| Input | SHA-256 |
+| --- | --- |
+| JDT LS `com.google.gson_2.14.0.jar` | `2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f` |
+| JDT LS `org.eclipse.core.runtime_3.35.0.v20260623-1631.jar` | `5b0c2794e9fe1785360dec920cc802f3388a0eb72ee25b89054b79ff3e2f07c9` |
+| JDT LS `org.eclipse.jdt.ls.core_1.60.0.202606262232.jar` | `e83035adc685b4519f2d8a8d42fe8651ce7ea4f4daf396f47ec453b5bff07be5` |
+| JDT LS `org.eclipse.osgi_3.24.300.v20260612-1540.jar` | `4f9ebafd82c344fe89f0860f32c6291becfbb4ab8d480a623e12b4c5ace57984` |
+| Spring `jdt-ls-commons.jar` | `0134b2b2afdd2207be8c271c5501d916ca14fc709ae6d0c8067ea646955fbf69` |
+| Spring `jdt-ls-extension.jar` | `692e8a63e6fc57a9c314121b506a0a709ddbcfcc9580c18aef6ed9b612b972ce` |
+| Spring `sts-gradle-tooling.jar` | `9fd8165a92a930021ad93b7640ac6ebb06bb6659f65aa641ba9b4f4295901ec4` |
+| Spring `reactor-core.jar` | `76ea420992e2c864f9a21d241ac29ac6582e857ae30ecd878cb96af827597590` |
+| Spring `reactive-streams.jar` | `71e23e2a0d9159fc1aae1158af714ac72fc67a384bb6fe195301081df49c2038` |
+
+The deterministic disposable output contained only the manifest, `plugin.xml`,
+and six expected class files. `jar --validate` passed. Its identity was 12,092
+bytes and SHA-256
+`818de215d85c23e27e0c3d429d05e1f7e2d34340f248e9a6da616898cb514984`.
+Two clean builds produced the same identity.
+
+The fixed official release archive at
+`tmp/s003-research-artifacts/java-lsp-proxy-darwin-aarch64.tar.gz` was rehashed
+as `3b128f058eed29e7b7a30c7aaccd430e2964917e45f62e5052d8df676dccb5e5`.
+It was not extracted, copied, executed, or modified for Gate A. Gate B must
+derive its fresh profile from this fixed release input and separately verify
+the extracted executable identity.
+
+### Tests and retained observations
+
+Node 26.5.0 syntax checks passed for all four coordinator modules. Eleven Node
+contract tests passed, covering the allowlisted official-proxy envelope,
+unsafe registration and port rejection, deadline, malformed response, JSON-RPC
+error redaction, direct route authentication and worktree correlation,
+six-argument preservation, exact add/remove lifecycle, failed-registration
+cleanup, failed-removal identity retention and retry, the Spring request
+mapping, duplicate rejection, and idempotent shutdown.
+
+The Java protocol self-test passed registration rejection, registry identity
+and idempotence, authenticated correlated event delivery, credential redaction,
+HTTP failure, and the three-second deadline. The full three-source bundle then
+compiled against the fixed JDT LS and Spring inputs with warnings treated as
+errors.
+
+The first Java compile used `-Xlint:all -Werror` and failed with six `classfile`
+warnings because the fixed Gson binary references absent Error Prone annotation
+classes. This observation is retained. Review confirmed that the warnings came
+from the fixed external classfile rather than S012 source, so the corrected
+command disabled only `classfile` lint (`-Xlint:all,-classfile -Werror`); all
+other warnings in owned source remain fatal.
+
+### Gate A conclusion and remaining uncertainty
+
+Gate A is **supported synthetically** for the stated contracts. This is not an
+S012 runtime result and does not change proposed D003 to Accepted. Gate A did
+not load the bundle in Equinox, invoke it through a running official Java
+extension, start Spring Boot LS, prove `server.port`, exercise Zed UI, or verify
+cleanup in real processes. Those uncertainties remain exclusively for fresh
+Gate B preparation and the bounded Gate C run.
 
 ## Gate B: isolated preparation
 

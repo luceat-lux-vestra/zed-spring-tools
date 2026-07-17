@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+  <extension point="org.eclipse.jdt.ls.core.delegateCommandHandler">
+    <delegateCommandHandler
+        class="dev.zed.spring.s012.BridgeCommandHandler"
+        name="S012 Spring Companion Bridge">
+      <command id="zed.spring.bridge.addClasspathListener" static="true"/>
+      <command id="zed.spring.bridge.removeClasspathListener" static="true"/>
+    </delegateCommandHandler>
+  </extension>
+</plugin>
