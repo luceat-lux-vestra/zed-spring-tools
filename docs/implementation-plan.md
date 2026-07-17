@@ -1,7 +1,7 @@
 # Product implementation and public-development plan
 
 - Status: In progress; M1-M3 complete, M4 next
-- Last updated: 2026-07-17
+- Last updated: 2026-07-18
 - Architecture: D002, D003, and D004 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
@@ -42,8 +42,10 @@ unmodified, and the product/spike import check passed.
 ### M2: Product-grade macOS arm64 vertical slice
 
 Status: complete. Steps 1-6 were driven live on macOS 26.5.1 arm64 with Zed
-1.10.3, Java extension 6.8.21, and Temurin JDK 25.0.3. Step 7's diagnostic is
-implemented and contract-tested but not yet observed at runtime.
+1.10.3, Java extension 6.8.21, and Temurin JDK 25.0.3. Step 7's
+missing/incompatible-Java diagnostic has since been observed at runtime by
+driving the real coordinator process on incompatible inputs; see the close note
+below.
 
 Implement the smallest product flow in this order:
 
@@ -95,16 +97,31 @@ are tracked in `LIMITATIONS.md`.
   "trace"`. The only jar paths present are Zed's own language-server launch
   records of product installation paths, not the project classpath.
 
-Two items are carried forward rather than waived:
+One item is carried forward rather than waived:
 
 - `zed::download_file` hung once for 24 minutes with no bytes, no connection, and
   no timeout while the network was healthy, and completed in seconds after a Zed
   restart. Acquisition can wedge with no actionable message. Zed's API takes no
   timeout, so the product cannot bound it directly; the cause is unestablished
   and one occurrence is not a reproduction. Tracked in `LIMITATIONS.md`.
-- Step 7's missing/incompatible-Java diagnostic still needs a runtime
-  observation. The adjacent absent-Java path was observed; `validateCompatibility`
-  and `javaMajor` remain covered only by contract tests.
+
+Step 7's missing/incompatible-Java diagnostic, previously carried forward, is now
+closed. It was observed on 2026-07-18 by driving the real coordinator process
+(`coordinator/src/main.mjs`, the source `runtime.rs` embeds) with the product's
+exact launch argument contract on incompatible inputs — not by unit-testing
+`validateCompatibility`/`javaMajor` in isolation. An incompatible JDK (real
+Temurin 17.0.18) was refused with `JDK 21 or newer is required by Spring Tools`;
+an unverified official-Java-extension contract (`extensionVersion` other than
+`6.8.21`) was refused with `official Java compatibility contract is invalid`
+before the JDK check. Both exited nonzero within ~100ms with empty stdout and no
+reduced mode. A compatible control (real Temurin 21.0.11 with the valid contract)
+passed both guards and launched the real Spring Tools language server, confirming
+the guard is discriminating rather than always-on. The absent-Java path was
+already observed during M2. Evidence:
+`tmp/m2-step7-incompatible-java-20260718/evidence/STEP7-GATE-RESULT.md`. The
+observation drove the coordinator process directly rather than through the Zed
+GUI, which is the appropriate surface for a startup-time guard that runs before
+any editor interaction; Zed launches this same process with these same arguments.
 
 ### M3: Initial experimental public source release
 
@@ -141,8 +158,8 @@ Publication record:
 Status: in progress. Inventory version 4 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
-Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 4 `verified`, 1
-`implemented`, and 41 `planned`. A capability is promoted to a blocked state
+Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 5 `verified` and 41
+`planned`. A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
 Code widget that delivers it there.

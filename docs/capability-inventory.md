@@ -36,8 +36,8 @@ delivers the same user outcome is a legitimate result, recorded as
 
 | State | Count |
 | --- | --- |
-| `verified` | 4 |
-| `implemented` | 1 |
+| `verified` | 5 |
+| `implemented` | 0 |
 | `planned` | 41 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
@@ -144,7 +144,7 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | Start Spring Boot Language Server on demand | `planned` | `vscode-spring-boot.ls.start`. **Known debt**: the coordinator does not handle this client request. |
 | Java type resolution for the server | `planned` | `sts/javaType`. **Known debt**: unhandled by the coordinator. |
 | Classpath listening | `verified` | `sts.vscode-spring-boot.enableClasspathListening` driven by the coordinator; observed registering and removing during the M2 gate run. **Install-ordering caveat**: if the extension is installed while a Java project is already open, `jdtls` does not pick up the bridge until Zed restarts; when the extension is present before the Java server starts it registers fine, cold cache included. See [S014](spikes/014-jdtls-bundle-startup-ordering.md). |
-| Missing / incompatible Java diagnostic | `implemented` | Contract-tested; the runtime observation is still outstanding from M2 step 7. |
+| Missing / incompatible Java diagnostic | `verified` | Observed on 2026-07-18 by driving the real coordinator process on incompatible inputs. A real Temurin 17.0.18 was refused with `JDK 21 or newer is required by Spring Tools`; an unverified official-Java-extension contract was refused with `official Java compatibility contract is invalid` before the JDK check. Both exited nonzero with no reduced mode; a compatible Temurin 21.0.11 control passed both guards and launched the real Spring server. Absent-Java path observed earlier in M2. Evidence: `tmp/m2-step7-incompatible-java-20260718/`. |
 | Embedded language syntax highlighting | `planned` | Setting `boot-java.embedded-syntax-highlighting`; VSIX contributes four grammars. |
 | Java reconcilers | `planned` | Setting `boot-java.java.reconcilers`; `boot-java.scan-java-test-sources.on`. |
 | Offline behaviour | `planned` | Artifact acquisition currently requires network on first use; see `LIMITATIONS.md`. |

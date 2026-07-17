@@ -42,8 +42,10 @@ extension.
   **Workaround: if acquisition appears stuck, quit and reopen Zed.** Zed's
   `download_file` API accepts no timeout, so the extension cannot currently bound
   or retry it. The cause is not established.
-- The missing/incompatible-Java diagnostic is implemented and contract-tested but
-  has not been observed at runtime.
+- The missing/incompatible-Java diagnostic is implemented and, as of 2026-07-18,
+  observed at runtime: the coordinator refuses to start on an incompatible JDK or
+  an unverified official-Java-extension contract, naming the reason, instead of
+  entering a reduced mode. Only the single macOS arm64 tuple has been exercised.
 - Spring client requests including `vscode-spring-boot.ls.start` and
   `sts/javaType` still need product handling and tests.
 - No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
