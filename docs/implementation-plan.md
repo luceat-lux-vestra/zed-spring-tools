@@ -1,6 +1,6 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1 and M2 complete, M3 next
+- Status: In progress; M1-M3 complete, M4 next
 - Last updated: 2026-07-17
 - Architecture: D002, D003, and D004 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -97,18 +97,33 @@ Two items are carried forward rather than waived:
 
 ### M3: Initial experimental public source release
 
-The first public push follows M2 and presents the repository as an actual
-extension project with historical research, not as a spike collection.
+Status: complete, 2026-07-17.
 
-Progress retained from the earlier publication audit: public compatibility,
-limitation, contribution, conduct, security, and third-party-boundary documents
-are drafted. Re-run the reachable-history and product-artifact audit after M2,
-then select the repository license and final GitHub namespace, enable private
-reporting, create the remote, and push the reviewed product commit.
+The repository is public at
+<https://github.com/luceat-lux-vestra/zed-spring-tools> under Apache-2.0, and
+presents an actual extension project with its historical research rather than a
+spike collection.
 
-Exit gate: the public URL works, the default branch matches the reviewed local
-product commit, the license is explicit, and the source release makes no stable
-Marketplace or multiplatform claim.
+Exit gate met: the public URL serves unauthenticated, the default branch `main`
+matches the reviewed local product commit `66f7024`, GitHub detects the license
+as Apache-2.0, and the documents keep every untested tuple labeled `untested`
+with no Marketplace or multiplatform claim.
+
+Publication record:
+
+- R010's audit was re-run at `1222f1e`: no binary or credential-container
+  suffix, no credential shape, no absolute home path, 393 blobs over 4.87 MB,
+  and all relative links resolving.
+- The owner selected Apache-2.0 and the `luceat-lux-vestra` namespace, accepted
+  publication of the existing author metadata without a history rewrite, and
+  retained the `Co-Authored-By` trailers.
+- The repository was created private, verified, and then flipped public, because
+  GitHub secret scanning and private vulnerability reporting are unavailable on
+  a private repository of this plan and could only run after the flip.
+- After the flip, secret scanning was enabled and reports **0 alerts**, and
+  private vulnerability reporting is enabled so `SECURITY.md` has a working
+  route. The remote tree matched the local commit exactly at 172 files, with no
+  ignored evidence, build output, or `extension.wasm` transmitted.
 
 ### M4: VS Code Spring Tools capability-parity program
 

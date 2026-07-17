@@ -12,8 +12,10 @@ and D004 are Accepted.
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
 and uninstall cycle reproduced real Spring Boot property completions, executed
 the authentic bridge removal, left no owned process or route, and kept
-credentials and classpaths out of the logs. The current work is M3's public
-source release. Spike code remains excluded from production.
+credentials and classpaths out of the logs. M3 published the repository at
+<https://github.com/luceat-lux-vestra/zed-spring-tools> under Apache-2.0, so
+development is now public and the current work is M4's capability-parity
+program. Spike code remains excluded from production.
 
 ## Product goal and delivery strategy
 
