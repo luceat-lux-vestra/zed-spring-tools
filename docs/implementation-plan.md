@@ -127,11 +127,11 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 1 exists at
+Status: in progress. Inventory version 2 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
-Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 2 `verified`, 2
-`implemented`, and 42 `planned`, with no `blocked-*` state asserted yet because
+Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 4 `verified`, 1
+`implemented`, and 41 `planned`, with no `blocked-*` state asserted yet because
 no capability has been investigated deeply enough to name its exact blocker.
 
 Every user-visible capability has one state: `planned`, `implemented`,

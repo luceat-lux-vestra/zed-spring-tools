@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 1
+- Inventory version: 2
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-17
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md)
@@ -36,9 +36,9 @@ delivers the same user outcome is a legitimate result, recorded as
 
 | State | Count |
 | --- | --- |
-| `verified` | 2 |
-| `implemented` | 2 |
-| `planned` | 42 |
+| `verified` | 4 |
+| `implemented` | 1 |
+| `planned` | 41 |
 | `blocked-zed-api` | 0 (1 candidate under check) |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 0 |
@@ -52,9 +52,9 @@ promoted to a blocked state on suspicion.
 | Capability | State | Notes |
 | --- | --- | --- |
 | Property key/value completion in `.properties` | `verified` | Real metadata completion observed on the tested tuple during the M2 gate run. |
-| Property completion in `.yaml` | `implemented` | `spring-boot-properties-yaml` is mapped in `extension.toml` but never observed. |
-| Hover documentation on properties | `planned` | Server advertises `hoverProvider`. |
-| Property validation / diagnostics | `planned` | Diagnostics observed reaching Zed during M2, but not assessed as a capability. |
+| Property completion in `.yaml` | `verified` | Real metadata completion observed in `application.yaml` on the tested tuple, including type detail and a deprecation note in the documentation panel. |
+| Hover documentation on properties | `planned` | Server advertises `hoverProvider`. Zed does not request hover passively, so this needs a driven observation. |
+| Property validation / diagnostics | `verified` | Spring-attributed diagnostics observed for both files on the tested tuple: `'ser' is an unknown property. Did you mean 'server.address'?` in `.properties`, which requires classpath metadata, and `Expecting a 'Mapping' node but got 'ser'` in `.yaml`. Both carry `source: vscode-spring-boot`. |
 | Navigation from a property to its definition | `planned` | Server advertises `definitionProvider`. |
 | Shared properties metadata reload | `planned` | `sts/common-properties/reload`; setting `boot-java.common.properties-metadata`. |
 | Convert `.properties` to `.yaml` | `planned` | `sts/boot/props-to-yaml`. Needs a Zed command surface. |
