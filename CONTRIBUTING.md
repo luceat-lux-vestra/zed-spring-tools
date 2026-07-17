@@ -19,7 +19,8 @@ be agreed first.
 ## How much process applies to you
 
 This repository keeps a heavy evidence discipline, but not all of it lands on
-every contribution. Two rules decide how much applies.
+every contribution. Three tiers decide how much applies, and which tier a rule
+sits in depends on the rule's nature, not on who you are.
 
 **Rules that apply to everything, with no exceptions.** These are what the
 project *is*, not house style:

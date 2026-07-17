@@ -13,8 +13,8 @@
   attributed that tree to Equinox's writable private-configuration default.
   S010 then supported relocation of that state, and S011 supported the real
   Spring classpath-to-`server.port` flow on macOS arm64/JDK 25
-- Next gate: resolve R010's owner-controlled license, Git identity, and GitHub
-  namespace decisions, then publish the audited source before product scaffolding
+- Next gate: expand M4's capability inventory from R011, starting with the
+  properties/YAML workstream, now that the audited source is published
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -43,6 +43,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R008](008-equinox-private-configuration-area.md) | Attribute S009 Equinox private configuration state | Complete | Shared config is only a parent; writable install defaults private state to `<install>/configuration` |
 | [R009](009-unmodified-java-companion-boundary.md) | Attribute the unmodified official-Java companion boundary | Complete | Bundle contribution and JDT requests work; reverse callback requires an owned bridge and runtime verification |
 | [R010](010-experimental-public-source-audit.md) | Audit the experimental public-source boundary | Complete | Reachable history is source-only and pattern-clean; license, author identity, and namespace require owner decisions |
+| [R011](011-vscode-spring-tools-capability-surface.md) | Enumerate the VS Code Spring Tools capability surface | Complete | 15 commands, 18 settings, 4 languages, and 13 advertised LSP capabilities derived from the pinned release; seeds the capability inventory |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
