@@ -1,0 +1,105 @@
+name: Bug report
+description: Something in the extension behaves incorrectly on a host you can name.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project only claims one tested tuple: macOS arm64 with JDK 25. A report
+        from any other host is still welcome and useful — we just need to know
+        exactly which host it came from, because we cannot infer behaviour across
+        tuples.
+
+        **Do not report a security vulnerability here.** Use private reporting:
+        <https://github.com/luceat-lux-vestra/zed-spring-tools/security/advisories/new>
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence you can find. Note if it is intermittent.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system and architecture
+      options:
+        - macOS arm64
+        - macOS x86_64
+        - Linux x86_64
+        - Linux arm64
+        - Windows x86_64
+        - Windows Arm64
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "macOS 26.5.1"
+    validations:
+      required: true
+
+  - type: input
+    id: zed-version
+    attributes:
+      label: Zed version
+      placeholder: "1.10.3"
+    validations:
+      required: true
+
+  - type: input
+    id: java-extension
+    attributes:
+      label: Official Zed Java extension version
+      description: Required. This project is a companion to it and cannot run without it.
+      placeholder: "6.8.21"
+    validations:
+      required: true
+
+  - type: input
+    id: jdk
+    attributes:
+      label: JDK used by the language server
+      placeholder: "Temurin 25.0.3"
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: zed-spring-tools version
+      placeholder: "0.1.0-alpha.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: project
+    attributes:
+      label: Project under test
+      description: Build tool, Spring Boot version, and anything unusual about the layout.
+      placeholder: "Maven, Spring Boot 3.5.5, single module"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        From `zed: open log`. Redact anything private before pasting — paths, tokens,
+        and internal hostnames are yours to remove, not ours to discover.
+      render: text
+    validations:
+      required: false

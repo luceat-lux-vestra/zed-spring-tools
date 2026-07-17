@@ -16,6 +16,36 @@ implementation slice. Open an issue before broad architecture, packaging,
 runtime-download, or capability-scope work so its evidence and exit criteria can
 be agreed first.
 
+## How much process applies to you
+
+This repository keeps a heavy evidence discipline, but not all of it lands on
+every contribution. Two rules decide how much applies.
+
+**Rules that apply to everything, with no exceptions.** These are what the
+project *is*, not house style:
+
+- Never present an inference as a confirmed fact.
+- State the exact host tuple for any runtime observation. Without it the
+  observation cannot be reused, because behaviour is not portable across tuples.
+- Leave untested platforms and capabilities labeled `untested`. Never claim
+  support you have not observed.
+- Pin external inputs by version and checksum; never treat an unpinned `latest`
+  download as evidence.
+- Preserve failed observations. Do not rewrite a failed result as a success.
+
+The issue and pull-request templates ask for these directly, so following the
+template is usually enough.
+
+**Rules that are the maintainer's job, not a barrier to entry.** Commit-message
+form, one-scope-per-change, and document structure matter for `main`'s history,
+but you do not have to get them right to contribute. A branch merges by squash
+when its intermediate commits are not worth keeping, so a messy branch with a
+correct change is welcome; the final commit body gets written at merge.
+
+**Rules that apply only to evidence-bearing work.** If you are writing a research
+document, a spike, or a decision, the sections below apply in full. A typo fix, a
+small bug fix, or a documentation correction does not need a spike plan.
+
 ## Branching
 
 The project follows GitHub Flow, and `main` is protected: it accepts no direct
