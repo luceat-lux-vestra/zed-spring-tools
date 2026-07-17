@@ -1,10 +1,10 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1 complete, M2 substantially complete
+- Status: In progress; M1 and M2 complete, M3 next
 - Last updated: 2026-07-17
 - Architecture: D002, D003, and D004 Accepted
-- Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 product slice
-  reproduced real Spring Boot completions from a clean install on that tuple
+- Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
+  on that tuple from a driven clean install, restart, and uninstall cycle
 
 ## Outcome
 
@@ -41,8 +41,9 @@ unmodified, and the product/spike import check passed.
 
 ### M2: Product-grade macOS arm64 vertical slice
 
-Status: substantially complete; steps 1-6 reproduced on macOS 26.5.1 arm64 with
-Zed 1.10.3, Java extension 6.8.21, and Temurin JDK 25.0.3.
+Status: complete. Steps 1-6 were driven live on macOS 26.5.1 arm64 with Zed
+1.10.3, Java extension 6.8.21, and Temurin JDK 25.0.3. Step 7's diagnostic is
+implemented and contract-tested but not yet observed at runtime.
 
 Implement the smallest product flow in this order:
 
@@ -61,24 +62,38 @@ copying `spikes/` or manually preparing a worktree under `tmp/`; credentials and
 classpaths are absent from normal logs; restart and uninstall leave no owned
 process or secret route; and the tested tuple remains explicit.
 
-Gate evidence recorded on 2026-07-17:
+Gate met on 2026-07-17 by a driven cycle, not by inference from end state.
+Evidence: `tmp/m2-close-20260717/evidence/M2-GATE-RESULT.md`.
 
-- A clean development install reproduces the flow. The extension materializes
-  its own coordinator, bridge, and pinned Spring artifact into its private work
-  directory; `scripts/prepare-local-poc.mjs` only isolates the host Zed profile
-  and the fixture project, and does not hand-prepare the product's runtime.
-- Credentials and classpaths are absent from the audited logs, at the stricter
-  `log.lsp: "trace"` level. The bridge credential exists only in coordinator
-  memory and its route binds an ephemeral loopback port, so neither reaches
-  disk; classpath payloads never cross the Zed-facing channel.
-- No owned process or owned route survived the run. The one leftover route file
-  belongs to the unmodified official Java proxy, not to this project.
+- A clean `install dev extension` reproduces the flow with no `spikes/` copy and
+  no hand-prepared runtime: Zed compiled and loaded the extension, which
+  materialized its own coordinator and bridge, acquired and validated the pinned
+  Spring VSIX, discovered the official Java provider, and returned real Spring
+  Boot metadata completions.
+- The tab-order race fix holds at runtime. With the properties buffer opened
+  before any Java file, the coordinator logged and waited for the official Java
+  route, then enabled coordination and registered the bridge, showing no
+  misleading failure while Java was absent.
+- Restart leaves no owned process or route: owned processes reach zero within
+  three seconds. Official Java's JDT LS outlives Zed briefly and exits on its
+  own, so the injected bridge does not hold it open.
+- Uninstall leaves no owned process or route, and the authentic removal contract
+  that S012 was Refuted on executed: `official Java classpath bridge removed`.
+- Credentials and classpaths are absent from a rotation-following log capture
+  that provably spans a classpath registration, at the stricter `log.lsp:
+  "trace"`. The only jar paths present are Zed's own language-server launch
+  records of product installation paths, not the project classpath.
 
-Remaining before the gate closes: a freshly driven restart and uninstall
-observation. Current cleanup evidence is post-run end state plus the coordinator
-lifecycle tests, which is weaker than a live cycle. Step 7's actionable
-missing/incompatible-Java error path also still needs a runtime observation
-rather than only its contract test.
+Two items are carried forward rather than waived:
+
+- `zed::download_file` hung once for 24 minutes with no bytes, no connection, and
+  no timeout while the network was healthy, and completed in seconds after a Zed
+  restart. Acquisition can wedge with no actionable message. Zed's API takes no
+  timeout, so the product cannot bound it directly; the cause is unestablished
+  and one occurrence is not a reproduction. Tracked in `LIMITATIONS.md`.
+- Step 7's missing/incompatible-Java diagnostic still needs a runtime
+  observation. The adjacent absent-Java path was observed; `validateCompatibility`
+  and `javaMajor` remain covered only by contract tests.
 
 ### M3: Initial experimental public source release
 

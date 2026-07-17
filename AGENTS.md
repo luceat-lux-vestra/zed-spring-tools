@@ -9,10 +9,11 @@ managed-JDT fallback. S012 proved the unmodified bridge and visible completion
 but was Refuted on cleanup; S013 then supported the exact removal contract. D003
 and D004 are Accepted.
 
-The M2 vertical slice now reproduces real Spring Boot property completions from
-a clean development install on macOS arm64/JDK 25, with log hygiene and owned
-cleanup audited. The current work is the remaining M2 exit-gate evidence and
-M3's public source release. Spike code remains excluded from production.
+The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
+and uninstall cycle reproduced real Spring Boot property completions, executed
+the authentic bridge removal, left no owned process or route, and kept
+credentials and classpaths out of the logs. The current work is M3's public
+source release. Spike code remains excluded from production.
 
 ## Product goal and delivery strategy
 

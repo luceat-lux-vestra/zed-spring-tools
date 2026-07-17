@@ -22,8 +22,15 @@ extension.
 - The PoC and the M2 slice prove attributable Spring Boot property completion and
   the cleanup path. They do not prove the rest of VS Code Spring Tools capability
   parity.
-- The M2 restart and uninstall cleanup evidence is post-run end state plus
-  automated lifecycle tests, not a freshly driven interactive cycle.
+- First-use Spring artifact acquisition can hang indefinitely. It was observed
+  once stalling for 24 minutes with no bytes transferred, no open connection, and
+  no timeout while the network was healthy, showing only an indefinite
+  `Downloading zed-spring-tools...`; quitting and relaunching Zed made the same
+  download finish in seconds. Zed's `download_file` API accepts no timeout, so
+  this cannot currently be bounded by the extension. If acquisition appears
+  stuck, restart Zed.
+- The missing/incompatible-Java diagnostic is implemented and contract-tested but
+  has not been observed at runtime.
 - Spring client requests including `vscode-spring-boot.ls.start` and
   `sts/javaType` still need product handling and tests.
 - No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
