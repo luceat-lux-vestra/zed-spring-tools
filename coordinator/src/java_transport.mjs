@@ -130,7 +130,12 @@ function postJson(port, timeoutMs, body, signal) {
           try {
             const envelope = JSON.parse(Buffer.concat(chunks).toString("utf8"));
             if (envelope?.error !== undefined && envelope.error !== null) {
-              reject(new Error("official Java rejected the compatibility command"));
+              const command = body?.params?.command ?? "unknown";
+              const detail =
+                typeof envelope.error === "string"
+                  ? envelope.error
+                  : JSON.stringify(envelope.error);
+              reject(new Error(`official Java rejected command ${command}: ${detail}`));
             } else if (!Object.hasOwn(envelope ?? {}, "result")) {
               reject(new Error("official Java response has no result"));
             } else {
