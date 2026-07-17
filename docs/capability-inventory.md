@@ -37,11 +37,11 @@ delivers the same user outcome is a legitimate result, recorded as
 | State | Count |
 | --- | --- |
 | `verified` | 5 |
-| `implemented` | 0 |
-| `planned` | 41 |
+| `implemented` | 1 |
+| `planned` | 39 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
-| `zed-native-equivalent` | 0 |
+| `zed-native-equivalent` | 1 |
 
 A capability is promoted to `blocked-*` only when the exact missing surface is
 named **and** no Zed-native workflow can deliver the outcome. A capability is
@@ -141,8 +141,8 @@ Debuggers are supported, so run/debug is not assumed blocked.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Start Spring Boot Language Server on demand | `planned` | `vscode-spring-boot.ls.start`. **Known debt**: the coordinator does not handle this client request. |
-| Java type resolution for the server | `planned` | `sts/javaType`. **Known debt**: unhandled by the coordinator. |
+| Start Spring Boot Language Server on demand | `zed-native-equivalent` | `vscode-spring-boot.ls.start` is a VS Code client command, not a server request the coordinator receives. In Spring Tools' `Main.ts` it calls `client.start()` and then registers the classpath service, registers the Java-data service, and forces `sts.vscode-spring-boot.enableClasspathListening(true)`. Zed owns language-server start/restart (auto-start on opening a Boot file, restart via Zed's action — both exercised in M2), and the coordinator already performs the callback's work: it serves the classpath bridge (`sts/addClasspathListener`) and the Java-data methods (`sts/java*`), and sends `enableClasspathListening(true)` once the official Java route is ready. So the outcome is delivered without an on-demand command. Earlier "coordinator does not handle this client request" was a miscategorization: it is not a coordinator request. |
+| Java type resolution for the server | `implemented` | `sts/javaType` is a server→client request (`@JsonRequest("sts/javaType")` on Spring Tools' `STS4LanguageClient`; the server calls `client.javaType(...)` from `JdtLsIndex`). The coordinator **does** handle it: `JavaTransport` maps it, and eight sibling `sts/java*` methods, to the official Java extension's `sts.java.*` commands over the loopback route, and `handleSpringMessage` routes any `supportsSpringClientMethod` request there. Contract-tested (`Java data requests are answered through the official Java transport`). Not yet observed with a real server request on a named tuple, so `implemented`, not `verified`. Earlier "unhandled by the coordinator" was incorrect. |
 | Classpath listening | `verified` | `sts.vscode-spring-boot.enableClasspathListening` driven by the coordinator; observed registering and removing during the M2 gate run. **Install-ordering caveat**: if the extension is installed while a Java project is already open, `jdtls` does not pick up the bridge until Zed restarts; when the extension is present before the Java server starts it registers fine, cold cache included. See [S014](spikes/014-jdtls-bundle-startup-ordering.md). |
 | Missing / incompatible Java diagnostic | `verified` | Observed on 2026-07-18 by driving the real coordinator process on incompatible inputs. A real Temurin 17.0.18 was refused with `JDK 21 or newer is required by Spring Tools`; an unverified official-Java-extension contract was refused with `official Java compatibility contract is invalid` before the JDK check. Both exited nonzero with no reduced mode; a compatible Temurin 21.0.11 control passed both guards and launched the real Spring server. Absent-Java path observed earlier in M2. Evidence: `tmp/m2-step7-incompatible-java-20260718/`. |
 | Embedded language syntax highlighting | `planned` | Setting `boot-java.embedded-syntax-highlighting`; VSIX contributes four grammars. |

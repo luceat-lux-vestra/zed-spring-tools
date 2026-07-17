@@ -1,7 +1,7 @@
 # R011: VS Code Spring Tools capability surface
 
 - Status: Complete for the pinned release; LSP surface partially runtime-verified
-- Last updated: 2026-07-17
+- Last updated: 2026-07-18
 - Investigator: Claude Opus 4.8
 - Evidence baseline:
   - Spring Tools `5.2.0.RELEASE`, asset `vscode-spring-boot-2.2.0-RC1.vsix`,
@@ -163,13 +163,20 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
 1. Whether completion is dynamically registered, and what else registers with it.
 2. Which advertised capabilities actually return results without live data or a
    Boot project — several may advertise unconditionally and return empty.
-3. Whether `vscode-spring-boot.ls.start` and `sts/javaType`, both currently
-   unhandled by the coordinator, gate any of the capabilities above.
+3. Resolved 2026-07-18: `sts/javaType` (and its `sts/java*` siblings) is handled
+   by the coordinator, routed to the official Java extension; `vscode-spring-boot.ls.start`
+   is a VS Code client command, not a coordinator request, and its callback's work
+   is already performed by the coordinator. Neither gates the capabilities above as
+   an unhandled request. See the inventory rows for the exact mechanism.
 
 ## Blockers and constraints
 
-1. `vscode-spring-boot.ls.start` and `sts/javaType` are unhandled client
-   requests. Until handled, any capability depending on them cannot be assessed.
+1. Retracted 2026-07-18: this had listed `vscode-spring-boot.ls.start` and
+   `sts/javaType` as unhandled client requests. That was a miscategorization.
+   `sts/javaType` is a server→client request the coordinator handles via the
+   official Java route (contract-tested); `vscode-spring-boot.ls.start` is a VS
+   Code editor command, not a request the coordinator receives, and Zed owns
+   language-server start/restart. Neither is a coordinator blocker.
 2. **Zed extensions cannot contribute a view of any kind.** The complete export
    list of the `zed_extension_api` 0.7.0 world is 19 functions: `init-extension`;
    six `language-server-*` functions; five DAP functions; `run-slash-command` and
