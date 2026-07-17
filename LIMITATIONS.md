@@ -46,8 +46,13 @@ extension.
   observed at runtime: the coordinator refuses to start on an incompatible JDK or
   an unverified official-Java-extension contract, naming the reason, instead of
   entering a reduced mode. Only the single macOS arm64 tuple has been exercised.
-- Spring client requests including `vscode-spring-boot.ls.start` and
-  `sts/javaType` still need product handling and tests.
+- `sts/javaType` and its eight sibling `sts/java*` server→client requests are
+  handled by the coordinator, which routes them to the official Java extension;
+  `sts/javaType` is contract-tested but not yet observed against a real server
+  request. `vscode-spring-boot.ls.start` is a VS Code client command, not a
+  coordinator request: Zed owns language-server start/restart and the coordinator
+  already wires the classpath bridge, the Java-data route, and classpath
+  listening that command's callback performs.
 - No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
   binary is stored in Git. Reproduction requires separately acquired, pinned,
   checksum-verified inputs.
