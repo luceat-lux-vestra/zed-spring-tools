@@ -52,7 +52,7 @@ impl zed::Extension for SpringToolsExtension {
         _worktree: &zed::Worktree,
     ) -> zed::Result<Option<zed::serde_json::Value>> {
         require_server(language_server_id)?;
-        Ok(Some(zed::serde_json::json!({ "enableJdtClasspath": true })))
+        Ok(Some(spring_initialization_options()))
     }
 
     fn language_server_additional_initialization_options(
@@ -83,6 +83,12 @@ fn require_server(language_server_id: &zed::LanguageServerId) -> Result<(), Stri
     } else {
         Err(format!("unknown language server: {language_server_id}"))
     }
+}
+
+fn spring_initialization_options() -> zed::serde_json::Value {
+    // The coordinator enables this only after the official Java route is
+    // ready. This keeps Spring LS startup independent of editor tab order.
+    zed::serde_json::json!({ "enableJdtClasspath": false })
 }
 
 fn coordinator_arguments(
@@ -149,5 +155,13 @@ mod tests {
         assert_eq!(arguments[4], "/jdks/temurin 25/bin/java");
         assert_eq!(arguments[10], "/extensions/work/java");
         assert!(!arguments.iter().any(|argument| argument == "sh"));
+    }
+
+    #[test]
+    fn spring_initialization_does_not_race_the_official_java_server() {
+        assert_eq!(
+            spring_initialization_options(),
+            zed::serde_json::json!({ "enableJdtClasspath": false })
+        );
     }
 }

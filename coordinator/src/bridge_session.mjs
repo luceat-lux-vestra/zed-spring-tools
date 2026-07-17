@@ -5,13 +5,14 @@ import { BRIDGE_ADD, BRIDGE_REMOVE } from "./java_transport.mjs";
 const MAX_BODY_BYTES = 1024 * 1024;
 
 export class BridgeSession {
-  constructor({ transport, worktree, callbackId, sendClasspathToSpring }) {
+  constructor({ transport, worktree, callbackId, sendClasspathToSpring, signal }) {
     if (typeof sendClasspathToSpring !== "function") throw new Error("Spring callback is required");
     this.transport = transport;
     this.worktreeId = createHash("sha256").update(worktree).digest("hex");
     this.callbackId = callbackId;
     this.credential = randomBytes(32).toString("base64url");
     this.sendClasspathToSpring = sendClasspathToSpring;
+    this.signal = signal;
     this.server = undefined;
     this.registration = undefined;
   }
@@ -36,7 +37,11 @@ export class BridgeSession {
       batched: false,
     });
     try {
-      const result = await this.transport.execute(BRIDGE_ADD, [this.registration]);
+      const result = await this.transport.execute(
+        BRIDGE_ADD,
+        [this.registration],
+        { signal: this.signal },
+      );
       if (result !== "ok") throw new Error("bridge registration returned an unexpected result");
     } catch (error) {
       await this.#closeServer();
@@ -51,7 +56,11 @@ export class BridgeSession {
     let removalError;
     if (registration !== undefined) {
       try {
-        const result = await this.transport.execute(BRIDGE_REMOVE, [registration]);
+        const result = await this.transport.execute(
+          BRIDGE_REMOVE,
+          [registration],
+          { timeoutMs: 2000 },
+        );
         if (result !== "ok") throw new Error("bridge removal returned an unexpected result");
       } catch (error) {
         removalError = error;

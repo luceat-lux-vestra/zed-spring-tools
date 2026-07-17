@@ -1,4 +1,5 @@
 use sha2::{Digest, Sha256};
+use std::env;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -48,7 +49,7 @@ pub struct SpringPaths {
 }
 
 pub fn ensure_installed(language_server_id: &zed::LanguageServerId) -> Result<SpringPaths, String> {
-    let install = install_root();
+    let install = install_root()?;
     if validate_install(&install).is_ok() {
         return paths(install);
     }
@@ -114,8 +115,11 @@ fn install_from_download(install: &Path) -> Result<SpringPaths, String> {
     paths(install.to_path_buf())
 }
 
-fn install_root() -> PathBuf {
-    PathBuf::from("spring-tools").join(VERSION)
+fn install_root() -> Result<PathBuf, String> {
+    Ok(env::current_dir()
+        .map_err(|error| format!("resolve extension work directory: {error}"))?
+        .join("spring-tools")
+        .join(VERSION))
 }
 
 fn validate_archive(path: &Path) -> Result<(), String> {
@@ -248,5 +252,11 @@ mod tests {
         assert!(URL.ends_with(ASSET));
         assert!(!URL.contains("latest"));
         assert_eq!(SHA256.len(), 64);
+    }
+
+    #[test]
+    fn install_paths_are_absolute_before_the_language_server_changes_working_directory() {
+        assert!(install_root().unwrap().is_absolute());
+        assert!(paths(install_root().unwrap()).unwrap().server.is_absolute());
     }
 }

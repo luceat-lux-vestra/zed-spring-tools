@@ -26,25 +26,29 @@ export class JavaTransport {
     this.portFile = path.join(javaWorkDirectory, "proxy", routeId(worktree));
   }
 
-  async execute(command, arguments_) {
+  async execute(command, arguments_, { signal, timeoutMs = this.timeoutMs } = {}) {
     if (!ALLOWED_COMMANDS.has(command) || !Array.isArray(arguments_)) {
       throw new Error("official Java transport rejected a non-allowlisted command");
     }
-    const port = await waitForPort(this.portFile, this.timeoutMs);
-    return await postJson(port, this.timeoutMs, {
+    const port = await waitForPort(this.portFile, timeoutMs, signal);
+    return await postJson(port, timeoutMs, {
       method: "workspace/executeCommand",
       params: { command, arguments: structuredClone(arguments_) },
-    });
+    }, signal);
   }
 
-  async executeSpringClientMethod(method, params) {
+  async executeSpringClientMethod(method, params, options) {
     const command = JAVA_METHODS.get(method);
     if (command === undefined) throw new Error("unsupported Spring Java client method");
-    return await this.execute(command, [structuredClone(params)]);
+    return await this.execute(command, [structuredClone(params)], options);
   }
 
   supportsSpringClientMethod(method) {
     return JAVA_METHODS.has(method);
+  }
+
+  async waitUntilReady({ signal } = {}) {
+    await waitForPort(this.portFile, this.timeoutMs, signal);
   }
 }
 
@@ -53,15 +57,16 @@ export function routeId(worktree) {
   return Buffer.from(normalized, "utf8").toString("hex");
 }
 
-async function waitForPort(file, timeoutMs) {
+async function waitForPort(file, timeoutMs, signal) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
+    throwIfAborted(signal);
     try {
       return await readPort(file);
     } catch (error) {
       lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await delay(100, signal);
     }
   }
   throw new Error(
@@ -88,8 +93,12 @@ async function readPort(file) {
   }
 }
 
-function postJson(port, timeoutMs, body) {
+function postJson(port, timeoutMs, body, signal) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
     const encoded = Buffer.from(JSON.stringify(body), "utf8");
     const request = http.request(
       {
@@ -133,8 +142,39 @@ function postJson(port, timeoutMs, body) {
         });
       },
     );
+    const abort = () => request.destroy(abortError());
+    signal?.addEventListener("abort", abort, { once: true });
+    request.once("close", () => signal?.removeEventListener("abort", abort));
     request.setTimeout(timeoutMs, () => request.destroy(new Error("official Java request timed out")));
     request.on("error", reject);
     request.end(encoded);
   });
+}
+
+function delay(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, milliseconds);
+    const abort = () => {
+      clearTimeout(timer);
+      reject(abortError());
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortError() {
+  const error = new Error("official Java coordination stopped");
+  error.name = "AbortError";
+  return error;
 }

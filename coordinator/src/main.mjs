@@ -12,30 +12,61 @@ import { LspDecoder, encodeLsp, errorFor, isRequest, responseFor } from "./lsp.m
 
 const ADD_CLASSPATH = "sts/addClasspathListener";
 const REMOVE_CLASSPATH = "sts/removeClasspathListener";
-const EXECUTE_CLIENT_COMMAND = "workspace/executeClientCommand";
+const EXECUTE_SPRING_COMMAND = "workspace/executeCommand";
+const ENABLE_CLASSPATH = "sts.vscode-spring-boot.enableClasspathListening";
 const CALLBACK_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const REQUEST_TIMEOUT_MS = 10_000;
 const JAVA_ROUTE_TIMEOUT_MS = 30_000;
 const SERVER_JAR = "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar";
 
 export class Coordinator {
-  constructor({ sendSpring, sendZed, javaTransport, worktree, requestTimeoutMs = REQUEST_TIMEOUT_MS }) {
+  constructor({
+    sendSpring,
+    sendZed,
+    javaTransport,
+    worktree,
+    requestTimeoutMs = REQUEST_TIMEOUT_MS,
+    logger = () => {},
+  }) {
     this.sendSpring = sendSpring;
     this.sendZed = sendZed;
     this.javaTransport = javaTransport;
     this.worktree = worktree;
     this.requestTimeoutMs = requestTimeoutMs;
+    this.logger = logger;
     this.pending = new Map();
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
     this.javaFailureShown = false;
+    this.shutdownIds = new Set();
+    this.abortController = new AbortController();
+    this.enableTask = undefined;
+    this.closed = false;
+  }
+
+  observeZedMessage(message) {
+    if (isRequest(message) && message.method === "shutdown") {
+      this.shutdownIds.add(idKey(message.id));
+    }
+    if (message?.method === "initialized" && message.id === undefined) {
+      this.#startClasspathCoordination();
+    }
   }
 
   async handleSpringMessage(message) {
+    if (this.closed) return;
     const pendingKey = responseKey(message);
     if (pendingKey !== null && this.pending.has(pendingKey)) {
       this.#settlePending(pendingKey, message);
+      return;
+    }
+
+    if (pendingKey !== null && this.shutdownIds.delete(pendingKey)) {
+      const normalized = Object.hasOwn(message, "result")
+        ? { ...message, result: null }
+        : message;
+      this.sendZed(encodeLsp(normalized));
       return;
     }
 
@@ -55,9 +86,13 @@ export class Coordinator {
     if (this.javaTransport.supportsSpringClientMethod(message.method)) {
       await this.#answer(message, async () => {
         try {
-          return await this.javaTransport.executeSpringClientMethod(message.method, message.params);
+          return await this.javaTransport.executeSpringClientMethod(
+            message.method,
+            message.params,
+            { signal: this.abortController.signal },
+          );
         } catch (error) {
-          this.#showJavaFailure();
+          if (!this.closed) this.#showJavaFailure();
           throw error;
         }
       });
@@ -84,15 +119,24 @@ export class Coordinator {
     });
   }
 
-  async close() {
-    const session = this.session;
-    this.session = undefined;
-    if (session !== undefined) await session.close();
+  beginClose() {
+    if (this.closed) return;
+    this.closed = true;
+    this.abortController.abort();
     for (const { reject, timer } of this.pending.values()) {
       clearTimeout(timer);
       reject(new Error("Spring Tools coordinator stopped"));
     }
     this.pending.clear();
+  }
+
+  async close() {
+    this.beginClose();
+    const session = this.session;
+    this.session = undefined;
+    if (session !== undefined) await session.close();
+    await this.enableTask;
+    this.shutdownIds.clear();
   }
 
   async #addClasspath(params) {
@@ -108,8 +152,9 @@ export class Coordinator {
       transport: this.javaTransport,
       worktree: this.worktree,
       callbackId: params.callbackCommandId,
+      signal: this.abortController.signal,
       sendClasspathToSpring: async (arguments_) =>
-        await this.requestSpring(EXECUTE_CLIENT_COMMAND, {
+        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
           command: params.callbackCommandId,
           arguments: structuredClone(arguments_),
         }),
@@ -117,9 +162,10 @@ export class Coordinator {
     try {
       await session.open();
       this.session = session;
+      this.logger("official Java classpath bridge registered");
       return "ok";
     } catch (error) {
-      this.#showJavaFailure();
+      if (!this.closed) this.#showJavaFailure();
       await session.close().catch(() => {});
       throw error;
     }
@@ -133,13 +179,48 @@ export class Coordinator {
     const session = this.session;
     await session.close();
     this.session = undefined;
+    this.logger("official Java classpath bridge removed");
     return "ok";
+  }
+
+  #startClasspathCoordination() {
+    if (this.enableTask !== undefined || this.closed) return;
+    this.enableTask = this.#enableClasspathWhenJavaReady();
+  }
+
+  async #enableClasspathWhenJavaReady() {
+    this.logger("waiting for the official Java language server route");
+    while (!this.closed) {
+      try {
+        await this.javaTransport.waitUntilReady({ signal: this.abortController.signal });
+      } catch (error) {
+        if (this.closed || error?.name === "AbortError") return;
+        this.logger("official Java route is not ready; continuing to wait");
+        await retryDelay(1000, this.abortController.signal).catch(() => {});
+        continue;
+      }
+      if (this.closed) return;
+      try {
+        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+          command: ENABLE_CLASSPATH,
+          arguments: [true],
+        });
+        this.logger("Spring classpath coordination enabled");
+        return;
+      } catch (error) {
+        if (this.closed || error?.name === "AbortError") return;
+        this.#showJavaFailure();
+        await retryDelay(1000, this.abortController.signal).catch(() => {});
+      }
+    }
   }
 
   async #answer(request, operation) {
     try {
-      this.sendSpring(encodeLsp(responseFor(request, await operation())));
+      const result = await operation();
+      if (!this.closed) this.sendSpring(encodeLsp(responseFor(request, result)));
     } catch (error) {
+      if (this.closed) return;
       const message = error instanceof Error ? error.message : "coordination failed";
       this.sendSpring(encodeLsp(errorFor(request, message)));
     }
@@ -157,7 +238,7 @@ export class Coordinator {
   }
 
   #showJavaFailure() {
-    if (this.javaFailureShown) return;
+    if (this.javaFailureShown || this.closed) return;
     this.javaFailureShown = true;
     this.sendZed(
       encodeLsp({
@@ -285,18 +366,22 @@ export async function run(arguments_, dependencies = {}) {
     shell: false,
     stdio: ["pipe", "pipe", "pipe"],
   });
-  child.stderr.pipe(process.stderr);
-  process.stdin.pipe(child.stdin);
+  const input = dependencies.input ?? process.stdin;
+  const output = dependencies.output ?? process.stdout;
+  const errorOutput = dependencies.errorOutput ?? process.stderr;
+  child.stderr.pipe(errorOutput);
+  input.pipe(child.stdin);
 
   const coordinator = new Coordinator({
     sendSpring: (bytes) => child.stdin.write(bytes),
-    sendZed: (bytes) => process.stdout.write(bytes),
+    sendZed: (bytes) => output.write(bytes),
     javaTransport: new JavaTransport({
       javaWorkDirectory: options.javaWorkDirectory,
       worktree: options.worktree,
       timeoutMs: JAVA_ROUTE_TIMEOUT_MS,
     }),
     worktree: options.worktree,
+    logger: (message) => errorOutput.write(`zed-spring-tools: ${message}\n`),
   });
   const decoder = new LspDecoder();
   let handling = Promise.resolve();
@@ -305,6 +390,7 @@ export async function run(arguments_, dependencies = {}) {
   const stop = async (killChild) => {
     if (stopping) return;
     stopping = true;
+    coordinator.beginClose();
     await handling.catch(() => {});
     await coordinator.close().catch(() => {
       process.exitCode = 1;
@@ -323,13 +409,23 @@ export async function run(arguments_, dependencies = {}) {
       child.kill();
     }
   });
+  child.stdin.on("error", () => {
+    if (!stopping) {
+      process.exitCode = 1;
+      void stop(true);
+    }
+  });
+  monitorZedInput(input, coordinator, () => void stop(true), () => {
+    process.exitCode = 1;
+    void stop(true);
+  });
   child.once("error", () => {
     process.exitCode = 1;
     void stop(false);
   });
   child.once("exit", (code) => {
     if (code !== 0 && code !== null) process.exitCode = code;
-    void stop(false).finally(() => process.stdin.destroy());
+    void stop(false).finally(() => input.destroy());
   });
   process.once("SIGTERM", () => void stop(true));
   process.once("SIGINT", () => void stop(true));
@@ -389,6 +485,37 @@ function responseKey(message) {
     return null;
   }
   return idKey(message.id);
+}
+
+export function monitorZedInput(input, coordinator, stop, fail = stop) {
+  const decoder = new LspDecoder();
+  input.on("data", (chunk) => {
+    try {
+      for (const message of decoder.push(chunk)) coordinator.observeZedMessage(message);
+    } catch {
+      fail();
+    }
+  });
+  input.once("end", stop);
+  input.once("error", fail);
+}
+
+function retryDelay(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error("coordination stopped"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, milliseconds);
+    const abort = () => {
+      clearTimeout(timer);
+      reject(new Error("coordination stopped"));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+  });
 }
 
 const isMain =

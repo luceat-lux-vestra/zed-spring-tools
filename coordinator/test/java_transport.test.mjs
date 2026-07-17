@@ -50,3 +50,17 @@ test("allowlisted Spring Java request uses the official loopback route", async (
   ]);
   await assert.rejects(() => transport.execute("not.allowed", []));
 });
+
+test("waiting for the official Java route is abortable during shutdown", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-abort-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const controller = new AbortController();
+  const transport = new JavaTransport({
+    javaWorkDirectory: path.join(root, "java"),
+    worktree: path.join(root, "worktree"),
+    timeoutMs: 10_000,
+  });
+  const waiting = transport.waitUntilReady({ signal: controller.signal });
+  controller.abort();
+  await assert.rejects(waiting, { name: "AbortError" });
+});
