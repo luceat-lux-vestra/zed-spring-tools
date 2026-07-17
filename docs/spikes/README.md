@@ -57,7 +57,8 @@ authentic callback, cache transition, and visible completion with official Java
 unmodified, but is Refuted under its strict cleanup criterion because the
 copied coordinator rejected Spring's authentic two-key removal shape before it
 reached the bridge. S013 is the one narrow removal-contract correction required
-before proposed D003 can be accepted.
+before proposed D003 can be accepted. S013 subsequently passed that exact
+contract on the fixed tuple, so D003 is now accepted.
 
 Platform validation follows incrementally after this local PoC and the initial
 public source release; multiplatform claims still require the declared matrix.
@@ -78,7 +79,7 @@ Tentative sequence:
 | [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Supported on macOS arm64/JDK 25 after corrected component build; other targets untested |
 | [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Supported on macOS arm64/JDK 25; cleanup defect retained; other targets untested |
 | [S012](012-unmodified-java-companion-bridge.md) | Reproduce S011 through an injected bridge while keeping the official Java extension and proxy unmodified | Refuted on cleanup after functional success: authentic Spring removal was rejected before bridge transport |
-| [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Gate B prepared and reviewed; Gate C not started |
+| [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Supported on macOS arm64/JDK 25; other targets untested |
 
 Use [template.md](template.md) before adding any spike code.
 

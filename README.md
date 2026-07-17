@@ -43,9 +43,9 @@ and the visible completion with official Java unmodified, but failed its strict
 removal criterion because the coordinator rejected the authentic Spring removal
 shape before bridge transport. The narrow
 [S013](docs/spikes/013-authentic-spring-removal-contract.md) cleanup contract
-must pass before proposed
-[D003](docs/decisions/003-java-companion-product-architecture.md) is accepted and
-product scaffolding begins.
+then passed on the fixed tuple, so
+[D003](docs/decisions/003-java-companion-product-architecture.md) is accepted
+and reviewed product planning may begin.
 
 The work in this phase must:
 
@@ -67,9 +67,9 @@ spikes/          # Disposable experiment code; never production code
 ```
 
 No product code, build system, extension manifest, or product CI exists yet.
-D002 selects the technical direction. D003 and S013 now provide the reviewed
-architecture proposal and its remaining cleanup evidence gate; product
-scaffolding waits for that gate.
+D002 selects the technical direction, and accepted D003 plus S013 close the
+architecture evidence gate. Product scaffolding may begin only from a reviewed
+implementation plan.
 
 An initial public GitHub source release is not a multiplatform support claim or
 a stable Zed Marketplace release. It requires a repository license, an evidence
@@ -84,4 +84,5 @@ labels; it must not include the Spring VSIX or extracted third-party binaries.
 See [the research index](docs/research/README.md),
 [the spike index](docs/spikes/README.md), and
 [the decision index](docs/decisions/README.md) for the evidence and selected
-direction.
+direction. The reviewed next milestones are in the
+[product implementation and public-development plan](docs/implementation-plan.md).

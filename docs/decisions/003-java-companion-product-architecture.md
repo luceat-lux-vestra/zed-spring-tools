@@ -1,6 +1,6 @@
 # D003: Java-companion product architecture
 
-- Status: Proposed; implementation blocked on S013
+- Status: Accepted
 - Date: 2026-07-17
 - Decision owner: Project owner
 - Depends on: D002, R009, S012, and S013
@@ -18,8 +18,9 @@ The detailed product architecture must preserve the official Java extension's
 ownership of Java support, isolate release-specific transport, and prevent the
 spike proxy from becoming production code. S012 proved the final transport and
 visible completion but failed its strict cleanup gate before bridge removal was
-reached. One narrow S013 removal-contract experiment is required before this
-proposal can be accepted and product scaffolding begins.
+reached. S013 then supported the exact authentic removal contract without
+changing official Java or the bridge protocol. The evidence gate is complete
+and reviewed product planning may proceed.
 
 ## Evidence
 
@@ -33,8 +34,13 @@ proposal can be accepted and product scaffolding begins.
   bundle contribution and command execution.
 - [S011](../spikes/011-integrated-spring-boot-local-poc.md) supports the desired
   Spring classpath-to-completion behavior but used an instrumented proxy.
+- [S012](../spikes/012-unmodified-java-companion-bridge.md) supports the
+  unmodified-Java transport and visible completion but retains its cleanup
+  Refuted result.
+- [S013](../spikes/013-authentic-spring-removal-contract.md) supports the exact
+  authentic removal, bridge cleanup, and owned-route deletion.
 
-## Proposed architecture
+## Accepted architecture
 
 ```text
 Zed
@@ -154,7 +160,7 @@ release now.
 Not selected. It conflicts with the required official Java environment and
 would require a separate decision for full Java ownership.
 
-## Implementation sequence after acceptance
+## Implementation sequence
 
 1. Create product-neutral protocol schemas and contract tests from the accepted
    S012 evidence; do not copy the instrumented S006 proxy.
@@ -174,16 +180,14 @@ Every implementation slice requires its own reviewed plan and must keep the
 capability inventory current. Product code may not claim support from spike
 evidence alone.
 
-## Acceptance gate
+## Acceptance record
 
-D003 becomes Accepted only if S012/S013 together demonstrate the real S011
+Accepted on 2026-07-17 because S012/S013 together demonstrate the real S011
 completion transition with the official Java extension and proxy byte-for-byte
-unmodified,
-one injected bridge bundle, authenticated direct callback, correct removal and
-shutdown, no second JDT LS, and no stale route. A failure to discover the
-private request endpoint is Inconclusive for transport attribution; an
-attributable inability to complete the bridge is Refuted for this proposal and
-requires revisiting D002 before product scaffolding.
+unmodified, one injected bridge bundle, authenticated direct callback, correct
+removal, no second JDT LS, and no stale owned route. This accepts the product
+architecture, not multiplatform support or the private proxy endpoint as a
+stable public API.
 
 ## Revisit conditions
 

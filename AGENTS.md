@@ -6,9 +6,9 @@ Local technical feasibility and the basic end-to-end PoC are complete. Amended
 D002 records a Pivot to a required official-Java companion with a versioned
 Java/Spring coordination boundary and no reduced managed-JDT fallback. S012
 proved the unmodified bridge and visible completion but was Refuted on cleanup;
-D003 is proposed and blocked on S013's narrow removal-contract evidence. Product
-scaffolding has not begun; do not treat this as a product implementation
-repository until S013 resolves and D003 is accepted.
+S013 then supported the exact removal contract. D003 is Accepted. Product
+scaffolding has not begun; record and review the detailed implementation plan
+before adding production files.
 
 ## Product goal and delivery strategy
 
