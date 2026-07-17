@@ -1,19 +1,35 @@
 # Contributing
 
-Thanks for helping build Spring tooling for Zed. This repository is currently
-between a completed feasibility PoC and its first production scaffold.
+Thanks for helping build Spring tooling for Zed. This repository has an
+installable extension with one working vertical slice, verified on a single
+tuple, and is expanding capability coverage in public.
 
 ## Before proposing a change
 
 Read `AGENTS.md`, the accepted decisions in `docs/decisions/`, and the reviewed
-`docs/implementation-plan.md`. D004 must select the production language, build,
-packaging, and compatibility-table structure before production extension files
-are added.
+`docs/implementation-plan.md`. D002, D003, and D004 fix the architecture, the
+official-Java boundary, and the production stack; a change that departs from
+them needs a decision document first.
 
 Keep a contribution to one investigation, experiment, decision, or reviewed
 implementation slice. Open an issue before broad architecture, packaging,
 runtime-download, or capability-scope work so its evidence and exit criteria can
 be agreed first.
+
+## Branching
+
+The project follows GitHub Flow, and `main` is protected: it takes no direct
+pushes, no force pushes, and no non-linear history.
+
+- Branch from `main`, one branch per change, kept short-lived.
+- Name the branch for the Conventional Commit type it carries, followed by a
+  short slug: `feat/`, `fix/`, `docs/`, `spike/`, `refactor/`, `test/`, or
+  `chore/`. Use the evidence identifier where one exists, as in
+  `spike/s014-request-mappings`.
+- Every commit needs a body explaining why the change is needed, what materially
+  changed, and which validation was run or remains pending.
+- Pull requests merge by rebase, or by squash when the intermediate commits are
+  not worth keeping.
 
 ## Research and spikes
 

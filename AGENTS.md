@@ -110,6 +110,27 @@ For every completed spike:
 - Keep commands shell-independent and use Zed platform, worktree, environment,
   and executable-discovery APIs for host differences.
 
+## Branching and pull requests
+
+The repository follows GitHub Flow. `main` is the published, reviewed state and
+is protected: direct pushes are rejected, force pushes and deletion are blocked,
+and history must stay linear. Those rules are enforced by a GitHub ruleset, not
+by convention alone, so the prohibition on rewriting published history is
+mechanical.
+
+- Branch from `main` for every change. Never commit directly to `main`.
+- Name the branch for the Conventional Commit type it carries: `feat/`, `fix/`,
+  `docs/`, `spike/`, `refactor/`, `test/`, or `chore/`, followed by a short
+  slug. Use the evidence identifier where one exists, as in
+  `spike/s014-request-mappings` or `docs/d005-branching`.
+- Keep a branch scoped to one investigation, experiment, decision, or reviewed
+  implementation slice, and keep it short-lived.
+- Open a pull request and merge with rebase, or squash when the branch's
+  intermediate commits are not worth keeping. Merge commits are disabled.
+  Approvals are not required, because a solo owner cannot approve their own pull
+  request; the pull request exists as the review and future CI surface.
+- Release branches are out of scope until M6 defines preview releases.
+
 ## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
