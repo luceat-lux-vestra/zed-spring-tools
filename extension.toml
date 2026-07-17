@@ -4,7 +4,7 @@ version = "0.1.0-alpha.1"
 schema_version = 1
 authors = ["Zed Spring Tools Contributors"]
 description = "Spring Boot language intelligence for Zed using the required official Java extension."
-repository = "https://github.com/algorist/zed-spring-tools"
+repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
 [language_servers.zed-spring-tools]
 name = "Spring Boot Language Server"

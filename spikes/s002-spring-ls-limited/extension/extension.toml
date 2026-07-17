@@ -4,7 +4,7 @@ version = "0.0.1"
 schema_version = 1
 authors = ["Zed Spring Tools Contributors"]
 description = "Disposable Spring Boot LS standard-LSP baseline for S002."
-repository = "https://github.com/algorist/zed-spring-tools"
+repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
 [language_servers.s002-spring-boot-ls]
 name = "S002 Spring Boot LS"

@@ -70,7 +70,7 @@ const ADAPTER_INDEX_ENTRY = `
         "version": "0.0.1",
         "schema_version": 1,
         "description": "Disposable Spring bridge probe requiring the official Zed Java extension.",
-        "repository": "https://github.com/algorist/zed-spring-tools",
+        "repository": "https://github.com/luceat-lux-vestra/zed-spring-tools",
         "authors": ["Zed Spring Tools Contributors"],
         "lib": {"kind": "Rust", "version": null},
         "themes": [],

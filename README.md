@@ -101,9 +101,18 @@ gate, and D004 fixes the stack that the current scaffold implements. Product CI
 does not exist yet.
 
 An initial public GitHub source release is not a multiplatform support claim or
-a stable Zed Marketplace release. It requires a repository license, an evidence
-and secret audit, reproducible local instructions, and clear tested/untested
-labels; it must not include the Spring VSIX or extracted third-party binaries.
+a stable Zed Marketplace release. It must not include the Spring VSIX or
+extracted third-party binaries.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+That license covers this repository's own source. It does not relicense any
+third-party material: the Spring Tools VSIX remains Eclipse Public License 1.0
+and the official Zed Java extension remains under its own upstream license.
+Neither is committed here. See [third-party material](THIRD_PARTY_NOTICES.md)
+for the exact boundaries.
 
 ## Primary research question
 

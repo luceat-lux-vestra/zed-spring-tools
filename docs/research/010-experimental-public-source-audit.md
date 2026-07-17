@@ -1,9 +1,14 @@
 # R010: Experimental public-source audit
 
-- Status: Complete; owner decisions block publication
+- Status: Complete; owner decisions resolved and re-audited after M2
 - Last updated: 2026-07-17
 - Audited commit: `11f1845a6d9a2a6ddc610dfe4f0b6153b9c8c2b2`
+- Re-audited commit: `1222f1e4322c65c053e8a3dec96c423f5271e56f` (post-M2)
 - Scope: reachable Git history and the public-source document set
+
+The findings below are preserved as recorded at the original audited commit. The
+re-audit and the owner's decisions are appended at the end; the original text is
+not rewritten to match them.
 
 ## Question
 
@@ -158,3 +163,54 @@ release: it is small, source-only, link-valid, free of detected retained runtime
 credentials and absolute home paths, and explicit about third-party binaries.
 Publication is not yet authorized because the license, author metadata, and
 GitHub namespace are owner-controlled decisions with visible external effects.
+
+## Re-audit after M2 and owner decisions
+
+- Re-audited commit: `1222f1e4322c65c053e8a3dec96c423f5271e56f`, worktree clean.
+- Date: 2026-07-17, after the M2 exit gate closed.
+
+### Re-audit confirmed facts
+
+1. Reachable `main` history contains 57 commits and 171 tracked files, grown by
+   the product scaffold and the M2 work.
+2. All reachable history contains 393 distinct blob observations totaling
+   4,865,906 bytes. The largest reachable blob is 80,065 bytes
+   (`spikes/s009-attributed-isolated-profile/tools/PrepareS009.java`). Git LFS
+   remains unnecessary and unconfigured.
+3. No reachable path carries a binary, archive, or credential-container suffix
+   from the audited set. The generated `extension.wasm`, the acquired Spring
+   VSIX, and Rust build output remain ignored rather than tracked.
+4. A full reachable-history scan for GitHub, AWS, PEM, Slack, and Google
+   credential shapes returns no match.
+5. A full reachable-history scan for absolute `/Users/...`, `/home/...`, and
+   `X:\Users\...` paths returns no match other than this document's own
+   description of those patterns. The product scaffold, its tests, and
+   `scripts/prepare-local-poc.mjs` take paths as arguments and embed none.
+6. Commit metadata still contains exactly one identity,
+   `luceat-lux-vestra <heathkimdev@gmail.com>`. Three commits carry a
+   `Co-Authored-By` trailer for the assisting model; the other 54 do not.
+7. No Git remote is configured.
+8. All relative Markdown links across the 48 tracked Markdown files resolve.
+
+### Owner decisions, recorded 2026-07-17
+
+1. **License: Apache-2.0.** `LICENSE` now contains the canonical text, verified
+   byte-identical to three independent copies vendored in the local Cargo
+   registry (SHA-256 prefix `a60eea8175145316`, 201 lines). `Cargo.toml` declares
+   `license = "Apache-2.0"` and the README states the boundary against the
+   third-party EPL-1.0 and upstream Java licenses.
+2. **Namespace: `luceat-lux-vestra/zed-spring-tools`**, the authenticated
+   account. The ten embedded `github.com/algorist/zed-spring-tools` URLs in the
+   product manifest, nine spike manifests and generators, and `Cargo.toml` were
+   corrected. This document intentionally retains the original URL as the record
+   of what the first audit found. `algorist` resolves to a real but unrelated
+   GitHub user, so the previous URLs would have misattributed the project.
+3. **Author metadata: published as-is.** No history rewrite. Publishing this
+   history publishes `heathkimdev@gmail.com` permanently.
+4. **`Co-Authored-By` trailers: retained** on the three commits that carry them.
+
+### Remaining before the remote exists
+
+Repository creation, private vulnerability reporting, and the first push are the
+only open steps. The post-push checks in "Runtime verification needed" above
+still apply.

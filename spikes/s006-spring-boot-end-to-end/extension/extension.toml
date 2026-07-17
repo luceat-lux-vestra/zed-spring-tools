@@ -4,7 +4,7 @@ version = "0.0.1"
 schema_version = 1
 authors = ["Zed Spring Tools Contributors"]
 description = "Disposable real Spring Boot LS classpath-to-completion probe for S006."
-repository = "https://github.com/algorist/zed-spring-tools"
+repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
 [language_servers.s006-spring-boot-end-to-end]
 name = "S006 Spring Boot End-to-End Probe"

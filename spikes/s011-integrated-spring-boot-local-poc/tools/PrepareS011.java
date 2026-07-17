@@ -93,7 +93,7 @@ public final class PrepareS011 {
                     "version": "0.0.1",
                     "schema_version": 1,
                     "description": "Disposable real Spring Boot LS classpath-to-completion probe for S006.",
-                    "repository": "https://github.com/algorist/zed-spring-tools",
+                    "repository": "https://github.com/luceat-lux-vestra/zed-spring-tools",
                     "authors": ["Zed Spring Tools Contributors"],
                     "lib": {"kind": "Rust", "version": null},
                     "themes": [],
