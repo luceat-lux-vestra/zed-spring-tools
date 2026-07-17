@@ -22,14 +22,14 @@ extension.
 - The PoC and the M2 slice prove attributable Spring Boot property completion and
   the cleanup path. They do not prove the rest of VS Code Spring Tools capability
   parity.
-- **The first launch on a fresh install does not work; a restart fixes it.** The
-  bridge that carries Spring's classpath information into the Java language server
-  is contributed at Java-server startup, but on a cold cache the Spring artifact
-  download has not finished by then, so the Java server starts without the bridge
-  and Spring features that need the classpath (completion, validation) stay dead.
-  Quitting and reopening Zed, once the artifact is on disk, makes it work. This is
-  a confirmed, reproducible startup race; the fix is undecided. See
-  `docs/research/012-cold-cache-bridge-bundle-race.md`.
+- **Installing the extension with a Java project already open needs a Zed
+  restart.** The bridge that carries Spring's classpath information into the Java
+  language server is contributed when that server starts. If the Java server is
+  already running when the extension is installed, it is not re-queried and runs
+  without the bridge, so Spring features that need the classpath (completion,
+  validation) stay dead until Zed is restarted. Installing the extension before
+  opening a Java project avoids this, and it works on a cold cache. Confirmed in
+  `docs/spikes/014-jdtls-bundle-startup-ordering.md`.
 - **First-use Spring artifact acquisition hangs, and it reproduces.** After a
   fresh `install dev extension`, the first download stalls with no bytes
   transferred, no open connection to the release host, no timeout, and Zed idle

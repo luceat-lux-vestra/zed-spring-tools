@@ -1,15 +1,30 @@
-# R012: Cold-cache bridge/bundle startup race
+# R012: Bridge/bundle startup ordering (originally mis-titled "cold-cache race")
 
-- Status: Confirmed on macOS arm64/JDK 25; fix direction undecided
+- Status: Superseded by [S014](../spikes/014-jdtls-bundle-startup-ordering.md)
+  Gate A. The cause is install ordering, not cache temperature.
 - Last updated: 2026-07-18
 - Investigator: Claude Opus 4.8
 - Evidence baseline:
   - Product commit `91a3997`
   - macOS 26.5.1 arm64, Zed 1.10.3, official Java extension 6.8.21,
     Temurin JDK 25.0.3
-  - Local evidence retained under the ignored path
-    `tmp/ws2-symbols-20260718/evidence/` (`lsp.log`, `lsp2.log`, JDT
-    `.metadata/.log`, `BRIDGE-RACE-FINDING.md`)
+  - Local evidence retained under the ignored paths
+    `tmp/ws2-symbols-20260718/evidence/` and
+    `tmp/s014-gate-a-010646/evidence/`
+
+## Correction (2026-07-18)
+
+This document first concluded the bridge fails because `jdtls` starts before a
+cold-cache download finishes. That was wrong: it varied two things at once, the
+cache temperature and whether the extension was installed before `jdtls` started.
+S014 Gate A held the cache cold and varied only the ordering, and found that a
+cold cache with the extension pre-installed registers the bridge fine — Zed waits
+for the contribution callback through the download. The real cause is that the
+failing runs opened a Java file first and installed the dev extension afterwards,
+so `jdtls` had already started and was never re-queried for the bundles.
+
+The confirmed facts below stand as recorded observations, but the inference that
+the cache was the cause is retracted. Read S014 for the corrected conclusion.
 
 ## Question
 
@@ -40,25 +55,24 @@ clean-install claim still hold?
    at its own startup. A bundle set that arrives after `jdtls` has started is not
    picked up, and there is no re-query.
 
-## Inferences
+## Inferences (both retracted by S014)
 
-1. Zed does not hold `jdtls` startup for a slow cross-extension
-   `additional_initialization_options` callback. When our download exceeds
-   whatever Zed allows, `jdtls` starts without our bundles.
-2. The classpath flow this project uses is carried by the bridge commands
-   (`zed.spring.bridge.v1.*`), not the Spring bundle commands (`sts.java.*`).
-   The bridge jar is built by this project and materializes without a download,
-   so contributing only the bridge jar may avoid the download dependency
-   entirely — but which bundles each capability needs is not yet established.
+1. ~~Zed does not hold `jdtls` startup for a slow contribution callback.~~
+   Retracted: S014 observed Zed waiting for the callback through the download.
+2. ~~Contributing only the bridge jar may avoid the download dependency.~~
+   Retracted twice over: the bridge reuses `ReusableClasspathListenerHandler`
+   from the Spring `jdt-ls-commons` bundle, so it needs the VSIX bundles; and
+   the download was not the cause anyway.
 
-## Impact on the M2 gate
+## Impact on the M2 gate (corrected)
 
-M2 recorded that a clean development install reproduces the flow. That run hit
-the download hang, was restarted, and only then succeeded — so its cache was warm
-on the successful attempt. The honest statement is that the flow works on a warm
-cache, and a genuinely cold first launch fails the bridge race until a restart
-warms the cache. The M2 gate note and the inventory's "classpath listening"
-evidence are annotated with this caveat.
+The first version of this section claimed M2 succeeded only on a warm cache and
+that a cold first launch fails. S014 shows that is wrong: a cold cache with the
+extension pre-installed registers the bridge. M2's restart succeeded because the
+extension was then present before `jdtls` started, which is also true of any
+registry install. The M2 cold-install flow is sound; the "warm-cache caveat"
+added to the plan, the inventory, and `LIMITATIONS.md` is being corrected to the
+install-ordering finding.
 
 ## Secondary defect (fixed)
 

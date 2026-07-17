@@ -65,14 +65,16 @@ process or secret route; and the tested tuple remains explicit.
 Gate met on 2026-07-17 by a driven cycle, not by inference from end state.
 Evidence: `tmp/m2-close-20260717/evidence/M2-GATE-RESULT.md`.
 
-**Caveat found on 2026-07-18 ([R012](research/012-cold-cache-bridge-bundle-race.md)):**
-this run's success depended on a warm artifact cache. The M2 run hit the download
-hang, was restarted, and only then succeeded, so the bundles were already on disk
-when `jdtls` started. On a genuinely cold first launch the bridge/bundle
-contribution races the download and loses, `jdtls` starts without the bridge, and
-classpath coordination fails until a restart warms the cache. The flow below is
-therefore verified on a warm cache; the cold-start first-run defect is tracked in
-R012 and `LIMITATIONS.md`, with the fix undecided.
+**Startup-ordering note ([S014](spikes/014-jdtls-bundle-startup-ordering.md)):**
+the bridge is contributed to `jdtls` at its startup. If the extension becomes
+available only after `jdtls` has already started — as when a dev extension is
+installed with a Java project already open — `jdtls` is not re-queried and starts
+without the bridge until Zed is restarted. When the extension is present before
+`jdtls` starts, which is the case after a restart and for any registry install,
+S014 confirmed on a cold cache that Zed waits for the contribution and the bridge
+registers. The flow below is therefore sound for an extension installed before
+the Java server starts; the install-ordering case and the separate download hang
+are tracked in `LIMITATIONS.md`.
 
 - A clean `install dev extension` reproduces the flow with no `spikes/` copy and
   no hand-prepared runtime: Zed compiled and loaded the extension, which

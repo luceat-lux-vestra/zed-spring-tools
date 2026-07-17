@@ -1,6 +1,6 @@
 # S014: jdtls bundle startup ordering
 
-- Status: Planned
+- Status: Gate A complete — H1 answered; the cause is install ordering, not cache
 - Last updated: 2026-07-18
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, official Java extension 6.8.21,
   Temurin JDK 25.0.3
@@ -91,7 +91,40 @@ to gather evidence; productizing it stays behind a decision (see Success below).
   official Java command outside the allowlist.
 - H2 Refuted → reopen options; record the constraint and stop.
 
-## Remaining uncertainty before running
+## Gate A result (2026-07-18)
 
-Whether Zed's contribution callback for another extension's language server is
-awaited at all is undocumented in the inspected API and is the point of Gate A.
+Run on a cold root (`tmp/s014-gate-a-010646`, VSIX absent at launch) with the
+extension already installed, using temporary `eprintln` probes in
+`additional_initialization_options` (reverted, never committed). Evidence:
+`tmp/s014-gate-a-010646/evidence/GATE-A-RESULT.md`.
+
+**H1 answered: Zed holds `jdtls` startup for the callback, download included.**
+The probe fired the full sequence — ENTER, bridge materialized, `ensure_installed`
+returned, RETURN with 6 bundles — and `jdtls`'s `initialize` params then included
+the bundles. JDT logged `Static Commands: [zed.spring.bridge.v1.*]` and the
+coordinator logged "official Java classpath bridge registered". The bridge worked
+on a cold cache.
+
+This isolates the cause. R012 conflated cache temperature with install ordering;
+holding the cache cold and varying only the ordering shows the cache was never
+the cause. The failing runs opened a Java file first and installed the dev
+extension afterwards, so `jdtls` had already started and was never re-queried for
+the newly contributed bundles. Their restarts succeeded because the extension was
+then present before `jdtls` started, not because the cache was warm.
+
+**Gate B is not run.** With H1 answered, a registry install — where the extension
+is present before any Java file is opened — needs no reload: Zed waits for the
+callback and the bridge registers. The only failing scenario is the extension
+becoming available after `jdtls` has started, which a `jdtls` restart resolves.
+That does not clearly justify invoking the out-of-allowlist `java.reloadBundles`,
+so Gate B and a `D005` decision are shelved rather than pursued.
+
+## Residual uncertainty
+
+- If the artifact download hangs (the separate defect in `LIMITATIONS.md`), the
+  callback may never return even when the extension is pre-installed. Whether Zed
+  then waits forever or times out into a bare `jdtls` was not tested; this run's
+  download completed inside the callback.
+- Whether Zed itself restarts a running `jdtls` when an extension is installed
+  mid-session was not tested; if it does, even the install-ordering case would
+  self-heal.
