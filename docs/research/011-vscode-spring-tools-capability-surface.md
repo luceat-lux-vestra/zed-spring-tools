@@ -183,8 +183,9 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
    reachable (`sts/spring-boot/structure`) and the server also advertises
    `documentSymbolProvider` and `workspaceSymbolProvider`, which render in Zed's
    native outline panel and symbol search. Whether those symbols carry the beans
-   and mappings the tree view shows is unverified — the current fixture has no
-   controllers or beans — so the capability stays `planned`, not blocked. An
+   and mappings the tree view shows is unverified, pending a driven run against
+   the fixture (which now includes a request mapping and a bean for this
+   purpose), so the capability stays `planned`, not blocked. An
    earlier revision of this document and inventory version 3 wrongly recorded it
    as `blocked-zed-api` by judging the VS Code widget instead of the outcome;
    inventory version 4 corrects that.
