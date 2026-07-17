@@ -22,13 +22,18 @@ extension.
 - The PoC and the M2 slice prove attributable Spring Boot property completion and
   the cleanup path. They do not prove the rest of VS Code Spring Tools capability
   parity.
-- First-use Spring artifact acquisition can hang indefinitely. It was observed
-  once stalling for 24 minutes with no bytes transferred, no open connection, and
-  no timeout while the network was healthy, showing only an indefinite
-  `Downloading zed-spring-tools...`; quitting and relaunching Zed made the same
-  download finish in seconds. Zed's `download_file` API accepts no timeout, so
-  this cannot currently be bounded by the extension. If acquisition appears
-  stuck, restart Zed.
+- **First-use Spring artifact acquisition hangs, and it reproduces.** After a
+  fresh `install dev extension`, the first download stalls with no bytes
+  transferred, no open connection to the release host, no timeout, and Zed idle
+  at roughly zero CPU, showing only an indefinite `Downloading
+  zed-spring-tools...`. Quitting and relaunching Zed makes the same download
+  complete in seconds. Observed twice on 2026-07-17: once stalling 24 minutes,
+  then finishing in under 12 seconds after a restart; and once stalling over 3
+  minutes, then delivering 79 MB within 10 seconds of a restart. The network was
+  healthy both times, verified independently at about 4.9 MB/s.
+  **Workaround: if acquisition appears stuck, quit and reopen Zed.** Zed's
+  `download_file` API accepts no timeout, so the extension cannot currently bound
+  or retry it. The cause is not established.
 - The missing/incompatible-Java diagnostic is implemented and contract-tested but
   has not been observed at runtime.
 - Spring client requests including `vscode-spring-boot.ls.start` and

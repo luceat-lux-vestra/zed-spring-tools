@@ -96,6 +96,34 @@ Grouped by the workstream they serve:
   `sts/jar/fetch-content`, `sts/enable/copilot/features`,
   `sts/boot/open-data-query-method-aot-definition`.
 
+### Completion is registered dynamically, not statically
+
+Confirmed on 2026-07-17 from a `tail -F` capture of a driven run on the tuple
+above, retained locally under the ignored path
+`tmp/ws1-verify-20260717/evidence/lsp.log`.
+
+`completionProvider` is absent from the Spring server's `initialize` result
+because the server registers it afterwards. One `client/registerCapability`
+message carries four completion registrations in a single batch:
+
+| Registration | Document selector |
+| --- | --- |
+| `textDocument/completion` | `java` |
+| `textDocument/completion` | `xml` |
+| `textDocument/completion` | `spring-boot-properties` |
+| `textDocument/completion` | `spring-boot-properties-yaml` |
+
+The `spring-boot-properties` selectors attribute the whole batch to the Spring
+server, because JDT LS does not know those languages. The server also registers
+`textDocument/semanticTokens` for `jpa-query-properties`, a language this
+project does not map.
+
+Attribution caveat: Zed's log does not tag messages with a server name, and the
+two servers maintain independent JSON-RPC id sequences, so an id alone cannot
+identify which server answered. Reliable attribution comes from payload
+content — a Spring-only document selector, an `sts.*` command, or a
+`source: vscode-spring-boot` field on a diagnostic — not from ids.
+
 ### This project's current coverage
 
 1. `extension.toml` maps only `Properties` to `spring-boot-properties` and
@@ -122,14 +150,13 @@ Grouped by the workstream they serve:
 
 ## Unverified hypotheses
 
-1. `completionProvider` does **not** appear in the observed `initialize` result,
-   yet property completion demonstrably works. The most likely explanation is
-   dynamic registration via `client/registerCapability` after initialization.
-   This is an inference from absence and has not been confirmed against a trace.
-2. The advertised capability set may vary with client capabilities, so a
+1. The advertised capability set may vary with client capabilities, so a
    different client could see a different list.
-3. The `resolve.completion.edit.<uuid>` command is session-scoped; whether any
+2. The `resolve.completion.edit.<uuid>` command is session-scoped; whether any
    other command carries per-session identity is not established.
+
+Hypothesis 1 of the original list — that completion is registered dynamically —
+was confirmed on 2026-07-17 and moved into the confirmed facts below.
 
 ## Items requiring runtime verification
 
