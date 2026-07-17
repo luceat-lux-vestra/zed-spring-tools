@@ -1,0 +1,28 @@
+id = "zed-spring-tools"
+name = "Zed Spring Tools"
+version = "0.1.0-alpha.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Spring Boot language intelligence for Zed using the required official Java extension."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.zed-spring-tools]
+name = "Spring Boot Language Server"
+languages = ["Java", "Properties", "YAML"]
+
+[language_servers.zed-spring-tools.language_ids]
+Java = "java"
+Properties = "spring-boot-properties"
+YAML = "spring-boot-properties-yaml"
+
+[[capabilities]]
+kind = "download_file"
+host = "github.com"
+path = [
+  "spring-projects",
+  "spring-tools",
+  "releases",
+  "download",
+  "5.2.0.RELEASE",
+  "vscode-spring-boot-2.2.0-RC1.vsix",
+]

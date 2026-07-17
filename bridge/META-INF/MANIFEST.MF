@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Zed Spring Tools Java Bridge
+Bundle-SymbolicName: dev.zed.spring.bridge;singleton:=true
+Bundle-Version: 0.1.0
+Bundle-Activator: dev.zed.spring.bridge.BridgePlugin
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.jdt.ls.core,
+ org.springframework.tooling.jdt.ls.commons
+Import-Package: com.google.gson,
+ org.osgi.framework

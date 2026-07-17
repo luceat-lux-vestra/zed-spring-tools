@@ -1,0 +1,23 @@
+[package]
+name = "zed-spring-tools"
+version = "0.1.0-alpha.1"
+edition = "2024"
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+flate2 = { version = "=1.1.9", default-features = false, features = ["rust_backend"] }
+sha2 = "=0.11.0"
+zed_extension_api = "=0.7.0"
+zip = { version = "=6.0.0", default-features = false, features = ["deflate-flate2"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[profile.release]
+lto = true
+opt-level = "s"
+strip = true

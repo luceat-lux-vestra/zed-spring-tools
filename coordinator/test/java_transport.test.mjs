@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+import { JavaTransport, routeId } from "../src/java_transport.mjs";
+
+test("official Java route ID is the normalized UTF-8 worktree hex", () => {
+  assert.equal(routeId("/tmp/프로젝트/"), Buffer.from("/tmp/프로젝트").toString("hex"));
+});
+
+test("allowlisted Spring Java request uses the official loopback route", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const worktree = path.join(root, "work tree");
+  const javaWork = path.join(root, "java");
+  fs.mkdirSync(path.join(javaWork, "proxy"), { recursive: true });
+  const received = [];
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      received.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ result: { name: "Demo" } }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  fs.writeFileSync(
+    path.join(javaWork, "proxy", routeId(worktree)),
+    String(server.address().port),
+  );
+
+  const transport = new JavaTransport({ javaWorkDirectory: javaWork, worktree, timeoutMs: 1000 });
+  assert.deepEqual(
+    await transport.executeSpringClientMethod("sts/javaType", { typeName: "example.Demo" }),
+    { name: "Demo" },
+  );
+  assert.deepEqual(received, [
+    {
+      method: "workspace/executeCommand",
+      params: {
+        command: "sts.java.type",
+        arguments: [{ typeName: "example.Demo" }],
+      },
+    },
+  ]);
+  await assert.rejects(() => transport.execute("not.allowed", []));
+});

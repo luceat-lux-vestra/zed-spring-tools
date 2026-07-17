@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "id": "zed-java",
+      "extensionVersion": "6.8.21",
+      "sourceCommit": "9148b8972c1b93fbe5512a9ecf0ba33c3182970d",
+      "targetLanguageServerId": "jdtls",
+      "workDirectoryId": "java",
+      "route": {
+        "kind": "utf8-worktree-hex-v1",
+        "directory": "proxy",
+        "transport": "loopback-http-json"
+      },
+      "bridge": {
+        "schemaVersion": 1,
+        "addCommand": "zed.spring.bridge.v1.addClasspathListener",
+        "removeCommand": "zed.spring.bridge.v1.removeClasspathListener"
+      },
+      "verifiedTuple": {
+        "zed": "1.10.3",
+        "jdtls": "1.60.0-202606262232",
+        "springTools": "5.2.0.RELEASE",
+        "host": "macOS-arm64",
+        "runtimeJdk": "25.0.3"
+      }
+    }
+  ]
+}

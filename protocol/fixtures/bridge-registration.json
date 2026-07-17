@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "callbackId": "sts4.classpath.AbCdEfGh",
+  "endpoint": "http://127.0.0.1:43121/v1/classpath",
+  "credential": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "worktreeId": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "batched": false
+}

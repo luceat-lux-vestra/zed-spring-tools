@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zed-spring-tools.dev/protocol/bridge-registration-v1.schema.json",
+  "title": "Zed Spring bridge registration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "callbackId",
+    "endpoint",
+    "credential",
+    "worktreeId",
+    "batched"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "callbackId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "endpoint": { "type": "string", "maxLength": 512 },
+    "credential": { "type": "string", "pattern": "^[A-Za-z0-9_-]{32,256}$" },
+    "worktreeId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "batched": { "const": false }
+  }
+}
