@@ -177,10 +177,17 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
    `context-server-configuration`; `index-docs` and `suggest-docs-packages`; and
    `labels-for-completions` and `labels-for-symbols`. None is a tree view, panel,
    sidebar, or webview. Zed's own documentation agrees: an extension "can provide
-   languages, themes, debuggers, snippets, and MCP servers". The `explorer.spring`
-   tree view is therefore `blocked-zed-api`, and the blocker is a missing
-   presentation surface rather than missing data — `sts/spring-boot/structure`
-   returns the content.
+   languages, themes, debuggers, snippets, and MCP servers". This blocks the VS
+   Code `explorer.spring` widget *as a custom panel*. It does **not** by itself
+   block the capability of browsing the logical structure: the server data is
+   reachable (`sts/spring-boot/structure`) and the server also advertises
+   `documentSymbolProvider` and `workspaceSymbolProvider`, which render in Zed's
+   native outline panel and symbol search. Whether those symbols carry the beans
+   and mappings the tree view shows is unverified — the current fixture has no
+   controllers or beans — so the capability stays `planned`, not blocked. An
+   earlier revision of this document and inventory version 3 wrongly recorded it
+   as `blocked-zed-api` by judging the VS Code widget instead of the outcome;
+   inventory version 4 corrects that.
 3. **Zed extensions cannot contribute a command-palette command**, which is how
    VS Code exposes most Spring Tools commands. This is a constraint, not
    automatically a blocker: the Spring server advertises `codeActionProvider` and
@@ -201,8 +208,11 @@ accessed 2026-07-17.
 
 1. A narrow spike capturing the full `client/registerCapability` traffic to
    settle the completion question and enumerate dynamic registrations.
-2. A read of Zed's extension API surface for any tree/panel contribution point,
-   to settle `explorer.spring` as `blocked-zed-api` or `zed-native-equivalent`.
+2. A driven run against a fixture that has controllers and beans, capturing the
+   `documentSymbol` and `workspace/symbol` responses, to settle whether the
+   logical structure reaches Zed's outline panel and symbol search. That decides
+   the browse-structure capability between `zed-native-equivalent` and
+   `blocked-zed-api`.
 3. A slice plan for workstream 1, whose server-side surface is now known:
    hover, code actions, inlay hints, and the two conversion commands.
 

@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 3
+- Inventory version: 4
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-17
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md)
@@ -38,13 +38,16 @@ delivers the same user outcome is a legitimate result, recorded as
 | --- | --- |
 | `verified` | 4 |
 | `implemented` | 1 |
-| `planned` | 40 |
-| `blocked-zed-api` | 1 |
+| `planned` | 41 |
+| `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 0 |
 
 A capability is promoted to `blocked-*` only when the exact missing surface is
-named. Suspicion stays in the notes.
+named **and** no Zed-native workflow can deliver the outcome. A capability is
+named for the user outcome it delivers, never for the VS Code widget that
+delivers it there — otherwise "we cannot build that exact widget" gets mistaken
+for "the outcome is impossible", which is a different and usually false claim.
 
 ## Known surface constraints
 
@@ -53,9 +56,13 @@ from the `zed_extension_api` 0.7.0 world's complete export list and corroborated
 by Zed's documentation, which states an extension "can provide languages, themes,
 debuggers, snippets, and MCP servers".
 
-1. **No view surface.** Nothing in the API contributes a tree view, panel,
-   sidebar, or webview. Anything whose VS Code form is a view has no place to
-   render. This is a confirmed blocker, not a suspicion.
+1. **No custom view surface.** Nothing in the API contributes a tree view,
+   panel, sidebar, or webview, so a VS Code view *as a custom panel* cannot be
+   reproduced. This is a confirmed constraint on the widget, not a verdict on any
+   capability: a capability whose VS Code form is a view may still be delivered
+   through a Zed-native surface — the outline panel (document symbols), symbol
+   search (workspace symbols), diagnostics, or completions. Blocking a capability
+   requires showing that none of those carry the outcome.
 2. **No command-palette contribution.** An extension cannot add an arbitrary
    command to Zed's palette, which is how VS Code exposes most Spring Tools
    commands. This does **not** by itself block those capabilities: the Spring
@@ -114,8 +121,8 @@ Debuggers are supported, so run/debug is not assumed blocked.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Logical Structure tree view | `blocked-zed-api` | **Exact blocker: Zed extensions cannot contribute a view of any kind.** VS Code contributes `explorer.spring` to its explorer container. The `zed_extension_api` 0.7.0 world exports 19 functions and not one is a tree view, panel, sidebar, or webview; Zed's own documentation states an extension "can provide languages, themes, debuggers, snippets, and MCP servers". The server data is reachable (`sts/spring-boot/structure`), so this is a missing presentation surface, not missing data. Needs an alternative Zed-native design or an upstream API. |
-| Structure refresh / grouping / open reference | `planned` | `structure.refresh`, `structure.grouping`, `structure.openReference`; `sts/spring-boot/structure`, `structure/groups`. Depends on the view above having somewhere to render. |
+| Browse / navigate the Spring logical structure | `planned` | VS Code delivers this as the `explorer.spring` tree view, which cannot be reproduced as a custom panel (see surface constraint 1). But the outcome — browsing beans, endpoints, and mappings — may be reachable through Zed's outline panel and symbol search: the Spring server advertises `documentSymbolProvider` and `workspaceSymbolProvider`, and Spring Tools is known to surface request mappings and beans as workspace symbols. Not yet verified, because the current fixture has no controllers or beans, so symbol responses are near-empty. This is the classification error corrected in the tree-view review: it was wrongly `blocked-zed-api`. Becomes `zed-native-equivalent` if symbols carry the structure, or `blocked-zed-api` only if they demonstrably do not. |
+| Structure refresh / grouping | `planned` | `structure.refresh`, `structure.grouping`; `sts/spring-boot/structure`, `structure/groups`. Meaningful only once the structure has a Zed surface to refresh. |
 | Run / debug a Boot application | `planned` | Not blocked: Zed supports debugger extensions, and the API exposes DAP (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`, locators). |
 | Maven goal / Gradle build | `planned` | `sts.maven.goal`, `sts.gradle.build`. Build execution is official Java's ownership under D003. |
 | Open Boot app page URL | `planned` | `vscode-spring-boot.open.url`. |
@@ -147,5 +154,7 @@ Debuggers are supported, so run/debug is not assumed blocked.
 - Bump the inventory version and re-derive when the pinned Spring Tools release
   moves. State recorded against one release does not carry to another.
 - A state changes only with evidence. `verified` requires a named tuple.
-- A `blocked-*` state requires the exact missing surface, not a general claim.
+- A `blocked-*` state requires the exact missing surface, not a general claim,
+  and requires that no Zed-native surface delivers the outcome. "We cannot build
+  that exact VS Code widget" is not a blocker; name the capability by outcome.
 - Update this file in the same change as the slice that moves a state.
