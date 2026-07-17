@@ -9,8 +9,9 @@ now attributed those startup paths. S009 then proved the isolated trust,
 extension, AI, and XDG controls plus the exact direct managed-JDT startup, but
 closed Inconclusive because Equinox created mutable `configuration/` state
 inside the fixed JDT distribution tree. R008 has now attributed that state to
-Equinox's writable private-configuration default and S010 has a reviewed narrow
-relocation plan.
+Equinox's writable private-configuration default. S010 now has a reviewed
+narrow relocation patch, distinct fixed builds, and a fresh non-UI Gate B
+profile ready for runtime review.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -38,9 +39,11 @@ S009 Gate C is closed Inconclusive despite direct `ServiceReady` and clean
 provider/HTML attribution. R008 completed the targeted source review: shared
 configuration is only the private configuration's parent, and the omitted
 private path defaults to the writable JDT install. S010 Gate A's five-line
-disposable Java-extension launch patch and static verifier now pass against the
-exact clean source. Gate B fixed builds and non-UI preparation require a new
-explicit continuation; no S010 runtime has started.
+disposable Java-extension launch patch and static verifier pass against the
+exact clean source. Gate B produced distinct locked control/patched WASM files
+and a fresh canonical Java-only profile with pristine JDT and derived private
+configuration paths. Gate C requires a new explicit continuation; no S010
+runtime has started.
 
 The work in this phase must:
 

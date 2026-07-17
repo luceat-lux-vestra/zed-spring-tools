@@ -6,8 +6,8 @@ product extension, launcher, installer, or cache manager.
 - `extension/private_configuration.patch` targets only Java extension commit
   `9148b8972c1b93fbe5512a9ecf0ba33c3182970d` and `src/jdtls.rs`.
 - `fixture/S010Fixture.java` is the dependency-free Gate C Java input.
-- `tools/PrepareS010.java` performs Gate A contract/self-tests and will be
-  extended only within the reviewed Gate B boundary.
+- `tools/PrepareS010.java` performs the Gate A contract/self-tests and the
+  reviewed Gate B fixed-input, extraction, and transactional profile checks.
 
 Gate A reproduction:
 
@@ -19,5 +19,14 @@ java -cp <ignored-classes> PrepareS010 --gate-a \
   <repository-root> <clean-fixed-java-checkout> <fresh-ignored-evidence-dir>
 ```
 
-The Gate A command runs `git apply --check`; it does not apply the patch, build
-the extension, prepare a Zed profile, or launch Zed/JDT.
+The Gate A command runs `git apply --check --unidiff-zero`; it does not apply
+the patch, build the extension, prepare a Zed profile, or launch Zed/JDT.
+
+Gate B reproduction uses the same compiled class and the explicit `--gate-b`
+arguments printed by its usage message. It accepts separate fixed control and
+patched checkouts/WASM files plus the pinned S009/S003/S008 inputs, and requires
+seven fresh direct children of repository `tmp/` for the profile, Unicode
+worktree, four XDG roots, and evidence. It canonicalizes the Java-only extension
+index, verifies every fixed identity, extracts a pristine JDT tree, and moves
+the prepared roots transactionally. It does not launch Zed, the proxy, JDT LS,
+Spring Tools, or UI automation. Gate C remains closed.

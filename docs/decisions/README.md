@@ -27,7 +27,8 @@ Inconclusive because Equinox added mutable `configuration/` state inside the
 fixed JDT tree. R008 has now source-attributed that boundary: shared
 configuration remains a parent while the omitted writable private area defaults
 inside the install. S010 targets relocation of only that private state. Its
-Gate A disposable patch and static verifier pass, but Gate B, runtime
-evidence, and the local Spring PoC remain unopened.
+Gate A disposable patch and static verifier pass, and Gate B has distinct fixed
+builds plus a fresh non-UI profile. Runtime evidence and the local Spring PoC
+remain unopened, so the direction gate is still not ready.
 
 Use [template.md](template.md) after sufficient evidence exists.

@@ -2,10 +2,13 @@ diff --git a/src/jdtls.rs b/src/jdtls.rs
 index 24ada2d..ae2fcbb 100644
 --- a/src/jdtls.rs
 +++ b/src/jdtls.rs
-@@ -284,0 +285 @@ pub fn build_jdtls_launch_args(
+@@ -284 +284,2 @@ pub fn build_jdtls_launch_args(
+         .map_err(|err| format!("Failed to determine JDTLS data path: {err}"))?;
 +    let jdtls_configuration_path = jdtls_data_path.join("configuration");
-@@ -297,0 +299,4 @@ pub fn build_jdtls_launch_args(
+@@ -297,2 +298,6 @@ pub fn build_jdtls_launch_args(
+         "-Dosgi.configuration.cascaded=true".to_string(),
 +        format!(
 +            "-Dosgi.configuration.area={}",
 +            path_to_string(jdtls_configuration_path)?
 +        ),
+         "-Djava.import.generatesMetadataFilesAtProjectRoot=false".to_string(),

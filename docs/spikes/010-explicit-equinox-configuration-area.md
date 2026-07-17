@@ -1,6 +1,6 @@
 # S010: Explicit Equinox private configuration area
 
-- Status: Gate A implemented and validated; Gate B not started
+- Status: Gate B built, prepared, and reviewed; Gate C not started
 - Last updated: 2026-07-17
 - Depends on: R008 complete; S009 Inconclusive
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
@@ -236,14 +236,15 @@ Zed, the proxy, JDT LS, or Spring Tools.
   `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`. Its five added lines derive
   `jdtls_configuration_path` from the existing worktree-scoped data path and
   insert exactly one private-configuration property after the shared/cascaded
-  properties and before `-jar`. It removes no source. The 416-byte zero-context
-  patch has SHA-256
-  `c0cf71f44b1cbf3d745e0ff9a588d1aa80e67d2dd5713effaa0859bd0220fcfa`.
+  properties and before `-jar`. It removes no source. The current 636-byte
+  minimal-context patch has SHA-256
+  `fa38c919943eee5eb1bbe9893fd7c13aedcd8fec07e5c1efed9a4a1c095e510f`.
 - `fixture/S010Fixture.java` is dependency-free, 127 bytes, and has SHA-256
   `1ebee7526689ef8ac8bdebe26f779c1f4433a273bc87e9fe2f5d3d285d19b520`.
-- `tools/PrepareS010.java` contains the Gate A contract and generated-fixture
-  tests. Its reviewed Gate A source has SHA-256
-  `47690c7b6c8a3f3b288a3621ea52fcc48bda1c7a1998b2f92b71cd38fad3e3bb`.
+- `tools/PrepareS010.java` contains the Gate A contract/generated-fixture tests
+  and reviewed Gate B preparation checks. Its current 72,237-byte source has
+  SHA-256
+  `cdcb002e81acbcceecee141f097e90272e854b8a409e6114f1fe73b15c74622c`.
 - The local reproduction commands and explicit non-product boundary are in the
   tracked spike README. Generated classes and the validation manifest remain
   under ignored `tmp/` paths.
@@ -261,14 +262,15 @@ Zed, the proxy, JDT LS, or Spring Tools.
    paths, `D = <cache>/jdtls-<hash>`, and `C = D/configuration` passed.
 4. `--gate-a` verified the real clean fixed checkout, both tracked input
    digests, the five-line/no-removal patch contract, and
-   `git apply --check --whitespace=error-all` against the exact source commit.
+   `git apply --check --unidiff-zero --whitespace=error-all` against the exact
+   source commit.
 5. The patch was applied only to an ignored disposable review worktree.
    `cargo fmt --check` passed with rustfmt 1.9.0-stable, and its changed-file
    set was exactly `src/jdtls.rs`.
 6. The ignored Gate A manifest records one property, placement before `-jar`,
    the complete commit/digests, passed apply check, test groups, and JDK runtime.
 
-### Gate A boundary
+### Gate A stop boundary (historical)
 
 - No source-built control or patched WASM exists.
 - No pinned JDT archive was extracted for S010 and no isolated profile, XDG
@@ -276,8 +278,96 @@ Zed, the proxy, JDT LS, or Spring Tools.
 - No real Java extension, Zed, proxy, JDT, Spring, or UI process was started.
 - Gate A does not test the runtime hypothesis and does not change S009's
   Inconclusive classification.
-- Gate B is the next eligible step, but it requires review of this tracked diff
-  and a new explicit continuation before any fixed build or non-UI preparation.
+- These statements describe the completed Gate A stop. The user subsequently
+  reviewed the result and explicitly opened Gate B; the Gate B result below
+  supersedes only this historical preparation boundary.
+
+## Gate B fixed build and non-UI preparation result
+
+Gate B completed on 2026-07-17. It built the exact control and patched Java
+extension separately, prepared a wholly new isolated profile/worktree/XDG set,
+and stopped without launching Zed, the proxy, JDT LS, Spring Tools, or any UI
+automation.
+
+### Fixed builds and identities
+
+- Both source trees were commit
+  `9148b8972c1b93fbe5512a9ecf0ba33c3182970d` with Cargo.lock SHA-256
+  `6d8a9788e6727b3596488ddbf0919e743ef19c0f2e602f1a5cc782069513c583`.
+  The control remained clean. The patched tree changed only `src/jdtls.rs`,
+  with five additions, no removals, and patched blob
+  `ae2fcbb8e65824643bc21fdeead413ec689cd9f2`.
+- The common command was
+  `CARGO_INCREMENTAL=0 cargo build --release --locked --offline --target
+  wasm32-wasip1 -p zed_java` using rustc 1.97.0 and cargo 1.97.0. The control
+  WASM is 1,912,230 bytes with SHA-256
+  `c016f6500b9b96e3dbc3a8d581c9e5860271f449c6cacdbb546fc82e00d8886d`;
+  the patched WASM is 1,912,656 bytes with SHA-256
+  `b1a2f6e21649c011e111058bcebad3d886baf3ee5e7de37d88a45d50ecffd2d4`.
+  Both have the WebAssembly magic and are distinct.
+- The 50,925,681-byte JDT archive retained SHA-256
+  `e94c303d8198f977930803582738771fd18c52c5492878410bf222b1aa81ef1d`;
+  its fresh flat extraction retained tree SHA-256
+  `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`
+  and contained no `configuration/`. `hdiutil verify` passed again for the
+  143,545,589-byte Zed 1.10.3 DMG with SHA-256
+  `717ab14826889b83ffb46992b5155cf3e32e801805044d5d739d893ffb19a1a0`.
+- The proxy, debug bundle, task helper, Gradle catalog, Java/Javac executables,
+  official installed Java tree, manifest, fixture, and JDK 25.0.3 identities
+  all matched their complete fixed values in the ignored Gate B manifest.
+
+### Prepared boundary
+
+- The final ignored roots use a new profile, four new XDG directories, and a
+  new worktree whose basename contains spaces and Korean characters. The
+  normalized full worktree path hashes to
+  `cd5b7715d57e569440afc3ef9d5e6443da51fdd8`; the manifest records the complete
+  derived `D` and `C = D/configuration` paths. Both were absent at preparation.
+- The patched installed-Java tree has SHA-256
+  `36b88ee8b62d4dfc5883b967403ee347bf26b71c43b230c8298973a3433a16ab`.
+  The source S009 index was verified as the documented semantically unchanged
+  post-run formatting, but was not reused: the tool generated the fixed
+  2,026-byte Java-only index with SHA-256
+  `a734897946e174c3e2b63058bec95b98c281da9fa28726eacc5881d46b70e6eb`.
+- The fresh profile contains only settings, fixed proxy/debug inputs, Java-only
+  extension/index, fresh JDT/helper/proxy-work roots, and its preparation
+  manifest. XDG config/data/state are empty; XDG cache contains only the fixed
+  Gradle catalog. There are no symlinks, JDT private configuration directories,
+  proxy/JDT processes, or Copilot token variables in the checked boundary.
+  Normal Zed was running and was deliberately left untouched.
+- `javac -Xlint:all -Werror`, Gate A synthetic tests, final Gate A real-source
+  apply check, `cargo fmt --check`, both locked offline builds, transactional
+  preparation, independent hash/tree/process audits, `git diff --check`, and
+  DMG verification passed. Raw full paths and manifests remain under ignored
+  `tmp/` roots.
+
+### Preserved failed conditions and corrections
+
+1. The first identical offline build attempts stopped before compilation
+   because locked `regex` 1.12.3 was absent locally. One `cargo fetch --locked
+   --target wasm32-wasip1` fetched exact lockfile dependencies; both retained
+   builds then ran offline.
+2. Applying the original zero-context serialization without its required
+   `--unidiff-zero` option misplaced both hunks at end-of-file and the patched
+   Rust compile failed. No runtime/profile was created. The tracked patch now
+   includes adjacent context, the verifier always supplies `--unidiff-zero`,
+   and the semantic change remains the same reviewed five additions. The
+   corrected patched checkout compiled and formatted successfully.
+3. Two early preparation calls stopped before staging because the verifier
+   expected an untrimmed porcelain status and then the pre-run index byte hash
+   from a post-run S009 file. A third transactional attempt discarded its
+   staging tree after exposing the JDT archive's flat top-level layout. The
+   final verifier corrects all three assumptions and creates the canonical
+   index itself. None of these attempts launched a runtime or left a partial
+   final destination.
+
+### Gate B stop
+
+Gate B establishes only a reviewed build/preflight state. It does not test the
+private-configuration runtime hypothesis and does not change S009's
+Inconclusive classification. Gate C remains closed and requires another
+explicit continuation before normal Zed is stopped or the isolated app, proxy,
+JDT, Spring, or UI is launched.
 
 ## Plan review record
 
@@ -300,7 +390,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. excluded Spring, lifecycle policy, product code, publication, and
    multiplatform claims.
 
-The user explicitly opened Gate A on 2026-07-17. The tracked disposable
-implementation and static validation above are now ready for review. No Gate B
-build/preparation, Gate C runtime, UI automation, or Spring continuation is
-authorized until a new explicit continuation.
+The user explicitly opened Gate A and later Gate B on 2026-07-17. Both tracked
+implementation review and non-UI preparation are complete. No Gate C runtime,
+UI automation, or Spring continuation is authorized until a new explicit
+continuation.
