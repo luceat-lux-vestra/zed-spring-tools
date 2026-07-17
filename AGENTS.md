@@ -2,14 +2,17 @@
 
 ## Current phase
 
-Local technical feasibility and the basic end-to-end PoC are complete. Amended
-D002 records a Pivot to a required official-Java companion with a versioned
-Java/Spring coordination boundary and no reduced managed-JDT fallback. S012
-proved the unmodified bridge and visible completion but was Refuted on cleanup;
-S013 then supported the exact removal contract. D003 and D004 are Accepted. The
-reviewed implementation plan now requires a source-separated basic product PoC
-before the first public push. Product scaffolding may begin under D004; spike
-code remains excluded from production.
+Local technical feasibility, the basic end-to-end PoC, and the D004 product
+scaffold are complete. Amended D002 records a Pivot to a required official-Java
+companion with a versioned Java/Spring coordination boundary and no reduced
+managed-JDT fallback. S012 proved the unmodified bridge and visible completion
+but was Refuted on cleanup; S013 then supported the exact removal contract. D003
+and D004 are Accepted.
+
+The M2 vertical slice now reproduces real Spring Boot property completions from
+a clean development install on macOS arm64/JDK 25, with log hygiene and owned
+cleanup audited. The current work is the remaining M2 exit-gate evidence and
+M3's public source release. Spike code remains excluded from production.
 
 ## Product goal and delivery strategy
 
@@ -32,20 +35,25 @@ code remains excluded from production.
 - Read official documentation and upstream source code.
 - Add or update files under `docs/research/`, `docs/spikes/`, and
   `docs/decisions/`.
-- Add minimal disposable code under a future `spikes/` directory only when a
-  written spike plan identifies the hypothesis and success criteria.
-- Update this file or the root README when the research workflow itself changes.
+- Add minimal disposable code under `spikes/` only when a written spike plan
+  identifies the hypothesis and success criteria.
+- Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
+  `scripts/`, and `tests/` within the boundary that D002, D003, and D004 fix,
+  following the reviewed implementation plan's current milestone.
+- Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-Do not add any of the following until research and spikes support a recorded
-direction decision:
+D002, D003, and D004 have settled the architecture, implementation language,
+build system, and the bridge/coordinator module boundary. Do not add any of the
+following until a recorded decision supports it:
 
-- a production extension manifest or extension skeleton;
-- a production implementation language or build system;
-- bridge, coordinator, launcher, installer, or server-manager modules;
-- a product architecture, roadmap, or implementation plan;
 - product packaging, release automation, or product CI;
+- a new runtime dependency, downloaded artifact, or network call at runtime;
+- any change to the official Java extension, its proxy, or its work directory
+  beyond the allowlisted bridge commands;
+- a reduced or self-managed JDT fallback, which D002 and D003 exclude;
+- promotion of `spikes/` code into production; or
 - claims that an untested capability or environment is supported.
 
 ## Research requirements
@@ -123,11 +131,10 @@ For every completed spike:
 
 ## Decision gate
 
-Product scaffolding can begin only after local evidence supports and a decision
-document records one of these outcomes. Multiplatform runtime evidence is not a
-prerequisite for this direction decision:
+This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
+required official Java extension, rather than a Zed-extension-centered MVP. D003
+accepted the resulting architecture and D004 its stack, so product scaffolding
+was allowed to begin and has.
 
-- Go: a Zed-extension-centered MVP is feasible;
-- Pivot: a bridge, coordinator, installer, or another structure is required;
-- Limited: only a clearly bounded subset is feasible; or
-- Stop: the desired core capability is not realistically achievable.
+Reopen the gate only if new evidence contradicts the Pivot, and record the
+outcome in a decision document before changing production code.

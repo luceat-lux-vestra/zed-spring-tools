@@ -1,9 +1,10 @@
 # Product implementation and public-development plan
 
-- Status: Reviewed; D004 accepted, implementation not started
+- Status: In progress; M1 complete, M2 substantially complete
 - Last updated: 2026-07-17
 - Architecture: D002, D003, and D004 Accepted
-- Local evidence: S013 Supported on macOS arm64/JDK 25
+- Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 product slice
+  reproduced real Spring Boot completions from a clean install on that tuple
 
 ## Outcome
 
@@ -27,20 +28,21 @@ Status: complete.
 
 ### M1: Production technology decision and scaffold
 
-D004 is accepted. Create the root product workspace it specifies before any
-public remote is created.
+Status: complete.
 
-The first scaffold contains protocol schemas and fixtures, pure contract tests,
-the required-Java compatibility diagnostic, deterministic bridge packaging,
-artifact validation, and explicit lifecycle boundaries. It may not copy a spike
-proxy, include downloaded binaries, or claim a working Spring feature before the
-runtime gate passes.
+D004 is accepted and the root product workspace it specifies exists: the
+Rust/WASM adapter, the dependency-free Node coordinator, the Java bridge, and
+the versioned protocol schemas and fixtures. No spike proxy was copied and no
+third-party runtime binary is committed.
 
-Exit gate: clean locked builds and contract tests on the available macOS host,
-no unreviewed network-at-runtime behavior, no official-Java mutation, and a
-manual product/spike import check.
+Exit gate met: clean locked builds and contract tests pass on the available
+macOS host, no unreviewed network-at-runtime behavior exists, official Java is
+unmodified, and the product/spike import check passed.
 
 ### M2: Product-grade macOS arm64 vertical slice
+
+Status: substantially complete; steps 1-6 reproduced on macOS 26.5.1 arm64 with
+Zed 1.10.3, Java extension 6.8.21, and Temurin JDK 25.0.3.
 
 Implement the smallest product flow in this order:
 
@@ -58,6 +60,25 @@ Exit gate: a clean development-extension install reproduces the flow without
 copying `spikes/` or manually preparing a worktree under `tmp/`; credentials and
 classpaths are absent from normal logs; restart and uninstall leave no owned
 process or secret route; and the tested tuple remains explicit.
+
+Gate evidence recorded on 2026-07-17:
+
+- A clean development install reproduces the flow. The extension materializes
+  its own coordinator, bridge, and pinned Spring artifact into its private work
+  directory; `scripts/prepare-local-poc.mjs` only isolates the host Zed profile
+  and the fixture project, and does not hand-prepare the product's runtime.
+- Credentials and classpaths are absent from the audited logs, at the stricter
+  `log.lsp: "trace"` level. The bridge credential exists only in coordinator
+  memory and its route binds an ephemeral loopback port, so neither reaches
+  disk; classpath payloads never cross the Zed-facing channel.
+- No owned process or owned route survived the run. The one leftover route file
+  belongs to the unmodified official Java proxy, not to this project.
+
+Remaining before the gate closes: a freshly driven restart and uninstall
+observation. Current cleanup evidence is post-run end state plus the coordinator
+lifecycle tests, which is weaker than a live cycle. Step 7's actionable
+missing/incompatible-Java error path also still needs a runtime observation
+rather than only its contract test.
 
 ### M3: Initial experimental public source release
 
