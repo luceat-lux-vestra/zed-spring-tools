@@ -2,8 +2,10 @@
 
 ## Current phase
 
-This repository is in local technical feasibility and end-to-end PoC research.
-Do not treat it as a product implementation repository yet.
+Local technical feasibility and the basic end-to-end PoC are complete. D002
+records a Pivot to a versioned Java/Spring coordination boundary. Product
+scaffolding has not begun; review D002 and record the detailed architecture and
+implementation plan before treating this as a product implementation repository.
 
 ## Product goal and delivery strategy
 

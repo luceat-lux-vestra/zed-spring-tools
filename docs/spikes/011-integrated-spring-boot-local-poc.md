@@ -1,6 +1,6 @@
 # S011: Integrated Spring Boot local PoC
 
-- Status: Pre-runtime verification passed; bounded runtime not started
+- Status: Supported on macOS arm64/JDK 25; cleanup defect retained
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: S003-S005 and S010 Supported; S006-S009 retained as
@@ -158,8 +158,8 @@ syntax and complete Spring-proxy self-test; S006 adapter formatting, five
 locked tests, warnings-denied Clippy and `wasm32-wasip2` check; instrumented
 Java-proxy formatting, six locked tests and warnings-denied Clippy; JSON
 parsing, fixed hashes, allowlists, symlink target, and absence of runtime
-processes. No Zed, JDT, Spring child, completion request, callback, or UI
-automation has run for S011 yet.
+processes. At this checkpoint no Zed, JDT, Spring child, completion request,
+callback, or UI automation had run for S011.
 
 One pre-runtime correction is retained: the first S011 preparation rejected an
 incorrect manually expanded Spring library-set digest copied from an earlier
@@ -168,3 +168,130 @@ fresh S006 manifest value
 `f1fe021fac5e94bd394ee2be1792dd385b5ce30bd527c67e7c7e77d87aeea56c`;
 the wholly fresh final roots were created only after that verification passed.
 No hypothesis input or server process had started.
+
+## Bounded runtime result
+
+The single final runtime ran on 2026-07-17 with the fixed composition and fresh
+roots above. It is classified **Supported on macOS arm64/JDK 25** for the stated
+functional hypothesis. The same real Spring Boot LS child returned zero
+`server.port` items at baseline, received the authentic JDT classpath callback,
+populated its project cache, and returned exactly one structurally preserved
+`server.port` item to a later Zed-originated completion request. The item was
+also visible in Zed. This is a local PoC result, not a product-readiness or
+multiplatform support claim.
+
+### Confirmed facts
+
+1. The mounted signed application reported Zed 1.10.3. The session selected the
+   patched Java component, pristine JDT LS `1.60.0-202606262232`, explicit
+   worktree data directory `D`, private configuration directory
+   `C = D/configuration`, one unchanged S006 adapter/proxy pair, one real Spring
+   child, the fixed five Spring JDT bundles, and the closed set of 168 Spring
+   libraries.
+2. JDT LS imported the fixed Maven fixture and emitted `ServiceReady`. Spring LS
+   initialized with classpath integration disabled before the controlled
+   transition.
+3. The evidence sequence recorded the exact fixture text, a Zed-originated
+   baseline request, and a matching child/write response with
+   `serverPortCount: 0` and digest
+   `e6126aba3e32885f7a50ff693eeb6530d762d534c7e894da95d6c10985a43b8f`.
+4. The same sequence then recorded the Java route, successful enable command,
+   real dynamically generated Spring callback route, JDT add result, callback
+   with six arguments, and the real Spring handler string result. A readiness
+   probe subsequently found one `server.port` item.
+5. A later Zed-originated request, child response, and Zed write each recorded
+   exactly one `server.port` item with the same digest
+   `fa60a2c41bf0531b828c36f3de56fa0d191b2cf96f84bf33826dcf4818ef95aa`.
+   The proxy did not synthesize or rewrite that completion.
+6. The completion menu visibly offered `server.port` with type `int`. Filtering
+   to `server.po` was performed only after the protocol success record so that
+   the item could be captured unambiguously; the editor was then restored to
+   the original `ser` text before shutdown, and the fixture on disk remained
+   `ser\n`.
+7. Spring's disable path logged removal and successful unregistration of the
+   generated callback. The proxy nevertheless recorded `jdt-remove-failed` for
+   its automatic relay. After Spring had disabled its listener, a direct request
+   through the same authenticated Java-proxy route returned a string result for
+   `sts.java.removeClasspathListener`. This retained cleanup defect did not
+   alter the earlier functional result.
+8. The isolated Zed process exited with status 0. The Spring child remained for
+   less than its existing five-second shutdown timer and then exited without a
+   kill. All isolated Zed, Java proxy, JDT, Spring proxy, and Spring child
+   processes were absent before cleanup. Owned route files were removed only
+   after process absence, the mounted app was detached, and the normal
+   `/Applications/Zed.app` session was restored.
+9. JDT's post-run full tree SHA-256 remained
+   `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`.
+   Runtime-private Equinox state existed only under `D/configuration`.
+
+### Evidence and primary references
+
+The ignored runtime evidence remains under
+`tmp/s011-evidence-final-20260717` and
+`tmp/s011 Spring Boot PoC 한글 20260717/.s006-evidence`. These files are local
+machine evidence and are intentionally excluded from source publication.
+
+- `spring-proxy.jsonl`: SHA-256
+  `526431c6a89c270d873051f9773af8481cd71656cf3da8dcbb4e3317f964fea1`;
+  sequences 2-4 are the empty baseline, 5-12 are route/callback/cache readiness,
+  13-16 are the attributable one-item completion, and 17-18 retain the cleanup
+  defect and Spring disable result.
+- `server-po-filter-visible.png`: SHA-256
+  `d13ad22e96af346890483b1d058a5b49a27b8f8535478b8e90e9fe4529d04a2c`;
+  visible `server.port` evidence.
+- `spring-ls-stderr.log`: SHA-256
+  `cf04a774c663aafdf0603a0804957b203eb5e2ab39127071e4abd8c11c414338`;
+  initialization, cache, enable/disable, and callback-unregistration evidence.
+- `Zed-post-shutdown.log`: SHA-256
+  `eff072d0cf1336c700b8066e7216db42cf1fa10d107009178c582190d759331b`;
+  final editor/LSP trace.
+- The relevant upstream sources reviewed locally on 2026-07-17 are
+  `headless-services/spring-boot-language-server/.../JdtLsProjectCache.java`,
+  `headless-services/commons/commons-language-server/.../ClasspathListenerManager.java`,
+  `headless-services/commons/commons-lsp-extensions/.../STS4LanguageClient.java`,
+  and `vscode-extensions/commons-vscode/src/java-data.ts` in the fixed Spring
+  Tools source checkout under ignored `tmp/s006-spring-tools-source`.
+
+### Failed observations and constraints
+
+- The fixed DMG first displayed Zed's move-to-Applications dialog. It was
+  dismissed before the baseline and did not create hypothesis evidence; no
+  rerun occurred after the real baseline began.
+- The JDT extension's `workspace/executeClientCommand` request for
+  `vscode-spring-boot.ls.start` received `-32601` from Zed. Spring LS was already
+  started through the controlled adapter, so this did not block the PoC, but a
+  product coordinator or upstream client surface must own that lifecycle seam.
+- Completion-item resolution sent `sts/javaType` requests that Zed answered
+  with `-32601`. The `server.port` label and type still rendered, but richer
+  type-aware resolution cannot be claimed. This is a confirmed parity blocker.
+- The automatic Java-side remove relay failed even though Spring's listener
+  manager unregistered its callback and an authenticated direct Java request
+  then succeeded. Product code must make removal idempotent, correlated, and
+  testable across restart/shutdown paths.
+- Only macOS 26.5.1 arm64 with Temurin JDK 25.0.3 was run. Linux, Windows,
+  x86_64, other Arm64 hosts, JDK 21, remote development, installation,
+  packaging, upgrades, and the broader Spring Tools capability inventory remain
+  unverified.
+
+### Inference
+
+The tested Spring/JDT feature is feasible, but not as a procedural
+Zed-extension-WASM-only product. The successful path required protocol-aware
+coordination across the Java proxy, JDT LS callbacks, and Spring proxy, while
+the failed client requests demonstrate more coordination surfaces beyond the
+single classpath callback. A versioned coordinator integrated with, or accepted
+upstream by, the existing Zed Java extension is the smallest leading product
+direction. This inference is selected formally in D002; it is not evidence that
+the current disposable proxies are production-ready.
+
+### Candidate next work
+
+1. Use D002 as the direction gate without promoting spike code.
+2. Define the supported coordination protocol and ownership boundary, including
+   lifecycle, `sts/javaType`, callback removal, restart, and version mismatch.
+3. Complete the initial-public-source license, secret/history, binary, evidence,
+   reproduction, and tested/untested audit from D001.
+4. Only after a reviewed product architecture plan, create production
+   scaffolding with platform-neutral extension code and platform-aware native
+   artifact discovery. Validate macOS arm64 first; retain all other desktop
+   tuples as `untested` until their matrix runs.

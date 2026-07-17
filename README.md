@@ -1,17 +1,12 @@
 # Zed Spring Tools
 
-This repository is currently a technical feasibility and local PoC workspace.
-Source-based research and the S001-S005 macOS arm64 feasibility sequence are
-complete. S006-S008 are Inconclusive. S008 nevertheless demonstrated the fixed
-managed-JDT direct path twice with distinct isolated data; its strict result was
-limited by unexpected fresh-profile extension/provider initialization. R007 has
-now attributed those startup paths. S009 then proved the isolated trust,
-extension, AI, and XDG controls plus the exact direct managed-JDT startup, but
-closed Inconclusive because Equinox created mutable `configuration/` state
-inside the fixed JDT distribution tree. R008 has now attributed that state to
-Equinox's writable private-configuration default. S010's corrected component
-build and runtime now prove that a narrow launch patch moves that private state
-below the worktree-scoped JDT data path without changing the fixed JDT tree.
+This repository has completed its source-based feasibility phase and basic
+local end-to-end PoC on macOS arm64/JDK 25. S010 proved a managed JDT launch
+that keeps writable Equinox private state outside the fixed distribution. S011
+then proved the real Spring classpath callback, project-cache transition, and a
+visible attributable `server.port` completion through Zed. D002 selects a Pivot
+to a Zed extension plus a versioned Java/Spring coordination boundary. Product
+scaffolding has not begun.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -27,23 +22,21 @@ will remain explicitly unverified until the matrix in
 
 ## Current phase
 
-Research and the local callback-routing feasibility sequence are complete. The
-current local evidence supports Spring bundle injection, a Spring JDT command,
-one result-correlated classpath callback through disposable proxy
-instrumentation, and two fixed-input managed-JDT starts with distinct explicit
-data paths. It does not yet prove the real Spring Boot LS end-to-end flow. S008
-closed Inconclusive because a fresh Zed profile did not retain its reviewed
-minimal extension/provider identity even though both JDT runs reached
-`ServiceReady`. R007 identified source-supported isolated-profile controls;
-S009 Gate C is closed Inconclusive despite direct `ServiceReady` and clean
-provider/HTML attribution. R008 completed the targeted source review: shared
-configuration is only the private configuration's parent, and the omitted
-private path defaults to the writable JDT install. S010 Gate A's five-line
-disposable Java-extension launch patch and static verifier pass against the
-exact clean source. After correcting the build target to Zed 1.10.3's
-component-model `wasm32-wasip2`, Gate C reached `ServiceReady`, created private
-Equinox state only below the intended cache path, and retained the pristine JDT
-tree hash. The next step is the final integrated Spring Boot end-to-end PoC.
+Research, prerequisite isolation, and the fixed local Spring Boot end-to-end
+PoC are complete. On macOS 26.5.1 arm64 with Temurin JDK 25.0.3, the same real
+Spring Boot LS child produced an empty completion baseline, received the
+authentic JDT classpath callback, populated its project cache, and later
+returned one visible `server.port` completion to Zed. The run retained an
+automatic listener-removal defect and unhandled `vscode-spring-boot.ls.start`
+and `sts/javaType` client requests. These are product blockers, not reasons to
+discard the successful core result.
+
+[D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
+direction gate with **Pivot**: use a platform-neutral Zed procedural extension
+plus an explicit versioned coordinator, preferably through an upstream-supported
+boundary in the existing Zed Java extension. The next phase is to review that
+protocol/product architecture and complete the D001 public-source audit before
+production scaffolding and incremental capability work.
 
 The work in this phase must:
 
@@ -64,8 +57,9 @@ docs/
 spikes/          # Disposable experiment code; never production code
 ```
 
-No product code, build system, extension manifest, or product CI should be added
-until the technical direction has been selected.
+No product code, build system, extension manifest, or product CI exists yet.
+D002 selects the technical direction; a separately reviewed architecture and
+implementation plan is the next prerequisite for product scaffolding.
 
 An initial public GitHub source release is not a multiplatform support claim or
 a stable Zed Marketplace release. It requires a repository license, an evidence
@@ -77,5 +71,7 @@ labels; it must not include the Spring VSIX or extracted third-party binaries.
 > What process and protocol structure is required for a Zed extension to run and
 > coordinate JDT LS and the Spring Tools Language Server?
 
-See [the research index](docs/research/README.md) for completed findings and
-[the spike index](docs/spikes/README.md) for the next verification sequence.
+See [the research index](docs/research/README.md),
+[the spike index](docs/spikes/README.md), and
+[the decision index](docs/decisions/README.md) for the evidence and selected
+direction.

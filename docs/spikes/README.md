@@ -46,9 +46,14 @@ five-line disposable patch and static verifier pass against the exact clean
 Java source. After correcting Gate B to Zed 1.10.3's wasip2 component model,
 Gate C reached `ServiceReady`, put private Equinox state only below the expected
 data path, and preserved the pristine JDT tree. S010 is Supported on the tested
-tuple; the final integrated Spring PoC is next.
+tuple. S011 then completed the final integrated local PoC: the same real Spring
+child returned an empty baseline, consumed the authentic JDT classpath callback,
+and later returned one visible `server.port` completion through Zed. S011 is
+Supported for that fixed functional hypothesis on macOS arm64/JDK 25, with an
+automatic listener-removal defect and unhandled Spring client requests retained
+as product blockers. D002 records the resulting Pivot direction.
 
-Platform validation follows incrementally after a later local PoC and initial
+Platform validation follows incrementally after this local PoC and the initial
 public source release; multiplatform claims still require the declared matrix.
 
 Tentative sequence:
@@ -65,7 +70,7 @@ Tentative sequence:
 | [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Inconclusive on macOS arm64/JDK 25 after two direct-path successes: fresh-profile extension/provider state violated attribution; other targets untested |
 | [S009](009-attributed-isolated-profile.md) | Compose source-controlled profile/XDG settings with one fixed managed-JDT start | Inconclusive on macOS arm64/JDK 25: controls/direct path worked, but JDT distribution identity changed through runtime `configuration/` state |
 | [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Supported on macOS arm64/JDK 25 after corrected component build; other targets untested |
-| [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Pre-runtime verification passed; bounded runtime not started |
+| [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Supported on macOS arm64/JDK 25; cleanup defect retained; other targets untested |
 
 Use [template.md](template.md) before adding any spike code.
 

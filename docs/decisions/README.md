@@ -1,35 +1,22 @@
 # Decision Index
 
-No product direction or architecture decision has been made. D001 records the
-project goal and delivery sequence without selecting an implementation
-architecture.
+The local direction gate is complete. D001 records the product goal and staged
+delivery sequence; D002 selects a coordinated Java/Spring product direction
+from the supported S011 local PoC. A detailed production architecture and
+implementation plan have not yet been approved.
 
 | ID | Decision | Status |
 | --- | --- | --- |
 | [D001](001-local-first-parity-and-publication.md) | Local-first capability parity and staged public development | Accepted |
+| [D002](002-pivot-to-versioned-coordination.md) | Pivot to a versioned Java/Spring coordination boundary | Accepted |
 
 Decision records in this directory must cite supporting research and spike
-results. The next expected decision remains the project direction gate: Go,
-Pivot, Limited, or Stop, but it is not ready. S006 closed Inconclusive before
-its end-to-end hypothesis input. S007 now records the reviewed managed-local
-JDT data-isolation prerequisite and one real Run 1. The exact direct data path
-worked and reached `ServiceReady`, but a Buildship cache-miss request and
-incomplete proxy-record cleanup made S007 Inconclusive; Run 2 was not started.
-R006 completed source attribution. S008 then completed two fixed-helper/catalog
-runs: both exact direct data paths reached `ServiceReady`, but the fresh profile
-auto-installed an extension, created unrelated editor state, and emitted
-provider-auth warnings. S008 is therefore Inconclusive rather than Refuted. A
-controlled profile-attribution run and a later attributable local PoC are still
-required. R007 has now attributed the profile paths, and S009 is planned and
-reviewed as that single controlled prerequisite run. S009 passed its trust,
-HTML, provider, direct-path, and `ServiceReady` runtime checks, but is
-Inconclusive because Equinox added mutable `configuration/` state inside the
-fixed JDT tree. R008 has now source-attributed that boundary: shared
-configuration remains a parent while the omitted writable private area defaults
-inside the install. S010 targets relocation of only that private state. Its
-corrected component build and runtime now reach `ServiceReady`, place private
-state only below the expected data path, and retain the pristine JDT tree. The
-integrated local Spring PoC remains open, so the direction gate is still not
-ready.
+results. S010 supported an isolated managed JDT runtime with private Equinox
+state outside the fixed distribution. S011 then supported the real
+classpath-callback-to-`server.port` flow on macOS arm64/JDK 25 and retained the
+unhandled Spring client requests and cleanup defect. D002 therefore selects
+Pivot rather than Go, Limited, or Stop. The next decision work is a reviewed
+coordinator ownership/protocol and product architecture plan, followed by the
+initial-public-source audit required by D001.
 
 Use [template.md](template.md) after sufficient evidence exists.

@@ -1,6 +1,6 @@
 # Research Index
 
-- Phase status: Core research complete; targeted R006-R008 follow-up complete
+- Phase status: Core and targeted prerequisite research complete; S011 local PoC supported
 - Last completed on: 2026-07-17
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
@@ -9,9 +9,11 @@
   attributed those paths. S009 then passed the profile controls and direct JDT
   startup but closed Inconclusive because the runtime created an unplanned
   Equinox `configuration/` tree inside the fixed JDT distribution. R008
-  attributed that tree to Equinox's writable private-configuration default
-- Next gate: plan and execute the final integrated Spring Boot end-to-end PoC
-  using the now-supported S010 JDT runtime prerequisite
+  attributed that tree to Equinox's writable private-configuration default.
+  S010 then supported relocation of that state, and S011 supported the real
+  Spring classpath-to-`server.port` flow on macOS arm64/JDK 25
+- Next gate: design and review the D002 versioned coordination boundary, then
+  complete the D001 initial-public-source audit
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -59,5 +61,8 @@ S009 passed those controls but exposed Equinox private state inside the fixed
 JDT tree. R008 attributed that state and defined S010's one-property relocation
 test. S010's corrected component build and bounded runtime reached
 `ServiceReady`, placed private Equinox state below the expected data path, and
-left the fixed JDT tree unchanged. Production feasibility still requires the
-attributable integrated Spring end-to-end result.
+left the fixed JDT tree unchanged. S011 then supported the attributable
+integrated Spring end-to-end result while retaining unhandled client requests
+and an automatic cleanup defect. D002 selects a versioned coordination Pivot;
+production architecture, packaging, and multiplatform runtime validation remain
+open.
