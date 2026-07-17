@@ -1,6 +1,6 @@
 # S010: Explicit Equinox private configuration area
 
-- Status: Planned; plan reviewed, Gate A not started
+- Status: Gate A implemented and validated; Gate B not started
 - Last updated: 2026-07-17
 - Depends on: R008 complete; S009 Inconclusive
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
@@ -224,6 +224,61 @@ observation or retry in place.
 Committed documentation must redact private absolute paths and secrets. Raw
 host-specific evidence remains ignored.
 
+## Gate A implementation and validation result
+
+Gate A completed on 2026-07-17 without building the Java extension or launching
+Zed, the proxy, JDT LS, or Spring Tools.
+
+### Tracked disposable inputs
+
+- `extension/private_configuration.patch` targets only
+  `src/jdtls.rs` at Java extension commit
+  `9148b8972c1b93fbe5512a9ecf0ba33c3182970d`. Its five added lines derive
+  `jdtls_configuration_path` from the existing worktree-scoped data path and
+  insert exactly one private-configuration property after the shared/cascaded
+  properties and before `-jar`. It removes no source. The 416-byte zero-context
+  patch has SHA-256
+  `c0cf71f44b1cbf3d745e0ff9a588d1aa80e67d2dd5713effaa0859bd0220fcfa`.
+- `fixture/S010Fixture.java` is dependency-free, 127 bytes, and has SHA-256
+  `1ebee7526689ef8ac8bdebe26f779c1f4433a273bc87e9fe2f5d3d285d19b520`.
+- `tools/PrepareS010.java` contains the Gate A contract and generated-fixture
+  tests. Its reviewed Gate A source has SHA-256
+  `47690c7b6c8a3f3b288a3621ea52fcc48bda1c7a1998b2f92b71cd38fad3e3bb`.
+- The local reproduction commands and explicit non-product boundary are in the
+  tracked spike README. Generated classes and the validation manifest remain
+  under ignored `tmp/` paths.
+
+### Passed checks
+
+1. `javac -Xlint:all` compiled the tool on Temurin 25.0.3+9-LTS without a
+   diagnostic.
+2. `--self-test` passed rejection cases for another source path, duplicate
+   private properties, placement after `-jar`, wrong source commit, dirty
+   checkout, prefix-colliding worktrees, symlink inputs, duplicate/missing
+   manifest keys, ZIP traversal, absolute/drive paths, and duplicate normalized
+   archive entries.
+3. Spaces and Unicode, normalized full-root SHA-1 derivation, distinct prefix
+   paths, `D = <cache>/jdtls-<hash>`, and `C = D/configuration` passed.
+4. `--gate-a` verified the real clean fixed checkout, both tracked input
+   digests, the five-line/no-removal patch contract, and
+   `git apply --check --whitespace=error-all` against the exact source commit.
+5. The patch was applied only to an ignored disposable review worktree.
+   `cargo fmt --check` passed with rustfmt 1.9.0-stable, and its changed-file
+   set was exactly `src/jdtls.rs`.
+6. The ignored Gate A manifest records one property, placement before `-jar`,
+   the complete commit/digests, passed apply check, test groups, and JDK runtime.
+
+### Gate A boundary
+
+- No source-built control or patched WASM exists.
+- No pinned JDT archive was extracted for S010 and no isolated profile, XDG
+  roots, worktree, proxy route, or fixed Zed mount was prepared.
+- No real Java extension, Zed, proxy, JDT, Spring, or UI process was started.
+- Gate A does not test the runtime hypothesis and does not change S009's
+  Inconclusive classification.
+- Gate B is the next eligible step, but it requires review of this tracked diff
+  and a new explicit continuation before any fixed build or non-UI preparation.
+
 ## Plan review record
 
 Reviewed on 2026-07-17 before implementation. The review:
@@ -245,5 +300,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. excluded Spring, lifecycle policy, product code, publication, and
    multiplatform claims.
 
-No disposable implementation, build, preparation, runtime, UI automation, or
-Spring continuation is authorized until the user explicitly opens Gate A.
+The user explicitly opened Gate A on 2026-07-17. The tracked disposable
+implementation and static validation above are now ready for review. No Gate B
+build/preparation, Gate C runtime, UI automation, or Spring continuation is
+authorized until a new explicit continuation.

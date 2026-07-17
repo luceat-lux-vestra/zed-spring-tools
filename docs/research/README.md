@@ -10,8 +10,8 @@
   startup but closed Inconclusive because the runtime created an unplanned
   Equinox `configuration/` tree inside the fixed JDT distribution. R008
   attributed that tree to Equinox's writable private-configuration default
-- Next gate: S010 Gate A disposable one-property Java-extension patch, only
-  after explicit continuation
+- Next gate: review S010 Gate A, then Gate B fixed control/patched builds and
+  non-UI preparation only after explicit continuation
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while

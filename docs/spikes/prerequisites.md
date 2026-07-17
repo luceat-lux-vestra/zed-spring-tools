@@ -413,7 +413,10 @@ Host audited: macOS 26.5.1 arm64.
   private configuration selection: the shared platform config is only a parent,
   while a writable install receives `<install>/configuration`. S010 now has a
   reviewed one-run plan for an explicit private path below the worktree-scoped
-  JDT data directory. Gate A has not started and requires explicit continuation.
+  JDT data directory. Gate A added and statically validated only the exact
+  five-line disposable Java launch patch, fixture, and verifier. Gate B fixed
+  builds and non-UI preparation have not started and require explicit
+  continuation.
 - This plan makes no product-architecture choice or platform support claim.
   Non-macOS tuples remain installability targets by design and runtime-untested.
 

@@ -1,0 +1,11 @@
+diff --git a/src/jdtls.rs b/src/jdtls.rs
+index 24ada2d..ae2fcbb 100644
+--- a/src/jdtls.rs
++++ b/src/jdtls.rs
+@@ -284,0 +285 @@ pub fn build_jdtls_launch_args(
++    let jdtls_configuration_path = jdtls_data_path.join("configuration");
+@@ -297,0 +299,4 @@ pub fn build_jdtls_launch_args(
++        format!(
++            "-Dosgi.configuration.area={}",
++            path_to_string(jdtls_configuration_path)?
++        ),

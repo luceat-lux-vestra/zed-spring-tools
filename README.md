@@ -37,9 +37,10 @@ minimal extension/provider identity even though both JDT runs reached
 S009 Gate C is closed Inconclusive despite direct `ServiceReady` and clean
 provider/HTML attribution. R008 completed the targeted source review: shared
 configuration is only the private configuration's parent, and the omitted
-private path defaults to the writable JDT install. The next gate is S010 Gate A,
-which may add one disposable Java-extension launch property only after explicit
-continuation.
+private path defaults to the writable JDT install. S010 Gate A's five-line
+disposable Java-extension launch patch and static verifier now pass against the
+exact clean source. Gate B fixed builds and non-UI preparation require a new
+explicit continuation; no S010 runtime has started.
 
 The work in this phase must:
 
