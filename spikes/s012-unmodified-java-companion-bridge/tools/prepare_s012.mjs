@@ -44,7 +44,7 @@ const ARTIFACTS = Object.freeze({
   adapterCargo: artifact(177, "15d45b7d2f105b2ace2a36c6ba78ea79762acdfa3d4faf8cd938dc1ba24e6413"),
   adapterSource: artifact(7_625, "bb5f4a6219ff12c3184e5c4c54d1f1747f851c9f27ee6057fa267bcca1c40a4f"),
   adapterManifest: artifact(563, "d78c48be0faa18a81f821cbc27b9956d0c5f2c8030d8edad3be6a3ce03392e10"),
-  bridge: artifact(12_092, "818de215d85c23e27e0c3d429d05e1f7e2d34340f248e9a6da616898cb514984"),
+  bridge: artifact(12_104, "0d253fb645d5df05304ae916f9267365737d9870816624e692aae4134c12264b"),
   springServer: artifact(-1, "ec922c593895331943ee1eccda434461da034bb87ac20f406fd7fb5e211bc8e1"),
   baseProxy: artifact(-1, "bc504acc16d47c2074348db3e1f667b914c7304701c604b5b538115d2463369b"),
   wrapper: artifact(-1, "d2eedbf12ecf808c792ad4de55dd143d3f04eed743313041a4db18db30f75dad"),

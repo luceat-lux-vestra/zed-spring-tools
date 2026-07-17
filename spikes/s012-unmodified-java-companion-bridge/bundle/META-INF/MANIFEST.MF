@@ -1,7 +1,7 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: S012 Unmodified Java Companion Bridge
-Bundle-SymbolicName: dev.zed.spring.s012.bridge
+Bundle-SymbolicName: dev.zed.spring.s012.bridge;singleton:=true
 Bundle-Version: 0.0.1
 Bundle-Activator: dev.zed.spring.s012.BridgePlugin
 Bundle-RequiredExecutionEnvironment: JavaSE-21

@@ -141,10 +141,11 @@ by Gate A were:
 | Spring `reactive-streams.jar` | `71e23e2a0d9159fc1aae1158af714ac72fc67a384bb6fe195301081df49c2038` |
 
 The deterministic disposable output contained only the manifest, `plugin.xml`,
-and six expected class files. `jar --validate` passed. Its identity was 12,092
-bytes and SHA-256
-`818de215d85c23e27e0c3d429d05e1f7e2d34340f248e9a6da616898cb514984`.
-Two clean builds produced the same identity.
+and six expected class files. `jar --validate` passed. The Gate C pre-input
+correction recorded below added the required OSGi singleton directive. The
+corrected identity is 12,104 bytes and SHA-256
+`0d253fb645d5df05304ae916f9267365737d9870816624e692aae4134c12264b`.
+Two clean corrected builds produced the same identity.
 
 The fixed official release archive at
 `tmp/s003-research-artifacts/java-lsp-proxy-darwin-aarch64.tar.gz` was rehashed
@@ -265,8 +266,8 @@ The preparation tool verified and staged:
   library set, five Spring JDT bundles, and clean Boot fixture; and
 - the deterministic S012 bridge JAR and S012 adapter identities from Gate A/B.
 
-The final ignored manifest is
-`tmp/s012-gate-b-evidence-final-v3-20260717/s012-prepared-manifest.txt`. It records
+The currently authorized ignored manifest is
+`tmp/s012-gate-b-evidence-final-v4-20260717/s012-prepared-manifest.txt`. It records
 the fresh profile/worktree/XDG paths, full-path-derived JDT data path, exact
 official proxy port-file path, six injected bundles, and absence of a second
 JDT launcher, managed fallback, instrumented proxy, runtime processes, routes,
@@ -298,7 +299,20 @@ retains that exact identity and retries removal during shutdown. A wholly fresh
 profile was prepared from the corrected source. A final self-test was then
 added for that exact failed-add/failed-remove retention path, so a second
 unlaunched preparation was superseded by the wholly fresh `final-v3` profile.
-Only `final-v3` is authorized for Gate C; neither rejected profile was launched.
+The initial `final-v3` Gate C launch reached official JDT bundle installation
+but stopped before any baseline completion, bridge registration, or classpath
+event. Equinox reported that the bridge extension point was ignored because
+the bundle was not marked singleton. The declaration was corrected to
+`Bundle-SymbolicName: dev.zed.spring.s012.bridge;singleton:=true`, all Gate A
+contracts and preparation self-tests passed again, and two clean bundle builds
+were byte-identical. The launch evidence is retained under
+`tmp/s012-gate-c-rejected-v3-20260717/`. This is a pre-hypothesis setup
+correction under the Gate C retry rule, not a bridge transport result.
+
+A wholly fresh `final-v4` profile, worktree, XDG set, and evidence root was then
+prepared from fixed inputs with the corrected bundle. Only `final-v4` is now
+authorized for Gate C; the earlier unlaunched rejected profiles and the stopped
+`final-v3` profile may not be reused.
 
 ### Known official-Java runtime state
 
