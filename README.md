@@ -23,8 +23,7 @@ capability may use a Zed-native workflow instead of copying VS Code's UI, but it
 must not silently disappear from the target because the current Zed API lacks a
 surface. Such gaps remain tracked for an alternative design or upstream work.
 The auditable list is the [capability inventory](docs/capability-inventory.md).
-At inventory version 3, it tracks 46 capabilities, of which 4 are `verified` and 1 is
-blocked on a missing Zed API.
+At inventory version 4, it tracks 46 capabilities, of which 4 are `verified`.
 
 Development is local-first: complete a useful macOS arm64 PoC, publish the source
 repository on GitHub with an experimental status, and then develop capabilities
