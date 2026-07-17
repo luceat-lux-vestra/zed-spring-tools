@@ -1,6 +1,6 @@
 # S012: Unmodified Java companion bridge
 
-- Status: Gate A implemented and synthetically verified; Gate B not started
+- Status: Gate B prepared and reviewed; Gate C not started
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: R009, D002, proposed D003, and S011
@@ -201,6 +201,123 @@ preparation tool must:
 - validate all fixed hashes, allowlists, component-model binaries, process
   absence, and token absence; and
 - print the exact bounded runtime procedure without launching Zed.
+
+## Gate B implementation and preparation record
+
+Gate B completed on 2026-07-17 and stopped before any Zed, Java proxy, JDT LS,
+Spring LS, or UI launch. All generated builds, profiles, worktrees, XDG roots,
+and evidence remain below ignored `tmp/` paths.
+
+### Disposable S012 adapter and Spring coordinator
+
+The Gate B adapter is a spike-only procedural Zed extension. It starts only the
+Spring Boot LS wrapper and contributes the exact five fixed Spring JDT bundles
+plus `s012-bridge.jar` to the official `jdtls` initialization. It does not
+contain or start a JDT LS, Java debugger, Java task runner, Java proxy, or
+managed-JDT fallback.
+
+The Spring wrapper reuses the unchanged S006 Spring stdio coordinator core for
+LSP passthrough, the same-child baseline/completion controls, and Spring child
+request correlation. Its injected Java call site replaces S006's instrumented
+route with the Gate A `OfficialJavaTransport` and `CompanionBridgeSession`.
+Consequently, the copied Spring test harness may still use its internal S006
+method names, but the only commands sent to the official Java proxy are the two
+S012 `zed.spring.bridge.*` commands. No S005/S006 Java proxy binary or Java
+proxy patch is copied, loaded, or present in the prepared profile.
+
+The wrapper self-test passed an actual loopback add/event/remove cycle against
+a mock official transport and fake Spring child handler. It verified the
+authenticated direct event, unchanged six arguments, authentic child result,
+and exact removal registration. The Gate A contract suite remains the source
+of the lower-level timeout, malformed-response, wrong-token, wrong-worktree,
+duplicate, and retry coverage.
+
+### Adapter build
+
+- Toolchains: Cargo 1.97.0 and rustc 1.97.0 with installed
+  `wasm32-wasip2`.
+- The generated locked build reused S006's fixed dependency lock and changed
+  only the root package name. The resulting ignored lock SHA-256 is
+  `596b4cce99860294bcb123837324d0571d739cf9f1eb42bcbccff915037f91f5`.
+- Five host unit tests passed for shell-independent macOS/Linux/Windows paths,
+  Java discovery, JDT-only contribution, exact six-bundle order, classpath
+  disable, and server-ID rejection.
+- Two clean release builds produced a byte-identical 237,084-byte component-
+  model WASM with SHA-256
+  `3641228bf613c302515aa833b1d028405f79fa9e44cc69abb109ddf41ee4486d`.
+  Multiplatform code shape is present, but only the macOS arm64 runtime is being
+  tested and all other targets remain `untested`.
+
+### Fresh prepared roots and fixed identities
+
+The preparation tool verified and staged:
+
+- the Zed-installed official Java extension 6.8.21 tree
+  `58e1155d9a6339790470e0b1ac31e49a7fd771a0412b168b22165433347fae68`,
+  including unmodified official component
+  `62dbf7edbe1ef4066f74e588dcec68d223ab7984f1861b59e44db0b10f52e3fd`;
+- the official 834,304-byte Java proxy executable
+  `53ed618c7044a6bf754117bd6573bc03c00f74728bbefcc8b295ed9e83c40076`;
+- the pristine fixed JDT LS tree
+  `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`
+  with no runtime `configuration/` and exactly one Equinox launcher;
+- the fixed Java task helper, debugger, Gradle catalog, Spring server and 168-
+  library set, five Spring JDT bundles, and clean Boot fixture; and
+- the deterministic S012 bridge JAR and S012 adapter identities from Gate A/B.
+
+The final ignored manifest is
+`tmp/s012-gate-b-evidence-final-v3-20260717/s012-prepared-manifest.txt`. It records
+the fresh profile/worktree/XDG paths, full-path-derived JDT data path, exact
+official proxy port-file path, six injected bundles, and absence of a second
+JDT launcher, managed fallback, instrumented proxy, runtime processes, routes,
+and credentials. Independent post-preparation checks rehashed all four central
+components, ran the staged wrapper self-test, and reconfirmed that the JDT data
+path, official port record, `.s012-state`, and `.s012-evidence` were absent.
+
+### Retained preflight corrections
+
+Three setup attempts stopped before creating any final destination:
+
+1. the initial Node tree verifier used locale-aware sorting and disagreed with
+   the established Java/code-point JDT tree digest; it was corrected to exact
+   code-point ordering without changing the input;
+2. the first declared system JDK path did not exist because this host's Temurin
+   25.0.3 is SDKMAN-managed; preparation now records the resolved non-symlinked
+   JDK home; and
+3. process inspection matched the preparation command's own official-proxy
+   input argument; it now excludes only its own PID and direct shell parent
+   before applying the same runtime-process allowlist.
+
+None reached a runtime hypothesis input or created a partial final profile.
+They are preparation corrections, not S012 runtime failures.
+
+The first otherwise successful prepared profile was also retained but rejected
+by final code review before runtime: a registration failure whose compensating
+remove also failed could lose the wrapper's session object. The wrapper now
+retains that exact identity and retries removal during shutdown. A wholly fresh
+profile was prepared from the corrected source. A final self-test was then
+added for that exact failed-add/failed-remove retention path, so a second
+unlaunched preparation was superseded by the wholly fresh `final-v3` profile.
+Only `final-v3` is authorized for Gate C; neither rejected profile was launched.
+
+### Known official-Java runtime state
+
+Because S012 deliberately restores the unmodified official Java component, it
+does not contain S010's disposable private-configuration JVM argument. R008
+therefore predicts that the official launch may create derived
+`configuration/` state below its writable JDT work tree. Gate C must record
+that state explicitly, remove it only after all isolated processes stop, and
+then reverify the original JDT files/tree. This official-provider behavior is
+not a modification of the Java extension package or proxy and is separate from
+the S012 bridge hypothesis; any different or unattributed path remains
+Inconclusive.
+
+### Gate B conclusion
+
+Gate B is **prepared and statically supported**. This is not a runtime result,
+does not accept D003, and does not establish product or platform support. Gate C
+is the remaining direction gate and must start only after the user is warned
+not to interact with Zed during the bounded isolated run.
 
 ## Gate C: one bounded runtime
 

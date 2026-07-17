@@ -1,0 +1,15 @@
+id = "s012-unmodified-java-companion"
+name = "S012 Unmodified Java Companion Probe"
+version = "0.0.1"
+schema_version = 1
+authors = ["Zed Spring Tools Contributors"]
+description = "Disposable Spring bridge probe requiring the official Zed Java extension."
+repository = "https://github.com/algorist/zed-spring-tools"
+
+[language_servers.s012-unmodified-java-companion]
+name = "S012 Unmodified Java Companion Probe"
+languages = ["Java", "Properties"]
+
+[language_servers.s012-unmodified-java-companion.language_ids]
+Java = "java"
+Properties = "spring-boot-properties"
