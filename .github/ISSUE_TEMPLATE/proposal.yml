@@ -1,0 +1,62 @@
+name: Proposal (architecture, packaging, runtime download, capability scope)
+description: Agree evidence and exit criteria before broad or gated work starts.
+labels: ["decision"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this before broad architecture, packaging, runtime-download, or
+        capability-scope work, so its evidence and exit criteria can be agreed first.
+
+        Some changes are gated on a recorded decision and cannot be merged without
+        one: product CI or release automation, a new runtime dependency or network
+        call, any change to the official Java extension beyond the allowlisted bridge
+        commands, a reduced or self-managed JDT fallback, and promoting `spikes/`
+        code into production. See `AGENTS.md`.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you want to change
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the current design is insufficient
+      description: |
+        Point at the accepted decisions (D002, D003, D004) or the reviewed plan where
+        you can. A proposal that departs from an accepted decision needs to say so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence you have, and evidence still needed
+      description: |
+        Separate confirmed facts from inferences and untested hypotheses. Name what
+        would need a spike or a runtime observation to settle.
+    validations:
+      required: true
+
+  - type: textarea
+    id: exit-criteria
+    attributes:
+      label: Exit criteria
+      description: |
+        What would make this Supported or Refuted? A proposal that cannot fail cannot
+        be evaluated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and blast radius
+      description: |
+        What breaks if this is wrong — the official-Java boundary, the platform
+        matrix, third-party licensing, or the ability to make honest support claims.
+    validations:
+      required: false

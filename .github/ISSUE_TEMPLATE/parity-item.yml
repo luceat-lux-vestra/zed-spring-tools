@@ -1,0 +1,92 @@
+name: Capability parity item
+description: Track one user-visible VS Code Spring Tools capability against this extension.
+labels: ["state:planned"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The long-term goal is capability parity with VS Code Spring Tools: every
+        user-visible capability is either reproduced in Zed, given an equivalent
+        Zed-native workflow, or kept as a documented blocker. Functional loss must
+        never disappear quietly, so a capability we cannot build still belongs here.
+
+        A Zed-native workflow that differs from VS Code's UI is a valid outcome.
+        Pixel-identical UI is not the goal.
+
+  - type: input
+    id: capability
+    attributes:
+      label: Capability
+      description: The user-visible behaviour, named as a user would describe it.
+      placeholder: "Hover documentation on Spring Boot properties"
+    validations:
+      required: true
+
+  - type: input
+    id: source-version
+    attributes:
+      label: VS Code Spring Tools version it comes from
+      description: The inventory is versioned. Name the release you looked at.
+      placeholder: "5.2.0.RELEASE"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workstream
+    attributes:
+      label: Workstream
+      options:
+        - properties/YAML completion, hover, validation, navigation, metadata refresh
+        - Java/Spring symbols, request mappings, bean navigation, code lenses, Boot project discovery
+        - live application data, process connection, loggers, metrics, actuator
+        - Boot dashboard, run/debug, tasks, project actions
+        - Initializr, guides, upgrade/refactoring, Modulith, commands
+        - settings, diagnostics, logs, compatibility UX, documentation, offline
+    validations:
+      required: true
+
+  - type: dropdown
+    id: proposed-state
+    attributes:
+      label: Proposed state
+      description: Your assessment. It is a proposal, not a verdict — evidence decides.
+      options:
+        - "planned — not built yet"
+        - "implemented — built, not yet verified on a tuple"
+        - "zed-native-equivalent — a different Zed workflow covers it"
+        - "blocked-zed-api — Zed lacks the required UI or protocol surface"
+        - "blocked-upstream — blocked on Spring Tools or the official Java extension"
+        - "verified — observed working on a named tuple"
+    validations:
+      required: true
+
+  - type: textarea
+    id: zed-surface
+    attributes:
+      label: Expected Zed surface
+      description: |
+        Which Zed capability would carry this — LSP, DAP, a command, a settings key —
+        or which surface appears to be missing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Exact blocker, if any
+      description: |
+        Required for `blocked-zed-api` or `blocked-upstream`. Name the specific API,
+        protocol method, or upstream behaviour, with a source link where you have one.
+        "Zed cannot do this" is not a blocker; the precise missing surface is.
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: |
+        Source links, protocol traces, or observations. State the exact host tuple for
+        any runtime observation. Separate what you confirmed from what you inferred.
+    validations:
+      required: false
