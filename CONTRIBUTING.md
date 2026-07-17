@@ -18,14 +18,14 @@ be agreed first.
 
 ## Branching
 
-The project follows GitHub Flow, and `main` is protected: it takes no direct
+The project follows GitHub Flow, and `main` is protected: it accepts no direct
 pushes, no force pushes, and no non-linear history.
 
 - Branch from `main`, one branch per change, kept short-lived.
 - Name the branch for the Conventional Commit type it carries, followed by a
   short slug: `feat/`, `fix/`, `docs/`, `spike/`, `refactor/`, `test/`, or
   `chore/`. Use the evidence identifier where one exists, as in
-  `spike/s014-request-mappings`.
+  `spike/s013-authentic-spring-removal-contract`.
 - Every commit needs a body explaining why the change is needed, what materially
   changed, and which validation was run or remains pending.
 - Pull requests merge by rebase, or by squash when the intermediate commits are

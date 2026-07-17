@@ -112,7 +112,7 @@ For every completed spike:
 
 ## Branching and pull requests
 
-The repository follows GitHub Flow. `main` is the published, reviewed state and
+The repository follows GitHub Flow. `main` is the published PR-gated state and
 is protected: direct pushes are rejected, force pushes and deletion are blocked,
 and history must stay linear. Those rules are enforced by a GitHub ruleset, not
 by convention alone, so the prohibition on rewriting published history is
@@ -122,7 +122,8 @@ mechanical.
 - Name the branch for the Conventional Commit type it carries: `feat/`, `fix/`,
   `docs/`, `spike/`, `refactor/`, `test/`, or `chore/`, followed by a short
   slug. Use the evidence identifier where one exists, as in
-  `spike/s014-request-mappings` or `docs/d005-branching`.
+  `spike/s013-authentic-spring-removal-contract` or
+  `docs/d004-product-stack-build-and-packaging`.
 - Keep a branch scoped to one investigation, experiment, decision, or reviewed
   implementation slice, and keep it short-lived.
 - Open a pull request and merge with rebase, or squash when the branch's
