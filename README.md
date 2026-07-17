@@ -4,9 +4,10 @@ This repository has completed its source-based feasibility phase and basic
 local end-to-end PoC on macOS arm64/JDK 25. S010 proved a managed JDT launch
 that keeps writable Equinox private state outside the fixed distribution. S011
 then proved the real Spring classpath callback, project-cache transition, and a
-visible attributable `server.port` completion through Zed. D002 selects a Pivot
-to a Zed extension plus a versioned Java/Spring coordination boundary. Product
-scaffolding has not begun.
+visible attributable `server.port` completion through Zed. Amended D002 selects
+a separately installed Spring companion that explicitly requires the official
+Zed Java extension and uses its JDT LS. A reduced self-managed JDT fallback is
+not part of the initial product. Product scaffolding has not begun.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -32,11 +33,13 @@ and `sts/javaType` client requests. These are product blockers, not reasons to
 discard the successful core result.
 
 [D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
-direction gate with **Pivot**: use a platform-neutral Zed procedural extension
-plus an explicit versioned coordinator, preferably through an upstream-supported
-boundary in the existing Zed Java extension. The next phase is to review that
-protocol/product architecture and complete the D001 public-source audit before
-production scaffolding and incremental capability work.
+direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,
+loads reviewed Spring bridge bundles into the Java-owned JDT LS, and owns the
+Spring coordinator and Spring Boot LS. The Java extension remains unmodified in
+the target architecture. [R009](docs/research/009-unmodified-java-companion-boundary.md)
+defines the remaining reverse-callback boundary; [S012](docs/spikes/012-unmodified-java-companion-bridge.md)
+must validate it before proposed [D003](docs/decisions/003-java-companion-product-architecture.md)
+is accepted and product scaffolding begins.
 
 The work in this phase must:
 
@@ -58,8 +61,9 @@ spikes/          # Disposable experiment code; never production code
 ```
 
 No product code, build system, extension manifest, or product CI exists yet.
-D002 selects the technical direction; a separately reviewed architecture and
-implementation plan is the next prerequisite for product scaffolding.
+D002 selects the technical direction. D003 and S012 now provide the reviewed
+architecture proposal and its remaining evidence gate; product scaffolding
+waits for that gate.
 
 An initial public GitHub source release is not a multiplatform support claim or
 a stable Zed Marketplace release. It requires a repository license, an evidence

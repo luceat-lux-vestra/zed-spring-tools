@@ -51,7 +51,9 @@ child returned an empty baseline, consumed the authentic JDT classpath callback,
 and later returned one visible `server.port` completion through Zed. S011 is
 Supported for that fixed functional hypothesis on macOS arm64/JDK 25, with an
 automatic listener-removal defect and unhandled Spring client requests retained
-as product blockers. D002 records the resulting Pivot direction.
+as product blockers. Amended D002 records the resulting required-companion Pivot.
+R009 attributes the unmodified official Java boundary, and S012 is the single
+bridge experiment required before proposed D003 can be accepted.
 
 Platform validation follows incrementally after this local PoC and the initial
 public source release; multiplatform claims still require the declared matrix.
@@ -71,6 +73,7 @@ Tentative sequence:
 | [S009](009-attributed-isolated-profile.md) | Compose source-controlled profile/XDG settings with one fixed managed-JDT start | Inconclusive on macOS arm64/JDK 25: controls/direct path worked, but JDT distribution identity changed through runtime `configuration/` state |
 | [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Supported on macOS arm64/JDK 25 after corrected component build; other targets untested |
 | [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Supported on macOS arm64/JDK 25; cleanup defect retained; other targets untested |
+| [S012](012-unmodified-java-companion-bridge.md) | Reproduce S011 through an injected bridge while keeping the official Java extension and proxy unmodified | Planned and reviewed; implementation not started |
 
 Use [template.md](template.md) before adding any spike code.
 

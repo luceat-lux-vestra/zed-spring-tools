@@ -2,10 +2,12 @@
 
 ## Current phase
 
-Local technical feasibility and the basic end-to-end PoC are complete. D002
-records a Pivot to a versioned Java/Spring coordination boundary. Product
-scaffolding has not begun; review D002 and record the detailed architecture and
-implementation plan before treating this as a product implementation repository.
+Local technical feasibility and the basic end-to-end PoC are complete. Amended
+D002 records a Pivot to a required official-Java companion with a versioned
+Java/Spring coordination boundary and no reduced managed-JDT fallback. D003 is
+proposed and blocked on S012's unmodified-companion bridge evidence. Product
+scaffolding has not begun; do not treat this as a product implementation
+repository until S012 resolves and D003 is accepted.
 
 ## Product goal and delivery strategy
 

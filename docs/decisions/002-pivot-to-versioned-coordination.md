@@ -1,7 +1,8 @@
-# D002: Pivot to a versioned Java/Spring coordination boundary
+# D002: Pivot to a Java-companion extension with versioned coordination
 
 - Status: Accepted
 - Date: 2026-07-17
+- Amended: 2026-07-17 after product-owner companion-boundary review
 - Decision owner: Project owner
 
 ## Context
@@ -20,6 +21,11 @@ request for `vscode-spring-boot.ls.start` or the `sts/javaType` request, and tha
 the disposable automatic listener-removal relay has a cleanup defect. The
 project therefore needs to select the coordination structure before product
 implementation begins.
+
+Subsequent product-owner review rejected a reduced self-managed JDT fallback.
+Spring completion without the official extension's debugging, test, task, and
+broader Java workflows would be an incoherent default Java development
+experience.
 
 ## Evidence
 
@@ -55,16 +61,25 @@ JDT classpath path loses the metadata-aware value, while R001/R004 and S011
 show that the necessary callbacks and Java-data requests do not fit the current
 procedural extension surface. It cannot meet the parity goal.
 
-### Pivot: procedural extension plus a versioned coordinator
+### Pivot: required Java companion plus a versioned coordinator
 
-The Zed extension owns editor registration and platform-aware discovery. A
-protocol-aware coordinator owns the bounded cross-server seams: Spring/JDT
-startup ordering, authenticated instance routing, classpath add/remove and
-callbacks, Java-data requests such as `sts/javaType`, lifecycle/restart, and
-version mismatch. The leading placement is integration with, or an upstreamed
-interface in, the existing Zed Java proxy so that the mature JDT process and
-project model remain single-owned. A separately maintained unified coordinator
-remains a fallback if that boundary cannot be made supported.
+The Spring extension remains a separately installed package but explicitly
+requires the official Zed Java extension. The Java extension continues to own
+JDT LS, Java debugging, tests, tasks, project import, and ordinary Java language
+support. The Spring package contributes Spring JDT bundles to that same JDT LS
+and owns Spring LS plus the bounded cross-server coordinator.
+
+The coordinator must handle authenticated instance routing, classpath
+add/remove and callbacks, Java-data requests such as `sts/javaType`, lifecycle,
+restart, and compatibility. Upstream work may later make the boundary more
+stable, but it is not a prerequisite for local or public experimental
+development. The first implementation path must target an unmodified official
+Java extension and isolate observed-version transport details behind a
+capability-checked adapter.
+
+A self-managed JDT LS is not a fallback in this decision. A future fully
+independent Java-and-Spring product would need its own explicit decision and
+scope for the complete Java development experience.
 
 ### Limited: publish only standard Spring LS features
 
@@ -79,13 +94,20 @@ is not supported by the evidence.
 
 ## Decision
 
-**Pivot.** Build the product around a Zed procedural extension and an explicit,
-versioned Java/Spring coordination boundary. Prefer reuse of the existing Zed
-Java extension's JDT LS ownership through an upstream-supported coordinator
-interface. Do not ship an undocumented dependency on its current route files
-or private protocol. If upstream integration proves unavailable, return to a
-reviewed decision comparing a maintained Java-proxy fork with a unified
-coordinator; do not silently adopt either.
+**Pivot.** Build `zed-spring-tools` as a companion to the official Zed Java
+extension with an explicit, versioned Java/Spring coordination boundary. The
+official Java extension is a required runtime dependency for the initial
+product and remains unmodified by the target architecture. If it is absent or
+incompatible, do not start a reduced self-managed JDT LS; report the requirement
+and provide installation or compatibility guidance.
+
+The Spring package may inject its own reviewed Spring/JDT bridge bundles into
+the JDT LS owned by the Java extension. This dependency must be stated in the
+extension description. Transport details observed from a Java extension
+release must be probed and adapted, not mistaken for a permanent upstream
+contract. Upstream collaboration remains optional hardening rather than a
+delivery gate. A Java-extension fork or unified Java owner requires a later
+explicit decision; neither is an implicit fallback.
 
 This decision passes the repository direction gate. It authorizes planning and
 scaffolding for the selected coordinated product direction, but it does not
@@ -94,13 +116,14 @@ approve redistribution of third-party binaries, or claim product readiness.
 
 ## Rationale
 
-S011 proves that the core Spring/JDT outcome is achievable and preserves the
+S011 proves that the core Spring/JDT outcome is achievable while preserving the
 existing Java extension's JDT process, making Limited and Stop unnecessarily
 restrictive. The same run proves that a WASM-only Go direction is insufficient:
 the desired flow crosses server/client boundaries that Zed does not currently
-route. A narrow, versioned coordinator preserves the supported core path while
-avoiding the larger duplication and lifecycle burden of immediately replacing
-the Java extension with a unified server owner.
+route. Requiring the official Java extension gives Spring users one coherent
+Java environment and avoids duplicating or partially replacing Java debugging,
+tests, tasks, project import, and JDT LS lifecycle. A narrow, versioned
+coordinator adds only the Spring-specific seams.
 
 ## Consequences
 
@@ -113,6 +136,14 @@ the Java extension with a unified server owner.
   become explicit coordinator or upstream-API work, not silent omissions.
 - The current disposable proxies are evidence, not production foundations.
   Production code must be designed and reviewed independently.
+- The extension description and setup documentation must state that the
+  official Zed Java extension is required and that Spring JDT bundles are loaded
+  into its JDT LS. Do not describe the initial runtime as standalone.
+- Missing or incompatible Java integration is a visible startup failure with
+  remediation guidance, not an automatic degraded or self-managed JDT mode.
+- Java extension updates are handled through observed-version capability probes,
+  compatibility tests, and transport adapters. A version change alone does not
+  require a fork or block an otherwise compatible release.
 - Initial implementation remains local-first on the tested macOS arm64/JDK 25
   tuple. Package design must remain platform-neutral and platform-aware from the
   first product scaffold; all unrun desktop/JDK tuples remain `untested`.
@@ -129,10 +160,10 @@ the Java extension with a unified server owner.
 ## Revisit conditions
 
 Revisit this decision if the Zed Java extension exposes a native generic
-cross-language-server routing API that removes the coordinator need; upstream
-maintainers reject any supportable coordination boundary; the coordinator
+cross-language-server routing API that removes custom transport; the companion
+cannot detect or use an unmodified official Java runtime safely; the coordinator
 cannot be delivered lawfully or securely across the desktop matrix; clean local
-product implementation cannot reproduce S011 without private mutable coupling;
-or capability inventory work shows that a unified coordinator is materially
-simpler and safer. A revisit must preserve the parity goal unless a new explicit
-product-goal decision changes it.
+product implementation cannot reproduce S011 without modifying or forking the
+Java extension; or the product owner later chooses to own a complete Java and
+Spring development environment. A revisit must preserve the parity goal unless
+a new explicit product-goal decision changes it.
