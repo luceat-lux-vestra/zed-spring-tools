@@ -170,15 +170,32 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
 
 1. `vscode-spring-boot.ls.start` and `sts/javaType` are unhandled client
    requests. Until handled, any capability depending on them cannot be assessed.
-2. The `explorer.spring` tree view has no obvious Zed extension-API equivalent.
-   The published `zed_extension_api` 0.7.0 world exports no tree-view or custom
-   panel surface, so this is a candidate `blocked-zed-api` item pending a
-   dedicated check.
-3. Zed's extension API does expose DAP (`get-dap-binary`, `dap-request-kind`,
-   `dap-config-to-scenario`, `dap-locator-create-scenario`, `run-dap-locator`),
-   so run/debug is not assumed blocked without evidence.
-4. The pinned release is not the newest Spring Tools. This inventory is versioned
+2. **Zed extensions cannot contribute a view of any kind.** The complete export
+   list of the `zed_extension_api` 0.7.0 world is 19 functions: `init-extension`;
+   six `language-server-*` functions; five DAP functions; `run-slash-command` and
+   `complete-slash-command-argument`; `context-server-command` and
+   `context-server-configuration`; `index-docs` and `suggest-docs-packages`; and
+   `labels-for-completions` and `labels-for-symbols`. None is a tree view, panel,
+   sidebar, or webview. Zed's own documentation agrees: an extension "can provide
+   languages, themes, debuggers, snippets, and MCP servers". The `explorer.spring`
+   tree view is therefore `blocked-zed-api`, and the blocker is a missing
+   presentation surface rather than missing data — `sts/spring-boot/structure`
+   returns the content.
+3. **Zed extensions cannot contribute a command-palette command**, which is how
+   VS Code exposes most Spring Tools commands. This is a constraint, not
+   automatically a blocker: the Spring server advertises `codeActionProvider` and
+   `workspace/executeCommand`, so a given command may still be reachable. Each
+   command capability needs its own check before any blocked claim.
+4. Debuggers are an explicit Zed extension type and the API exposes DAP
+   (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`,
+   `dap-locator-create-scenario`, `run-dap-locator`), so run/debug is not
+   assumed blocked.
+5. The pinned release is not the newest Spring Tools. This inventory is versioned
    against `5.2.0.RELEASE` and must be re-derived when the pin moves.
+
+Sources for 2 and 3: `zed_extension_api` 0.7.0 `wit/since_v0.6.0/extension.wit`,
+and `docs/src/extensions/developing-extensions.md` in `zed-industries/zed`,
+accessed 2026-07-17.
 
 ## Candidate next experiments
 

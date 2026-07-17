@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 2
+- Inventory version: 3
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-17
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md)
@@ -38,14 +38,33 @@ delivers the same user outcome is a legitimate result, recorded as
 | --- | --- |
 | `verified` | 4 |
 | `implemented` | 1 |
-| `planned` | 41 |
-| `blocked-zed-api` | 0 (1 candidate under check) |
+| `planned` | 40 |
+| `blocked-zed-api` | 1 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 0 |
 
-Nothing is `blocked-*` yet, because no capability has been investigated deeply
-enough to name its exact blocker. Candidates are marked in the notes rather than
-promoted to a blocked state on suspicion.
+A capability is promoted to `blocked-*` only when the exact missing surface is
+named. Suspicion stays in the notes.
+
+## Known surface constraints
+
+Two constraints of the Zed extension API shape several rows below. Both are read
+from the `zed_extension_api` 0.7.0 world's complete export list and corroborated
+by Zed's documentation, which states an extension "can provide languages, themes,
+debuggers, snippets, and MCP servers".
+
+1. **No view surface.** Nothing in the API contributes a tree view, panel,
+   sidebar, or webview. Anything whose VS Code form is a view has no place to
+   render. This is a confirmed blocker, not a suspicion.
+2. **No command-palette contribution.** An extension cannot add an arbitrary
+   command to Zed's palette, which is how VS Code exposes most Spring Tools
+   commands. This does **not** by itself block those capabilities: the Spring
+   server advertises `codeActionProvider`, so a command may be reachable as a
+   code action, and `workspace/executeCommand` remains available over LSP.
+   Whether each command capability has such a route is undetermined, so those
+   rows stay `planned` rather than being called blocked.
+
+Debuggers are supported, so run/debug is not assumed blocked.
 
 ## Workstream 1 — properties and YAML
 
@@ -95,9 +114,9 @@ promoted to a blocked state on suspicion.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Logical Structure tree view | `planned` | VS Code contributes the `explorer.spring` view. **Candidate `blocked-zed-api`**: the 0.7.0 extension world exports no tree/panel surface. Needs a dedicated check before being recorded as blocked. |
-| Structure refresh / grouping / open reference | `planned` | `structure.refresh`, `structure.grouping`, `structure.openReference`; `sts/spring-boot/structure`, `structure/groups`. |
-| Run / debug a Boot application | `planned` | Not assumed blocked: Zed's extension API exposes DAP (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`, locators). |
+| Logical Structure tree view | `blocked-zed-api` | **Exact blocker: Zed extensions cannot contribute a view of any kind.** VS Code contributes `explorer.spring` to its explorer container. The `zed_extension_api` 0.7.0 world exports 19 functions and not one is a tree view, panel, sidebar, or webview; Zed's own documentation states an extension "can provide languages, themes, debuggers, snippets, and MCP servers". The server data is reachable (`sts/spring-boot/structure`), so this is a missing presentation surface, not missing data. Needs an alternative Zed-native design or an upstream API. |
+| Structure refresh / grouping / open reference | `planned` | `structure.refresh`, `structure.grouping`, `structure.openReference`; `sts/spring-boot/structure`, `structure/groups`. Depends on the view above having somewhere to render. |
+| Run / debug a Boot application | `planned` | Not blocked: Zed supports debugger extensions, and the API exposes DAP (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`, locators). |
 | Maven goal / Gradle build | `planned` | `sts.maven.goal`, `sts.gradle.build`. Build execution is official Java's ownership under D003. |
 | Open Boot app page URL | `planned` | `vscode-spring-boot.open.url`. |
 
