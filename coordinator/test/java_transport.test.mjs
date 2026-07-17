@@ -51,6 +51,34 @@ test("allowlisted Spring Java request uses the official loopback route", async (
   await assert.rejects(() => transport.execute("not.allowed", []));
 });
 
+test("an official Java error envelope surfaces the command and the real reason", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-err-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const worktree = path.join(root, "worktree");
+  const javaWork = path.join(root, "java");
+  fs.mkdirSync(path.join(javaWork, "proxy"), { recursive: true });
+  const server = http.createServer((request, response) => {
+    request.on("data", () => {});
+    request.on("end", () => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: "No delegateCommandHandler for zed.spring.bridge.v1.addClasspathListener" }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  fs.writeFileSync(path.join(javaWork, "proxy", routeId(worktree)), String(server.address().port));
+
+  const transport = new JavaTransport({ javaWorkDirectory: javaWork, worktree, timeoutMs: 1000 });
+  await assert.rejects(
+    () => transport.execute("zed.spring.bridge.v1.addClasspathListener", [{}]),
+    (error) => {
+      assert.match(error.message, /zed\.spring\.bridge\.v1\.addClasspathListener/);
+      assert.match(error.message, /No delegateCommandHandler/);
+      return true;
+    },
+  );
+});
+
 test("waiting for the official Java route is abortable during shutdown", async (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-abort-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
