@@ -1,9 +1,9 @@
 # D003: Java-companion product architecture
 
-- Status: Proposed; implementation blocked on S012
+- Status: Proposed; implementation blocked on S013
 - Date: 2026-07-17
 - Decision owner: Project owner
-- Depends on: D002, R009, and S012
+- Depends on: D002, R009, S012, and S013
 
 ## Context
 
@@ -16,8 +16,10 @@ and outbound JDT requests but lacks the reverse Spring callback route.
 
 The detailed product architecture must preserve the official Java extension's
 ownership of Java support, isolate release-specific transport, and prevent the
-spike proxy from becoming production code. One final transport experiment is
-required before this proposal can be accepted and product scaffolding begins.
+spike proxy from becoming production code. S012 proved the final transport and
+visible completion but failed its strict cleanup gate before bridge removal was
+reached. One narrow S013 removal-contract experiment is required before this
+proposal can be accepted and product scaffolding begins.
 
 ## Evidence
 
@@ -174,8 +176,9 @@ evidence alone.
 
 ## Acceptance gate
 
-D003 becomes Accepted only if S012 demonstrates the real S011 completion
-transition with the official Java extension and proxy byte-for-byte unmodified,
+D003 becomes Accepted only if S012/S013 together demonstrate the real S011
+completion transition with the official Java extension and proxy byte-for-byte
+unmodified,
 one injected bridge bundle, authenticated direct callback, correct removal and
 shutdown, no second JDT LS, and no stale route. A failure to discover the
 private request endpoint is Inconclusive for transport attribution; an
@@ -184,7 +187,7 @@ requires revisiting D002 before product scaffolding.
 
 ## Revisit conditions
 
-Revisit after S012, when Zed or the Java extension exposes a supported generic
+Revisit after S013, when Zed or the Java extension exposes a supported generic
 coordination API, when a Java update changes the observed transport, when the
 bridge cannot meet the security/lifecycle constraints, or when the product
 owner explicitly chooses full Java ownership.

@@ -37,9 +37,15 @@ direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,
 loads reviewed Spring bridge bundles into the Java-owned JDT LS, and owns the
 Spring coordinator and Spring Boot LS. The Java extension remains unmodified in
 the target architecture. [R009](docs/research/009-unmodified-java-companion-boundary.md)
-defines the remaining reverse-callback boundary; [S012](docs/spikes/012-unmodified-java-companion-bridge.md)
-must validate it before proposed [D003](docs/decisions/003-java-companion-product-architecture.md)
-is accepted and product scaffolding begins.
+defines the remaining reverse-callback boundary.
+[S012](docs/spikes/012-unmodified-java-companion-bridge.md) proved that boundary
+and the visible completion with official Java unmodified, but failed its strict
+removal criterion because the coordinator rejected the authentic Spring removal
+shape before bridge transport. The narrow
+[S013](docs/spikes/013-authentic-spring-removal-contract.md) cleanup contract
+must pass before proposed
+[D003](docs/decisions/003-java-companion-product-architecture.md) is accepted and
+product scaffolding begins.
 
 The work in this phase must:
 
@@ -61,9 +67,9 @@ spikes/          # Disposable experiment code; never production code
 ```
 
 No product code, build system, extension manifest, or product CI exists yet.
-D002 selects the technical direction. D003 and S012 now provide the reviewed
-architecture proposal and its remaining evidence gate; product scaffolding
-waits for that gate.
+D002 selects the technical direction. D003 and S013 now provide the reviewed
+architecture proposal and its remaining cleanup evidence gate; product
+scaffolding waits for that gate.
 
 An initial public GitHub source release is not a multiplatform support claim or
 a stable Zed Marketplace release. It requires a repository license, an evidence

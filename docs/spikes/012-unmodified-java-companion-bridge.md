@@ -1,6 +1,6 @@
 # S012: Unmodified Java companion bridge
 
-- Status: Gate B prepared and reviewed; Gate C not started
+- Status: Refuted on cleanup after functional success on macOS arm64/JDK 25
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: R009, D002, proposed D003, and S011
@@ -387,6 +387,38 @@ control, moved the missing callback into one owned injected bundle, prohibited
 the S005/S006 proxy patch, required authentication and exact removal, and kept
 all product scaffolding outside the spike. Gate A may begin only after this plan,
 R009, D002 amendment, proposed D003, and all relevant indexes are committed.
+
+## Gate C runtime result
+
+The fresh final-v4 run is classified **Refuted on cleanup after functional
+success** under S012's stated criteria. The unchanged official Java extension
+and proxy loaded all six injected bundles, including the corrected singleton
+bridge. JDT imported the Maven fixture, Spring initialized with classpath
+disabled, and the same real Spring child transitioned from an attributable
+zero-item baseline through one authenticated six-argument JDT classpath event
+to exactly one structurally preserved `server.port` completion. Zed visibly
+offered `server.port` with type `int`.
+
+The evidence then recorded `jdt-remove-failed` before the successful Spring
+disable result. Source attribution found that Spring's real removal params
+contain `callbackCommandId` and default `batched: false`, while the retained
+S006 coordinator requires exactly the first key. The request was therefore
+rejected before `OfficialJavaTransport` or
+`zed.spring.bridge.removeClasspathListener` was invoked. Shutdown did not
+remove the owned route automatically. After all isolated processes were absent,
+the route, official port record, and derived Equinox configuration were removed
+manually; manual cleanup does not satisfy S012 success.
+
+The ignored evidence is retained under
+`tmp/s012-gate-b-evidence-final-v4-20260717` and the worktree's
+`.s012-evidence` directory. Central identities remained official Java WASM
+`62dbf7edbe1ef4066f74e588dcec68d223ab7984f1861b59e44db0b10f52e3fd`,
+official proxy
+`53ed618c7044a6bf754117bd6573bc03c00f74728bbefcc8b295ed9e83c40076`,
+and bridge
+`0d253fb645d5df05304ae916f9267365737d9870816624e692aae4134c12264b`.
+No second JDT LS ran. S013 isolates the attributed two-key removal contract;
+S012 will not be rerun or reclassified.
 
 ## Remaining uncertainty after a supported result
 
