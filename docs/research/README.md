@@ -10,8 +10,8 @@
   startup but closed Inconclusive because the runtime created an unplanned
   Equinox `configuration/` tree inside the fixed JDT distribution. R008
   attributed that tree to Equinox's writable private-configuration default
-- Next gate: review completed S010 Gate B evidence, then open Gate C's one
-  bounded runtime only after explicit continuation
+- Next gate: plan and execute the final integrated Spring Boot end-to-end PoC
+  using the now-supported S010 JDT runtime prerequisite
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -57,6 +57,7 @@ inputs can reach the two direct managed data paths, but its profile-attribution
 conditions did not hold. R007 attributed that gap and defines S009's controls.
 S009 passed those controls but exposed Equinox private state inside the fixed
 JDT tree. R008 attributed that state and defined S010's one-property relocation
-test. S010 Gate B now has distinct fixed builds and a fresh non-UI preflight,
-but no runtime evidence. None establishes production feasibility; the direction
-decision still requires an attributable local end-to-end result.
+test. S010's corrected component build and bounded runtime reached
+`ServiceReady`, placed private Equinox state below the expected data path, and
+left the fixed JDT tree unchanged. Production feasibility still requires the
+attributable integrated Spring end-to-end result.

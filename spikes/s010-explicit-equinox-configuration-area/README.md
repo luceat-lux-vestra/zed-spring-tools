@@ -27,6 +27,9 @@ arguments printed by its usage message. It accepts separate fixed control and
 patched checkouts/WASM files plus the pinned S009/S003/S008 inputs, and requires
 seven fresh direct children of repository `tmp/` for the profile, Unicode
 worktree, four XDG roots, and evidence. It canonicalizes the Java-only extension
-index, verifies every fixed identity, extracts a pristine JDT tree, and moves
-the prepared roots transactionally. It does not launch Zed, the proxy, JDT LS,
-Spring Tools, or UI automation. Gate C remains closed.
+index, requires Zed component-model WASM headers, verifies every fixed identity,
+extracts a pristine JDT tree, and moves the prepared roots transactionally. The
+corrected fixed build command targets `wasm32-wasip2`, matching the exact Zed
+1.10.3 extension builder. Gate B itself does not launch Zed, the proxy, JDT LS,
+Spring Tools, or UI automation. Gate C subsequently passed on macOS arm64/JDK
+25; its raw host evidence remains under ignored `tmp/` paths.

@@ -1,6 +1,6 @@
 # S010: Explicit Equinox private configuration area
 
-- Status: Gate B built, prepared, and reviewed; Gate C not started
+- Status: Supported on macOS arm64/JDK 25 after corrected Gate B component build and Gate C
 - Last updated: 2026-07-17
 - Depends on: R008 complete; S009 Inconclusive
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
@@ -242,9 +242,9 @@ Zed, the proxy, JDT LS, or Spring Tools.
 - `fixture/S010Fixture.java` is dependency-free, 127 bytes, and has SHA-256
   `1ebee7526689ef8ac8bdebe26f779c1f4433a273bc87e9fe2f5d3d285d19b520`.
 - `tools/PrepareS010.java` contains the Gate A contract/generated-fixture tests
-  and reviewed Gate B preparation checks. Its current 72,237-byte source has
+  and reviewed Gate B/Gate C identity checks. Its current 72,792-byte source has
   SHA-256
-  `cdcb002e81acbcceecee141f097e90272e854b8a409e6114f1fe73b15c74622c`.
+  `638517c50b26a10e4810b15bdac0ab875475c17861ce603cbd942df2f51c2473`.
 - The local reproduction commands and explicit non-product boundary are in the
   tracked spike README. Generated classes and the validation manifest remain
   under ignored `tmp/` paths.
@@ -299,12 +299,12 @@ automation.
   `ae2fcbb8e65824643bc21fdeead413ec689cd9f2`.
 - The common command was
   `CARGO_INCREMENTAL=0 cargo build --release --locked --offline --target
-  wasm32-wasip1 -p zed_java` using rustc 1.97.0 and cargo 1.97.0. The control
-  WASM is 1,912,230 bytes with SHA-256
-  `c016f6500b9b96e3dbc3a8d581c9e5860271f449c6cacdbb546fc82e00d8886d`;
-  the patched WASM is 1,912,656 bytes with SHA-256
-  `b1a2f6e21649c011e111058bcebad3d886baf3ee5e7de37d88a45d50ecffd2d4`.
-  Both have the WebAssembly magic and are distinct.
+  wasm32-wasip2 -p zed_java` using rustc 1.97.0 and cargo 1.97.0. The corrected
+  control component is 2,000,090 bytes with SHA-256
+  `3d5556eac160422eb1520a0054710c0f07640e1c09d607d00a605da9274b8187`;
+  the patched component is 2,000,470 bytes with SHA-256
+  `aca6555668c84e9668f9be99de85763503a85e31c6ce554a78dac77eacae6605`.
+  Both have component-model header `0061736d0d000100` and are distinct.
 - The 50,925,681-byte JDT archive retained SHA-256
   `e94c303d8198f977930803582738771fd18c52c5492878410bf222b1aa81ef1d`;
   its fresh flat extraction retained tree SHA-256
@@ -321,10 +321,10 @@ automation.
 - The final ignored roots use a new profile, four new XDG directories, and a
   new worktree whose basename contains spaces and Korean characters. The
   normalized full worktree path hashes to
-  `cd5b7715d57e569440afc3ef9d5e6443da51fdd8`; the manifest records the complete
+  `6fe0b955c46c11a8625fab26a8d70ce6de5419d6`; the manifest records the complete
   derived `D` and `C = D/configuration` paths. Both were absent at preparation.
 - The patched installed-Java tree has SHA-256
-  `36b88ee8b62d4dfc5883b967403ee347bf26b71c43b230c8298973a3433a16ab`.
+  `a8ec9f4d63155742c7e4b5107c2662a042ecf2524e24eff31faa8a61147f5851`.
   The source S009 index was verified as the documented semantically unchanged
   post-run formatting, but was not reused: the tool generated the fixed
   2,026-byte Java-only index with SHA-256
@@ -360,14 +360,66 @@ automation.
    final verifier corrects all three assumptions and creates the canonical
    index itself. None of these attempts launched a runtime or left a partial
    final destination.
+4. The first Gate C attempt exposed that the original Gate B command built a
+   `wasm32-wasip1` core module while Zed 1.10.3's exact extension builder uses
+   `wasm32-wasip2` components. Zed rejected it before loading Java or spawning
+   a proxy/JVM. The app was stopped and normal Zed restored; `D`, `C`, and the
+   JDT tree were still untouched. The corrected Gate B rebuilt both variants
+   identically for wasip2, made the verifier reject non-component headers, and
+   prepared wholly new final-v3 roots before the only real hypothesis run.
 
-### Gate B stop
+### Gate B stop (historical)
 
-Gate B establishes only a reviewed build/preflight state. It does not test the
-private-configuration runtime hypothesis and does not change S009's
-Inconclusive classification. Gate C remains closed and requires another
-explicit continuation before normal Zed is stopped or the isolated app, proxy,
-JDT, Spring, or UI is launched.
+Gate B established only a reviewed build/preflight state. The user subsequently
+opened the broader local-PoC goal, which authorized Gate C. The result below
+supersedes this historical stop without turning the disposable patch into
+product code.
+
+## Gate C runtime result
+
+The corrected Gate C run completed on 2026-07-17 and supports the S010
+hypothesis on the tested macOS arm64/JDK 25 tuple.
+
+### Confirmed runtime evidence
+
+- The fixed foreground Zed 1.10.3 loaded the corrected Java 6.8.21 component,
+  opened the dependency-free fixture from the spaces/Unicode worktree without
+  trust interaction, and spawned exactly one fixed proxy and one Temurin
+  25.0.3 JVM.
+- The observed proxy/JVM vector contained exactly one
+  `-Dosgi.configuration.area=<D>/configuration` after the shared read-only and
+  cascaded properties and before `-jar`. It retained exactly one fixed
+  `config_mac_arm` shared area and exactly one `-data D`; no wrapper, host
+  fallback, or second JDT candidate appeared.
+- JDT LS 1.60.0 returned initialize in 2.96 seconds and emitted real
+  `ServiceReady` at 13:16:13 KST. It published empty diagnostics for the opened
+  fixture. Runtime state existed at `D`; private Equinox state existed at
+  `C = D/configuration` with 78 files and 20 directories after shutdown.
+- The fixed JDT distribution contained no `configuration/` during or after the
+  run. Its post-run full tree SHA-256 remained exactly
+  `b64b23722e3c0ccf6093571852ccfe551d4604e7dc175d0e0adbfcdb7aef7583`,
+  equal to the pristine archive extraction.
+- The prepared proxy, patched component, settings, catalog, and fixture stayed
+  fixed. Zed reformatted the Java-only index from
+  `a7348979...e6eb` to the already-attributed semantic equivalent
+  `8b416957...cb68`; installed extensions remained only Java. XDG config, data,
+  and state remained empty, and the ready screenshot showed no trust or
+  provider modal.
+
+### Shutdown and cleanup
+
+- The isolated Zed, proxy, and JVM exited within the fixed shutdown bound.
+  The proxy route record did not delete automatically, matching the known
+  S007-S009 behavior; after process absence it was recorded and explicitly
+  unlinked, leaving the route directory empty.
+- The fixed DMG was detached and normal `/Applications/Zed.app` restarted.
+  The normal shared log retained its inode. Provider warnings appended only
+  after normal Zed restoration are outside the isolated foreground interval
+  and are not attributed to S010.
+
+S010 therefore removes S009's writable-install prerequisite blocker. It proves
+only the private-configuration relocation on this tuple; Spring Tools remains
+outside S010 and still requires the final integrated PoC.
 
 ## Plan review record
 
@@ -390,7 +442,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. excluded Spring, lifecycle policy, product code, publication, and
    multiplatform claims.
 
-The user explicitly opened Gate A and later Gate B on 2026-07-17. Both tracked
-implementation review and non-UI preparation are complete. No Gate C runtime,
-UI automation, or Spring continuation is authorized until a new explicit
-continuation.
+The user explicitly opened Gate A, Gate B, and then the continuing local-PoC
+goal on 2026-07-17. Gate C is complete and Supported on the tested tuple. The
+next eligible work is a separately planned integrated Spring Boot end-to-end
+PoC; no production scaffold or multiplatform support claim follows from S010.

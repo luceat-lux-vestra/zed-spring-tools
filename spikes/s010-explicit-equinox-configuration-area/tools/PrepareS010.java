@@ -74,11 +74,11 @@ public final class PrepareS010 {
             50_925_681L,
             "e94c303d8198f977930803582738771fd18c52c5492878410bf222b1aa81ef1d");
     private static final ArtifactSpec CONTROL_WASM = new ArtifactSpec(
-            1_912_230L,
-            "c016f6500b9b96e3dbc3a8d581c9e5860271f449c6cacdbb546fc82e00d8886d");
+            2_000_090L,
+            "3d5556eac160422eb1520a0054710c0f07640e1c09d607d00a605da9274b8187");
     private static final ArtifactSpec PATCHED_WASM = new ArtifactSpec(
-            1_912_656L,
-            "b1a2f6e21649c011e111058bcebad3d886baf3ee5e7de37d88a45d50ecffd2d4");
+            2_000_470L,
+            "aca6555668c84e9668f9be99de85763503a85e31c6ce554a78dac77eacae6605");
     private static final ArtifactSpec OFFICIAL_WASM = new ArtifactSpec(
             2_128_402L,
             "62dbf7edbe1ef4066f74e588dcec68d223ab7984f1861b59e44db0b10f52e3fd");
@@ -220,6 +220,11 @@ public final class PrepareS010 {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 2 && args[0].equals("--tree-sha256")) {
+            System.out.println(treeSha256(requireDirectory(
+                    Path.of(args[1]), "tree identity root")));
+            return;
+        }
         if (args.length == 1 && args[0].equals("--self-test")) {
             selfTest();
             System.out.println("S010 Gate A synthetic tests passed");
@@ -245,6 +250,7 @@ public final class PrepareS010 {
         if (args.length != 4 || !args[0].equals("--gate-a")) {
             System.err.println(
                     "usage: java PrepareS010 --self-test\n"
+                            + "   or: java PrepareS010 --tree-sha256 <tree-root>\n"
                             + "   or: java PrepareS010 --gate-a <repository-root> "
                             + "<clean-java-checkout> <fresh-evidence-dir>\n"
                             + "   or: java PrepareS010 --gate-b <repository-root> "
@@ -372,6 +378,7 @@ public final class PrepareS010 {
 
         verifyArtifact(installedTemplate.resolve("extension.wasm"),
                 OFFICIAL_WASM, "official Java WASM");
+        verifyWasm(installedTemplate.resolve("extension.wasm"));
         verifyArtifact(installedTemplate.resolve("extension.toml"),
                 EXTENSION_MANIFEST, "Java extension manifest");
         require(treeSha256(installedTemplate).equals(INSTALLED_JAVA_TREE_SHA256),
@@ -568,7 +575,7 @@ public final class PrepareS010 {
         values.put("cargo-version", singleLine(run(repository, "cargo", "--version")));
         values.put("build-command",
                 "CARGO_INCREMENTAL=0 cargo build --release --locked --offline "
-                        + "--target wasm32-wasip1 -p zed_java");
+                        + "--target wasm32-wasip2 -p zed_java");
         values.put("control-wasm-size", Long.toString(CONTROL_WASM.size()));
         values.put("control-wasm-sha256", CONTROL_WASM.sha256());
         values.put("patched-wasm-size", Long.toString(PATCHED_WASM.size()));
@@ -723,16 +730,20 @@ public final class PrepareS010 {
     }
 
     private static void verifyWasm(Path path) throws IOException {
-        byte[] magic;
+        byte[] header;
         try (InputStream input = Files.newInputStream(path)) {
-            magic = input.readNBytes(4);
+            header = input.readNBytes(8);
         }
-        require(magic.length == 4
-                        && magic[0] == 0
-                        && magic[1] == 'a'
-                        && magic[2] == 's'
-                        && magic[3] == 'm',
-                "WASM magic bytes are invalid");
+        require(header.length == 8
+                        && header[0] == 0
+                        && header[1] == 'a'
+                        && header[2] == 's'
+                        && header[3] == 'm'
+                        && header[4] == 0x0d
+                        && header[5] == 0
+                        && header[6] == 1
+                        && header[7] == 0,
+                "WASM is not a component-model binary");
     }
 
     private static void verifyTokenEnvironment() throws IOException {

@@ -43,8 +43,10 @@ inside the fixed JDT distribution. R008 has now attributed that tree to the
 writable Equinox private-configuration default. S010 was planned and reviewed to
 test one explicit worktree-scoped private configuration property. Its Gate A
 five-line disposable patch and static verifier pass against the exact clean
-Java source. Gate B produced distinct locked control/patched WASM files and a
-fresh canonical Java-only preflight with pristine JDT; no runtime has started.
+Java source. After correcting Gate B to Zed 1.10.3's wasip2 component model,
+Gate C reached `ServiceReady`, put private Equinox state only below the expected
+data path, and preserved the pristine JDT tree. S010 is Supported on the tested
+tuple; the final integrated Spring PoC is next.
 
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
@@ -62,7 +64,7 @@ Tentative sequence:
 | [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Inconclusive on macOS arm64/JDK 25 after Run 1: expected direct data path worked, but update/network attribution and cleanup were insufficient; Run 2 not started |
 | [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Inconclusive on macOS arm64/JDK 25 after two direct-path successes: fresh-profile extension/provider state violated attribution; other targets untested |
 | [S009](009-attributed-isolated-profile.md) | Compose source-controlled profile/XDG settings with one fixed managed-JDT start | Inconclusive on macOS arm64/JDK 25: controls/direct path worked, but JDT distribution identity changed through runtime `configuration/` state |
-| [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Gate B built and prepared; Gate C not started |
+| [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Supported on macOS arm64/JDK 25 after corrected component build; other targets untested |
 
 Use [template.md](template.md) before adding any spike code.
 
