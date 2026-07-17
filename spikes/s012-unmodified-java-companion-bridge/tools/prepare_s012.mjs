@@ -47,7 +47,7 @@ const ARTIFACTS = Object.freeze({
   bridge: artifact(12_104, "0d253fb645d5df05304ae916f9267365737d9870816624e692aae4134c12264b"),
   springServer: artifact(-1, "ec922c593895331943ee1eccda434461da034bb87ac20f406fd7fb5e211bc8e1"),
   baseProxy: artifact(-1, "bc504acc16d47c2074348db3e1f667b914c7304701c604b5b538115d2463369b"),
-  wrapper: artifact(-1, "d2eedbf12ecf808c792ad4de55dd143d3f04eed743313041a4db18db30f75dad"),
+  wrapper: artifact(-1, "48fb355468b0b54a6c87481df2f0927e45b401398eccd00086c6a6c91135fd50"),
   bridgeEventRoute: artifact(-1, "69c007ae387b129c8f2d61b26daee4f1204200878376b24d35fe9ed5e9064775"),
   bridgeSession: artifact(-1, "17a19f497a3d3e540e2b747f95c6c6753b42ffb74a4393e990e5bf8b7f86ee9c"),
   officialTransport: artifact(-1, "00442f79bfb48232e958ec372cefef9825d615a66beecfa3087532e3d5bef67f"),

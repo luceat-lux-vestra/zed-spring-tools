@@ -1,6 +1,6 @@
 # S013: Authentic Spring removal contract
 
-- Status: Planned and reviewed; implementation not started
+- Status: Gate B prepared and reviewed; Gate C not started
 - Last updated: 2026-07-17
 - Target tuple: macOS 26.5.1 arm64, Zed 1.10.3, Temurin JDK 25.0.3
 - Depends on: S012 Refuted on cleanup; D003 remains Proposed
@@ -99,6 +99,32 @@ accepted params, changing the bridge protocol, manually invoking removal,
 reusing final-v4, or treating process-exit cleanup as equivalent to the real
 Spring remove request. It selected one exact wire-shape normalization at the
 Spring boundary and requires a wholly fresh attributable run.
+
+## Gate A/B implementation and verification record
+
+The disposable wrapper now contains one pure
+`normalizeSpringRemovalFrame` function. It accepts only a request with a string
+or numeric ID, method `sts/removeClasspathListener`, exact keys
+`callbackCommandId` and `batched`, `batched: false`, and the fixed dynamic
+callback syntax. It removes only `batched` from the internal message passed to
+the existing coordinator and retains the original raw frame. Seven negative
+cases prove that canonical, batched-true, extra-key, malformed-ID,
+notification, unrelated-method, and response frames remain unchanged.
+
+The corrected wrapper is 17,208 bytes with SHA-256
+`48fb355468b0b54a6c87481df2f0927e45b401398eccd00086c6a6c91135fd50`.
+Its self-test passed. The complete eleven S012 Node contracts, preparation
+self-test, Java bridge protocol self-test, five adapter host tests, bridge JAR
+validation, and two-build bridge identity check also passed without changing
+the bridge, adapter, official Java, or proxy identities.
+
+The fresh ignored Gate B roots are prefixed
+`tmp/s012-s013-gate-b-*-final-20260717`. The preparation manifest is
+`tmp/s012-s013-gate-b-evidence-final-20260717/s012-prepared-manifest.txt`;
+the derived JDT data suffix is
+`e785bd8f41280ee743eec041d086267a821b28d6`. Preparation verified empty runtime
+state, exact six bundles, pristine JDT, fixed inputs, no second JDT launcher,
+and no running Zed/JDT/Spring process. Gate C has not started.
 
 ## Remaining uncertainty after support
 

@@ -78,7 +78,7 @@ Tentative sequence:
 | [S010](010-explicit-equinox-configuration-area.md) | Relocate Equinox private configuration outside the fixed JDT tree | Supported on macOS arm64/JDK 25 after corrected component build; other targets untested |
 | [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Supported on macOS arm64/JDK 25; cleanup defect retained; other targets untested |
 | [S012](012-unmodified-java-companion-bridge.md) | Reproduce S011 through an injected bridge while keeping the official Java extension and proxy unmodified | Refuted on cleanup after functional success: authentic Spring removal was rejected before bridge transport |
-| [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Planned and reviewed; implementation not started |
+| [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Gate B prepared and reviewed; Gate C not started |
 
 Use [template.md](template.md) before adding any spike code.
 

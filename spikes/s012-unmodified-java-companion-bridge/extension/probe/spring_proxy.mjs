@@ -160,6 +160,28 @@ function hasExactKeys(value, expected) {
   );
 }
 
+function normalizeSpringRemovalFrame(frame) {
+  const message = frame?.message;
+  const idType = typeof message?.id;
+  const params = message?.params;
+  if (
+    message?.method !== "sts/removeClasspathListener" ||
+    !["number", "string"].includes(idType) ||
+    !hasExactKeys(params, ["batched", "callbackCommandId"]) ||
+    params.batched !== false ||
+    !/^sts4\.classpath\.[A-Za-z]{8}$/.test(params.callbackCommandId ?? "")
+  ) {
+    return frame;
+  }
+  return {
+    ...frame,
+    message: {
+      ...message,
+      params: { callbackCommandId: params.callbackCommandId },
+    },
+  };
+}
+
 function parseArgs(args) {
   if (args.length !== 12) throw new Error("expected six named S012 arguments");
   const expected = [
@@ -291,7 +313,9 @@ async function runProxy(args) {
   });
   child.stdout.on("data", (chunk) => {
     try {
-      for (const frame of childDecoder.push(chunk)) coordinator.handleChildFrame(frame);
+      for (const frame of childDecoder.push(chunk)) {
+        coordinator.handleChildFrame(normalizeSpringRemovalFrame(frame));
+      }
     } catch {
       if (!shutdownStarted) evidence.write("spring-protocol-failure");
       child.kill();
@@ -371,6 +395,65 @@ async function selfTest() {
   assert.deepEqual(sanitizedEnvironment({ PATH: "/bin", SECRET: "no" }), {
     PATH: "/bin",
   });
+
+  const authenticRemoval = {
+    raw: Buffer.from("authentic"),
+    message: {
+      jsonrpc: "2.0",
+      id: "remove-1",
+      method: "sts/removeClasspathListener",
+      params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: false },
+    },
+  };
+  const normalizedRemoval = normalizeSpringRemovalFrame(authenticRemoval);
+  assert.deepEqual(normalizedRemoval.message.params, {
+    callbackCommandId: "sts4.classpath.AbCdEfGh",
+  });
+  assert.equal(normalizedRemoval.raw, authenticRemoval.raw);
+  for (const unchanged of [
+    {
+      ...authenticRemoval,
+      message: {
+        ...authenticRemoval.message,
+        params: { callbackCommandId: "sts4.classpath.AbCdEfGh" },
+      },
+    },
+    {
+      ...authenticRemoval,
+      message: {
+        ...authenticRemoval.message,
+        params: { ...authenticRemoval.message.params, batched: true },
+      },
+    },
+    {
+      ...authenticRemoval,
+      message: {
+        ...authenticRemoval.message,
+        params: { ...authenticRemoval.message.params, extra: true },
+      },
+    },
+    {
+      ...authenticRemoval,
+      message: {
+        ...authenticRemoval.message,
+        params: { callbackCommandId: "bad", batched: false },
+      },
+    },
+    {
+      ...authenticRemoval,
+      message: { ...authenticRemoval.message, id: undefined },
+    },
+    {
+      ...authenticRemoval,
+      message: { ...authenticRemoval.message, method: "sts/addClasspathListener" },
+    },
+    {
+      ...authenticRemoval,
+      message: { jsonrpc: "2.0", id: "response", result: "ok" },
+    },
+  ]) {
+    assert.equal(normalizeSpringRemovalFrame(unchanged), unchanged);
+  }
 
   const credential = "T".repeat(43);
   const javaCalls = [];
@@ -483,6 +566,7 @@ if (isMain) {
 
 export {
   JavaBridgeIntegration,
+  normalizeSpringRemovalFrame,
   parseArgs,
   readPortFilePointer,
   sanitizedEnvironment,
