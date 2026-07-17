@@ -1,11 +1,11 @@
 # S009: Source-controlled isolated-profile JDT startup
 
-- Status: Gate A complete and reviewed; Gate B not started
+- Status: Gate B complete and reviewed; Gate C not started
 - Date: 2026-07-17
 - Related decision: D001
 - Related research: R003, R006, R007
 - Depends on: S008 Inconclusive after two direct-path successes
-- Implementation gate: Gate B requires a later explicit continuation
+- Implementation gate: Gate C requires a later explicit continuation
 
 ## Hypothesis
 
@@ -181,7 +181,7 @@ automation.
 
 ## Gate B: real preparation and preflight review
 
-Gate B requires another explicit continuation after Gate A review. It may:
+Gate B was explicitly authorized on 2026-07-17 after Gate A review. It may:
 
 1. reverify the clean fixed checkouts/artifacts, retained fixed helper, JDK,
    signed Zed DMG, and available capacity without rebuilding or downloading a
@@ -378,11 +378,97 @@ java spikes/s009-attributed-isolated-profile/tools/PrepareS009.java --self-test
 S009 preparation synthetic tests passed
 ```
 
-Still unverified: the ignored fixed inputs have not been passed through this
-new tool, no real profile/worktree/XDG destination or manifest exists, token
-absence has not been checked for a real launch environment, and Zed, proxy, and
-JDT have not been started. Those are Gate B and Gate C concerns. Gate B remains
-closed pending explicit continuation.
+At Gate A close, the ignored fixed inputs had not been passed through this new
+tool, no real profile/worktree/XDG destination or manifest existed, token
+absence had not been checked for a real launch environment, and Zed, proxy, and
+JDT had not been started. Gate B addressed the preparation items; runtime
+questions remain Gate C concerns.
+
+## Gate B real preparation and preflight review record
+
+Gate B completed on 2026-07-17 on the local macOS 26.5.1 arm64/Temurin
+25.0.3+9 tuple. `PrepareS009` was compiled with the Gate A strict flags and
+executed exactly once against six wholly new ignored destinations. It completed
+without a correction or retry. No fixture was opened, catalog mtime refreshed,
+normal Zed stopped, fixed app launched, proxy/JDT process started, or UI input
+performed.
+
+### Fixed-input revalidation
+
+- The retained 143,545,589-byte Zed 1.10.3 Apple Silicon DMG reproduced
+  SHA-256 `717ab148...1a0` and passed APFS checksum verification. Its read-only
+  mount passed deep/strict code-signature verification for identifier
+  `dev.zed.Zed`, Team ID `MQ55VZLNZQ`, and the Zed Industries Developer ID
+  chain; `spctl` accepted it as a notarized Developer ID app.
+- The bundle-local 3,570,560-byte CLI reproduced SHA-256 `f1dad0ae...d8215`
+  and reported Zed 1.10.3. The image was detached after preparation.
+- The clean Java extension checkout remained at
+  `9148b897...2970d`, and the clean Zed source checkout remained at
+  `0c54c414...892a`. Fixed Cargo source files, Rust/Cargo 1.97.0 identities,
+  Temurin binaries, official Java 6.8.21 tree, managed JDT/plugins, proxy,
+  debug bundle, embedded catalog, and retained helper all passed the Gate A
+  size/hash/shape checks. No rebuild or download occurred.
+- Both Copilot token variables were checked for presence only and were absent.
+  Approximately 800 GiB remained available before preparation.
+
+### Prepared identity and independent review
+
+- The profile contains 153 regular files, 31 directories, no symlinks, and
+  only the roots `config`, `fixed`, `extensions`, and the 71-key manifest.
+  Exactly one Java extension, one managed JDT candidate, one helper candidate,
+  and an empty proxy-route directory exist.
+- Independent tree hashing and recursive comparison reproduced Java tree
+  SHA-256 `58e1155d...fae68` and JDT tree SHA-256
+  `b64b2372...f7583` for both retained inputs and prepared copies. The proxy,
+  debug bundle, helper, and catalog reproduced their fixed hashes.
+- Exact settings are 910 bytes, SHA-256 `3d248a2c...81d7f`. Independent JSON
+  parsing confirmed top-level `disable_ai: true`, trust-all enabled only in the
+  isolated profile, HTML auto-install and Java auto-update disabled, Java-only
+  `jdtls`, the final local proxy/debug paths, Lombok and JDK auto-download
+  disabled, and updates set to `never`.
+- The 2,026-byte extension index retained SHA-256 `a7348979...e6eb` and parsed
+  as only official Java 6.8.21 with `dev: false` and Java/Properties language
+  entries. No HTML or other extension exists.
+- The package-free worktree contains only the 134-byte fixed fixture. Its
+  fixture SHA-256 is `020c6382...c491`, full-path SHA-1 is
+  `b5062417...d3944`, and tree SHA-256 is `f0cd9800...301d`.
+- XDG config, data, and state roots are empty. XDG cache contains only the
+  413,663-byte fixed Gradle catalog, SHA-256 `f91a3840...4d02`; its preparation
+  mtime `1784252793304` ms was independently reproduced and was not refreshed.
+- The manifest has 71 unique complete keys. Its expected data path is derived
+  from the normalized full worktree path. That path, the managed host fallback,
+  and the packaged-launcher fallback are all absent. No prohibited credential,
+  provider, previous-spike, prior-data, or route state and no proxy/JDT process
+  were found.
+
+### Normal-Zed and shared-path boundary
+
+Normal Zed remained the installed 1.11.3 app throughout preparation: PID 47245,
+start time 2026-07-17 05:57:11 KST, installed CLI SHA-256
+`9289fa39...6975`, and no isolated arguments. The final shared-path boundary is
+2026-07-17 10:48:26 KST (epoch `1784252906`):
+
+| Boundary | Size or state | mtime epoch | inode |
+| --- | ---: | ---: | ---: |
+| `~/Library/Logs/Zed/Zed.log` | 767,618 bytes | 1784235432 | 121592491 |
+| `~/Library/Logs/Zed/Zed.log.old` | 1,048,579 bytes | 1783265325 | 156857117 |
+| `~/Library/Logs/Zed/telemetry.log` | 8,244 bytes | 1784252574 | 121592518 |
+| `~/Library/Caches/Zed` | directory; 11 direct entries | 1784235431 | 121592490 |
+| `~/.local/state/Zed` | absent | n/a | n/a |
+
+These paths are shared macOS boundaries, not proof of complete sandboxing. Gate
+C must establish a new immediate prelaunch boundary and attribute only changes
+after it.
+
+### Gate B conclusion and remaining runtime work
+
+Gate B is complete and the single prepared input set is ready for Gate C. This
+is preparation evidence only. It does not prove settings application, direct
+fixture opening, warning absence, exact runtime process arguments, `-data`
+selection, `ServiceReady`, catalog stability, post-run profile identity,
+shutdown, route cleanup, or normal-Zed restoration. Gate C remains closed until
+an explicit continuation and must use this exact prepared set without a setup
+correction after any proxy or JDT child starts.
 
 ## Plan review record
 
@@ -406,7 +492,7 @@ Reviewed on 2026-07-17 before implementation. The review:
 8. kept Spring, product scaffolding, publication, and multiplatform claims
    outside S009.
 
-Gate A's disposable code and synthetic tests now exist. No generated real
-profile, new runtime destination, fixed-input preparation, Zed/JDT process, or
-UI action has been created or executed. Gate B remains closed until a later
+Gate A's disposable code and Gate B's ignored real preparation now exist. No
+fixture opening, catalog runtime refresh, fixed Zed launch, proxy/JDT process,
+normal-Zed stop, or UI action has occurred. Gate C remains closed until a later
 explicit continuation.

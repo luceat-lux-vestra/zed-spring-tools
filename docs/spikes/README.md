@@ -35,9 +35,9 @@ Inconclusive under its strict attribution criteria, not Refuted. A new reviewed
 profile-attribution spike is required before a Spring end-to-end plan. R007
 subsequently established that trust and HTML were fixed defaults, Copilot read
 outside `--user-data-dir` through the XDG config fallback, and native-agent
-provider enumeration caused the ChatGPT warning. S009 Gate A now has a reviewed
-transactional preparation tool and synthetic tests for one controlled run; no
-real S009 preparation or runtime exists yet.
+provider enumeration caused the ChatGPT warning. S009 Gate B now has one
+reviewed fixed-input isolated profile/worktree/XDG set for the controlled run;
+no S009 runtime exists yet.
 Platform validation follows incrementally after a later local PoC and initial
 public source release; multiplatform claims still require the declared matrix.
 
@@ -53,7 +53,7 @@ Tentative sequence:
 | [S006](006-spring-boot-end-to-end.md) | Populate the real Spring project cache and prove `server.port` completion through Zed | Inconclusive on macOS arm64/JDK 25 before hypothesis input; actual JDT data path missed the reviewed prepared runtime |
 | [S007](007-managed-jdt-data-isolation.md) | Prove official Java managed-local JDT startup uses two explicit isolated data paths | Inconclusive on macOS arm64/JDK 25 after Run 1: expected direct data path worked, but update/network attribution and cleanup were insufficient; Run 2 not started |
 | [S008](008-preseeded-managed-jdt-isolation.md) | Repeat managed-local JDT isolation twice with fixed helper/catalog inputs | Inconclusive on macOS arm64/JDK 25 after two direct-path successes: fresh-profile extension/provider state violated attribution; other targets untested |
-| [S009](009-attributed-isolated-profile.md) | Compose source-controlled profile/XDG settings with one fixed managed-JDT start | Gate A complete and reviewed; Gate B not started |
+| [S009](009-attributed-isolated-profile.md) | Compose source-controlled profile/XDG settings with one fixed managed-JDT start | Gate B complete and reviewed; Gate C not started |
 
 Use [template.md](template.md) before adding any spike code.
 

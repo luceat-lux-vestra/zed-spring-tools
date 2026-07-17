@@ -21,8 +21,8 @@ auto-installed an extension, created unrelated editor state, and emitted
 provider-auth warnings. S008 is therefore Inconclusive rather than Refuted. A
 controlled profile-attribution run and a later attributable local PoC are still
 required. R007 has now attributed the profile paths, and S009 is planned and
-reviewed as that single controlled prerequisite run. Gate A preparation code
-and synthetic review are complete, but it has no real preparation or runtime
+reviewed as that single controlled prerequisite run. Gate B's one real
+preparation set is complete and independently reviewed, but it has no runtime
 evidence yet.
 
 Use [template.md](template.md) after sufficient evidence exists.
