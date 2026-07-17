@@ -1,18 +1,18 @@
 # Product implementation and public-development plan
 
-- Status: Reviewed; implementation not started
+- Status: Reviewed; D004 accepted, implementation not started
 - Last updated: 2026-07-17
-- Architecture: D002 and D003 Accepted
+- Architecture: D002, D003, and D004 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25
 
 ## Outcome
 
-Publish the current research and reproducible local PoC as an experimental
-public source repository, then build `zed-spring-tools` in public toward
-capability parity with VS Code Spring Tools. The product is a separately
-installed Spring companion that requires the official Zed Java extension. It
-does not ship a reduced standalone Java environment or claim untested platform
-support.
+Build a real, source-separated `zed-spring-tools` package and complete its basic
+local product PoC before the first public GitHub push. The product is a
+separately installed Spring companion that requires the official Zed Java
+extension. It does not ship a reduced standalone Java environment or claim
+untested platform support. Research and spikes remain evidence, not the public
+release's substitute for product code.
 
 ## Delivery order and gates
 
@@ -25,75 +25,54 @@ Status: complete.
 - Keep all runtime binaries, profiles, routes, credentials, logs, and
   screenshots under ignored `tmp/` paths.
 
-### M1: Experimental public source release
+### M1: Production technology decision and scaffold
 
-No product scaffold is required for this milestone.
+D004 is accepted. Create the root product workspace it specifies before any
+public remote is created.
 
-Progress on 2026-07-17: the reachable Git history, tracked files, generated
-artifact extensions, object sizes, identity/path patterns, and credential
-patterns were audited. No reachable third-party binary, oversized blob, local
-absolute path, or credential-shaped value was found. Research code contains
-expected synthetic `token` fields only. Public compatibility, limitation,
-contribution, conduct, security, and third-party-boundary documents are drafted.
-Repository license selection, final GitHub namespace, private reporting setup,
-remote creation, and push remain open.
+The first scaffold contains protocol schemas and fixtures, pure contract tests,
+the required-Java compatibility diagnostic, deterministic bridge packaging,
+artifact validation, and explicit lifecycle boundaries. It may not copy a spike
+proxy, include downloaded binaries, or claim a working Spring feature before the
+runtime gate passes.
 
-1. Select and add the repository license; record third-party notice and
-   redistribution boundaries from R005.
-2. Audit tracked objects and full Git history for credentials, local paths,
-   generated binaries, VSIX/JAR/WASM artifacts, oversized files, and private
-   data.
-3. Make every reproduction instruction distinguish committed source from
-   ignored local evidence and user-supplied or downloaded pinned artifacts.
-4. Add contribution, conduct, vulnerability-reporting, and experimental-status
-   documents appropriate for public development.
-5. State the exact tested tuple and label every other platform/JDK tuple
-   `untested`.
-6. Create the public GitHub repository only after the audit is clean, push the
-   reviewed default branch, and create an initial experimental source tag only
-   if the tag contents are reproducible and contain no third-party binaries.
+Exit gate: clean locked builds and contract tests on the available macOS host,
+no unreviewed network-at-runtime behavior, no official-Java mutation, and a
+manual product/spike import check.
 
-Exit gate: public repository URL works, the default branch matches the reviewed
-local commit, the license is explicit, and the source release makes no stable
-Marketplace or multiplatform claim.
+### M2: Product-grade macOS arm64 vertical slice
 
-### M2: Production technology decision and scaffold
+Implement the smallest product flow in this order:
 
-Before adding production files, record D004. It must decide:
-
-- the Zed adapter language and component build;
-- the coordinator runtime and how it is acquired on every desktop tuple;
-- the Java bridge build, Java baseline, and deterministic packaging;
-- artifact acquisition versus redistribution for Spring Tools components;
-- the versioned `JavaTransport` compatibility-table format; and
-- workspace layout, test layers, formatting, dependency locking, and CI scope.
-
-The first scaffold contains only protocol schemas, pure contract tests, the
-required-Java compatibility diagnostic, and empty lifecycle boundaries. It may
-not copy a spike proxy, include downloaded binaries, or claim a working Spring
-feature.
-
-Exit gate: clean builds and contract tests on the available macOS host, no
-unreviewed network-at-runtime behavior, no official-Java mutation, and a manual
-diff confirming that disposable spike code was redesigned rather than promoted.
-
-### M3: Product-grade macOS arm64 vertical slice
-
-Implement the smallest supported product flow in this order:
-
-1. discover and capability-probe the installed official Java provider;
-2. acquire and verify pinned Spring artifacts under the accepted license plan;
-3. contribute the exact bridge/Spring bundle set only to `jdtls`;
-4. start one Spring LS and one worktree-scoped coordinator;
-5. reproduce S013's empty baseline, authentic classpath event, visible
-   `server.port`, exact removal, restart, and crash cleanup; and
-6. show actionable missing/incompatible-Java errors instead of starting a
+1. materialize the owned coordinator and bridge from the extension component;
+2. acquire and verify the pinned unchanged Spring artifact;
+3. discover and capability-probe the installed official Java provider;
+4. contribute the exact bridge/Spring bundle set only to `jdtls`;
+5. start one Spring LS and one worktree-scoped coordinator;
+6. reproduce S013's authentic classpath event, visible `server.port`, exact
+   removal, restart, and crash cleanup; and
+7. show actionable missing/incompatible-Java errors instead of starting a
    misleading reduced mode.
 
-Exit gate: a clean install reproduces the flow without any manual `tmp/`
-preparation, credentials or classpaths are absent from normal logs, restart and
-uninstall leave no owned process or secret route, and the tested tuple remains
-explicit.
+Exit gate: a clean development-extension install reproduces the flow without
+copying `spikes/` or manually preparing a worktree under `tmp/`; credentials and
+classpaths are absent from normal logs; restart and uninstall leave no owned
+process or secret route; and the tested tuple remains explicit.
+
+### M3: Initial experimental public source release
+
+The first public push follows M2 and presents the repository as an actual
+extension project with historical research, not as a spike collection.
+
+Progress retained from the earlier publication audit: public compatibility,
+limitation, contribution, conduct, security, and third-party-boundary documents
+are drafted. Re-run the reachable-history and product-artifact audit after M2,
+then select the repository license and final GitHub namespace, enable private
+reporting, create the remote, and push the reviewed product commit.
+
+Exit gate: the public URL works, the default branch matches the reviewed local
+product commit, the license is explicit, and the source release makes no stable
+Marketplace or multiplatform claim.
 
 ### M4: VS Code Spring Tools capability-parity program
 
@@ -141,11 +120,12 @@ stability signal.
 
 ## Review record
 
-Reviewed on 2026-07-17 before production implementation. The review keeps the
-public source release ahead of product scaffolding, adds D004 as the explicit
-language/build/packaging gate, preserves official Java ownership, prohibits
-copying spike infrastructure into production, and makes capability parity an
-auditable inventory rather than a broad marketing claim.
+Reviewed on 2026-07-17 before production implementation and amended after the
+project owner rejected a research-only initial publication. D004 is the explicit
+language/build/packaging gate. The amended order completes a source-separated
+basic product PoC before creating the public repository, preserves official Java
+ownership, prohibits copying spike infrastructure into production, and makes
+capability parity an auditable inventory rather than a broad marketing claim.
 
 The highest known risks are the official proxy's private compatibility surface,
 third-party artifact distribution, currently unhandled Spring client methods,

@@ -3,13 +3,16 @@
 The local direction gate is complete. D001 records the product goal and staged
 delivery sequence; amended D002 selects a required official-Java companion from
 the supported S011 local PoC. D003 records the accepted detailed
-unmodified-companion architecture after S013's exact removal evidence.
+unmodified-companion architecture after S013's exact removal evidence. D004
+selects the source-first product stack and moves the basic product PoC ahead of
+the initial public push.
 
 | ID | Decision | Status |
 | --- | --- | --- |
 | [D001](001-local-first-parity-and-publication.md) | Local-first capability parity and staged public development | Accepted |
 | [D002](002-pivot-to-versioned-coordination.md) | Pivot to a Java-companion extension with versioned coordination | Accepted, amended |
 | [D003](003-java-companion-product-architecture.md) | Java-companion product architecture | Accepted |
+| [D004](004-product-stack-build-and-packaging.md) | Product stack, build, and packaging | Accepted |
 
 Decision records in this directory must cite supporting research and spike
 results. S010 supported an isolated managed JDT runtime with private Equinox
@@ -21,6 +24,10 @@ Java extension; a reduced managed-JDT fallback is excluded. R009 attributes the
 unmodified companion boundary. S012 validated the bridge and visible completion
 but failed cleanup before bridge removal was reached. S013 validated the
 authentic removal contract, so D003 is accepted and reviewed product planning
-can begin.
+can begin. The project owner then rejected publication of the research tree
+without a real product source boundary. D004 records the root product workspace,
+Rust/WASM adapter, managed-Node coordinator, deterministic Java 21 bridge,
+unchanged official VSIX acquisition, compatibility table, and pre-public
+product PoC gate.
 
 Use [template.md](template.md) after sufficient evidence exists.

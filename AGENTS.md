@@ -6,9 +6,10 @@ Local technical feasibility and the basic end-to-end PoC are complete. Amended
 D002 records a Pivot to a required official-Java companion with a versioned
 Java/Spring coordination boundary and no reduced managed-JDT fallback. S012
 proved the unmodified bridge and visible completion but was Refuted on cleanup;
-S013 then supported the exact removal contract. D003 is Accepted. Product
-scaffolding has not begun; record and review the detailed implementation plan
-before adding production files.
+S013 then supported the exact removal contract. D003 and D004 are Accepted. The
+reviewed implementation plan now requires a source-separated basic product PoC
+before the first public push. Product scaffolding may begin under D004; spike
+code remains excluded from production.
 
 ## Product goal and delivery strategy
 
@@ -16,8 +17,9 @@ before adding production files.
   Track every user-visible capability and either reproduce it in Zed, provide an
   equivalent Zed-native workflow, or retain a documented blocker and upstream
   dependency. The goal does not require pixel-identical VS Code UI.
-- Complete a basic end-to-end PoC on the available macOS arm64 host before the
-  initial public GitHub source release.
+- Complete a source-separated, installable basic product PoC on the available
+  macOS arm64 host before the initial public GitHub source release. The existing
+  disposable spike PoC does not satisfy this product gate by itself.
 - Develop in public after that local PoC and expand capability coverage
   incrementally. An experimental public repository or preview must state the
   exact tested host and must not imply unverified support.
@@ -107,6 +109,17 @@ For every completed spike:
 - Update the relevant index when adding a research, spike, or decision document.
 - Report changed files, validation performed, unverified items, and follow-up
   work at task completion.
+
+## Commit messages
+
+- Follow Conventional Commits with a scoped subject where it improves clarity:
+  `type(scope): imperative summary`.
+- Every commit must include a body after a blank line. The body must explain why
+  the change is needed, what materially changed, and which validation was run or
+  remains pending. Do not create title-only commits.
+- Use a `BREAKING CHANGE:` footer when applicable and preserve relevant issue,
+  decision, research, or spike identifiers in the body.
+- Do not rewrite already published history solely to restyle commit messages.
 
 ## Decision gate
 
