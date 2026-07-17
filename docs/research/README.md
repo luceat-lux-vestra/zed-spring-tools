@@ -1,6 +1,7 @@
 # Research Index
 
-- Phase status: Core research and R006-R009 follow-up complete; S011 local PoC supported
+- Phase status: Core research, S013 local PoC, and D003 architecture gate
+  complete; experimental public-source preparation is in progress
 - Last completed on: 2026-07-17
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
@@ -12,8 +13,8 @@
   attributed that tree to Equinox's writable private-configuration default.
   S010 then supported relocation of that state, and S011 supported the real
   Spring classpath-to-`server.port` flow on macOS arm64/JDK 25
-- Next gate: execute S012's unmodified official-Java companion bridge, then
-  accept or reject proposed D003
+- Next gate: resolve R010's owner-controlled license, Git identity, and GitHub
+  namespace decisions, then publish the audited source before product scaffolding
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -41,6 +42,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R007](007-s008-profile-startup-attribution.md) | Attribute S008 isolated-profile startup state | Complete | Trust/HTML are defaults; Copilot crosses the custom profile via XDG; AI disable guards provider enumeration |
 | [R008](008-equinox-private-configuration-area.md) | Attribute S009 Equinox private configuration state | Complete | Shared config is only a parent; writable install defaults private state to `<install>/configuration` |
 | [R009](009-unmodified-java-companion-boundary.md) | Attribute the unmodified official-Java companion boundary | Complete | Bundle contribution and JDT requests work; reverse callback requires an owned bridge and runtime verification |
+| [R010](010-experimental-public-source-audit.md) | Audit the experimental public-source boundary | Complete | Reachable history is source-only and pattern-clean; license, author identity, and namespace require owner decisions |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -66,6 +68,9 @@ left the fixed JDT tree unchanged. S011 then supported the attributable
 integrated Spring end-to-end result while retaining unhandled client requests
 and an automatic cleanup defect. D002 selects a versioned coordination Pivot;
 its amendment requires the official Java extension and excludes a reduced
-managed-JDT fallback. R009 defines S012 as the remaining unmodified-companion
-transport experiment. Proposed D003, packaging, and multiplatform runtime
-validation remain open.
+managed-JDT fallback. R009 defined the remaining unmodified-companion boundary.
+S012 proved the functional transport with official Java unchanged, and S013
+supported the authentic removal and cleanup correction. D003 is accepted. R010
+closes the mechanical publication audit while retaining owner-controlled
+license, author-identity, and GitHub namespace decisions. Product packaging and
+multiplatform runtime validation remain open.
