@@ -1,13 +1,19 @@
 # Zed Spring Tools
 
-This repository has completed its source-based feasibility phase and basic
-local end-to-end PoC on macOS arm64/JDK 25. S010 proved a managed JDT launch
-that keeps writable Equinox private state outside the fixed distribution. S011
-then proved the real Spring classpath callback, project-cache transition, and a
-visible attributable `server.port` completion through Zed. Amended D002 selects
-a separately installed Spring companion that explicitly requires the official
-Zed Java extension and uses its JDT LS. A reduced self-managed JDT fallback is
-not part of the initial product. Product scaffolding has not begun.
+This is an experimental research and proof-of-concept repository. It has
+completed its source-based feasibility phase and basic local end-to-end PoC on
+macOS arm64/JDK 25, but it does **not** yet contain an installable product
+extension.
+
+S010 proved a managed JDT launch that keeps writable Equinox private state
+outside the fixed distribution. S011 then proved the real Spring classpath
+callback, project-cache transition, and a visible attributable `server.port`
+completion through Zed. S012 reproduced that functional path with the official
+Java extension and proxy unmodified, and S013 corrected and verified the exact
+listener-removal contract. D002 and D003 therefore select a separately
+installed Spring companion that explicitly requires the official Zed Java
+extension and uses its JDT LS. A reduced self-managed JDT fallback is not part
+of the initial product. Product scaffolding has not begun.
 
 The long-term product goal is capability parity with VS Code Spring Tools. A
 capability may use a Zed-native workflow instead of copying VS Code's UI, but it
@@ -27,10 +33,10 @@ Research, prerequisite isolation, and the fixed local Spring Boot end-to-end
 PoC are complete. On macOS 26.5.1 arm64 with Temurin JDK 25.0.3, the same real
 Spring Boot LS child produced an empty completion baseline, received the
 authentic JDT classpath callback, populated its project cache, and later
-returned one visible `server.port` completion to Zed. The run retained an
-automatic listener-removal defect and unhandled `vscode-spring-boot.ls.start`
-and `sts/javaType` client requests. These are product blockers, not reasons to
-discard the successful core result.
+returned one visible `server.port` completion to Zed. S013 also completed the
+authentic listener-removal and owned-route cleanup path. Unhandled
+`vscode-spring-boot.ls.start` and `sts/javaType` client requests remain product
+work; the PoC is not a general Spring feature implementation.
 
 [D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
 direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,
@@ -86,3 +92,6 @@ See [the research index](docs/research/README.md),
 [the decision index](docs/decisions/README.md) for the evidence and selected
 direction. The reviewed next milestones are in the
 [product implementation and public-development plan](docs/implementation-plan.md).
+
+For the concise public boundary, see [compatibility](COMPATIBILITY.md),
+[known limitations](LIMITATIONS.md), and [third-party material](THIRD_PARTY_NOTICES.md).

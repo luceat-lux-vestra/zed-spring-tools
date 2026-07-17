@@ -29,6 +29,15 @@ Status: complete.
 
 No product scaffold is required for this milestone.
 
+Progress on 2026-07-17: the reachable Git history, tracked files, generated
+artifact extensions, object sizes, identity/path patterns, and credential
+patterns were audited. No reachable third-party binary, oversized blob, local
+absolute path, or credential-shaped value was found. Research code contains
+expected synthetic `token` fields only. Public compatibility, limitation,
+contribution, conduct, security, and third-party-boundary documents are drafted.
+Repository license selection, final GitHub namespace, private reporting setup,
+remote creation, and push remain open.
+
 1. Select and add the repository license; record third-party notice and
    redistribution boundaries from R005.
 2. Audit tracked objects and full Git history for credentials, local paths,
