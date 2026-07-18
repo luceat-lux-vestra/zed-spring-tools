@@ -233,23 +233,63 @@ Aside: an earlier non-isolated attempt in the user's main Zed (repo root, main
 data dir) failed jdtls init at 00:29 with a broken pipe; it is unrelated to the
 isolated run and not part of this result. Cause not investigated.
 
+### Driven run 2 — official Run-runnable arm (2026-07-19)
+
+6.8.23 **does expose** an official main-class runnable in stock Zed: triggering
+it generated and ran a `Run FixtureApplication` task. This is a genuine split
+result:
+
+- **As driven by Zed it failed (exit 127).** Zed's generated task command
+  resolves the helper as
+  `$HOME/Library/Application Support/Zed/extensions/work/java/task-bin/java-task-helper`
+  — the default macOS data dir, hard-coded and **ignoring `--user-data-dir`**. The
+  isolated profile's helper lives under its own `--user-data-dir`, and the main
+  data dir's `work/java` had been removed, so the path did not exist. This is a
+  Zed task-generation/isolation limitation, not a 6.8.23 helper defect; on a
+  normal (non-`--user-data-dir`) install the helper is at exactly that path.
+- **The helper binary itself launches the app.** Invoked directly with Zed's exact
+  arguments (`run-class <file> dev.zed.spring.fixture FixtureApplication ""`), the
+  isolated `java-task-helper` detected the Maven project, reported
+  `No wrapper found, using mvn` (the fixture ships no `mvnw`), and ran
+  `mvn compile exec:java -Dexec.mainClass=dev.zed.spring.fixture.FixtureApplication -Dexec.classpathScope=runtime`.
+  Tomcat started on port 8080, `Started FixtureApplication in 0.939 seconds`, and
+  `GET /greeting` returned `hello` — the app was reachable. Killing the process
+  freed 8080 cleanly. Evidence: `run-helper.log`.
+- **Attribution correction:** 6.8.23 runs a main class through `exec:java` on the
+  Maven wrapper *if present, else system `mvn`* — not `spring-boot:run`, and not a
+  plain `java` invocation. The plan's "project Maven wrapper" wording holds only
+  for wrapper-bearing projects; this wrapper-less fixture used system `mvn`.
+- The Zed-driven stop criterion (step 6) could not be exercised because the app
+  never started inside Zed; the direct process was stopped outside Zed and exited
+  cleanly.
+
 ### Pending
 
-- Step 5: the official `Run <main class>` runnable via 6.8.23's `task_helper`
-  and the Maven wrapper — the main-task-reuse half of the hypothesis.
-- Steps 6–7: stop, uninstall, and authentic-cleanup verification.
+- Steps 6–7: product uninstall and authentic-cleanup verification (the bridge
+  removal contract itself is S013-verified on 6.8.21 and unchanged here).
 - Steps 8–9: log-redaction scan and a warm offline restart.
-- The explicit-6.8.23-record arm and the 6.8.21 baseline comparison for the
-  `workspace/executeClientCommand` error.
+- Re-run the official runnable in a **non-isolated** Zed (or with the helper path
+  reconciled) to confirm the Zed-driven path works for a real user install.
+- The explicit-6.8.23-record admission arm and the 6.8.21 baseline comparison for
+  the `workspace/executeClientCommand` error.
 
 ## Result
 
-In progress. The **coordination and visible-Spring-behavior half is Supported on
-the tested tuple**: the unchanged product's bridge, callbacks, proxy route, and
-`server.port` completion all work against official Java 6.8.23 without a reduced
-mode. This still changes no capability-inventory state and adds no compatibility
-record: the main-runnable reuse, authentic cleanup, and redaction gates remain
-unrun, and per the plan a 6.8.23 record is only added after those pass.
+In progress; a split result on the tested tuple (macOS 26.5.2 arm64, Zed 1.11.3,
+JDK 25.0.3), no capability-inventory state changed:
+
+- **Coordination and visible Spring behavior: Supported.** The unchanged
+  6.8.21-contracted product's bridge, bundle contribution, callbacks, proxy
+  route, and `server.port` completion all work against official Java 6.8.23
+  without a reduced mode.
+- **Official main runnable: Supported at the helper, blocked through Zed under
+  isolation.** 6.8.23's `task_helper` launches the reachable Maven Boot app via
+  `mvn exec:java`, but Zed's generated runnable hard-codes the default data-dir
+  helper path and fails (exit 127) under `--user-data-dir`. A non-isolated
+  re-run is needed to confirm the normal user path.
+
+Per the plan, a 6.8.23 compatibility record is only added after the remaining
+cleanup, redaction, and non-isolated runnable gates pass; those are unrun.
 
 ## Remaining uncertainty
 
