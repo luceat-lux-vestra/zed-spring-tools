@@ -222,10 +222,13 @@ discovery versus a link returned by an explicit action.
 Zed 1.11.3 supports LSP Document Symbols behind the default-off
 `languages.Java.document_symbols` setting. The earlier zero-request run is a
 valid control for the default tree-sitter path, not evidence that Zed lacks the
-feature. [S015](spikes/015-stock-zed-java-spring-document-symbols.md) must test
-the authentic JDT/Spring merge, hierarchy, navigation, refresh, and restart
-before the preferred per-file Outline route is claimed. Verified Project Symbols
-remains the fallback if that gate fails.
+feature. [S015](spikes/015-stock-zed-java-spring-document-symbols.md) found a
+clear nested JDT/Spring merge with correct navigation and edit refresh after
+both servers were ready, but Refuted the preferred route on restart. Spring
+answered before JDT's later dynamic registration, and Zed cached a Spring-only
+Outline that omitted ordinary Java symbols until a source edit forced
+recollection. Verified Project Symbols therefore remains the fallback; a future
+stock-Zed refresh fix must repeat S015 before the route is reconsidered.
 
 [R014](research/014-final-upstream-capability-surface-audit.md) rechecked D005
 against Zed main, official Java 6.8.23, and current Spring source. It found no
@@ -255,17 +258,16 @@ be proposed later only through a new direction decision, after stock-Zed routes
 are tested, and only for a capability such as embedded syntax highlighting that
 has no safe equivalent.
 
-Immediate M4 slice order after the current Boot-project transport work is:
+Immediate M4 slice order after S015 is:
 
-1. S015 Document Symbols verification;
-2. S016 official Java 6.8.23 compatibility and main-task verification;
-3. authentic `sts/highlight` to CodeLens adaptation;
-4. Boot-project selection and merge-safe Run/Debug configuration using official
+1. S016 official Java 6.8.23 compatibility and main-task verification;
+2. authentic `sts/highlight` to CodeLens adaptation;
+3. Boot-project selection and merge-safe Run/Debug configuration using official
    Java task/DAP ownership, including a comparison of the default `java-main`
    runnable with a Spring-specific workspace tag binding;
-5. properties/YAML conversion and metadata reload Code Actions;
-6. one opt-in Spring Structure document slice; and
-7. separately gated live-data, metrics, logger, upgrade, Modulith, and special
+4. properties/YAML conversion and metadata reload Code Actions;
+5. one opt-in Spring Structure document slice; and
+6. separately gated live-data, metrics, logger, upgrade, Modulith, and special
    language slices.
 
 The current Boot-project-discovery slice completes one missing dependency in
@@ -327,10 +329,15 @@ remains the selected architecture; the order now gates official Java 6.8.23
 before reusing its task helper and explicitly excludes removed/private action,
 task, browser, and Project-Symbol grouping shortcuts.
 
+Amended on 2026-07-18 after S015. The on-state merge itself was usable, but the
+restart ordering dropped baseline Java symbols until a later edit. The per-file
+LSP Outline route is therefore not promoted, Project Symbols remains the
+fallback, and S016 becomes the next runtime gate.
+
 The highest known risks are the official proxy's private compatibility surface,
 third-party artifact distribution, unadapted Spring client methods, official
-Java 6.8.23 compatibility, multi-server Document Symbols quality, generated-file
-merge/freshness, remote credential
+Java 6.8.23 compatibility, multi-server Document Symbols restart refresh,
+generated-file merge/freshness, remote credential
 handling, shutdown-response mismatches, Java-provider updates, and the untested
 platform matrix. Each has an explicit decision or validation gate above; none is
 treated as already solved by the local PoC.

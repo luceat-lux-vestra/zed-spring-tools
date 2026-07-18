@@ -84,10 +84,11 @@ Debuggers are supported, so run/debug is not assumed blocked.
 Zed 1.11.3 also has a default-off `document_symbols` language setting that
 switches Outline and Breadcrumbs from tree-sitter to LSP
 `textDocument/documentSymbol`. The extension can read settings but cannot force
-this user setting. Zed merges results from every capable server on the Java
-buffer, so the authentic JDT/Spring hierarchy and duplicate behavior require
-[S015](spikes/015-stock-zed-java-spring-document-symbols.md). Project Symbols
-remains the verified structure-navigation fallback.
+this user setting. S015 confirmed that Zed merges clear nested JDT/Spring results
+after both servers are ready, but Refuted the route on restart: Spring answers
+before JDT's later dynamic registration, and the cached Outline omits Java
+symbols until a source edit forces recollection. Project Symbols remains the
+verified structure-navigation fallback.
 
 ## Workstream 1 — properties and YAML
 
@@ -109,7 +110,7 @@ remains the verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Document symbols | `zed-native-equivalent` | Corrected 2026-07-18: Zed 1.11.3 **does** consume LSP Document Symbols when `languages.Java.document_symbols` is `on`; the setting defaults to `off`, so the earlier driven run's zero requests prove only the tree-sitter control. Spring 5.2.0 source recursively returns nested Document Symbols, while Zed merges every capable Java server's result. S015 must verify authentic JDT/Spring hierarchy, duplicates, navigation, refresh, and restart before Outline is promoted. Until then, the same Spring elements remain reachable through the verified Project Symbols fallback. Earlier evidence retained: `tmp/ws2-symbols-run2-20260718/`. |
+| Document symbols | `zed-native-equivalent` | S015 Refuted the preferred LSP Outline route on the tested tuple. With `languages.Java.document_symbols: on` after both servers were ready, Zed merged package/type/method plus nested Spring component/bean/endpoint results with no exact duplicate labels; navigation and saved-edit refresh worked. After restart, however, Spring answered before JDT dynamically registered Document Symbols, and Zed cached a Spring-only Outline that omitted ordinary Java symbols until another source edit forced recollection. The setting was restored to `off`; verified Project Symbols remains the supported fallback and an opt-in Structure document remains planned. Evidence: `tmp/s015-document-symbols-20260718/evidence/`; earlier tree-sitter control: `tmp/ws2-symbols-run2-20260718/`. |
 | Workspace symbols (Spring symbols) | `verified` | Observed 2026-07-18. Zed's "Go to Symbol in Project" issued `workspace/symbol`; the Spring server (through the coordinator) returned the logical structure — `@+ 'greetingController' (@RestController <: @Controller, @Component)`, `@+ 'greetingPrefix' (@Bean) String`, `@+ 'greetingConfiguration' (@Configuration)`, `@+ 'fixtureApplication' (@SpringBootApplication)`, and `@/greeting -- GET` — each with a resolved location in the fixture. jdtls returned 0 for the `@`-prefixed queries, so the symbols are attributable to Spring. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
 | Request mapping navigation | `verified` | Observed 2026-07-18. `@/greeting -- GET` (kind 6) is returned by `workspace/symbol` as a navigable workspace symbol resolved to `GreetingController.java`, so Zed's symbol picker jumps to the mapping. |
 | Bean navigation | `verified` | Observed 2026-07-18. `@+ 'greetingPrefix' (@Bean)` and the `@Component`/`@Configuration` symbols are returned by `workspace/symbol` with resolved locations, navigable from Zed's symbol picker. |
@@ -137,7 +138,7 @@ remains the verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Browse / navigate the Spring logical structure | `zed-native-equivalent` | Resolved baseline 2026-07-18: Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the documented fallback. Preferred additions are S015's official per-file LSP Outline and an explicitly requested, regenerable Spring Structure document for worktree grouping. Neither addition changes this state until driven. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
+| Browse / navigate the Spring logical structure | `zed-native-equivalent` | Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the supported equivalent. S015 Refuted the preferred per-file LSP Outline because restart can omit Java symbols; an explicitly requested, regenerable Spring Structure document remains the planned grouping companion. Evidence: `tmp/ws2-symbols-run2-20260718/` and `tmp/s015-document-symbols-20260718/evidence/`. |
 | Structure refresh / grouping | `planned` | Preferred route: `sts/spring-boot/structure` and `structure/groups` generate or refresh an opt-in, deterministic Structure document with source links. Project Symbols remains fallback. The document must be safe to delete, must not silently edit `.gitignore`, and needs stale/refresh verification. |
 | Run / debug a Boot application | `planned` | Preferred route after S016: reuse official Java 6.8.23's main runnable for a matching Run action. Reviewable Spring-specific `.zed/tasks.json` and explicit official-Java Run (`noDebug`) or Debug entries are companions only where profiles, arguments, project choice, or debugging require them. The later execution slice must also test, but not assume, a Spring-specific workspace task bound to the existing `java-main` runnable tag. Version 6.8.21 and manually authored configuration remain the conditional fallback until the compatibility and safe-generation gates pass; no route may overwrite unknown configuration or imply programmatic debug start. |
 | Maven goal / Gradle build | `planned` | Build execution remains official Java/Zed task ownership under D003. After S016, prefer official Java 6.8.23's wrapper-aware main/test tasks where they match; generate or merge reviewable `.zed/tasks.json` only for arbitrary goals/builds or Spring-specific commands. Manual tasks remain fallback. Spring LS's direct `Runtime.exec` commands are not selected because they do not provide Zed task/terminal ownership. |

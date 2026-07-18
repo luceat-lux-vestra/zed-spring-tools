@@ -26,6 +26,9 @@ The [final upstream audit](docs/research/014-final-upstream-capability-surface-a
 found no better official stock-Zed architecture; it records the compatibility-
 gated official Java 6.8.23 task improvement and the unavailable private/removed
 shortcuts.
+S015 found that Java and Spring Document Symbols merge well after both servers
+are ready, but restart can cache Spring-only results before JDT registers the
+capability. Project Symbols therefore remains the supported navigation fallback.
 
 ## What works today
 
@@ -98,6 +101,8 @@ pending.
 - The official Java extension `6.8.21` is required.
 - Official Java 6.8.23 is a planned compatibility refresh, not yet supported.
 - Installation after JDT LS has already started requires a Zed restart.
+- The opt-in Java LSP Outline is not a supported Spring route: after restart it
+  can omit ordinary Java symbols until a document edit forces recollection.
 - First-use artifact acquisition can hang until Zed is restarted.
 - There is no product continuous integration, packaged release, offline install,
   rollback flow, or Marketplace entry yet.

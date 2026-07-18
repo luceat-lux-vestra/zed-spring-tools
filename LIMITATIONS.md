@@ -11,9 +11,12 @@ extension.
   or unverified. Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
   `document_symbols` setting is enabled. The earlier zero-request run was the
-  default tree-sitter control. The authentic JDT/Spring merged hierarchy,
-  duplicates, refresh, and navigation remain unverified pending S015, so the
-  verified Project Symbols workflow remains the fallback.
+  default tree-sitter control. S015 found a clear nested JDT/Spring merge and
+  correct Spring navigation after both servers were ready, but Refuted the route
+  on restart: Spring answered before JDT's later dynamic registration, and Zed
+  cached a Spring-only Outline that omitted ordinary Java symbols until a source
+  edit forced recollection. The verified Project Symbols workflow remains the
+  fallback; the opt-in Structure document remains planned.
 - Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested
