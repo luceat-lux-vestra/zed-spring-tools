@@ -290,9 +290,11 @@ same isolated Zed. Coordination is **Supported on Gradle too**:
   build-tool-independent.
 - Not exercised: the Gradle official runnable (`task_helper` runs
   `gradle run -PmainClass=...`); it is expected to mirror run 2's split result.
-- Out of scope: completion ordering (`server.port` not ranked first for
+- Out of scope: completion ordering (`server.port` not visibly ranked first for
   `server.p`) is Zed's client-side fuzzy ranking, reproduces on Maven too, and is
-  independent of 6.8.23 — tracked separately as a Zed+Spring UX item.
+  independent of 6.8.23. [R015](../research/015-spring-completion-ranking.md)
+  confirms that Spring sends `server.port` first and attributes the visible
+  reorder to Zed's single-word fuzzy pass preceding LSP `sortText`.
 
 ### Pending
 
