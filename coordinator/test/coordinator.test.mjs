@@ -59,14 +59,15 @@ test("versioned official Java provider contract is exact", () => {
   );
 });
 
-test("Java data requests are answered through the official Java transport", async () => {
+test("Spring Java client requests are answered through the official Java transport", async () => {
   const springWrites = [];
   const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: {
-      supportsSpringClientMethod: (method) => method === "sts/javaType",
+      supportsSpringClientMethod: (method) =>
+        method === "sts/javaType" || method === "sts/project/gav",
       executeSpringClientMethod: async (method, params) => ({ method, params }),
     },
     worktree: "/tmp/project",
@@ -77,11 +78,25 @@ test("Java data requests are answered through the official Java transport", asyn
     method: "sts/javaType",
     params: { typeName: "example.Demo" },
   });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "gav",
+    method: "sts/project/gav",
+    params: { projectUris: ["file:///tmp/project"] },
+  });
   assert.deepEqual(springWrites, [
     {
       jsonrpc: "2.0",
       id: 7,
       result: { method: "sts/javaType", params: { typeName: "example.Demo" } },
+    },
+    {
+      jsonrpc: "2.0",
+      id: "gav",
+      result: {
+        method: "sts/project/gav",
+        params: { projectUris: ["file:///tmp/project"] },
+      },
     },
   ]);
   assert.deepEqual(zedWrites, []);

@@ -187,6 +187,17 @@ updates the inventory, and publishes its exact blocker when Zed lacks a UI or
 protocol surface. Pixel-identical VS Code UI is not required; functional loss
 must never be hidden.
 
+The current Boot-project-discovery slice completes one missing dependency in
+the accepted Java-companion boundary. Spring's
+`sts/spring-boot/executableBootProjects` command calls the server-to-client
+`sts/project/gav` request before returning its project records; the coordinator
+must map that request to the official Java bundle's `sts.project.gav` delegate
+command, without rewriting the request or result. The slice adds exact transport
+and coordinator contract coverage and updates the inventory and limitations.
+It does not add a Zed command, task, or DAP surface, so Boot project info and
+executable-project discovery remain `planned` until a user-facing workflow is
+implemented and driven on a named tuple.
+
 The references-and-implementations verification also exposed a startup-order
 race after the official Java route appeared but while Java project import was
 still completing: the first bridge registration timed out, Spring disabled

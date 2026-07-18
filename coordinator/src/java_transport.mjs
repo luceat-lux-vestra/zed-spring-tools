@@ -6,7 +6,7 @@ import path from "node:path";
 export const BRIDGE_ADD = "zed.spring.bridge.v1.addClasspathListener";
 export const BRIDGE_REMOVE = "zed.spring.bridge.v1.removeClasspathListener";
 
-const JAVA_METHODS = new Map([
+const SPRING_CLIENT_METHODS = new Map([
   ["sts/javaType", "sts.java.type"],
   ["sts/javadoc", "sts.java.javadoc"],
   ["sts/javadocHoverLink", "sts.java.javadocHoverLink"],
@@ -16,9 +16,14 @@ const JAVA_METHODS = new Map([
   ["sts/javaSubTypes", "sts.java.hierarchy.subtypes"],
   ["sts/javaSuperTypes", "sts.java.hierarchy.supertypes"],
   ["sts/javaCodeComplete", "sts.java.code.completions"],
+  ["sts/project/gav", "sts.project.gav"],
 ]);
 
-const ALLOWED_COMMANDS = new Set([BRIDGE_ADD, BRIDGE_REMOVE, ...JAVA_METHODS.values()]);
+const ALLOWED_COMMANDS = new Set([
+  BRIDGE_ADD,
+  BRIDGE_REMOVE,
+  ...SPRING_CLIENT_METHODS.values(),
+]);
 
 export class JavaTransport {
   constructor({ javaWorkDirectory, worktree, timeoutMs = 5000 }) {
@@ -38,13 +43,13 @@ export class JavaTransport {
   }
 
   async executeSpringClientMethod(method, params, options) {
-    const command = JAVA_METHODS.get(method);
+    const command = SPRING_CLIENT_METHODS.get(method);
     if (command === undefined) throw new Error("unsupported Spring Java client method");
     return await this.execute(command, [structuredClone(params)], options);
   }
 
   supportsSpringClientMethod(method) {
-    return JAVA_METHODS.has(method);
+    return SPRING_CLIENT_METHODS.has(method);
   }
 
   async waitUntilReady({ signal } = {}) {
