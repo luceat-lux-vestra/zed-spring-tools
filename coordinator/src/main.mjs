@@ -42,6 +42,7 @@ export class Coordinator {
     this.sequence = 0;
     this.sessionId = randomUUID();
     this.javaFailureShown = false;
+    this.routedJavaMethods = new Set();
     this.shutdownIds = new Set();
     this.abortController = new AbortController();
     this.enableTask = undefined;
@@ -101,11 +102,13 @@ export class Coordinator {
     if (this.javaTransport.supportsSpringClientMethod(message.method)) {
       await this.#answer(message, async () => {
         try {
-          return await this.javaTransport.executeSpringClientMethod(
+          const result = await this.javaTransport.executeSpringClientMethod(
             message.method,
             message.params,
             { signal: this.abortController.signal },
           );
+          this.#noteJavaRoute(message.method);
+          return result;
         } catch (error) {
           if (!this.closed) this.#showJavaFailure();
           throw error;
@@ -265,6 +268,12 @@ export class Coordinator {
     } else {
       pending.reject(new Error("Spring Tools rejected an internal callback"));
     }
+  }
+
+  #noteJavaRoute(method) {
+    if (this.routedJavaMethods.has(method)) return;
+    this.routedJavaMethods.add(method);
+    this.logger(`official Java data request ${method} answered`);
   }
 
   #showJavaFailure() {

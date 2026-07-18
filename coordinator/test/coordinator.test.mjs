@@ -87,6 +87,53 @@ test("Java data requests are answered through the official Java transport", asyn
   assert.deepEqual(zedWrites, []);
 });
 
+test("an answered Java data request is logged once per method, with no parameters", async () => {
+  const logs = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed() {},
+    javaTransport: {
+      supportsSpringClientMethod: (method) => method === "sts/javaType",
+      executeSpringClientMethod: async () => ({ name: "example.Demo" }),
+    },
+    worktree: "/tmp/project",
+    logger: (message) => logs.push(message),
+  });
+  const request = (id) => ({
+    jsonrpc: "2.0",
+    id,
+    method: "sts/javaType",
+    params: { bindingKey: "Ljava/lang/Integer;", projectUri: "file:///tmp/project" },
+  });
+  await coordinator.handleSpringMessage(request(1));
+  await coordinator.handleSpringMessage(request(2));
+  assert.deepEqual(logs, ["official Java data request sts/javaType answered"]);
+  assert.ok(!logs[0].includes("Integer"), "route log must not carry request parameters");
+});
+
+test("a failed Java data request is not logged as answered", async () => {
+  const logs = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed() {},
+    javaTransport: {
+      supportsSpringClientMethod: () => true,
+      executeSpringClientMethod: async () => {
+        throw new Error("official Java route was not found");
+      },
+    },
+    worktree: "/tmp/project",
+    logger: (message) => logs.push(message),
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 9,
+    method: "sts/javaType",
+    params: {},
+  });
+  assert.deepEqual(logs, []);
+});
+
 test("ordinary LSP traffic remains visible to Zed", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
