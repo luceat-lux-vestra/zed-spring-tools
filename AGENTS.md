@@ -155,8 +155,9 @@ mechanical.
 - The maintainer checks metadata before merge. Historical pull requests do not
   need a complete retroactive relabeling.
 - Keep the responsible human as the Git author. For material Codex assistance,
-  add `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>` and note
-  that this descriptive trailer is not guaranteed to map to a GitHub account.
+  add `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`. GitHub
+  currently resolves that trailer to the `codex` account; update the model label
+  when the active Codex model changes.
 
 ## Change discipline
 

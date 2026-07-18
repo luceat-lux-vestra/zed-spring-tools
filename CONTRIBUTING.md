@@ -85,7 +85,8 @@ information.
 
 The responsible human remains the Git author. Material Codex assistance may be
 recorded with `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`.
-This is a descriptive attribution and may not resolve to a GitHub account.
+GitHub currently resolves this trailer to the `codex` account. Update the model
+label when the active Codex model changes.
 
 ## Research and spikes
 
