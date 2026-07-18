@@ -54,18 +54,34 @@ now macOS **26.5.2** (build 25F84), a point release above the 26.5.1 recorded on
 the earlier tested tuple; each run must record the exact observed value rather
 than assume the earlier release. Zed is `1.11.3`, runtime JDK Temurin `25.0.3`.
 
-### 6.8.23 is not present locally; obtaining it is a network step
+### 6.8.23 is not installable from the Zed registry; it needs a source dev build
 
-Every `extensions/installed/java/extension.toml` on the host — the live Zed data
-dir and every warm `tmp/` profile — reports `version = "6.8.21"`. Official Java
-`6.8.23` exists nowhere locally. Acquiring it means updating the `java` extension
-in a real Zed from the Zed extension registry (a runtime network fetch), then
-building the isolated profile from that installed tree with
-`scripts/prepare-local-poc.mjs`, which copies `extensions/installed/java` plus
-the `jdtls`/`bin` work dirs and asserts the manifest version. That assertion is
-currently pinned to `6.8.21` and must be pointed at `6.8.23` for this spike's
-profile preparation. Record the installed 6.8.23 digest on download; do not use
-an unpinned `latest` as an asserted supported configuration.
+Every `extensions/installed/java/extension.toml` on the host reported
+`version = "6.8.21"`. Confirmed on 2026-07-19 why: `zed-extensions/java` has
+tagged **v6.8.23** (2026-07-17, commit `ddc13dafaf9ddc44ab46c9ff9768832aa98dfe11`),
+but the Zed extension registry (`zed-industries/extensions/extensions.toml`) still
+pins `java = 6.8.21`. Zed's Extensions UI therefore offers only 6.8.21, and a
+normal "update" cannot reach 6.8.23. (A `proxy-bin/v6.8.23/` binary was observed
+in the live work dir before the user uninstalled `java`, consistent with a prior
+source dev build having fetched the versioned proxy.)
+
+Obtaining 6.8.23 therefore means cloning `zed-extensions/java` at v6.8.23 and
+installing it as a **dev extension**, so Zed builds the WASM and, on first Java
+open, downloads jdtls plus the v6.8.23 proxy from the tag's GitHub release
+(`src/proxy.rs` → `github_release_by_tag_name`). Source review of the tag
+confirms the S016 hypothesis's additions are present: a `task_helper` crate, a
+`gradle-bridge`, and a new `gradle-language-server` language server in
+`extension.toml`. Do not use an unpinned `latest`; the pinned tag/commit above is
+the spike input. The clone lives at
+`tmp/s016-java-6.8.23-20260719/zed-java-src` (checked out at the commit,
+gitignored).
+
+Consequence: a copy-from-installed profile prep (the shape of
+`scripts/prepare-local-poc.mjs`) does not fit, because there is no registry
+install to copy. The spike stages only a fresh isolated profile plus the fixture
+and settings; `java` (6.8.23) and `zed-spring-tools` are both dev-installed into
+that profile, preserving the S014 ordering by installing both before the fixture
+opens.
 
 ### The compatibility contract is self-asserted, not runtime-detected
 
@@ -102,13 +118,15 @@ self-declared support, not any runtime gate. The driven run must therefore:
 This is the reusable design finding to carry into the follow-up decision on how
 6.8.23 should be admitted.
 
-### Profile-prep scaffolding staged
+### Profile-staging scaffolding
 
 `spikes/s016-official-java-6.8.23-compatibility-refresh/` holds a disposable
-6.8.23 analog of `scripts/prepare-local-poc.mjs` plus a driven-run runbook. Its
-`--self-test` passes against a synthetic 6.8.23 source without a live install, so
-step 2 (isolated-profile build) is automated once a real 6.8.23 install exists;
-the interactive Zed steps remain manual.
+`stage_s016.mjs` plus a driven-run runbook. `--stage` builds a fresh isolated
+Zed profile (trace on, pinned JDK home, auto-update off) and the fixture
+worktree; it does not copy `java`, because 6.8.23 is dev-installed, not a
+registry install. `--self-test` passes without a live install. The interactive
+Zed steps — dev-installing both extensions and driving the pickers — remain
+manual.
 
 ## Procedure
 
