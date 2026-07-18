@@ -23,6 +23,15 @@ const CLASSPATH_CALLBACK_COMMAND = /^sts4\.classpath\.[A-Za-z]{8}$/;
 const CALLBACK_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const REQUEST_TIMEOUT_MS = 10_000;
 const JAVA_ROUTE_TIMEOUT_MS = 30_000;
+// A late-starting official Java server can still be importing the project when
+// the route first registers, so the first classpath handshakes time out and
+// recover once the import finishes. Keep re-driving the handshake for this long
+// before surfacing the hard requirement error, so a slow startup does not raise
+// a misleading "requires the official Java extension" popup. Each retry cycle is
+// bounded by the Java transport timeout plus the backoff below, so this leaves
+// room for several attempts against a cold project import.
+const JAVA_HANDSHAKE_GRACE_MS = 60_000;
+const CLASSPATH_RETRY_MS = 1_000;
 const SERVER_JAR = "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar";
 
 export class Coordinator {
@@ -32,6 +41,8 @@ export class Coordinator {
     javaTransport,
     worktree,
     requestTimeoutMs = REQUEST_TIMEOUT_MS,
+    javaHandshakeGraceMs = JAVA_HANDSHAKE_GRACE_MS,
+    classpathRetryMs = CLASSPATH_RETRY_MS,
     logger = () => {},
   }) {
     this.sendSpring = sendSpring;
@@ -39,6 +50,8 @@ export class Coordinator {
     this.javaTransport = javaTransport;
     this.worktree = worktree;
     this.requestTimeoutMs = requestTimeoutMs;
+    this.javaHandshakeGraceMs = javaHandshakeGraceMs;
+    this.classpathRetryMs = classpathRetryMs;
     this.logger = logger;
     this.pending = new Map();
     this.pendingZedRequests = new Set();
@@ -46,6 +59,8 @@ export class Coordinator {
     this.sequence = 0;
     this.sessionId = randomUUID();
     this.javaFailureShown = false;
+    this.coordinationStartedAt = Date.now();
+    this.classpathRetryScheduled = false;
     this.routedJavaMethods = new Set();
     this.ownedCapabilityRegistrations = new Set();
     this.shutdownIds = new Set();
@@ -190,13 +205,51 @@ export class Coordinator {
     try {
       await session.open();
       this.session = session;
+      this.classpathRetryScheduled = false;
       this.logger("official Java classpath bridge registered");
       return "ok";
     } catch (error) {
-      if (!this.closed) this.#showJavaFailure();
       await session.close().catch(() => {});
+      // A late-starting official Java server is still importing the project, so
+      // registering the classpath listener times out and Spring gives up. Spring
+      // does not retry on its own, so re-drive the enable handshake until the
+      // server is ready; only surface the requirement error once that keeps
+      // failing past the grace window.
+      if (!this.closed) {
+        if (Date.now() - this.coordinationStartedAt >= this.javaHandshakeGraceMs) {
+          this.#showJavaFailure();
+        } else {
+          this.#scheduleClasspathRetry();
+        }
+      }
       throw error;
     }
+  }
+
+  #scheduleClasspathRetry() {
+    if (this.classpathRetryScheduled || this.closed) return;
+    this.classpathRetryScheduled = true;
+    void (async () => {
+      await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
+      this.classpathRetryScheduled = false;
+      if (this.closed || this.session !== undefined) return;
+      if (Date.now() - this.coordinationStartedAt >= this.javaHandshakeGraceMs) {
+        this.#showJavaFailure();
+        return;
+      }
+      this.logger("official Java classpath handshake not ready yet; re-enabling");
+      try {
+        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+          command: ENABLE_CLASSPATH,
+          arguments: [true],
+        });
+      } catch (error) {
+        if (this.closed || error?.name === "AbortError") return;
+      }
+      // Keep re-driving until the bridge registers or the grace window elapses,
+      // even if Spring does not re-issue the registration request on its own.
+      if (!this.closed && this.session === undefined) this.#scheduleClasspathRetry();
+    })();
   }
 
   async #removeClasspath(params) {
@@ -213,6 +266,7 @@ export class Coordinator {
 
   #startClasspathCoordination() {
     if (this.enableTask !== undefined || this.closed) return;
+    this.coordinationStartedAt = Date.now();
     this.enableTask = this.#enableClasspathWhenJavaReady();
   }
 
@@ -224,7 +278,7 @@ export class Coordinator {
       } catch (error) {
         if (this.closed || error?.name === "AbortError") return;
         this.logger("official Java route is not ready; continuing to wait");
-        await retryDelay(1000, this.abortController.signal).catch(() => {});
+        await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
         continue;
       }
       if (this.closed) return;
@@ -239,7 +293,7 @@ export class Coordinator {
       } catch (error) {
         if (this.closed || error?.name === "AbortError") return;
         this.#showJavaFailure();
-        await retryDelay(1000, this.abortController.signal).catch(() => {});
+        await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
       }
     }
   }
