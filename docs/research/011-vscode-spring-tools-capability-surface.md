@@ -164,10 +164,14 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
 2. Which advertised capabilities actually return results without live data or a
    Boot project — several may advertise unconditionally and return empty.
 3. Resolved 2026-07-18: `sts/javaType` (and its `sts/java*` siblings) is handled
-   by the coordinator, routed to the official Java extension; `vscode-spring-boot.ls.start`
-   is a VS Code client command, not a coordinator request, and its callback's work
-   is already performed by the coordinator. Neither gates the capabilities above as
-   an unhandled request. See the inventory rows for the exact mechanism.
+   by the coordinator and routed to the official Java extension. The separate
+   `sts/project/gav` request required by executable Boot-project discovery is
+   also mapped to the official Java `sts.project.gav` delegate and
+   contract-tested. `vscode-spring-boot.ls.start` is a VS Code client command,
+   not a coordinator request, and its callback's work is already performed by
+   the coordinator. These requests no longer gate the capabilities above as an
+   unhandled transport request; see the inventory rows for the remaining
+   user-facing gaps.
 
 ## Blockers and constraints
 

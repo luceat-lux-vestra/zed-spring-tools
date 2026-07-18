@@ -11,7 +11,7 @@ test("official Java route ID is the normalized UTF-8 worktree hex", () => {
   assert.equal(routeId("/tmp/프로젝트/"), Buffer.from("/tmp/프로젝트").toString("hex"));
 });
 
-test("allowlisted Spring Java request uses the official loopback route", async (context) => {
+test("allowlisted Spring Java requests use the official loopback route", async (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const worktree = path.join(root, "work tree");
@@ -24,7 +24,11 @@ test("allowlisted Spring Java request uses the official loopback route", async (
     request.on("end", () => {
       received.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
       response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ result: { name: "Demo" } }));
+      const command = received.at(-1)?.params?.command;
+      const result = command === "sts.project.gav"
+        ? [{ groupId: "example", artifactId: "demo", version: "1.0.0" }]
+        : { name: "Demo" };
+      response.end(JSON.stringify({ result }));
     });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -39,12 +43,25 @@ test("allowlisted Spring Java request uses the official loopback route", async (
     await transport.executeSpringClientMethod("sts/javaType", { typeName: "example.Demo" }),
     { name: "Demo" },
   );
+  assert.deepEqual(
+    await transport.executeSpringClientMethod("sts/project/gav", {
+      projectUris: ["file:///tmp/work%20tree"],
+    }),
+    [{ groupId: "example", artifactId: "demo", version: "1.0.0" }],
+  );
   assert.deepEqual(received, [
     {
       method: "workspace/executeCommand",
       params: {
         command: "sts.java.type",
         arguments: [{ typeName: "example.Demo" }],
+      },
+    },
+    {
+      method: "workspace/executeCommand",
+      params: {
+        command: "sts.project.gav",
+        arguments: [{ projectUris: ["file:///tmp/work%20tree"] }],
       },
     },
   ]);
