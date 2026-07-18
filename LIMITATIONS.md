@@ -8,8 +8,25 @@ extension.
   property/YAML completion and validation, and Spring workspace symbols (beans,
   the request-mapping endpoint, and stereotypes reachable through Zed's project
   symbol search). Most VS Code Spring Tools capabilities are still unimplemented
-  or unverified. Zed's per-file outline is tree-sitter-based and does not consume
-  the server's LSP document symbols.
+  or unverified. Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
+  Document Symbols for Outline and Breadcrumbs when the default-off Java
+  `document_symbols` setting is enabled. The earlier zero-request run was the
+  default tree-sitter control. The authentic JDT/Spring merged hierarchy,
+  duplicates, refresh, and navigation remain unverified pending S015, so the
+  verified Project Symbols workflow remains the fallback.
+- Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
+  webview, arbitrary editor item, or arbitrary command-palette action. D005
+  therefore selects standard LSP/DAP/task surfaces first and explicitly requested
+  Structure/Live documents only where grouping or a table is essential. Those
+  generated documents, CodeLens adaptation, Run/Debug generation, and live-data
+  UX are plans, not implemented capabilities. The full preferred and fallback
+  mapping is in `docs/capability-delivery-plan.md`.
+- The final upstream audit found no hidden extension shortcut for those missing
+  surfaces. Extension slash commands are removed, internal CodeLens task
+  scheduling is not exported to extension LSP adapters, general
+  `window/showDocument` is not supported by Zed's project LSP client, and
+  Project Symbols does not render `containerName` as a hierarchy. URLs therefore
+  require a verified Document Link/Markdown link plus copyable text fallback.
 - There is no packaged extension, installer, release artifact, product CI, or
   Marketplace entry. Installation means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a
@@ -19,6 +36,10 @@ extension.
 - The product requires the official Zed Java extension. It does not replace Java
   debugging, tests, tasks, project import, or other Java ownership, and it will
   not offer a reduced standalone JDT fallback.
+- Official Java 6.8.23 adds useful wrapper-aware main/test tasks but is not yet a
+  supported companion. The product remains pinned to 6.8.21 until S016 verifies
+  the versioned bridge, callbacks, cleanup, logs, and representative Boot main
+  runnable; source compatibility alone is not a support claim.
 - The coordinator depends on a private Java-provider transport that the official
   Java extension does not document as public API. A future Java extension release
   may change it and break this project. The versioned adapter narrows that risk

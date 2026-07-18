@@ -2,7 +2,7 @@
 
 - Status: In progress; M1-M3 complete, M4 in progress
 - Last updated: 2026-07-18
-- Architecture: D002, D003, and D004 Accepted
+- Architecture: D002-D005 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
 
@@ -155,10 +155,12 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 4 exists at
+Status: in progress. Inventory version 5 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
-Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 14 `verified`, 0
+Spring Tools `5.2.0.RELEASE` and amended by
+[R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
+delivery routes. It records 46 capabilities: 14 `verified`, 0
 `implemented`, 3 `zed-native-equivalent`, and 29 `planned`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
@@ -186,6 +188,71 @@ Each slice starts with a reviewed plan, adds contract and integration tests,
 updates the inventory, and publishes its exact blocker when Zed lacks a UI or
 protocol surface. Pixel-identical VS Code UI is not required; functional loss
 must never be hidden.
+
+#### Selected capability-delivery strategy
+
+[D005](decisions/005-lsp-first-capability-delivery.md) selects an additive,
+stock-Zed, LSP-first strategy for the complete inventory. The canonical mapping
+is [the M4 capability delivery plan](capability-delivery-plan.md); it records the
+current baseline/fallback, preferred route, failure trigger, and planning
+confidence for properties/YAML, symbols, CodeLens, Boot discovery, Run/Debug,
+tasks, live connections, metrics, loggers, dashboard outcomes, upgrade,
+Modulith, special languages, embedded highlighting, Initializr, AI explanations,
+and offline/compatibility behavior.
+
+The delivery order is:
+
+1. retain every verified standard-LSP and Project Symbols result as a fallback;
+2. use native standard LSP surfaces before adapting a custom Spring protocol;
+3. adapt allowlisted Spring protocols inside the existing coordinator rather
+   than adding another process or UI route;
+4. use explicitly requested, regenerable Structure/Live documents only where a
+   workspace-wide hierarchy or table is essential; and
+5. leave a capability `planned` when neither its preferred route nor its named
+   fallback has runtime evidence.
+
+Zed 1.11.3 supports LSP Document Symbols behind the default-off
+`languages.Java.document_symbols` setting. The earlier zero-request run is a
+valid control for the default tree-sitter path, not evidence that Zed lacks the
+feature. [S015](spikes/015-stock-zed-java-spring-document-symbols.md) must test
+the authentic JDT/Spring merge, hierarchy, navigation, refresh, and restart
+before the preferred per-file Outline route is claimed. Verified Project Symbols
+remains the fallback if that gate fails.
+
+[R014](research/014-final-upstream-capability-surface-audit.md) rechecked D005
+against Zed main, official Java 6.8.23, and current Spring source. It found no
+better stock-Zed architecture. It also established that extension slash
+commands are removed, built-in CodeLens task scheduling is not exported to an
+extension LSP adapter, general `window/showDocument` is not advertised or
+handled, and Project Symbols cannot become a tree through `containerName`.
+Those routes are excluded rather than treated as implementation shortcuts.
+
+Official Java 6.8.23 adds wrapper-aware Maven/Gradle/vanilla main and test tasks.
+They are a simplification candidate, not inherited support: the current product
+contract remains 6.8.21 until
+[S016](spikes/016-official-java-6.8.23-compatibility-refresh.md) repeats the
+bridge, callback, cleanup, logging, and main-runnable gate. If Supported, matching
+official Java tasks take precedence over product-generated duplicate Java tasks;
+Spring-specific goals and Boot Debug still use reviewable Zed task/debug
+configuration.
+
+The baseline product continues to exclude Java language/query replacement, a
+custom Zed build, and an external dashboard. An opt-in Java query experiment may
+be proposed later only through a new direction decision, after stock-Zed routes
+are tested, and only for a capability such as embedded syntax highlighting that
+has no safe equivalent.
+
+Immediate M4 slice order after the current Boot-project transport work is:
+
+1. S015 Document Symbols verification;
+2. S016 official Java 6.8.23 compatibility and main-task verification;
+3. authentic `sts/highlight` to CodeLens adaptation;
+4. Boot-project selection and merge-safe Run/Debug configuration using official
+   Java task/DAP ownership;
+5. properties/YAML conversion and metadata reload Code Actions;
+6. one opt-in Spring Structure document slice; and
+7. separately gated live-data, metrics, logger, upgrade, Modulith, and special
+   language slices.
 
 The current Boot-project-discovery slice completes one missing dependency in
 the accepted Java-companion boundary. Spring's
@@ -235,9 +302,21 @@ language/build/packaging gate. The amended order completes a source-separated
 basic product PoC before creating the public repository, preserves official Java
 ownership, prohibits copying spike infrastructure into production, and makes
 capability parity an auditable inventory rather than a broad marketing claim.
+Amended on 2026-07-18 after R013 and the project owner's D005 choice. The M4
+strategy now keeps the current verified/manual routes as explicit fallbacks,
+prefers standard-LSP adaptation in the existing coordinator, permits only
+opt-in generated Structure/Live documents, and excludes Java language/query
+replacement from the baseline.
+
+Amended again on 2026-07-18 after R014's final latest-upstream audit. D005
+remains the selected architecture; the order now gates official Java 6.8.23
+before reusing its task helper and explicitly excludes removed/private action,
+task, browser, and Project-Symbol grouping shortcuts.
 
 The highest known risks are the official proxy's private compatibility surface,
-third-party artifact distribution, currently unhandled Spring client methods,
-shutdown-response mismatches, Java-provider updates, and the untested platform
-matrix. Each has an explicit decision or validation gate above; none is treated
-as already solved by the local PoC.
+third-party artifact distribution, unadapted Spring client methods, official
+Java 6.8.23 compatibility, multi-server Document Symbols quality, generated-file
+merge/freshness, remote credential
+handling, shutdown-response mismatches, Java-provider updates, and the untested
+platform matrix. Each has an explicit decision or validation gate above; none is
+treated as already solved by the local PoC.

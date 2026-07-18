@@ -87,8 +87,8 @@ to gather evidence; productizing it stays behind a decision (see Success below).
 - H1 "Zed waits" → fix by making the contribution reliably complete
   (production `src/` change, no gate). A decision doc is not required.
 - H1 "Zed does not wait" and H2 Supported → a reload-based fix that calls
-  `java.reloadBundles`, which needs a **D005** decision because it invokes an
-  official Java command outside the allowlist.
+  `java.reloadBundles`, which needs a separate direction decision because it
+  invokes an official Java command outside the allowlist.
 - H2 Refuted → reopen options; record the constraint and stop.
 
 ## Gate A result (2026-07-18)
@@ -117,7 +117,8 @@ is present before any Java file is opened — needs no reload: Zed waits for the
 callback and the bridge registers. The only failing scenario is the extension
 becoming available after `jdtls` has started, which a `jdtls` restart resolves.
 That does not clearly justify invoking the out-of-allowlist `java.reloadBundles`,
-so Gate B and a `D005` decision are shelved rather than pursued.
+so Gate B and a reload-specific direction decision are shelved rather than
+pursued. D005 now identifies the unrelated M4 capability-delivery decision.
 
 ## Residual uncertainty
 
