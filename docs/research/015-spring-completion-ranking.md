@@ -1,6 +1,6 @@
 # R015: Spring property completion ranking in stock Zed
 
-- Status: Complete for attribution; candidate upstream fixes remain untested
+- Status: Complete for attribution; upstream issue filed and narrow sorter fix candidate verified
 - Last updated: 2026-07-19
 - Investigator: OpenAI Codex (GPT-5.6 Sol)
 - Runtime baseline:
@@ -104,6 +104,13 @@ general completion-quality claim.
     score. The adapter also emits `CompletionItemTag.Deprecated`. The live
     response confirms both effects: tagged items were placed at the end and
     carried `tags: [1]`.
+15. A focused test against Zed main commit `2118a7c53a` passed the captured
+    labels, `filterText`, and `sortText` values through Zed's actual completion
+    sorter. With query `p`, the tested order began
+    `server.ssl.key-password`, deprecated `server.max-http-post-size`, and the
+    three visible Tomcat candidates, with `server.port` sixth. With query
+    `server.p`, `server.port` returned to first place. This verifies the narrow
+    sorter premise but is not yet a live official-Java runtime test.
 
 ## Primary sources
 
@@ -144,10 +151,19 @@ All sources were accessed on 2026-07-19.
     settings
   - upstream commit:
     <https://github.com/zed-industries/zed/commit/952d712dac48a4af2c54fb22c82d82a9d69b72d4>
+- Latest Zed source verification at commit `2118a7c53a`:
+  - `crates/editor/src/code_completion_tests.rs`, focused local test using the
+    captured Spring subset; `cargo test -p editor
+    test_spring_properties_completion_ranking -- --nocapture` passed
+  - the temporary test was not retained because the source-level change belongs
+    to the Java extension, not Zed core
 - Official Java extension 6.8.23 at commit `ddc13daf`:
   - `languages/properties/config.toml`, no `completion_query_characters`
   - upstream tag:
     <https://github.com/zed-extensions/java/tree/v6.8.23/languages/properties>
+  - upstream issue filed with the captured ordering and latest-Zed sorter
+    reproduction:
+    <https://github.com/zed-extensions/java/issues/287>
 - Spring Tools 5.2.0.RELEASE at commit `18d1a975`:
   - `VscodeCompletionEngineAdapter.java:220-286`, proposal sort, sequential
     `sortText`, and deprecated tag conversion
@@ -172,10 +188,11 @@ All sources were accessed on 2026-07-19.
    styling only; the fuzzy tuple can move a tagged item from the response tail
    to the visible beginning.
 3. Adding `.` (and plausibly `-`) to the official Properties language's
-   `completion_query_characters` is the narrowest source-level candidate. It
-   would make the local query include `server.p` instead of only `p`, without
-   changing Spring metadata or the product coordinator. This is not yet a
-   verified fix.
+   `completion_query_characters` is the narrowest source-level candidate. The
+   actual Zed sorter restored `server.port` to first for the captured subset
+   when given `server.p` instead of `p`. A live Properties-language runtime
+   check and relaxed-binding coverage remain necessary before calling the
+   configuration change fully verified.
 4. Globally promoting `sortText` ahead of fuzzy score in Zed is broader and may
    regress language servers that rely on useful client fuzzy ranking. Any such
    change needs upstream tests across representative languages.
@@ -183,12 +200,13 @@ All sources were accessed on 2026-07-19.
 ## Unverified hypotheses
 
 1. A Properties configuration with `completion_query_characters = [".", "-"]`
-   will keep `server.port` first for `server.p` without degrading relaxed Spring
-   property matching.
+   will preserve the sorter result in a live official-Java session without
+   degrading relaxed Spring property matching.
 2. YAML keys may show an analogous mismatch at nested separators, despite the
    different language configuration and syntax.
-3. Zed main after 1.11.3 may retain the same behavior; this investigation fixes
-   the claim only to the installed stable commit.
+3. The latest-Zed sorter result may differ in a complete live menu due to
+   response fields or integration behavior not represented by the bounded
+   captured subset.
 
 ## Runtime verification needed
 
@@ -212,10 +230,10 @@ All sources were accessed on 2026-07-19.
 
 ## Candidate next experiments
 
-1. Add an upstream-style Zed/official-Java test fixture whose Properties
-   language includes `.` and `-`, then assert the local query and menu order for
-   `server.p`, `server.tomcat.m`, and one deprecated property. This distinguishes
-   the narrow language-config fix from a Zed sorter change.
+1. Follow <https://github.com/zed-extensions/java/issues/287> and add an
+   upstream-style official-Java test fixture whose Properties language includes
+   `.` and `-`, then assert the local query and menu order for `server.p`,
+   `server.tomcat.m`, and one deprecated property.
 2. If that fails, add a focused Zed editor test with the captured
    `label`/`filterText`/`sortText`/`tags` subset and compare candidate sort tuples.
    Use the result to propose the smallest sorter rule that preserves server
@@ -232,4 +250,7 @@ query to `p`, fuzzy-ranks candidates ahead of their server-provided `sortText`,
 and uses the deprecated tag only for presentation. The user-visible ordering is
 therefore a confirmed Zed/Properties-language integration issue, not a Spring
 metadata or official-Java 6.8.23 coordination regression. No product code change
-is justified by this result.
+is justified by this result. The captured subset returns `server.port` to first
+place when Zed receives the full `server.p` query, and the responsible Java
+extension issue is now tracked upstream as
+<https://github.com/zed-extensions/java/issues/287>.
