@@ -1,7 +1,7 @@
 # S016: Official Java 6.8.23 compatibility refresh
 
-- Status: Proposed
-- Date: 2026-07-18
+- Status: Prepared; runtime driven run pending (see Preparation below)
+- Date: 2026-07-18 (prepared 2026-07-19)
 - Related research:
   [R014](../research/014-final-upstream-capability-surface-audit.md)
 - Decisions:
@@ -40,6 +40,67 @@ main class.
 
 Other desktop, architecture, JDK, Zed, Java-extension, and build-tool tuples
 remain untested.
+
+## Preparation (2026-07-19, source-backed; no runtime claim)
+
+Groundwork completed before the driven run. Nothing here asserts a runtime
+result; the compatibility state is unchanged.
+
+### Environment pinned and captured
+
+Host, Zed, JDK, and product source are recorded in
+`tmp/s016-java-6.8.23-20260719/evidence/` (`env.txt`, `README.md`). The host is
+now macOS **26.5.2** (build 25F84), a point release above the 26.5.1 recorded on
+the earlier tested tuple; each run must record the exact observed value rather
+than assume the earlier release. Zed is `1.11.3`, runtime JDK Temurin `25.0.3`.
+
+### 6.8.23 is not present locally; obtaining it is a network step
+
+Every `extensions/installed/java/extension.toml` on the host — the live Zed data
+dir and every warm `tmp/` profile — reports `version = "6.8.21"`. Official Java
+`6.8.23` exists nowhere locally. Acquiring it means updating the `java` extension
+in a real Zed from the Zed extension registry (a runtime network fetch), then
+building the isolated profile from that installed tree with
+`scripts/prepare-local-poc.mjs`, which copies `extensions/installed/java` plus
+the `jdtls`/`bin` work dirs and asserts the manifest version. That assertion is
+currently pinned to `6.8.21` and must be pointed at `6.8.23` for this spike's
+profile preparation. Record the installed 6.8.23 digest on download; do not use
+an unpinned `latest` as an asserted supported configuration.
+
+### The compatibility contract is self-asserted, not runtime-detected
+
+Source review of the product (not a runtime observation):
+
+- The extension writes its own embedded `protocol/java-providers.json` into the
+  runtime work dir (`src/runtime.rs`), and the coordinator validates *that* file.
+  `validateCompatibility` (`coordinator/src/main.mjs:454`) requires exactly one
+  provider and hard-codes `provider.extensionVersion !== "6.8.21"` alongside the
+  route/bridge shape.
+- `platform::resolve_java` (`src/platform.rs`) discovers only the `java`
+  *executable* via `worktree.which("java")`. Nothing reads the installed Java
+  *extension's* `extension.toml` version.
+- The coordinator reaches the official proxy purely through a port file at
+  `<javaWork>/proxy/<routeId>` (`coordinator/src/java_transport.mjs:31`); the
+  bridge handshake exchanges a schema version, not an extension version.
+
+Consequence for Procedure step 3: the "rejection control" cannot be a
+version-string refusal of the installed extension, because the product performs
+no such detection. With the unchanged contract the coordinator will still attempt
+to connect to whatever proxy exists at the pinned path. A mismatch can therefore
+surface only *structurally* — a changed proxy route/directory, port-file scheme,
+or bridge command/schema in 6.8.23. Adding a "6.8.23 compatibility record" is, in
+the current design, a source edit to `java-providers.json` plus the hard-coded
+`6.8.21` check (and the `providers.length === 1` shape); it changes the product's
+self-declared support, not any runtime gate. The driven run must therefore:
+
+1. observe whether unchanged 6.8.21-contracted product still resolves the pinned
+   route and bridge against a real 6.8.23 install (the true structural gate), and
+2. treat "accepts only the explicitly added record" as a statement about the
+   self-asserted contract, noting that a genuine installed-version guard does not
+   yet exist and recording whether the spike result argues for adding one.
+
+This is the reusable design finding to carry into the follow-up decision on how
+6.8.23 should be admitted.
 
 ## Procedure
 
@@ -101,11 +162,16 @@ runnable is Refuted. Record both outcomes instead of collapsing them.
 
 ## Observations
 
-Not run.
+Runtime steps not run. Preparation only (see the Preparation section): the
+environment is pinned and captured, 6.8.23 is confirmed absent locally, and the
+self-asserted-contract finding reframes step 3. No runtime behavior observed.
 
 ## Result
 
 Pending. This plan adds no compatibility record and changes no capability state.
+Preparation confirmed the environment pin and surfaced that no installed-version
+guard exists today; the structural route/bridge gate is what the driven run must
+exercise.
 
 ## Remaining uncertainty
 
