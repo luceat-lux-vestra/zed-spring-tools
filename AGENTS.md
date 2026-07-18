@@ -13,8 +13,11 @@ per-capability routes as fallbacks; Java language/query replacement is excluded
 from the baseline. R014's final latest-upstream audit found no better stock-Zed
 architecture. S015 found a usable live JDT/Spring Document Symbols merge but was
 Refuted because restart cached Spring-only results before JDT's later dynamic
-registration. Project Symbols remains the fallback; S016 is the next
-source-backed runtime gate for official Java 6.8.23 compatibility/task reuse.
+registration. Project Symbols remains the fallback. S016 then Supported official
+Java 6.8.23 coordination, product cleanup, warm-cache startup, and the normal-
+profile Maven main runnable on macOS arm64/JDK 25. The next reviewed slice is
+the separate 6.8.23 compatibility-table product change; authentic
+`sts/highlight` to CodeLens follows it.
 
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
 and uninstall cycle reproduced real Spring Boot property completions, executed

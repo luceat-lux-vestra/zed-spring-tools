@@ -82,7 +82,7 @@ Tentative sequence:
 | [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Supported on macOS arm64/JDK 25; other targets untested |
 | [S014](014-jdtls-bundle-startup-ordering.md) | Find why jdtls starts without the bridge bundle on a cold cache and test the two fixes | Gate A complete: install ordering identified; reload gate shelved |
 | [S015](015-stock-zed-java-spring-document-symbols.md) | Test official Java/Spring LSP Document Symbols in stock Zed without replacing Java queries | Refuted on macOS arm64/JDK 25: the normal merge worked, but restart cached Spring-only results before JDT's later dynamic registration |
-| [S016](016-official-java-6.8.23-compatibility-refresh.md) | Verify official Java 6.8.23's coordination contract and matching main-task reuse before accepting the provider | In progress on macOS arm64/JDK 25: coordination Supported on both Maven and Gradle (visible server.port completion); main runnable Supported at the helper (mvn exec:java, Tomcat on 8080) but blocked through Zed under --user-data-dir. Cleanup, redaction, and non-isolated runnable gates unrun |
+| [S016](016-official-java-6.8.23-compatibility-refresh.md) | Verify official Java 6.8.23's coordination contract and matching main-task reuse before accepting the provider | Supported on macOS arm64/JDK 25: Maven/Gradle coordination, product cleanup, warm-cache startup, and the normal-profile Maven main runnable passed. The `--user-data-dir` helper path and an upstream official-Java JDT/port-file cleanup caveat remain; compatibility-table promotion is a separate product change |
 
 Use [template.md](template.md) before adding any spike code.
 

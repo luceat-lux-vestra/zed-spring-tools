@@ -29,11 +29,42 @@ development install on 2026-07-17, returning real Spring Boot property
 completions. That observation covers the M2 vertical slice only, not general
 Spring feature coverage.
 
+## S016 compatibility-candidate evidence
+
+S016 passed its official Java 6.8.23 coordination, product-owned cleanup, warm-
+cache, and normal-profile Maven main-runnable criteria on this later exact
+tuple:
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2 (build 25F84), arm64 |
+| Zed | 1.11.3, stable source commit `952d712dac48a4af2c54fb22c82d82a9d69b72d4` |
+| Official Zed Java extension | 6.8.23, source commit `ddc13dafaf9ddc44ab46c9ff9768832aa98dfe11` |
+| JDT LS | `1.60.0-202606262232`, source commit `57ed41bdddc93df13ace6a266d8e3c1d35c95618` |
+| Spring Tools | `5.2.0.RELEASE`, source commit `18d1a975dbea4f9314fd736d0237bd9e23f243f9` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixtures | Maven Spring Boot 3.5.5; disposable Gradle 9.5.1 coordination mirror |
+
+This is compatibility-candidate evidence, not the shipped compatibility claim.
+The product source still embeds only the 6.8.21 provider record. A separately
+reviewed product change must admit 6.8.23 and decide whether compatibility stays
+structurally self-declared or gains an installed-extension-version guard.
+
+The supported observation is also bounded. Maven and Gradle coordination,
+visible Spring completion, product uninstall, warm cached startup with outbound
+network denied, and the ordinary-profile Maven main runnable passed. Gradle and
+vanilla task execution, test runnables, debugging, first-install offline
+behavior, and all other desktop/JDK tuples remain untested. Zed's generated
+runnable resolves its helper in the default data directory and therefore failed
+under `--user-data-dir`. Twice, after worktree closure, the official Java proxy
+exited while its JDT child and port file remained; product-owned processes and
+routes were already gone. See S016 for attribution and bounded evidence.
+
 ## Desktop matrix
 
 | Desktop tuple | Current state |
 | --- | --- |
-| macOS arm64 | Verified on the exact tuple above, for the M2 slice only |
+| macOS arm64 | Verified on the exact M2 tuple above; S016 adds separately bounded 6.8.23 candidate evidence on macOS 26.5.2 |
 | macOS x86_64 | Untested |
 | Linux x86_64 | Untested |
 | Linux arm64 | Untested |

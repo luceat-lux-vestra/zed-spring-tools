@@ -1,7 +1,7 @@
 # S016: Official Java 6.8.23 compatibility refresh
 
-- Status: Prepared; runtime driven run pending (see Preparation below)
-- Date: 2026-07-18 (prepared 2026-07-19)
+- Status: Supported on macOS arm64/JDK 25; compatibility-table promotion pending
+- Date: 2026-07-18 (completed 2026-07-19)
 - Related research:
   [R014](../research/014-final-upstream-capability-surface-audit.md)
 - Decisions:
@@ -136,9 +136,12 @@ manual.
 2. Prepare a clean isolated Zed profile. Install official Java 6.8.23 unchanged
    before installing the development product, preserving the S014 ordering
    contract.
-3. Start the fixture and verify the coordinator accepts only the explicitly
-   added 6.8.23 compatibility record. A run without that record is the rejection
-   control and must not enter a reduced mode.
+3. Start the fixture with the unchanged 6.8.21 compatibility declaration and
+   test the real structural boundary: proxy route discovery, bridge commands,
+   callbacks, and absence of a reduced mode. Source review established before
+   the run that the product cannot reject the installed extension by version;
+   admitting 6.8.23 to the declared table is therefore a separate product
+   change after this spike.
 4. Exercise the accepted D003 boundary: bridge bundle contribution, official
    proxy discovery, Spring startup, authentic Java classpath/project callbacks,
    visible `server.port` completion, and one verified navigation or Code Action
@@ -159,10 +162,12 @@ manual.
 
 ## Success criteria
 
-- The unknown-provider control rejects Java 6.8.23 without starting a reduced
-  managed-JDT mode.
-- The explicit 6.8.23 compatibility record supports the same bridge, callback,
-  visible Spring completion, and cleanup outcomes accepted for 6.8.21.
+- The unchanged product either fails closed at a changed structural boundary or
+  supports the same bridge, callback, visible Spring completion, and cleanup
+  outcomes accepted for 6.8.21; it never starts a reduced managed-JDT mode.
+- Any declared 6.8.23 compatibility record remains a separately reviewed source
+  change, because the current coordinator does not observe the installed Java
+  extension version.
 - The official Java main runnable uses its task helper and the Maven wrapper,
   starts the representative Spring Boot application, exposes useful terminal
   output, and stops cleanly through Zed.
@@ -172,8 +177,8 @@ manual.
 
 ## Failure criteria
 
-- Java 6.8.23 is accepted without an explicit compatibility record or falls back
-  to a self-managed JDT mode.
+- Java 6.8.23 requires an unreviewed official-Java modification, crosses a
+  changed proxy/bridge boundary, or falls back to a self-managed JDT mode.
 - Bridge contribution, proxy discovery, callbacks, visible Spring behavior, or
   authentic cleanup regresses.
 - The official runnable cannot launch the Maven Boot main class, bypasses the
@@ -296,34 +301,109 @@ same isolated Zed. Coordination is **Supported on Gradle too**:
   confirms that Spring sends `server.port` first and attributes the visible
   reorder to Zed's single-word fuzzy pass preceding LSP `sortText`.
 
-### Pending
+### Driven run 4 — lifecycle, warm cache, and normal-profile runnable (2026-07-19)
 
-- Steps 6–7: product uninstall and authentic-cleanup verification (the bridge
-  removal contract itself is S013-verified on 6.8.21 and unchanged here).
-- Steps 8–9: log-redaction scan and a warm offline restart.
-- Re-run the official runnable in a **non-isolated** Zed (or with the helper path
-  reconciled) to confirm the Zed-driven path works for a real user install.
-- The explicit-6.8.23-record admission arm and the 6.8.21 baseline comparison for
-  the `workspace/executeClientCommand` error.
+The final driven arm closed the product-owned cleanup, bounded-evidence,
+warm-cache, and ordinary-user-path gates.
+
+- Closing both worktrees drove Spring's authentic classpath-listener removal;
+  the coordinator reported `Unregistering classpath callback ... OK`. Both
+  product coordinators and Spring Boot language servers exited, and their proxy
+  routes disappeared.
+- Removing `zed-spring-tools` through Zed's Extensions UI removed only the
+  product dev-extension link. Official Java 6.8.23 remained installed and
+  unmodified. A restart with an empty worktree did not recreate a product
+  process or route.
+- A warm restart ran Zed under an outbound-denied sandbox that still allowed
+  loopback. External telemetry and Copilot DNS requests failed as expected,
+  while the cached Java 6.8.23 proxy/JDT, coordinator, and Spring LS all started
+  and visible `server.port` completion returned. The sandbox also blocked
+  `/usr/bin/login`, so terminal creation in this run is a sandbox artifact and
+  is not part of the task result.
+- Java 6.8.23 was then dev-installed into Zed's ordinary data directory to test
+  the real user path that the generated task hard-codes. Zed's gutter action
+  launched `Run FixtureApplication` through the default-data-dir
+  `java-task-helper`, which selected Maven and ran `compile exec:java` with the
+  fixture's main class. Tomcat listened on 8080, `GET /greeting` returned
+  `hello`, and `Ctrl-C` in Zed's task terminal stopped the process with exit
+  code 130. The helper, Maven, Boot process, and port 8080 were all absent
+  afterward.
+- The official Java helper's SHA-256 was
+  `b7173b7bfadd79855bd09d0d2dab9348fa09102db3cc1f93ea7e7a7def93dc3f`.
+  The 6.8.23 proxy's SHA-256 was
+  `c4ad9a806d8c07166e793a85f5ab09026034c2bcc5aa167b6d6d38b04ddee27b`.
+  Retained bounded text and screenshots were scanned for credentials,
+  authorization data, API tokens, complete classpaths, and unrelated absolute
+  user paths; none remained. Broad desktop captures and an over-broad Zed log
+  were moved to Trash rather than retained as evidence.
+- The same non-fatal `workspace/executeClientCommand` rejection exists in the
+  S015 Java 6.8.21 baseline, so it is not attributed to 6.8.23.
+
+One lifecycle caveat reproduced twice after the worktrees closed: the official
+Java proxy exited but its JDT child remained reparented to PID 1, with the
+official non-secret proxy port file still present. The product coordinator,
+Spring LS, product route, and product extension state were already gone. The
+orphan JDT was terminated and the stale official-Java port file removed after
+attribution. Source comparison found the Unix parent monitor moved from proxy
+to `proxy-common` without a semantic change between 6.8.21 and 6.8.23. This is
+an upstream official-Java/Zed lifecycle uncertainty, not a product-owned cleanup
+failure, and remains a follow-up rather than being hidden by the successful
+product uninstall result.
+
+After the normal-profile task run, the user's default Zed state was restored:
+the 6.8.23 dev extension was removed, registry Java 6.8.21 was reinstalled, and
+Zed was quit with no Zed or Java process left running.
+
+### Artifact and bounded-evidence digests
+
+All values are SHA-256. Generated runtime artifacts and evidence remain ignored;
+the table makes the exact driven inputs and retained files auditable without
+committing third-party binaries, profiles, logs, or screenshots.
+
+| Artifact or evidence | SHA-256 |
+| --- | --- |
+| Java 6.8.23 dev-build `extension.wasm` | `f47835a672c18ddd84cb90731a137d31ec53285c7f4e700a4786a7239528c22b` |
+| Java 6.8.23 `java-lsp-proxy` | `c4ad9a806d8c07166e793a85f5ab09026034c2bcc5aa167b6d6d38b04ddee27b` |
+| Java 6.8.23 `java-task-helper` | `b7173b7bfadd79855bd09d0d2dab9348fa09102db3cc1f93ea7e7a7def93dc3f` |
+| Product WASM used for the isolated run | `aba46c2318514410ea8a43ae18b04dc85e573ff515e0a8f5f8231094c3a13740` |
+| Product `zed-spring-bridge.jar` | `8335a47e5f7beb62d1164d17738918c5e316043830eb5cd7ad2a621aa80b315f` |
+| Spring Tools 5.2.0 release VSIX | `70943c4e434d469090f8cee54dacf1de10ec1161f92685581dc2ef6164971bb3` |
+| Spring Boot LS executable JAR | `ec922c593895331943ee1eccda434461da034bb87ac20f406fd7fb5e211bc8e1` |
+| `arm1-process-snapshot.txt` | `cf894c2c3f36bcad8b8a4663d60bb9870b4862bc27ca9788ce8cabc101754d44` |
+| `isolated-jdtls-metadata.log` | `9897e0f7743826aa9a2bc9acc31f5db6578bfa16fcac5f19bf721777d61daf22` |
+| `run-helper.log` | `9bfe74ac1d2f98057663f77d6e9ed4e657766d8caa554f744d91fe4c433a6f1f` |
+| `server-port-completion.png` | `4988acb943053b723005e3ad6a76108a9f205bdacbf97026e5e148a27cb4ece5` |
+| `gradle-server-completion.png` | `45da8fa58b23e94aa2437401948b5ebd8982cdb0909ac334c2f43b5c8915b3b7` |
+| `warm-offline-server-port.png` | `9970028fef03163b93eff087b6e30d3cd80dca789ad808c604270f4b2af12537` |
+| `nonisolated-runnable-running.png` | `d52d26af4c74df4364a7be77b134e51b96db98b91d18771b2ea4273f467fc1ae` |
+| `nonisolated-runnable-stopped.png` | `3d94e8887cd450bbe5d312742a2356cede4c1fc23530a25505c0bdae0ad00925` |
+| `nonisolated-greeting.txt` (`hello`) | `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` |
 
 ## Result
 
-In progress; a split result on the tested tuple (macOS 26.5.2 arm64, Zed 1.11.3,
-JDK 25.0.3), no capability-inventory state changed:
+**Supported on the tested tuple**: macOS 26.5.2 arm64, Zed 1.11.3, and Temurin
+JDK 25.0.3.
 
-- **Coordination and visible Spring behavior: Supported, on both Maven and
-  Gradle.** The unchanged 6.8.21-contracted product's bridge, bundle
-  contribution, callbacks, proxy route, and `server.port` completion all work
-  against official Java 6.8.23 without a reduced mode; jdtls imports both a Maven
-  and a Gradle project and the classpath reaches the Spring LS in each.
-- **Official main runnable: Supported at the helper, blocked through Zed under
-  isolation.** 6.8.23's `task_helper` launches the reachable Maven Boot app via
-  `mvn exec:java`, but Zed's generated runnable hard-codes the default data-dir
-  helper path and fails (exit 127) under `--user-data-dir`. A non-isolated
-  re-run is needed to confirm the normal user path.
+- The unchanged product's bridge, official-proxy discovery, callbacks, Maven
+  and Gradle imports, visible Spring completion, and product-owned removal
+  contract all work with official Java 6.8.23 without a reduced mode.
+- The official Java main runnable works through stock Zed's ordinary data
+  directory: it launches the representative Maven Boot application, exposes
+  useful terminal output, serves the verified endpoint, and stops through Zed.
+- Warm cached startup works with outbound network denied on this tuple. This is
+  not a claim for first-install offline behavior or other platforms.
+- Zed's generated task still fails under `--user-data-dir` because it resolves
+  the helper in the default data directory. That isolation-only limitation does
+  not refute the normal user path.
+- Product-owned cleanup passed. The separate official-Java JDT/port-file
+  lifecycle caveat remains unresolved and explicitly attributed above.
 
-Per the plan, a 6.8.23 compatibility record is only added after the remaining
-cleanup, redaction, and non-isolated runnable gates pass; those are unrun.
+This spike does **not** change the shipped compatibility claim. The repository
+still declares and enforces only 6.8.21 in its embedded provider record; adding
+6.8.23 is the next separately reviewed product change. Because the coordinator
+does not inspect the installed extension version, that change must also decide
+whether to add a real installed-version guard or retain a structurally versioned,
+self-declared compatibility table.
 
 ## Remaining uncertainty
 
@@ -332,17 +412,21 @@ cleanup, redaction, and non-isolated runnable gates pass; those are unrun.
 - Every untested platform/JDK tuple.
 - Future official Java and Zed releases.
 - Whether Java 6.8.23's Gradle LS affects larger mixed Maven/Gradle worktrees.
+- Whether the official Java proxy can reliably reap its JDT child and stale port
+  file when a worktree closes; this is not product-owned cleanup.
 
 ## Next experiment
 
-If the coordination contract is Supported, add 6.8.23 through a separately
-reviewed compatibility-table change. If the runnable is also Supported, prefer
-it for matching generic main/test actions and keep generated Zed tasks only for
-Spring-specific or unmatched commands. Boot Debug remains a separate explicit
-`.zed/debug.json` experiment.
+Add 6.8.23 through a separately reviewed compatibility-table product change,
+including the installed-version-guard design decision and regression coverage.
+Then proceed to the planned authentic `sts/highlight` to CodeLens slice. Reuse
+the verified official Java main runnable for matching generic Run actions;
+generic test, Gradle/vanilla task, and Boot Debug behavior retain their own
+runtime gates.
 
 ## Reusable findings
 
-Preserve the exact release digests, rejection control, task-helper command
-attribution, visible terminal behavior, stop path, removal payload, and redacted
-cleanup evidence so later official-Java versions can repeat this gate.
+Preserve the exact release digests, structural compatibility control,
+task-helper command attribution, visible terminal behavior, stop path, removal
+payload, official-Java lifecycle caveat, and redacted cleanup evidence so later
+official-Java versions can repeat this gate.
