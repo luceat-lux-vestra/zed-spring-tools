@@ -25,5 +25,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!--
+            Generates spring-configuration-metadata.json for the fixture's own
+            @ConfigurationProperties at compile time. Without it the Spring
+            language server has no metadata to document or navigate for the
+            fixture.greeting.* keys, so hover and property-to-definition would
+            have nothing project-provided to act on.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 </project>

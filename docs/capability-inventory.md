@@ -36,9 +36,9 @@ delivers the same user outcome is a legitimate result, recorded as
 
 | State | Count |
 | --- | --- |
-| `verified` | 8 |
-| `implemented` | 1 |
-| `planned` | 34 |
+| `verified` | 10 |
+| `implemented` | 2 |
+| `planned` | 31 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 3 |
@@ -79,9 +79,9 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | --- | --- | --- |
 | Property key/value completion in `.properties` | `verified` | Real metadata completion observed on the tested tuple during the M2 gate run. |
 | Property completion in `.yaml` | `verified` | Real metadata completion observed in `application.yaml` on the tested tuple, including type detail and a deprecation note in the documentation panel. |
-| Hover documentation on properties | `planned` | Server advertises `hoverProvider`. Zed does not request hover passively, so this needs a driven observation. |
+| Hover documentation on properties | `verified` | Observed 2026-07-18. Zed issued `textDocument/hover` on `application.properties` (Properties routes only to `zed-spring-tools`, so Spring-attributed) and Spring returned non-empty markdown for both a framework-provided key (`server.port` → type `java.lang.Integer`, `Default: 8080`, `Server HTTP port.`) and a project-provided key (`fixture.greeting.salutation` → the fixture's own javadoc, via generated `spring-configuration-metadata.json`). Evidence: `tmp/lsp-verify-20260718/`. |
 | Property validation / diagnostics | `verified` | Spring-attributed diagnostics observed for both files on the tested tuple: `'ser' is an unknown property. Did you mean 'server.address'?` in `.properties`, which requires classpath metadata, and `Expecting a 'Mapping' node but got 'ser'` in `.yaml`. Both carry `source: vscode-spring-boot`. |
-| Navigation from a property to its definition | `planned` | Server advertises `definitionProvider`. |
+| Navigation from a property to its definition | `verified` | Observed 2026-07-18. `textDocument/definition` on `fixture.greeting.salutation` in `application.properties` returned a LocationLink to `GreetingProperties.java` at the `salutation` field (line 26). Spring-attributed (Properties routes only to `zed-spring-tools`); Zed jumps. Evidence: `tmp/lsp-verify-20260718/`. |
 | Shared properties metadata reload | `planned` | `sts/common-properties/reload`; setting `boot-java.common.properties-metadata`. |
 | Convert `.properties` to `.yaml` | `planned` | `sts/boot/props-to-yaml`. Needs a Zed command surface. |
 | Convert `.yaml` to `.properties` | `planned` | `sts/boot/yaml-to-props`. Needs a Zed command surface. |
@@ -97,8 +97,8 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | Workspace symbols (Spring symbols) | `verified` | Observed 2026-07-18. Zed's "Go to Symbol in Project" issued `workspace/symbol`; the Spring server (through the coordinator) returned the logical structure — `@+ 'greetingController' (@RestController <: @Controller, @Component)`, `@+ 'greetingPrefix' (@Bean) String`, `@+ 'greetingConfiguration' (@Configuration)`, `@+ 'fixtureApplication' (@SpringBootApplication)`, and `@/greeting -- GET` — each with a resolved location in the fixture. jdtls returned 0 for the `@`-prefixed queries, so the symbols are attributable to Spring. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
 | Request mapping navigation | `verified` | Observed 2026-07-18. `@/greeting -- GET` (kind 6) is returned by `workspace/symbol` as a navigable workspace symbol resolved to `GreetingController.java`, so Zed's symbol picker jumps to the mapping. |
 | Bean navigation | `verified` | Observed 2026-07-18. `@+ 'greetingPrefix' (@Bean)` and the `@Component`/`@Configuration` symbols are returned by `workspace/symbol` with resolved locations, navigable from Zed's symbol picker. |
-| Code lenses | `planned` | Server advertises `codeLensProvider`; setting `boot-java.highlight-codelens.on`. |
-| Inlay hints (including cron) | `planned` | Server advertises `inlayHintProvider`; setting `boot-java.cron.inlay-hints`. |
+| Code lenses | `planned` | Server advertises `codeLensProvider`; setting `boot-java.highlight-codelens.on`. Driven run 2026-07-18: Zed **does** consume LSP code lenses — with Zed's `code_lens` setting on (it is off by default), jdtls reference-count lenses render via `textDocument/codeLens` + `codeLens/resolve` round-trips — so this is **not** a Zed-API block. But the Spring server returned no standard code lenses on the static fixture; Spring delivers element annotation through the custom `sts/highlight` notification, not `textDocument/codeLens`. Observing Spring code-lens content is coupled to `boot-java.highlight-codelens.on` and/or a live-data connection (Workstream 3). Evidence: `tmp/lsp-verify-20260718/`. |
+| Inlay hints (including cron) | `implemented` | Confirmed 2026-07-18 on macOS arm64/JDK 25 with the development extension and unmodified Zed 1.11.3. The coordinator now sends the standard server-to-client `workspace/inlayHint/refresh` request after official-Java classpath coordination is enabled and again when Spring reports a completed, non-empty `spring/index/updated`; Zed then requested `textDocument/inlayHint` from Spring, received `label: "every hour"` for `@Scheduled(cron = "0 0 * * * *")`, and rendered it inline. This project-side fix does not require an upstream Zed change. The earlier zero-request verdict was invalid: its fixture lived under this repository's ignored `tmp/` tree, and Zed deliberately removes ignored worktree entries in `Editor::is_lsp_relevant` before collecting visible inlay-hint ranges. A single **Toggle Inlay Hints** invocation was also not a force-enable diagnostic: Zed computes `Toggle(!self.inlay_hints_enabled())`, so it disables an already-enabled buffer. A separate generic Zed issue remains for servers such as jdtls that dynamically register `textDocument/inlayHint` without requesting a refresh; it is not a blocker for Spring cron hints because the coordinator owns the Spring LSP connection and can request the refresh itself. Runtime traces: `tmp/inlay-fix-runtime-20260718/stock-zed-index-refresh.log` and `tmp/inlay-fix-runtime-20260718/patched-clean-zed.log`; non-ignored fixture: `/tmp/zed-spring-inlay-fixture.aTcams`. |
 | Code actions / quick fixes | `planned` | Server advertises `codeActionProvider` with resolve. |
 | References and implementations | `planned` | Server advertises `referencesProvider`, `implementationProvider`. |
 | Boot project info | `planned` | `sts/spring-boot/bootProjectInfo`. |

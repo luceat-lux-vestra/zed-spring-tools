@@ -14,6 +14,8 @@ const ADD_CLASSPATH = "sts/addClasspathListener";
 const REMOVE_CLASSPATH = "sts/removeClasspathListener";
 const EXECUTE_SPRING_COMMAND = "workspace/executeCommand";
 const ENABLE_CLASSPATH = "sts.vscode-spring-boot.enableClasspathListening";
+const REFRESH_INLAY_HINTS = "workspace/inlayHint/refresh";
+const SPRING_INDEX_UPDATED = "spring/index/updated";
 const CALLBACK_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const REQUEST_TIMEOUT_MS = 10_000;
 const JAVA_ROUTE_TIMEOUT_MS = 30_000;
@@ -35,6 +37,7 @@ export class Coordinator {
     this.requestTimeoutMs = requestTimeoutMs;
     this.logger = logger;
     this.pending = new Map();
+    this.pendingZedRequests = new Set();
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -46,12 +49,17 @@ export class Coordinator {
   }
 
   observeZedMessage(message) {
+    const pendingKey = responseKey(message);
+    if (pendingKey !== null && this.pendingZedRequests.delete(pendingKey)) {
+      return false;
+    }
     if (isRequest(message) && message.method === "shutdown") {
       this.shutdownIds.add(idKey(message.id));
     }
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startClasspathCoordination();
     }
+    return true;
   }
 
   async handleSpringMessage(message) {
@@ -71,6 +79,13 @@ export class Coordinator {
     }
 
     if (!isRequest(message)) {
+      if (
+        message?.method === SPRING_INDEX_UPDATED &&
+        Array.isArray(message.params?.affectedProjects) &&
+        message.params.affectedProjects.length > 0
+      ) {
+        this.#refreshZedInlayHints();
+      }
       this.sendZed(encodeLsp(message));
       return;
     }
@@ -128,6 +143,7 @@ export class Coordinator {
       reject(new Error("Spring Tools coordinator stopped"));
     }
     this.pending.clear();
+    this.pendingZedRequests.clear();
   }
 
   async close() {
@@ -205,6 +221,7 @@ export class Coordinator {
           command: ENABLE_CLASSPATH,
           arguments: [true],
         });
+        this.#refreshZedInlayHints();
         this.logger("Spring classpath coordination enabled");
         return;
       } catch (error) {
@@ -213,6 +230,19 @@ export class Coordinator {
         await retryDelay(1000, this.abortController.signal).catch(() => {});
       }
     }
+  }
+
+  #refreshZedInlayHints() {
+    const id = `zed-spring-tools:${this.sessionId}:zed:${++this.sequence}`;
+    this.pendingZedRequests.add(idKey(id));
+    this.sendZed(
+      encodeLsp({
+        jsonrpc: "2.0",
+        id,
+        method: REFRESH_INLAY_HINTS,
+        params: null,
+      }),
+    );
   }
 
   async #answer(request, operation) {
@@ -370,8 +400,6 @@ export async function run(arguments_, dependencies = {}) {
   const output = dependencies.output ?? process.stdout;
   const errorOutput = dependencies.errorOutput ?? process.stderr;
   child.stderr.pipe(errorOutput);
-  input.pipe(child.stdin);
-
   const coordinator = new Coordinator({
     sendSpring: (bytes) => child.stdin.write(bytes),
     sendZed: (bytes) => output.write(bytes),
@@ -415,10 +443,16 @@ export async function run(arguments_, dependencies = {}) {
       void stop(true);
     }
   });
-  monitorZedInput(input, coordinator, () => void stop(true), () => {
-    process.exitCode = 1;
-    void stop(true);
-  });
+  monitorZedInput(
+    input,
+    coordinator,
+    (bytes) => child.stdin.write(bytes),
+    () => void stop(true),
+    () => {
+      process.exitCode = 1;
+      void stop(true);
+    },
+  );
   child.once("error", () => {
     process.exitCode = 1;
     void stop(false);
@@ -487,11 +521,15 @@ function responseKey(message) {
   return idKey(message.id);
 }
 
-export function monitorZedInput(input, coordinator, stop, fail = stop) {
+export function monitorZedInput(input, coordinator, sendSpring, stop, fail = stop) {
   const decoder = new LspDecoder();
   input.on("data", (chunk) => {
     try {
-      for (const message of decoder.push(chunk)) coordinator.observeZedMessage(message);
+      for (const message of decoder.push(chunk)) {
+        if (coordinator.observeZedMessage(message) !== false) {
+          sendSpring(encodeLsp(message));
+        }
+      }
     } catch {
       fail();
     }

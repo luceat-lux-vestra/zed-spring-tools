@@ -100,15 +100,40 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   assert.deepEqual(zedWrites, [request]);
 });
 
+test("a completed Spring index update refreshes Zed inlay hints", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const update = {
+    jsonrpc: "2.0",
+    method: "spring/index/updated",
+    params: { affectedProjects: ["example"] },
+  };
+
+  await coordinator.handleSpringMessage(update);
+
+  assert.equal(zedWrites[0].method, "workspace/inlayHint/refresh");
+  assert.deepEqual(zedWrites[1], update);
+  assert.equal(
+    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites[0].id, result: null }),
+    false,
+  );
+});
+
 test("classpath enable waits for initialized and the official Java route", async () => {
   const springWrites = [];
+  const zedWrites = [];
   let routeReady;
   const ready = new Promise((resolve) => {
     routeReady = resolve;
   });
   const coordinator = new Coordinator({
     sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: {
       supportsSpringClientMethod: () => false,
       waitUntilReady: async () => await ready,
@@ -131,6 +156,12 @@ test("classpath enable waits for initialized and the official Java route", async
     arguments: [true],
   });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: enable.id, result: "OK" });
+  while (zedWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(zedWrites[0].method, "workspace/inlayHint/refresh");
+  assert.equal(
+    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites[0].id, result: null }),
+    false,
+  );
   await coordinator.close();
 });
 
@@ -175,10 +206,17 @@ test("Spring shutdown result is normalized to the LSP null contract", async () =
 test("Zed input EOF requests coordinator shutdown", async () => {
   const input = new PassThrough();
   const observed = [];
+  const forwarded = [];
   let stopped = 0;
   monitorZedInput(
     input,
-    { observeZedMessage: (message) => observed.push(message) },
+    {
+      observeZedMessage: (message) => {
+        observed.push(message);
+        return true;
+      },
+    },
+    (bytes) => forwarded.push(decodeSingle(bytes)),
     () => {
       stopped += 1;
     },
@@ -186,6 +224,7 @@ test("Zed input EOF requests coordinator shutdown", async () => {
   input.end(encodeForTest({ jsonrpc: "2.0", method: "initialized", params: {} }));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(observed[0].method, "initialized");
+  assert.equal(forwarded[0].method, "initialized");
   assert.equal(stopped, 1);
 });
 
