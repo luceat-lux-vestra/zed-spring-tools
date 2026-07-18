@@ -1,6 +1,6 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1-M3 complete, M4 next
+- Status: In progress; M1-M3 complete, M4 in progress
 - Last updated: 2026-07-18
 - Architecture: D002, D003, and D004 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -158,8 +158,8 @@ Publication record:
 Status: in progress. Inventory version 4 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
-Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 13 `verified`, 0
-`implemented`, 3 `zed-native-equivalent`, and 30 `planned`.
+Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 14 `verified`, 0
+`implemented`, 3 `zed-native-equivalent`, and 29 `planned`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
@@ -186,6 +186,16 @@ Each slice starts with a reviewed plan, adds contract and integration tests,
 updates the inventory, and publishes its exact blocker when Zed lacks a UI or
 protocol surface. Pixel-identical VS Code UI is not required; functional loss
 must never be hidden.
+
+The references-and-implementations verification also exposed a startup-order
+race after the official Java route appeared but while Java project import was
+still completing: the first bridge registration timed out, Spring disabled
+classpath listening, and no automatic retry followed. The coordinator now
+re-drives that handshake within a bounded grace window and defers only the
+classpath-specific missing-extension diagnostic during that interval.
+Coordinator regression tests cover transient recovery, grace-window exhaustion,
+and immediate reporting for unrelated Java data-route failures. A real-Zed
+forced-timeout recovery run remains pending.
 
 ### M5: Installability and platform validation
 

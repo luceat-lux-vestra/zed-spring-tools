@@ -111,11 +111,12 @@ test("an answered Java data request is logged once per method, with no parameter
   assert.ok(!logs[0].includes("Integer"), "route log must not carry request parameters");
 });
 
-test("a failed Java data request is not logged as answered", async () => {
+test("a failed Java data request is not logged and reports the requirement immediately", async () => {
   const logs = [];
+  const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring() {},
-    sendZed() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: {
       supportsSpringClientMethod: () => true,
       executeSpringClientMethod: async () => {
@@ -132,6 +133,9 @@ test("a failed Java data request is not logged as answered", async () => {
     params: {},
   });
   assert.deepEqual(logs, []);
+  assert.equal(zedWrites.length, 1);
+  assert.equal(zedWrites[0].method, "window/showMessage");
+  assert.match(zedWrites[0].params.message, /requires the official Java extension/);
 });
 
 test("ordinary LSP traffic remains visible to Zed", async () => {
@@ -234,6 +238,115 @@ test("an absent Java route is logged without showing a false failure popup", asy
   }
 
   assert.deepEqual(zedWrites, []);
+  await coordinator.close();
+});
+
+test("a classpath registration that times out is re-driven until the Java server is ready", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  let addAttempts = 0;
+  const transport = {
+    supportsSpringClientMethod: () => false,
+    async execute(command) {
+      if (command === "zed.spring.bridge.v1.addClasspathListener") {
+        addAttempts += 1;
+        if (addAttempts === 1) {
+          throw new Error("official Java rejected command: timed out after 5000ms");
+        }
+      }
+      return "ok";
+    },
+  };
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: transport,
+    worktree: "/tmp/project",
+    javaHandshakeGraceMs: 10_000,
+    classpathRetryMs: 1,
+  });
+
+  const callbackId = "sts4.classpath.AbCdEfGh";
+  const isEnable = (message) =>
+    message.method === "workspace/executeCommand" &&
+    message.params?.command === "sts.vscode-spring-boot.enableClasspathListening";
+
+  // The Java server is still importing, so the first registration times out.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "add-1",
+    method: "sts/addClasspathListener",
+    params: { callbackCommandId: callbackId, batched: true },
+  });
+  const firstResponse = springWrites.shift();
+  assert.ok(firstResponse.error, "the failed registration is reported to Spring as an error");
+
+  // Spring gives up, so the coordinator re-drives the enable handshake itself.
+  // Answer each re-drive; once one has been driven, the Java server becomes
+  // ready and the next registration attempt succeeds.
+  let reDrove = false;
+  let registered = false;
+  for (let step = 0; step < 2000 && !registered; step += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+    while (springWrites.length > 0) {
+      const message = springWrites.shift();
+      if (isEnable(message)) {
+        reDrove = true;
+        await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: message.id, result: "OK" });
+      } else if (message.id === "add-2" && message.result === "ok") {
+        registered = true;
+      }
+    }
+    if (reDrove && addAttempts < 2) {
+      await coordinator.handleSpringMessage({
+        jsonrpc: "2.0",
+        id: "add-2",
+        method: "sts/addClasspathListener",
+        params: { callbackCommandId: callbackId, batched: true },
+      });
+    }
+  }
+
+  assert.ok(reDrove, "the coordinator re-drove the enable handshake after the timeout");
+  assert.ok(registered, "the retried registration eventually succeeded");
+  assert.equal(addAttempts, 2);
+  // The transient failure raised no requirement popup.
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessage"),
+    false,
+  );
+  await coordinator.close();
+});
+
+test("a classpath registration that keeps failing past the grace window surfaces the Java requirement", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const transport = {
+    supportsSpringClientMethod: () => false,
+    async execute() {
+      throw new Error("official Java rejected command: timed out after 5000ms");
+    },
+  };
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: transport,
+    worktree: "/tmp/project",
+    javaHandshakeGraceMs: 0,
+    classpathRetryMs: 1,
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "add",
+    method: "sts/addClasspathListener",
+    params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: true },
+  });
+
+  const popup = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.ok(popup);
+  assert.equal(popup.params.type, 1);
+  assert.match(popup.params.message, /requires the official Java extension/);
   await coordinator.close();
 });
 

@@ -1,142 +1,149 @@
 # Zed Spring Tools
 
-This is an experimental repository. It has completed its source-based
-feasibility phase, its basic local end-to-end PoC, and the source-separated
-product scaffold that D004 requires. On macOS arm64/JDK 25 a clean development
-install now delivers real Spring Boot language intelligence through the product
-extension — property completion, hover, validation, and navigation; Spring
-symbol, request-mapping, and bean navigation; cron inlay hints; and Spring
-quick-fix code actions — each observed on that one tuple and recorded in the
-[capability inventory](docs/capability-inventory.md). It is **not** a stable
-release and claims no tested platform other than that tuple.
+Experimental Spring Boot language intelligence for Zed, built as a companion to
+the required official Java extension.
 
-S010 proved a managed JDT launch that keeps writable Equinox private state
-outside the fixed distribution. S011 then proved the real Spring classpath
-callback, project-cache transition, and a visible attributable `server.port`
-completion through Zed. S012 reproduced that functional path with the official
-Java extension and proxy unmodified, and S013 corrected and verified the exact
-listener-removal contract. D002 and D003 therefore select a separately
-installed Spring companion that explicitly requires the official Zed Java
-extension and uses its JDT LS. A reduced self-managed JDT fallback is not part
-of the initial product. D004 then fixed the product stack, and the product
-scaffold and its macOS arm64 vertical slice now exist in this tree.
+> This is an early public-development project, not a stable release. It is
+> available only as a local development extension and has runtime evidence on
+> one macOS arm64/JDK 25 environment.
 
-The long-term product goal is capability parity with VS Code Spring Tools. A
-capability may use a Zed-native workflow instead of copying VS Code's UI, but it
-must not silently disappear from the target because the current Zed API lacks a
-surface. Such gaps remain tracked for an alternative design or upstream work.
-The auditable list is the [capability inventory](docs/capability-inventory.md).
-At inventory version 4, it tracks 46 capabilities, of which 13 are `verified`.
+## Project status
 
-Development is local-first: complete a useful macOS arm64 PoC, publish the source
-repository on GitHub with an experimental status, and then develop capabilities
-and platform validation in public. The extension is intended to be installable
-on every Zed-supported macOS, Linux, and Windows desktop, but untested platforms
-will remain explicitly unverified until the matrix in
-[the prerequisite document](docs/spikes/prerequisites.md) runs.
+| Item | Current state |
+| --- | --- |
+| Development phase | M4 capability-parity program |
+| Capability inventory | 14 `verified`, 3 `zed-native-equivalent`, 29 `planned` |
+| Distribution | Local development extension only; no package or Marketplace entry |
+| Runtime coverage | macOS 26.5.1 arm64 with Temurin JDK 25.0.3 |
+| Other desktop/JDK combinations | Untested |
 
-## Current phase
+See the [capability inventory](docs/capability-inventory.md) for the evidence
+behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
+components.
 
-Research, prerequisite isolation, the fixed local Spring Boot end-to-end PoC,
-and the product scaffold are complete. On macOS 26.5.1 arm64 with Temurin JDK
-25.0.3, the same real Spring Boot LS child produced an empty completion
-baseline, received the authentic JDT classpath callback, populated its project
-cache, and later returned one visible `server.port` completion to Zed. S013 also
-completed the authentic listener-removal and owned-route cleanup path.
+## What works today
 
-The product extension now reproduces that flow from a clean development install
-rather than from a hand-prepared spike worktree: it materializes its own
-coordinator and bridge, acquires the pinned unchanged Spring artifact, discovers
-the official Java provider, and returns real Spring Boot property completions.
-An audit of the run's logs found no credential and no classpath payload, and no
-owned process or owned route survived it.
+The following outcomes have been observed on the tested environment:
 
-The M4 capability-parity program builds on that PoC: each capability is driven
-against the running product and promoted only on observed evidence for the
-tested tuple. Thirteen capabilities are now `verified`, including property
-hover, validation, and definition navigation; Spring workspace symbols with
-request-mapping and bean navigation; cron inlay hints; and Spring quick-fix code
-actions applied end to end. Zed-native startup replaces
-`vscode-spring-boot.ls.start`, and the coordinator's official-Java route now
-handles and has runtime-verified `sts/javaType`. The extension is not yet a
-general Spring feature implementation; the full state-by-state list, including
-what stays `planned`, is the [capability inventory](docs/capability-inventory.md).
-See [known limitations](LIMITATIONS.md).
+- Spring Boot property and YAML completion, hover, validation, and definition
+  navigation;
+- Spring workspace symbols, request-mapping navigation, and bean navigation;
+- cron inlay hints;
+- Spring quick-fix code actions applied end to end;
+- Java references and implementations through the official Java language
+  server; and
+- the `sts/javaType` Spring-to-Java data route.
 
-[D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
-direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,
-loads reviewed Spring bridge bundles into the Java-owned JDT LS, and owns the
-Spring coordinator and Spring Boot LS. The Java extension remains unmodified in
-the target architecture. [R009](docs/research/009-unmodified-java-companion-boundary.md)
-defines the remaining reverse-callback boundary.
-[S012](docs/spikes/012-unmodified-java-companion-bridge.md) proved that boundary
-and the visible completion with official Java unmodified, but failed its strict
-removal criterion because the coordinator rejected the authentic Spring removal
-shape before bridge transport. The narrow
-[S013](docs/spikes/013-authentic-spring-removal-contract.md) cleanup contract
-then passed on the fixed tuple, so
-[D003](docs/decisions/003-java-companion-product-architecture.md) is accepted.
-[D004](docs/decisions/004-product-stack-build-and-packaging.md) then selected the
-product stack that the current scaffold implements.
+Zed-native language-server startup replaces the VS Code-specific
+`vscode-spring-boot.ls.start` command. Most of the broader VS Code Spring Tools
+surface is still planned or unverified.
 
-The work in this phase must:
+## Try it locally
 
-- distinguish confirmed facts from inferences and hypotheses;
-- cite primary sources and relevant source-code locations;
-- record reproducible runtime observations;
-- identify client, server, distribution, and licensing constraints;
-- keep production code separated from `spikes/` and free of copied spike
-  infrastructure, committed third-party binaries, and official-Java mutation;
-  and
-- label every capability and platform by its evidence, so an untested target
-  stays `untested` rather than becoming an implied support claim.
+### Prerequisites
+
+- Zed with the official Java extension version `6.8.21` installed;
+- JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
+- Rust installed through `rustup`, which Zed requires when building a local
+  development extension; and
+- network access for the first pinned Spring Tools artifact download.
+
+### Install
+
+1. Clone this repository.
+2. Install the official Java extension before opening the Java project.
+3. In Zed's Extensions page, choose **Install Dev Extension** — or run
+   `zed: install dev extension` — and select this repository directory. See
+   [Zed's development-extension instructions](https://zed.dev/docs/extensions/developing-extensions).
+4. Open a Spring Boot project and wait for Java project import and Spring
+   indexing to finish. The integrated product path is verified only with the
+   repository's Maven fixture.
+
+If Java was already running when this extension was installed, restart Zed so
+JDT LS receives the contributed bridge bundles. If the first Spring artifact
+download remains stuck, restart Zed and retry. Both conditions are documented in
+[known limitations](LIMITATIONS.md).
+
+## How it fits together
+
+```text
+Zed
+├── official Java extension ──> Java-owned JDT LS
+│                                  └── contributed Spring/bridge bundles
+└── Zed Spring Tools ────────> coordinator ──> Spring Boot LS
+                                   │
+                                   └── versioned loopback bridge to JDT LS
+```
+
+The official Java extension and its proxy remain unmodified. This project owns
+the Rust/WASM Zed adapter, the Node coordinator, the reviewed Java bridge, and
+the versioned coordination protocol. It does not provide a reduced or
+self-managed JDT fallback.
+
+The coordinator now retries a classpath-listener handshake that times out while
+the official Java server is still importing the project. Regression tests cover
+transient recovery, grace-window exhaustion, and immediate reporting for
+unrelated Java-route failures. A forced-timeout recovery run in real Zed remains
+pending.
+
+## Important limitations
+
+- This is not a stable release and does not claim multiplatform support.
+- The official Java extension `6.8.21` is required.
+- Installation after JDT LS has already started requires a Zed restart.
+- First-use artifact acquisition can hang until Zed is restarted.
+- There is no product continuous integration, packaged release, offline install,
+  rollback flow, or Marketplace entry yet.
+- SSH remote development and WSL-hosted projects are outside the current scope.
+
+Read [known limitations](LIMITATIONS.md) before relying on the extension.
+
+## Evidence and roadmap
+
+- [Capability inventory](docs/capability-inventory.md) — user-visible parity
+  states and runtime evidence
+- [Implementation plan](docs/implementation-plan.md) — milestones and delivery
+  gates
+- [Compatibility](COMPATIBILITY.md) — exact verified and untested environments
+- [Decisions](docs/decisions/README.md) — accepted product direction and stack
+- [Research](docs/research/README.md) and [spikes](docs/spikes/README.md) — source
+  findings and reproducible feasibility evidence
+- [Contributing](CONTRIBUTING.md) — branch, evidence, validation, and PR rules
 
 ## Repository layout
 
 ```text
-src/            # Rust/WASM Zed extension adapter
-coordinator/    # Dependency-free Node Spring coordinator and its tests
-bridge/         # Java bridge contributed to the Java-owned JDT LS
-protocol/       # Versioned schemas and fixtures for the Java boundary
-scripts/        # Local PoC preparation and bridge verification
-tests/          # Product fixtures
-docs/
-├── decisions/  # Decisions made from research and spike evidence
-├── research/   # Source-based technical investigations
-└── spikes/     # Reproducible feasibility experiments
-spikes/         # Disposable experiment code; never production code
+src/            Rust/WASM Zed extension adapter
+coordinator/    Dependency-free Node coordinator and tests
+bridge/         Java bridge contributed to the Java-owned JDT LS
+protocol/       Versioned schemas and compatibility fixtures
+scripts/        Local PoC preparation and bridge verification
+tests/          Product fixtures
+docs/           Decisions, research, spikes, inventory, and roadmap
+spikes/         Disposable experiment code; never production code
 ```
 
-Production code under the first six directories is source-separated from
-`spikes/`, which stays disposable evidence and is never promoted. D002 selects
-the technical direction, accepted D003 plus S013 close the architecture evidence
-gate, and D004 fixes the stack that the current scaffold implements. Product CI
-does not exist yet.
+No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
+binary is committed to this repository.
 
-An initial public GitHub source release is not a multiplatform support claim or
-a stable Zed Marketplace release. It must not include the Spring VSIX or
-extracted third-party binaries.
+## Development checks
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --locked
+node --test "coordinator/test/*.test.mjs"
+cargo build --locked --release --target wasm32-wasip2
+```
+
+The Spring Boot fixture can be compiled independently with:
+
+```sh
+mvn -f tests/fixtures/spring-boot-basic/pom.xml clean test
+```
 
 ## License
 
-This project is licensed under the [Apache License 2.0](LICENSE).
-
-That license covers this repository's own source. It does not relicense any
-third-party material: the Spring Tools VSIX remains Eclipse Public License 1.0
-and the official Zed Java extension remains under its own upstream license.
-Neither is committed here. See [third-party material](THIRD_PARTY_NOTICES.md)
-for the exact boundaries.
-
-## Primary research question
-
-> What process and protocol structure is required for a Zed extension to run and
-> coordinate JDT LS and the Spring Tools Language Server?
-
-See [the research index](docs/research/README.md),
-[the spike index](docs/spikes/README.md), and
-[the decision index](docs/decisions/README.md) for the evidence and selected
-direction. The reviewed next milestones are in the
-[product implementation and public-development plan](docs/implementation-plan.md).
-
-For the concise public boundary, see [compatibility](COMPATIBILITY.md),
-[known limitations](LIMITATIONS.md), and [third-party material](THIRD_PARTY_NOTICES.md).
+This project's source is licensed under the [Apache License 2.0](LICENSE).
+Third-party components keep their own licenses and are not redistributed here;
+see [third-party notices](THIRD_PARTY_NOTICES.md).
