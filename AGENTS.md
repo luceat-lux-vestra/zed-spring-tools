@@ -6,8 +6,13 @@ Local technical feasibility, the basic end-to-end PoC, and the D004 product
 scaffold are complete. Amended D002 records a Pivot to a required official-Java
 companion with a versioned Java/Spring coordination boundary and no reduced
 managed-JDT fallback. S012 proved the unmodified bridge and visible completion
-but was Refuted on cleanup; S013 then supported the exact removal contract. D003
-and D004 are Accepted.
+but was Refuted on cleanup; S013 then supported the exact removal contract.
+D003-D005 are Accepted. D005 selects stock-Zed LSP-first capability delivery
+with opt-in generated Structure/Live documents while preserving the existing
+per-capability routes as fallbacks; Java language/query replacement is excluded
+from the baseline. R014's final latest-upstream audit found no better stock-Zed
+architecture. S015 and S016 are the next source-backed runtime gates for merged
+Document Symbols and official Java 6.8.23 compatibility/task reuse.
 
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
 and uninstall cycle reproduced real Spring Boot property completions, executed
@@ -41,21 +46,25 @@ program. Spike code remains excluded from production.
 - Add minimal disposable code under `spikes/` only when a written spike plan
   identifies the hypothesis and success criteria.
 - Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
-  `scripts/`, and `tests/` within the boundary that D002, D003, and D004 fix,
+  `scripts/`, and `tests/` within the boundary that D002-D005 fix,
   following the reviewed implementation plan's current milestone.
 - Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-D002, D003, and D004 have settled the architecture, implementation language,
-build system, and the bridge/coordinator module boundary. Do not add any of the
-following until a recorded decision supports it:
+D002-D005 have settled the architecture, implementation language, build system,
+bridge/coordinator module boundary, and stock-Zed capability-delivery strategy.
+Do not add any of the following until a recorded decision supports it:
 
 - product packaging, release automation, or product CI;
 - a new runtime dependency, downloaded artifact, or network call at runtime;
 - any change to the official Java extension, its proxy, or its work directory
   beyond the allowlisted bridge commands;
 - a reduced or self-managed JDT fallback, which D002 and D003 exclude;
+- replacement or co-ownership of the official Java language, grammar, or query
+  pack, which D003 and D005 exclude from the baseline;
+- a custom Zed distribution or external dashboard runtime, which D005 does not
+  select;
 - promotion of `spikes/` code into production; or
 - claims that an untested capability or environment is supported.
 
@@ -185,8 +194,9 @@ mechanical.
 
 This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
 required official Java extension, rather than a Zed-extension-centered MVP. D003
-accepted the resulting architecture and D004 its stack, so product scaffolding
-was allowed to begin and has.
+accepted the resulting architecture, D004 its stack, and D005 the LSP-first
+stock-Zed capability surfaces with preserved fallbacks, so product scaffolding
+and reviewed M4 slices are allowed to proceed.
 
 Reopen the gate only if new evidence contradicts the Pivot, and record the
 outcome in a decision document before changing production code.

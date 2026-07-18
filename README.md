@@ -20,6 +20,12 @@ the required official Java extension.
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
 components.
+The [M4 capability delivery plan](docs/capability-delivery-plan.md) keeps each
+preferred stock-Zed route beside its existing fallback and runtime gate.
+The [final upstream audit](docs/research/014-final-upstream-capability-surface-audit.md)
+found no better official stock-Zed architecture; it records the compatibility-
+gated official Java 6.8.23 task improvement and the unavailable private/removed
+shortcuts.
 
 ## What works today
 
@@ -90,6 +96,7 @@ pending.
 
 - This is not a stable release and does not claim multiplatform support.
 - The official Java extension `6.8.21` is required.
+- Official Java 6.8.23 is a planned compatibility refresh, not yet supported.
 - Installation after JDT LS has already started requires a Zed restart.
 - First-use artifact acquisition can hang until Zed is restarted.
 - There is no product continuous integration, packaged release, offline install,
@@ -102,6 +109,8 @@ Read [known limitations](LIMITATIONS.md) before relying on the extension.
 
 - [Capability inventory](docs/capability-inventory.md) — user-visible parity
   states and runtime evidence
+- [M4 capability delivery plan](docs/capability-delivery-plan.md) — preferred
+  routes, preserved fallbacks, and verification gates
 - [Implementation plan](docs/implementation-plan.md) — milestones and delivery
   gates
 - [Compatibility](COMPATIBILITY.md) — exact verified and untested environments

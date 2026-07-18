@@ -192,14 +192,16 @@ was confirmed on 2026-07-17 and moved into the confirmed facts below.
    Code `explorer.spring` widget *as a custom panel*. It does **not** by itself
    block the capability of browsing the logical structure: the server data is
    reachable (`sts/spring-boot/structure`) and the server also advertises
-   `documentSymbolProvider` and `workspaceSymbolProvider`, which render in Zed's
-   native outline panel and symbol search. Whether those symbols carry the beans
-   and mappings the tree view shows is unverified, pending a driven run against
-   the fixture (which now includes a request mapping and a bean for this
-   purpose), so the capability stays `planned`, not blocked. An
+   `documentSymbolProvider` and `workspaceSymbolProvider`, which can feed Zed's
+   native outline panel and symbol search. The workspace-symbol half was later
+   verified for beans and mappings. R013 also established that Document Symbols
+   require a default-off Zed language setting and that Zed merges JDT and Spring
+   results; S015 now owns that separate runtime gate. An
    earlier revision of this document and inventory version 3 wrongly recorded it
    as `blocked-zed-api` by judging the VS Code widget instead of the outcome;
-   inventory version 4 corrects that.
+   inventory version 4 corrected the widget/outcome classification, and version
+   5 records the default-off Document Symbols correction without discarding the
+   verified Project Symbols fallback.
 3. **Zed extensions cannot contribute a command-palette command**, which is how
    VS Code exposes most Spring Tools commands. This is a constraint, not
    automatically a blocker: the Spring server advertises `codeActionProvider` and
@@ -232,15 +234,13 @@ and `docs/src/extensions/developing-extensions.md` and
 
 ## Candidate next experiments
 
-1. A narrow spike capturing the full `client/registerCapability` traffic to
-   settle the completion question and enumerate dynamic registrations.
-2. A driven run against a fixture that has controllers and beans, capturing the
-   `documentSymbol` and `workspace/symbol` responses, to settle whether the
-   logical structure reaches Zed's outline panel and symbol search. That decides
-   the browse-structure capability between `zed-native-equivalent` and
-   `blocked-zed-api`.
-3. A slice plan for workstream 1, whose server-side surface is now known:
-   hover, code actions, inlay hints, and the two conversion commands.
+1. Completed in later M4 evidence: dynamic completion registration, workspace
+   symbols, hover, Code Actions, and inlay hints were captured and attributed;
+   see inventory version 5 for the named results.
+2. Execute S015 to compare the default-off tree-sitter control with the official
+   LSP Document Symbols setting and assess the combined JDT/Spring Outline.
+3. Follow D005's capability delivery plan for conversion, CodeLens, Boot
+   configuration, Structure document, and live-data slices.
 
 ## Reproduction
 

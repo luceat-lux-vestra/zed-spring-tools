@@ -80,7 +80,9 @@ Tentative sequence:
 | [S011](011-integrated-spring-boot-local-poc.md) | Compose the supported JDT path with the real Spring classpath-to-completion flow | Supported on macOS arm64/JDK 25; cleanup defect retained; other targets untested |
 | [S012](012-unmodified-java-companion-bridge.md) | Reproduce S011 through an injected bridge while keeping the official Java extension and proxy unmodified | Refuted on cleanup after functional success: authentic Spring removal was rejected before bridge transport |
 | [S013](013-authentic-spring-removal-contract.md) | Accept Spring's authentic removal wire shape and prove exact bridge cleanup | Supported on macOS arm64/JDK 25; other targets untested |
-| [S014](014-jdtls-bundle-startup-ordering.md) | Find why jdtls starts without the bridge bundle on a cold cache and test the two fixes | Planned |
+| [S014](014-jdtls-bundle-startup-ordering.md) | Find why jdtls starts without the bridge bundle on a cold cache and test the two fixes | Gate A complete: install ordering identified; reload gate shelved |
+| [S015](015-stock-zed-java-spring-document-symbols.md) | Test official Java/Spring LSP Document Symbols in stock Zed without replacing Java queries | Proposed |
+| [S016](016-official-java-6.8.23-compatibility-refresh.md) | Verify official Java 6.8.23's coordination contract and matching main-task reuse before accepting the provider | Proposed |
 
 Use [template.md](template.md) before adding any spike code.
 
