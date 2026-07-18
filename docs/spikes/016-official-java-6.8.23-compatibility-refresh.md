@@ -263,6 +263,37 @@ result:
   never started inside Zed; the direct process was stopped outside Zed and exited
   cleanly.
 
+### Driven run 3 — Gradle coordination (2026-07-19)
+
+To cover 6.8.23's new Gradle support, a disposable Gradle mirror of the Maven
+fixture (`spikes/s016-.../fixture-gradle/`, same Java sources, Spring Boot 3.5.5,
+`application` plugin, Gradle 9.5.1 wrapper) was opened as a second worktree in the
+same isolated Zed. Coordination is **Supported on Gradle too**:
+
+- jdtls spawned a second workspace and imported the project via its
+  **GradleProjectImporter** (Buildship, the wrapper's Gradle 9.5.1). Once
+  synchronized, `GreetingController.java` (`@RestController`/`@GetMapping`)
+  validated with 0 problems and hover worked — so jdtls resolved the Gradle
+  Spring classpath on 6.8.23.
+- The Gradle worktree got its own coordinator, Spring Boot LS, and pinned
+  `utf8-worktree-hex-v1` proxy route port file; its bridge jdtls also registered
+  `zed.spring.bridge.v1.addClasspathListener`/`removeClasspathListener`.
+- During the slower Gradle synchronize, jdtls cancelled the in-flight
+  `addClasspathListener` once (`IProgressMonitor` cancel →
+  `BridgeCommandHandler.requireActive` threw `bridge command was cancelled`).
+  This matches the coordinator's documented retry-on-slow-import behavior; it
+  recovered after synchronization.
+- **Visible `server.port` completion works in the Gradle worktree's
+  `application.properties`** (`gradle-server-completion.png`) — the Gradle
+  classpath reached the Spring LS. The same non-fatal
+  `workspace/executeClientCommand` error appeared, confirming it is
+  build-tool-independent.
+- Not exercised: the Gradle official runnable (`task_helper` runs
+  `gradle run -PmainClass=...`); it is expected to mirror run 2's split result.
+- Out of scope: completion ordering (`server.port` not ranked first for
+  `server.p`) is Zed's client-side fuzzy ranking, reproduces on Maven too, and is
+  independent of 6.8.23 — tracked separately as a Zed+Spring UX item.
+
 ### Pending
 
 - Steps 6–7: product uninstall and authentic-cleanup verification (the bridge
@@ -278,10 +309,11 @@ result:
 In progress; a split result on the tested tuple (macOS 26.5.2 arm64, Zed 1.11.3,
 JDK 25.0.3), no capability-inventory state changed:
 
-- **Coordination and visible Spring behavior: Supported.** The unchanged
-  6.8.21-contracted product's bridge, bundle contribution, callbacks, proxy
-  route, and `server.port` completion all work against official Java 6.8.23
-  without a reduced mode.
+- **Coordination and visible Spring behavior: Supported, on both Maven and
+  Gradle.** The unchanged 6.8.21-contracted product's bridge, bundle
+  contribution, callbacks, proxy route, and `server.port` completion all work
+  against official Java 6.8.23 without a reduced mode; jdtls imports both a Maven
+  and a Gradle project and the classpath reaches the Spring LS in each.
 - **Official main runnable: Supported at the helper, blocked through Zed under
   isolation.** 6.8.23's `task_helper` launches the reachable Maven Boot app via
   `mvn exec:java`, but Zed's generated runnable hard-codes the default data-dir

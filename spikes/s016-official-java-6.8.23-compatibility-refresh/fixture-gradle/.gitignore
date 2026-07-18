@@ -1,0 +1,6 @@
+# Build outputs and the third-party Gradle wrapper binary are not committed
+# (the repository does not commit third-party binaries). Regenerate the wrapper
+# with `gradle wrapper --gradle-version 9.5.1` before opening the project.
+.gradle/
+build/
+gradle/wrapper/gradle-wrapper.jar
