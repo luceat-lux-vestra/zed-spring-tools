@@ -14,9 +14,10 @@
   attributed that tree to Equinox's writable private-configuration default.
   S010 then supported relocation of that state, and S011 supported the real
   Spring classpath-to-`server.port` flow on macOS arm64/JDK 25
-- Next gates: S015 verifies the preferred Java/Spring Document Symbols route;
-  S016 then verifies official Java 6.8.23 before its new task helper can be
-  reused. Subsequent M4 slices follow D005's preferred/fallback mapping
+- Runtime-gate update: S015 Refuted the preferred Java/Spring Document Symbols
+  route on restart, so Project Symbols remains the fallback. S016 is next and
+  verifies official Java 6.8.23 before its new task helper can be reused.
+  Subsequent M4 slices follow D005's preferred/fallback mapping
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -47,7 +48,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R010](010-experimental-public-source-audit.md) | Audit the experimental public-source boundary | Complete | Reachable history is source-only and pattern-clean; license, author identity, and namespace require owner decisions |
 | [R011](011-vscode-spring-tools-capability-surface.md) | Enumerate the VS Code Spring Tools capability surface | Complete | 15 commands, 18 settings, 4 languages, and 13 advertised LSP capabilities derived from the pinned release; seeds the capability inventory |
 | [R012](012-cold-cache-bridge-bundle-race.md) | Bridge/bundle startup ordering (mis-titled cold-cache) | Superseded by S014 | First concluded a cold-cache race; S014 corrected it to an install-ordering issue. jdtls that starts before the extension is installed is not re-queried for the bridge; a cold cache with the extension pre-installed works |
-| [R013](013-zed-native-capability-delivery-surfaces.md) | Stock-Zed capability delivery surfaces | Complete for source feasibility | LSP-first coordinator adaptation gives the highest stock-Zed coverage; official Document Symbols needs S015, current verified routes remain fallbacks, and Java query replacement is excluded from the baseline |
+| [R013](013-zed-native-capability-delivery-surfaces.md) | Stock-Zed capability delivery surfaces | Complete for source feasibility | LSP-first coordinator adaptation gives the highest stock-Zed coverage; S015 later Refuted Document Symbols on restart, current verified routes remain fallbacks, and Java query replacement is excluded from the baseline |
 | [R014](014-final-upstream-capability-surface-audit.md) | Final upstream capability-surface audit | Complete for source feasibility | Latest Zed still has no extension tree/panel or public task/show-document shortcut; Java 6.8.23 adds a useful compatibility-gated main/test task path without replacing D005 |
 
 Use [template.md](template.md) for each investigation. A status may be `Not

@@ -42,5 +42,8 @@ R014's final audit against latest upstream source confirms D005, adds S016 as
 the gate for official Java 6.8.23's task improvement, and excludes removed or
 private slash-command, task-scheduling, ShowDocument, and symbol-grouping
 shortcuts.
+S015 later Refutes the preferred per-file Document Symbols route on restart,
+which activates D005's Project Symbols/Structure fallback without changing the
+accepted architecture.
 
 Use [template.md](template.md) after sufficient evidence exists.

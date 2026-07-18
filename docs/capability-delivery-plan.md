@@ -36,7 +36,7 @@ cover genuinely different workflows.
 | Discover and invoke Spring operations | Contextual standard Code Actions, reachable through Zed's Code Actions command/picker | CodeLens for a small high-frequency source-local subset; Task Picker for execution; Debug UI for debugging | Generated candidate/Live document when a bounded selection cannot fit the standard prompt; documented manual operation when no safe interaction exists | Extension slash command or arbitrary top-level Command Palette contribution |
 | Run, build, and debug | Compatibility-tested official Java runnable for a matching Java main/test action | Reviewable `.zed/tasks.json` for Spring-specific or parameterized execution and `.zed/debug.json` for debugging | Existing manually authored task/debug configuration and the last supported official-Java tuple | Private `ScheduleTask`, invisible Spring LS `Runtime.exec`, or programmatic debug start |
 | Reach an application or endpoint URL | Standard Document Link or Markdown link in hover/generated content | Clickable Markdown in a bounded `window/showMessageRequest` result when an action produces the URL | Always-visible copyable URL text | General `window/showDocument`; an OS-specific `open`/`xdg-open`/`start` task is only a future contingency after a cross-platform security/quoting spike |
-| Inspect the current file and worktree structure | LSP Document Symbols in Outline/Breadcrumbs for the current file; Project Symbols for worktree search | Opt-in Structure document for project-wide hierarchy/grouping | If S015 rejects the combined Outline, retain Project Symbols and use the Structure document for Spring-only grouping | Extension-owned tree/panel, Project Symbols name encoding, or Java language replacement without a new decision |
+| Inspect the current file and worktree structure | Project Symbols for worktree search; S015 Refuted LSP Document Symbols as the supported current-file route because restart can omit Java symbols | Opt-in Structure document for project-wide hierarchy/grouping | Retain Project Symbols and use the Structure document for Spring-only grouping; a future stock-Zed refresh fix may reopen the Outline gate | Extension-owned tree/panel, Project Symbols name encoding, or Java language replacement without a new decision |
 
 The Code Actions menu is the closest public integrated Spring menu: Zed composes
 runnable tasks, LSP Code Actions, and available debug scenarios in that source
@@ -85,7 +85,7 @@ user outcome take precedence.
 | --- | --- | --- | --- | ---: |
 | Properties/YAML completion, hover, and validation — recommend keys and values, show documentation, and diagnose invalid configuration | Preserve the verified Spring LS standard-LSP path. | No replacement; continue standard completion, hover, diagnostics, and definition. | Any regression stays on the last compatibility-tested Spring/Java tuple. | 5/5 |
 | Property conversion and metadata reload — convert properties and YAML and reload shared metadata | Commands remain `planned`; users can edit files or restart the server manually. | Expose a Code Action, execute the Spring command, and apply the returned workspace edit. | If create/replace edits are not safe, retain the command as `planned` and document the manual workflow. | 4/5 |
-| Per-file Spring Outline — show the current file's beans, endpoints, and components hierarchically | Preserve verified Project Symbols as the navigable fallback. | Enable Zed's official LSP Document Symbols setting for Java and use Outline/Breadcrumbs; S015 tests the combined JDT/Spring result. | If symbols duplicate, interleave, lose Java symbols, or fail to refresh, keep Project Symbols and use the Structure document for Spring-only grouping. | 4/5; runtime gate |
+| Per-file Spring Outline — show the current file's beans, endpoints, and components hierarchically | Preserve verified Project Symbols as the navigable fallback. | S015 Refuted enabling Zed's LSP Document Symbols setting as a supported route: the normal merge is usable, but restart can cache Spring-only results and lose Java symbols. Reopen only after a stock-Zed refresh fix passes the same gate. | The fallback trigger fired. Keep Project Symbols and use the planned Structure document for Spring-only grouping. | 5/5; fallback selected by runtime gate |
 | Project-wide Spring structure — browse beans, endpoints, configurations, and grouping across the worktree | Preserve verified Project Symbols and direct source navigation. | Keep Project Symbols for search and add an opt-in generated Spring Structure document for stable grouping and refresh. | If safe generation, refresh, or navigation cannot be proven, Project Symbols remains the supported equivalent. | 4/5 |
 | Bean and endpoint navigation — jump from Spring elements and request mappings to source | Preserve verified Workspace Symbols plus official Java definition, references, and implementations. | Combine the same surfaces with links from Outline or generated documents. | Links may be omitted without losing the verified symbol-search path. | 5/5 |
 | CodeLens — show bean, endpoint, reference, or live status above classes and methods | Keep this capability `planned`; Project Symbols and hover retain navigation and detail. | Translate Spring's `sts/highlight` data into standard CodeLens items and refresh them when the index or live state changes. | If refresh, ranges, or command execution are unreliable, retain hover/inlay/symbol surfaces and do not ship stale lenses. | 4/5 |
@@ -135,13 +135,12 @@ user outcome take precedence.
 
 ## Immediate order
 
-1. Run S015 against stock Zed to settle the per-file Outline route.
-2. Run S016 to decide official Java 6.8.23 compatibility and main-task reuse.
-3. Implement and verify the `sts/highlight` to CodeLens adaptation.
-4. Deliver Boot-project selection and merge-safe Run/Debug configuration,
+1. Run S016 to decide official Java 6.8.23 compatibility and main-task reuse.
+2. Implement and verify the `sts/highlight` to CodeLens adaptation.
+3. Deliver Boot-project selection and merge-safe Run/Debug configuration,
    reusing the verified official Java main task when it matches.
-5. Deliver properties/YAML conversion and metadata reload as Code Actions.
-6. Prototype the opt-in Structure document before using the same pattern for
+4. Deliver properties/YAML conversion and metadata reload as Code Actions.
+5. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
-7. Expand live-data and remaining command slices only after their interaction,
+6. Expand live-data and remaining command slices only after their interaction,
    freshness, and security gates are written.

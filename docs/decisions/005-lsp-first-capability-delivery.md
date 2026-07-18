@@ -27,6 +27,9 @@ required that the existing plan remain explicit and usable as a fallback.
   choice against latest Zed/Java/Spring source, identifies official Java
   6.8.23's compatibility-gated task improvement, and rules out removed slash
   commands, private task scheduling, and general ShowDocument as product routes.
+- [S015](../spikes/015-stock-zed-java-spring-document-symbols.md) later confirms
+  the normal JDT/Spring merge but Refutes the preferred Outline route on restart,
+  activating this decision's Project Symbols/Structure fallback.
 - [R011](../research/011-vscode-spring-tools-capability-surface.md) enumerates the
   pinned Spring commands, settings, languages, LSP capabilities, and VS Code
   view.
@@ -123,9 +126,11 @@ The decision has these rules:
    creation or refresh. They must be regenerable, timestamped where live, free of
    credentials, safe to delete, and must not silently edit `.gitignore` or
    overwrite unknown user configuration.
-6. `document_symbols: "on"` is the preferred Java Outline route, but only after
-   S015 verifies the combined JDT/Spring response. The extension may guide the
-   setting; it cannot force it.
+6. `document_symbols: "on"` was the candidate Java Outline route. S015 Refuted
+   it as a supported route because restart can cache Spring-only results before
+   JDT dynamically registers the capability. Project Symbols remains the
+   fallback and the opt-in Structure document remains the planned grouping
+   companion. The extension may read or guide the setting; it cannot force it.
 7. A failed preferred route returns to its named fallback and stays `planned` if
    no verified outcome exists. Failed observations are retained.
 8. The baseline product does not re-register `Java`, replace its grammar or
@@ -166,7 +171,8 @@ server data already available.
   similarity.
 - The inventory's zero-request Document Symbols observation is retained but
   reclassified as a default-off control, not a missing Zed capability.
-- S015 is required before per-file Spring Outline is claimed.
+- S015 completed Refuted, so per-file Spring LSP Outline is not claimed and the
+  named Project Symbols/Structure fallback is active.
 - S016 is required before official Java 6.8.23 is accepted or its new task
   helper becomes a preferred product route. Until then 6.8.21 remains the exact
   supported companion.
