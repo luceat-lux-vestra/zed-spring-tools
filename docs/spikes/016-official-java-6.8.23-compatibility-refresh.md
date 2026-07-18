@@ -1,12 +1,13 @@
 # S016: Official Java 6.8.23 compatibility refresh
 
-- Status: Supported on macOS arm64/JDK 25; compatibility-table promotion pending
+- Status: Supported on macOS arm64/JDK 25; D006 later superseded the per-release promotion gate
 - Date: 2026-07-18 (completed 2026-07-19)
 - Related research:
   [R014](../research/014-final-upstream-capability-surface-audit.md)
 - Decisions:
   [D003](../decisions/003-java-companion-product-architecture.md) and
-  [D005](../decisions/005-lsp-first-capability-delivery.md)
+  [D005](../decisions/005-lsp-first-capability-delivery.md); D006 later
+  supersedes the per-release promotion gate
 
 ## Hypothesis
 
@@ -398,12 +399,12 @@ JDK 25.0.3.
 - Product-owned cleanup passed. The separate official-Java JDT/port-file
   lifecycle caveat remains unresolved and explicitly attributed above.
 
-This spike does **not** change the shipped compatibility claim. The repository
-still declares and enforces only 6.8.21 in its embedded provider record; adding
-6.8.23 is the next separately reviewed product change. Because the coordinator
-does not inspect the installed extension version, that change must also decide
-whether to add a real installed-version guard or retain a structurally versioned,
-self-declared compatibility table.
+At completion, this spike did **not** change the shipped compatibility claim:
+the repository still declared and enforced only 6.8.21 in its embedded provider
+record even though the coordinator did not inspect the installed extension
+version. D006 subsequently used this observation to remove exact release
+admission in favor of functional adapter probes. That later policy does not
+broaden this spike's bounded runtime evidence.
 
 ## Remaining uncertainty
 
@@ -417,12 +418,12 @@ self-declared compatibility table.
 
 ## Next experiment
 
-Add 6.8.23 through a separately reviewed compatibility-table product change,
-including the installed-version-guard design decision and regression coverage.
-Then proceed to the planned authentic `sts/highlight` to CodeLens slice. Reuse
-the verified official Java main runnable for matching generic Run actions;
-generic test, Gradle/vanilla task, and Boot Debug behavior retain their own
-runtime gates.
+Proceed to the planned authentic `sts/highlight` to CodeLens slice. Under D006,
+remove the self-declared exact-release gate on the same branch while preserving
+structural and functional probes, and define the bounded user-reviewed failure-
+report contract. Reuse the verified official Java main runnable for matching
+generic Run actions; generic test, Gradle/vanilla task, and Boot Debug behavior
+retain their own runtime gates.
 
 ## Reusable findings
 

@@ -12,7 +12,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 14 `verified`, 3 `zed-native-equivalent`, 29 `planned` |
+| Capability inventory | 16 `verified`, 0 `implemented`, 5 `zed-native-equivalent`, 36 `planned` |
 | Distribution | Local development extension only; no package or Marketplace entry |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested |
@@ -23,15 +23,18 @@ components.
 The [M4 capability delivery plan](docs/capability-delivery-plan.md) keeps each
 preferred stock-Zed route beside its existing fallback and runtime gate.
 The [final upstream audit](docs/research/014-final-upstream-capability-surface-audit.md)
-found no better official stock-Zed architecture; it records the compatibility-
-gated official Java 6.8.23 task improvement and the unavailable private/removed
-shortcuts.
+found no better official stock-Zed architecture; it records the official Java
+6.8.23 task improvement and the unavailable private/removed shortcuts.
 S015 found that Java and Spring Document Symbols merge well after both servers
 are ready, but restart can cache Spring-only results before JDT registers the
 capability. Project Symbols therefore remains the supported navigation fallback.
 S016 then verified official Java 6.8.23 coordination, warm-cache startup, and
-its normal-profile Maven main runnable on the tested tuple. The shipped product
-still declares only 6.8.21 until a separate compatibility-table change lands.
+its normal-profile Maven main runnable on the tested tuple. D006 makes official-
+Java compatibility capability-first rather than release-pinned: a release
+continues when the known runtime contract works and fails visibly when it does
+not. The coordinator now presents a bounded, user-reviewed GitHub report as a
+clickable Zed notification; the user's browser session handles GitHub sign-in
+and nothing is submitted automatically.
 
 ## What works today
 
@@ -50,11 +53,54 @@ Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. Most of the broader VS Code Spring Tools
 surface is still planned or unverified.
 
+The coordinator also implements Spring CodeLens compatibility: standard Spring
+lenses retain server actions, source-opening lenses use Zed's native location
+UI, and version-matched live `sts/highlight` lenses are merged without showing
+stale data. A driven macOS run connected a real Boot process and verified
+rendered endpoint URLs, live bean/injection lenses, refresh, click-selected
+ranges, the explanatory fallback, and authentic Spring data in native Hover.
+The same gate verified the commandless `@Value` adaptation: the lens kept the
+runtime value out of persistent source UI, while native Hover returned
+`CODELENS_SAMPLE_LIMIT : 37 (from: systemEnvironment)` from the connected
+process.
+The five separate static Spring provider families are enabled by product
+defaults, contract-tested, and observed in the showcase. Data AOT `CL-4d` now
+pre-resolves Spring's authentic generated target and rewrites the lens to Zed's
+native location command; a driven click opened the exact AOT method while the
+fixture's `/target/` remained ignored. AI-only titles remain visible regardless
+of Zed AI state. Their notice now says precisely that current Zed APIs let this
+extension neither detect nor invoke Agent and that the extension sends no
+source or prompt to an AI service.
+
+The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
+every standard provider, its user-visible subfeatures, the separate live-data
+stream, and JDT reference lenses to numbered targets in one Java fixture file.
+
+Zed disables CodeLens by default. To see Java and Spring lenses, add this to
+your Zed settings:
+
+```json
+{
+  "code_lens": "on"
+}
+```
+
+For a live lens that needs more detail, clicking selects its source position.
+Then run `editor: hover` (`cmd-k cmd-i` on macOS, `ctrl-k ctrl-i` on
+Linux/Windows). Stock Zed cannot yet perform that second action automatically.
+For a live endpoint URL lens, clicking explains that Zed cannot execute Spring
+Tools' VS Code-only URL command; the visible URL can still be opened manually.
+The CodeLens fixture ignores its own `target/` output. For other projects, Zed
+offers no extension-controlled sort-last behavior; `.gitignore` or local
+`.git/info/exclude` remains the project/user choice, and this extension does not
+edit it.
+
 ## Try it locally
 
 ### Prerequisites
 
-- Zed with the official Java extension version `6.8.21` installed;
+- Zed with the official Java extension installed; the product is not pinned to
+  one extension point release, while exact tested releases remain recorded;
 - JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
 - Rust installed through `rustup`, which Zed requires when building a local
   development extension; and
@@ -101,9 +147,14 @@ pending.
 ## Important limitations
 
 - This is not a stable release and does not claim multiplatform support.
-- The official Java extension `6.8.21` is required.
-- Official Java 6.8.23 passed S016 on the tested tuple but is not yet declared
-  by the shipped compatibility table.
+- The official Java extension is required. Compatibility is capability-based,
+  so an upstream release can still break the private route and produce a visible
+  failure until this project adapts.
+- Automatic GitHub issue creation through Zed sign-in is unavailable. On a
+  recognized compatibility failure, the implemented notification opens a
+  bounded title/body-prefilled public issue in the user's browser for review
+  and manual submission. A driven Zed-to-browser check passed; the test did not
+  submit an issue. Security reports must use private vulnerability reporting.
 - Installation after JDT LS has already started requires a Zed restart.
 - The opt-in Java LSP Outline is not a supported Spring route: after restart it
   can omit ordinary Java symbols until a document edit forces recollection.
@@ -118,6 +169,8 @@ Read [known limitations](LIMITATIONS.md) before relying on the extension.
 
 - [Capability inventory](docs/capability-inventory.md) — user-visible parity
   states and runtime evidence
+- [CodeLens showcase](docs/code-lens-showcase.md) — one inspection fixture plus
+  the provider/subfeature implementation and verification matrix
 - [M4 capability delivery plan](docs/capability-delivery-plan.md) — preferred
   routes, preserved fallbacks, and verification gates
 - [Implementation plan](docs/implementation-plan.md) — milestones and delivery

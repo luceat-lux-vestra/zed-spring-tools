@@ -7,7 +7,7 @@ scaffold are complete. Amended D002 records a Pivot to a required official-Java
 companion with a versioned Java/Spring coordination boundary and no reduced
 managed-JDT fallback. S012 proved the unmodified bridge and visible completion
 but was Refuted on cleanup; S013 then supported the exact removal contract.
-D003-D005 are Accepted. D005 selects stock-Zed LSP-first capability delivery
+D003-D006 are Accepted. D005 selects stock-Zed LSP-first capability delivery
 with opt-in generated Structure/Live documents while preserving the existing
 per-capability routes as fallbacks; Java language/query replacement is excluded
 from the baseline. R014's final latest-upstream audit found no better stock-Zed
@@ -15,9 +15,28 @@ architecture. S015 found a usable live JDT/Spring Document Symbols merge but was
 Refuted because restart cached Spring-only results before JDT's later dynamic
 registration. Project Symbols remains the fallback. S016 then Supported official
 Java 6.8.23 coordination, product cleanup, warm-cache startup, and the normal-
-profile Maven main runnable on macOS arm64/JDK 25. The next reviewed slice is
-the separate 6.8.23 compatibility-table product change; authentic
-`sts/highlight` to CodeLens follows it.
+profile Maven main runnable on macOS arm64/JDK 25. R016 found that Zed's
+`read:user` GitHub sign-in cannot authorize extension-created issues. D006
+therefore selects capability-first optimistic official-Java compatibility and a
+user-reviewed prefilled issue report on actual contract failure. R018 then
+re-audited Spring Boot Tools and the wider VS Code extension pack by developer
+outcome, correcting the pinned package's configuration count from 18 to 118 and
+separating standard Spring CodeLens from custom live `sts/highlight`. Adapters
+for both paths exist and are contract-tested. A driven Boot/JMX run then
+verified authentic endpoint, bean and injection live lenses, click-selected
+ranges, the explanatory fallback, and composed Spring/JDT native Hover. The
+five standard-provider families were then observed in the showcase after its
+`CL-2` target and `CL-3` marker were corrected. R019 records the resulting
+boundary: AI Agent state/dispatch and file-finder sort-last are unavailable to
+the product. The AI notices now state that boundary and send no prompt or source
+to AI. Data AOT `CL-4d` now pre-resolves Spring's authentic target, rewrites it
+to a Zed location command, and passed its one-click ignored-`target/` runtime
+gate. The compatibility-failure notification now keeps a bounded Markdown link
+visible and a driven click opened a title/body-prefilled GitHub composer without
+submitting it. `CL-7c` also passed against a connected Boot 3.5.5/JMX process:
+the commandless `@Value` range became a visible Hover lens and native Hover
+returned the environment value `37` plus its `systemEnvironment` source. The
+release-pin cleanup remains ancillary to this branch.
 
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
 and uninstall cycle reproduced real Spring Boot property completions, executed
@@ -51,13 +70,13 @@ program. Spike code remains excluded from production.
 - Add minimal disposable code under `spikes/` only when a written spike plan
   identifies the hypothesis and success criteria.
 - Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
-  `scripts/`, and `tests/` within the boundary that D002-D005 fix,
+  `scripts/`, and `tests/` within the boundary that D002-D006 fix,
   following the reviewed implementation plan's current milestone.
 - Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-D002-D005 have settled the architecture, implementation language, build system,
+D002-D006 have settled the architecture, implementation language, build system,
 bridge/coordinator module boundary, and stock-Zed capability-delivery strategy.
 Do not add any of the following until a recorded decision supports it:
 
@@ -200,8 +219,9 @@ mechanical.
 This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
 required official Java extension, rather than a Zed-extension-centered MVP. D003
 accepted the resulting architecture, D004 its stack, and D005 the LSP-first
-stock-Zed capability surfaces with preserved fallbacks, so product scaffolding
-and reviewed M4 slices are allowed to proceed.
+stock-Zed capability surfaces with preserved fallbacks. D006 makes official-
+Java admission capability-first and compatibility reporting user-reviewed, so
+product scaffolding and reviewed M4 slices are allowed to proceed.
 
 Reopen the gate only if new evidence contradicts the Pivot, and record the
 outcome in a decision document before changing production code.

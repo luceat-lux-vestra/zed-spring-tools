@@ -1,8 +1,8 @@
 # Product implementation and public-development plan
 
 - Status: In progress; M1-M3 complete, M4 in progress
-- Last updated: 2026-07-18
-- Architecture: D002-D005 Accepted
+- Last updated: 2026-07-19
+- Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
 
@@ -155,13 +155,15 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 5 exists at
+Status: in progress. Inventory version 9 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
-delivery routes. It records 46 capabilities: 14 `verified`, 0
-`implemented`, 3 `zed-native-equivalent`, and 29 `planned`.
+delivery routes and re-audited by
+[R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 57
+capabilities: 16 `verified`, 0 `implemented`, 5 `zed-native-equivalent`, and 36
+`planned`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
@@ -247,11 +249,35 @@ Official Java 6.8.23 adds wrapper-aware Maven/Gradle/vanilla main and test tasks
 [S016](spikes/016-official-java-6.8.23-compatibility-refresh.md) Supported the
 bridge, callback, product cleanup, warm-cache, and ordinary-profile Maven main-
 runnable gates on macOS arm64/JDK 25; Gradle coordination also passed, while
-Gradle/vanilla task execution remains unrun. The current product contract still
-declares only 6.8.21 until a separate compatibility-table change lands. Once it
-does, matching official Java tasks take precedence over product-generated
-duplicate Java tasks; Spring-specific goals and Boot Debug still use reviewable
-Zed task/debug configuration.
+Gradle/vanilla task execution remains unrun. [D006](decisions/006-capability-first-java-compatibility-and-reporting.md)
+now treats the installed extension release as diagnostic metadata rather than
+an admission gate: the product attempts the known runtime capability contract
+and fails visibly on an actual break. Matching official Java tasks take
+precedence over product-generated duplicate Java tasks when their behavior has
+the required evidence; Spring-specific goals and Boot Debug still use
+reviewable Zed task/debug configuration.
+
+[R016](research/016-zed-github-compatibility-reporting.md) found that Zed's
+GitHub sign-in grants only `read:user` and exposes neither its token nor an issue
+API to extensions. GitHub Issues also has no anonymous-author mode. The selected
+compatibility-failure route is therefore a bounded prefilled public issue to be
+opened through clickable LSP Markdown for explicit user review and submission.
+The strict title/body URL builder and persistent `Not now` notification are
+implemented; a driven Zed click opened the populated browser composer without
+submitting it. No
+telemetry, token, raw log, source, path, classpath, environment, or credential
+enters that route; security reports remain private.
+
+[R019](research/019-zed-codelens-agent-navigation-and-build-output.md) resolves
+the three follow-up CodeLens UX questions. The AI provider is enabled regardless
+of Zed AI state, while Zed's public APIs expose neither authoritative Agent-state
+detection nor Agent dispatch/prefill; product work is limited to accurate local-
+only wording. Zed also cannot sort arbitrary Maven `target/` paths last, so the
+showcase owns a local `.gitignore` and the product does not mutate user policy.
+`CL-4d` is different: Spring already resolves the exact generated URI/range, so
+the coordinator pre-resolves and caches that result, refreshes CodeLens, and
+rewrites the action to Zed's supported location command. The product slice and
+its ignored-target one-click runtime gate passed on 2026-07-19.
 
 The baseline product continues to exclude Java language/query replacement, a
 custom Zed build, and an external dashboard. An opt-in Java query experiment may
@@ -259,17 +285,20 @@ be proposed later only through a new direction decision, after stock-Zed routes
 are tested, and only for a capability such as embedded syntax highlighting that
 has no safe equivalent.
 
-Immediate M4 slice order after S016 is:
+Immediate M4 slice order after D006 is:
 
-1. admit official Java 6.8.23 through a reviewed compatibility-table product
-   change, including the installed-version-guard design and regression tests;
-2. implement authentic `sts/highlight` to CodeLens adaptation;
-3. deliver Boot-project selection and merge-safe Run/Debug configuration using
+1. completed on the current CodeLens/compatibility branch: retained the verified
+   live path, promoted all five static families after corrected AI-boundary
+   wording and authentic `CL-4d` asynchronous target pre-resolution/one-click
+   navigation passed with ignored `target/`, removed the self-declared exact-
+   release gate while preserving functional probes, and verified the bounded
+   compatibility-report notification through the populated browser composer;
+2. deliver Boot-project selection and merge-safe Run/Debug configuration using
    official Java task/DAP ownership, including a comparison of the default
    `java-main` runnable with a Spring-specific workspace tag binding;
-4. properties/YAML conversion and metadata reload Code Actions;
-5. one opt-in Spring Structure document slice; and
-6. separately gated live-data, metrics, logger, upgrade, Modulith, and special
+3. properties/YAML conversion and metadata reload Code Actions;
+4. one opt-in Spring Structure document slice; and
+5. separately gated live-data, metrics, logger, upgrade, Modulith, and special
    language slices.
 
 The current Boot-project-discovery slice completes one missing dependency in
@@ -338,13 +367,39 @@ fallback, and S016 becomes the next runtime gate.
 
 Amended on 2026-07-19 after S016. Official Java 6.8.23 preserved the structural
 coordination boundary, product-owned cleanup, warm cached startup, and the
-ordinary-profile Maven main runnable on the tested tuple. A separate reviewed
-compatibility-table change now precedes CodeLens work; the official-Java
-JDT/port-file lifecycle caveat and untested task/platform tuples remain open.
+ordinary-profile Maven main runnable on the tested tuple.
+
+Amended again on 2026-07-19 after the project owner's D006 direction and R016.
+Exact official-Java point releases no longer require separate admission;
+functional adapter probes and visible failure remain. Automatic or anonymous
+GitHub issue submission is unavailable in stock Zed, so the selected
+compatibility-failure route is a bounded, user-reviewed prefilled issue form.
+CodeLens compatibility is now
+implemented and contract-tested on that branch. The connected-live gate passed
+with endpoint, bean and injection lenses plus authentic native Hover. At that
+amendment, the five standard-provider families still remained to be driven; the
+following addendum records their later result and supersedes that pending state.
+
+Amended again on 2026-07-19 after the maintainer's standard-provider pass and
+R019. Every provider family was observed after correcting the `CL-2` fixture
+target and `CL-3` marker, but the pass exposed one product-solvable gap:
+`CL-4d` must translate Spring's pre-resolved generated target into a Zed location
+command instead of treating a popup plus manual Go to Definition as completion.
+Direct Agent action/state integration and file-finder sort-last are Zed API/UI
+boundaries; this branch owns only accurate AI wording and a fixture-local
+`/target/` ignore rule for those two items.
+
+Completed addendum, 2026-07-19: the branch delivered that final static slice.
+`CL-4d` now captures Spring's authentic generated URI/range, caches it by source
+version and command arguments, refreshes CodeLens, and rewrites the click to
+Zed's native location command. The driven click opened the exact generated
+method with `/target/` ignored. The AI notice correction is live. The bounded
+compatibility notification also passed a diagnostic Zed-to-browser gate using a
+title/body-prefilled GitHub composer; no issue was submitted.
 
 The highest known risks are the official proxy's private compatibility surface
 and observed JDT/port-file lifecycle caveat, third-party artifact distribution,
-unadapted Spring client methods, installed-version compatibility enforcement,
+unadapted Spring client methods, capability-drift attribution and reporting,
 multi-server Document Symbols restart refresh, generated-file merge/freshness,
 remote credential handling, shutdown-response mismatches, Java-provider updates,
 and the untested platform matrix. Each has an explicit decision or validation

@@ -8,6 +8,7 @@ use zed_extension_api as zed;
 
 const SERVER_ID: &str = "zed-spring-tools";
 const JAVA_SERVER_ID: &str = "jdtls";
+const EXTENSION_VERSION: &str = "0.1.0-alpha.1";
 
 struct SpringToolsExtension;
 
@@ -55,6 +56,15 @@ impl zed::Extension for SpringToolsExtension {
         Ok(Some(spring_initialization_options()))
     }
 
+    fn language_server_workspace_configuration(
+        &mut self,
+        language_server_id: &zed::LanguageServerId,
+        _worktree: &zed::Worktree,
+    ) -> zed::Result<Option<zed::serde_json::Value>> {
+        require_server(language_server_id)?;
+        Ok(Some(spring_workspace_configuration()))
+    }
+
     fn language_server_additional_initialization_options(
         &mut self,
         language_server_id: &zed::LanguageServerId,
@@ -91,6 +101,26 @@ fn spring_initialization_options() -> zed::serde_json::Value {
     zed::serde_json::json!({ "enableJdtClasspath": false })
 }
 
+fn spring_workspace_configuration() -> zed::serde_json::Value {
+    // VS Code contributes these defaults through its settings schema. Zed has
+    // no equivalent Spring settings schema, so provide the same effective
+    // defaults explicitly or Spring's standard CodeLens providers stay off.
+    zed::serde_json::json!({
+        "boot-java": {
+            "highlight-codelens": {
+                "on": true
+            },
+            "highlight-copilot-codelens": {
+                "on": true
+            },
+            "java": {
+                "codelens-over-query-methods": true,
+                "codelens-web-configs-on-controller-classes": true
+            }
+        }
+    })
+}
+
 fn coordinator_arguments(
     runtime: &runtime::RuntimePaths,
     spring: &artifacts::SpringPaths,
@@ -120,6 +150,8 @@ fn coordinator_arguments(
             zed::Os::Windows => "windows",
         }
         .to_owned(),
+        "--extension-version".to_owned(),
+        EXTENSION_VERSION.to_owned(),
     ])
 }
 
@@ -154,7 +186,12 @@ mod tests {
         assert_eq!(arguments[2], "/work tree/프로젝트");
         assert_eq!(arguments[4], "/jdks/temurin 25/bin/java");
         assert_eq!(arguments[10], "/extensions/work/java");
+        assert_eq!(arguments[16], EXTENSION_VERSION);
         assert!(!arguments.iter().any(|argument| argument == "sh"));
+        assert!(
+            include_str!("../extension.toml")
+                .contains(&format!("version = \"{EXTENSION_VERSION}\""))
+        );
     }
 
     #[test]
@@ -162,6 +199,23 @@ mod tests {
         assert_eq!(
             spring_initialization_options(),
             zed::serde_json::json!({ "enableJdtClasspath": false })
+        );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_enables_every_codelens_provider() {
+        assert_eq!(
+            spring_workspace_configuration(),
+            zed::serde_json::json!({
+                "boot-java": {
+                    "highlight-codelens": { "on": true },
+                    "highlight-copilot-codelens": { "on": true },
+                    "java": {
+                        "codelens-over-query-methods": true,
+                        "codelens-web-configs-on-controller-classes": true
+                    }
+                }
+            })
         );
     }
 }

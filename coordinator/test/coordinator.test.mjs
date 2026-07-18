@@ -7,8 +7,10 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 
 import {
+  compatibilityReportUrl,
   Coordinator,
   javaMajor,
+  javaVersion,
   monitorZedInput,
   parseOptions,
   run,
@@ -33,6 +35,7 @@ test("product arguments are positional, absolute, and shell independent", () => 
     "--java-work-dir", "/tmp/extensions/work/java",
     "--compatibility", "/tmp/runtime/providers.json",
     "--host-os", "macos",
+    "--extension-version", "0.1.0-alpha.1",
   ]);
   assert.equal(options.worktree, "/tmp/work tree");
   assert.equal(options.hostOs, "macos");
@@ -47,14 +50,60 @@ test("Java requirement accepts 21 and the configured Java 25 default", () => {
   assert.equal(javaMajor('openjdk version "21.0.8" 2025-07-15'), 21);
   assert.equal(javaMajor('java version "25.0.3" 2026-04-21'), 25);
   assert.equal(javaMajor('java version "1.8.0_402"'), 8);
+  assert.equal(javaVersion('openjdk version "25.0.3" 2026-04-21'), "25.0.3");
 });
 
-test("versioned official Java provider contract is exact", () => {
-  assert.equal(validateCompatibility(compatibility).extensionVersion, "6.8.21");
+test("compatibility report URL contains only bounded allowlisted fields", () => {
+  const report = compatibilityReportUrl({
+    failureKind: "classpath-registration-failed-v1",
+    hostOs: "macos",
+    hostArch: "arm64",
+    jdkVersion: "25.0.3",
+    extensionVersion: "0.1.0-alpha.1",
+  });
+  const url = new URL(report);
+  assert.equal(url.origin, "https://github.com");
+  assert.equal(url.pathname, "/luceat-lux-vestra/zed-spring-tools/issues/new");
+  assert.equal(url.searchParams.get("title"), "[Compatibility] classpath-registration-failed-v1");
+  const body = url.searchParams.get("body");
+  assert.match(body, /Failure: Official Java classpath registration failed/);
+  assert.match(body, /Fingerprint: `classpath-registration-failed-v1`/);
+  assert.match(body, /Spring Tools: `5\.2\.0\.RELEASE`/);
+  assert.match(body, /JDK: `25\.0\.3`/);
+  assert.match(body, /Host: `macOS arm64`/);
+  assert.match(body, /Zed Spring Tools: `0\.1\.0-alpha\.1`/);
+  assert.match(body, /Zed: `not observable by this extension`/);
+  assert.match(body, /Official Java extension: `not observable by this extension`/);
+  assert.equal(url.searchParams.has("zed-version"), false);
+  assert.equal(url.searchParams.has("official-java-version"), false);
+  assert.deepEqual([...url.searchParams.keys()], ["title", "body"]);
+  assert.ok(report.length < 2_000);
+  assert.throws(() => compatibilityReportUrl({
+    failureKind: "arbitrary-error",
+    hostOs: "macos",
+    hostArch: "arm64",
+    jdkVersion: "25.0.3",
+    extensionVersion: "0.1.0-alpha.1",
+  }));
+  assert.throws(() => compatibilityReportUrl({
+    failureKind: "java-data-route-failed-v1",
+    hostOs: "macos",
+    hostArch: "arm64",
+    jdkVersion: "/Users/private/project",
+    extensionVersion: "0.1.0-alpha.1",
+  }));
+});
+
+test("official Java provider admission is structural, not release-pinned", () => {
+  assert.equal(validateCompatibility(compatibility).id, "zed-java");
+  assert.equal(validateCompatibility({
+    ...compatibility,
+    providers: [{ ...compatibility.providers[0], extensionVersion: "future-metadata" }],
+  }).id, "zed-java");
   assert.throws(() =>
     validateCompatibility({
       ...compatibility,
-      providers: [{ ...compatibility.providers[0], extensionVersion: "next" }],
+      providers: [{ ...compatibility.providers[0], targetLanguageServerId: "other" }],
     }),
   );
 });
@@ -149,8 +198,11 @@ test("a failed Java data request is not logged and reports the requirement immed
   });
   assert.deepEqual(logs, []);
   assert.equal(zedWrites.length, 1);
-  assert.equal(zedWrites[0].method, "window/showMessage");
-  assert.match(zedWrites[0].params.message, /requires the official Java extension/);
+  assert.equal(zedWrites[0].method, "window/showMessageRequest");
+  assert.match(zedWrites[0].params.message, /requires a working official Java extension/);
+  assert.match(zedWrites[0].params.message, /java-data-route-failed-v1/);
+  assert.match(zedWrites[0].params.message, /Nothing is submitted/);
+  assert.deepEqual(zedWrites[0].params.actions, [{ title: "Not now" }]);
 });
 
 test("ordinary LSP traffic remains visible to Zed", async () => {
@@ -164,6 +216,432 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   const request = { jsonrpc: "2.0", id: "configuration", method: "workspace/configuration" };
   await coordinator.handleSpringMessage(request);
   assert.deepEqual(zedWrites, [request]);
+});
+
+test("Spring initialize advertises the coordinator CodeLens explanation command", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      capabilities: {
+        executeCommandProvider: { commands: ["sts/server-command"] },
+      },
+    },
+  });
+  assert.deepEqual(
+    zedWrites[0].result.capabilities.executeCommandProvider.commands,
+    ["sts/server-command", "zed-spring-tools.explain-code-lens"],
+  );
+});
+
+test("standard Spring CodeLens preserves server commands and adapts VS Code client commands", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const uri = "file:///tmp/project/Demo.java";
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, version: 4, text: "class Demo {}" } },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "lens",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri } },
+  });
+  const range = {
+    start: { line: 1, character: 2 },
+    end: { line: 1, character: 5 },
+  };
+  const targetRange = {
+    start: { line: 8, character: 3 },
+    end: { line: 8, character: 12 },
+  };
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lens",
+    result: [
+      { range, command: { title: "Go To Implementation", command: "sts/server-command" } },
+      {
+        range,
+        command: {
+          title: "Web config",
+          command: "vscode.open",
+          arguments: [uri, { selection: targetRange }],
+        },
+      },
+      { range, command: { title: "GET /demo" } },
+      {
+        range,
+        command: {
+          title: "Explain query",
+          command: "vscode-spring-boot.query.explain",
+          arguments: ["prompt"],
+        },
+      },
+      {
+        range,
+        command: {
+          title: "Convert to Router Builder Pattern with AI",
+          command: "vscode-spring-boot.query.explain",
+          arguments: ["prompt"],
+        },
+      },
+      {
+        range,
+        command: {
+          title: "http://127.0.0.1:8080/demo",
+          command: "vscode-spring-boot.open.url",
+          arguments: ["http://127.0.0.1:8080/demo"],
+        },
+      },
+    ],
+  });
+  const [server, open, info, ai, aiEdit, url] = zedWrites[0].result;
+  assert.equal(server.command.command, "sts/server-command");
+  assert.equal(open.command.command, "editor.action.goToLocations");
+  assert.deepEqual(open.command.arguments, [uri, range.start, [{ uri, range: targetRange }]]);
+  assert.deepEqual(info.command.arguments, [{ kind: "info", originalCommand: null }]);
+  assert.deepEqual(ai.command.arguments, [
+    { kind: "ai", originalCommand: "vscode-spring-boot.query.explain" },
+  ]);
+  assert.deepEqual(aiEdit.command.arguments, [
+    { kind: "ai-edit", originalCommand: "vscode-spring-boot.query.explain" },
+  ]);
+  assert.deepEqual(url.command.arguments, [
+    {
+      kind: "url",
+      originalCommand: "vscode-spring-boot.open.url",
+      url: "http://127.0.0.1:8080/demo",
+    },
+  ]);
+});
+
+test("Spring generated implementation is pre-resolved and rewritten to one-click navigation", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  let generatedTargetExists = true;
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    targetExists: () => generatedTargetExists,
+  });
+  const sourceUri = "file:///tmp/project/src/Repository.java";
+  const targetUri =
+    "file:///tmp/project/target/spring-aot/main/sources/example/RepositoryImpl__AotRepository.java";
+  const lensRange = {
+    start: { line: 12, character: 2 },
+    end: { line: 12, character: 23 },
+  };
+  const targetRange = {
+    start: { line: 41, character: 9 },
+    end: { line: 41, character: 20 },
+  };
+  const commandArguments = [{
+    docId: { uri: sourceUri },
+    repoFqName: "example.Repository",
+    queryMethodName: "findByMessage",
+    paramTypes: ["java.lang.String"],
+    originSelection: null,
+  }];
+  const generatedLens = {
+    range: lensRange,
+    command: {
+      title: "Go To Implementation",
+      command: "sts/boot/open-data-query-method-aot-definition",
+      arguments: commandArguments,
+    },
+  };
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri: sourceUri, version: 4, text: "interface Repository {}" } },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "lens-before-resolution",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri: sourceUri } },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lens-before-resolution",
+    result: [generatedLens],
+  });
+  assert.equal(zedWrites[0].result[0].command.command, "zed-spring-tools.explain-code-lens");
+  assert.equal(zedWrites[0].result[0].command.arguments[0].kind, "generated-target");
+
+  while (springWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
+  const resolveRequest = springWrites.shift();
+  assert.equal(resolveRequest.method, "workspace/executeCommand");
+  assert.deepEqual(resolveRequest.params, {
+    command: "sts/boot/open-data-query-method-aot-definition",
+    arguments: commandArguments,
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "authentic-show-document",
+    method: "window/showDocument",
+    params: { uri: targetUri, selection: targetRange },
+  });
+  assert.deepEqual(springWrites.shift(), {
+    jsonrpc: "2.0",
+    id: "authentic-show-document",
+    result: { success: true },
+  });
+  assert.equal(
+    zedWrites.some((message) => message.method?.startsWith("window/showMessage")),
+    false,
+    "the background resolver must not expose the old popup",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: resolveRequest.id,
+    result: { success: true },
+  });
+  while (!zedWrites.some((message) => message.method === "workspace/codeLens/refresh")) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  const refresh = zedWrites.find((message) => message.method === "workspace/codeLens/refresh");
+  assert.equal(coordinator.observeZedMessage({ jsonrpc: "2.0", id: refresh.id, result: null }), false);
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-resolution",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri: sourceUri } },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-resolution",
+    result: [generatedLens],
+  });
+  const rewritten = zedWrites.at(-1).result[0].command;
+  assert.equal(rewritten.command, "editor.action.goToLocations");
+  assert.deepEqual(rewritten.arguments, [
+    sourceUri,
+    lensRange.start,
+    [{ uri: targetUri, range: targetRange }],
+  ]);
+
+  generatedTargetExists = false;
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-target-removal",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri: sourceUri } },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-target-removal",
+    result: [generatedLens],
+  });
+  assert.equal(zedWrites.at(-1).result[0].command.command, "zed-spring-tools.explain-code-lens");
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didChange",
+    params: { textDocument: { uri: sourceUri, version: 5 }, contentChanges: [] },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-change",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri: sourceUri } },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lens-after-change",
+    result: [generatedLens],
+  });
+  assert.equal(zedWrites.at(-1).result[0].command.command, "zed-spring-tools.explain-code-lens");
+  await coordinator.close();
+});
+
+test("version-matched sts/highlight lenses merge into standard CodeLens and stale lenses do not", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const uri = "file:///tmp/project/Demo.java";
+  const range = {
+    start: { line: 2, character: 0 },
+    end: { line: 2, character: 4 },
+  };
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, version: 7, text: "class Demo {}" } },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/highlight",
+    params: {
+      doc: { uri, version: 7 },
+      codeLenses: [
+        {
+          range,
+          command: {
+            title: "Injected into 2 beans",
+            command: "sts.showHoverAtPosition",
+            arguments: [range.start],
+          },
+        },
+        { range },
+      ],
+    },
+  });
+  assert.equal(zedWrites[0].method, "workspace/codeLens/refresh");
+  assert.equal(coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites[0].id, result: null }), false);
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "matching",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri } },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "matching", result: [] });
+  assert.equal(zedWrites[1].result.length, 2, "commandless live ranges gain a visible Hover affordance");
+  assert.equal(zedWrites[1].result[0].command.command, "zed-spring-tools.explain-code-lens");
+  assert.equal(zedWrites[1].result[0].command.arguments[0].kind, "hover");
+  assert.equal(zedWrites[1].result[1].command.title, "Spring live data — use Hover");
+  assert.equal(zedWrites[1].result[1].command.arguments[0].kind, "hover");
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didChange",
+    params: { textDocument: { uri, version: 8 }, contentChanges: [] },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "stale",
+    method: "textDocument/codeLens",
+    params: { textDocument: { uri } },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "stale", result: [] });
+  assert.deepEqual(zedWrites[2].result, []);
+});
+
+test("unavailable CodeLens commands explain the native Zed workflow instead of failing silently", () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const handled = coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: 44,
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.explain-code-lens",
+      arguments: [{ kind: "hover" }],
+    },
+  });
+  assert.equal(handled, false);
+  assert.equal(zedWrites[0].method, "window/showMessage");
+  assert.match(zedWrites[0].params.message, /editor: hover/);
+  assert.match(zedWrites[0].params.message, /zed-industries\/zed\/issues\/20042/);
+  assert.deepEqual(zedWrites[1], { jsonrpc: "2.0", id: 44, result: null });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: 45,
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.explain-code-lens",
+      arguments: [{ kind: "url", url: "http://127.0.0.1:8080/demo" }],
+    },
+  });
+  assert.match(zedWrites[2].params.message, /VS Code-only command/);
+  assert.match(zedWrites[2].params.message, /http:\/\/127\.0\.0\.1:8080\/demo/);
+  assert.deepEqual(zedWrites[3], { jsonrpc: "2.0", id: 45, result: null });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: 46,
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.explain-code-lens",
+      arguments: [{ kind: "ai" }],
+    },
+  });
+  const aiNotice = zedWrites[4].params.message;
+  assert.match(aiNotice, /do not let this extension detect/);
+  assert.match(aiNotice, /open\/prefill Agent/);
+  assert.match(aiNotice, /separate user-initiated Agent request/);
+  assert.match(aiNotice, /does not send the prompt or source/);
+  assert.doesNotMatch(aiNotice, /If Zed AI is enabled/);
+  assert.deepEqual(zedWrites[5], { jsonrpc: "2.0", id: 46, result: null });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: 47,
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.explain-code-lens",
+      arguments: [{ kind: "ai-edit" }],
+    },
+  });
+  const aiEditNotice = zedWrites[6].params.message;
+  assert.match(aiEditNotice, /no deterministic refactoring command/);
+  assert.match(aiEditNotice, /open\/prefill Agent/);
+  assert.match(aiEditNotice, /does not send the prompt or source/);
+  assert.doesNotMatch(aiEditNotice, /If Zed AI is enabled/);
+  assert.deepEqual(zedWrites[7], { jsonrpc: "2.0", id: 47, result: null });
+});
+
+test("an unrelated Spring show-document request still reports the Zed limitation", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "show-generated",
+    method: "window/showDocument",
+    params: {
+      uri: "file:///tmp/project/target/generated/RepositoryImpl.java",
+      selection: {
+        start: { line: 12, character: 4 },
+        end: { line: 12, character: 20 },
+      },
+    },
+  });
+  assert.equal(zedWrites[0].method, "window/showMessage");
+  assert.match(zedWrites[0].params.message, /RepositoryImpl\.java/);
+  assert.match(zedWrites[0].params.message, /line 13/);
+  assert.match(zedWrites[0].params.message, /window\/showDocument/);
+  assert.match(zedWrites[0].params.message, /Go to Definition/);
+  assert.deepEqual(springWrites[0], {
+    jsonrpc: "2.0",
+    id: "show-generated",
+    result: { success: false },
+  });
 });
 
 test("a completed Spring index update refreshes Zed inlay hints", async () => {
@@ -210,8 +688,27 @@ test("classpath enable waits for initialized and the official Java route", async
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(springWrites, []);
   coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
-  await new Promise((resolve) => setImmediate(resolve));
+  while (springWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
+
+  const enableCodeLenses = springWrites.shift();
+  assert.equal(enableCodeLenses.method, "workspace/executeCommand");
+  assert.deepEqual(enableCodeLenses.params, {
+    command: "sts/enable/copilot/features",
+    arguments: [true],
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: enableCodeLenses.id,
+    result: "OK",
+  });
+  while (zedWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(zedWrites[0].method, "workspace/codeLens/refresh");
+  assert.equal(
+    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites.shift().id, result: null }),
+    false,
+  );
   assert.deepEqual(springWrites, []);
+
   routeReady();
   while (springWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
 
@@ -358,10 +855,11 @@ test("a classpath registration that keeps failing past the grace window surfaces
     params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: true },
   });
 
-  const popup = zedWrites.find((message) => message.method === "window/showMessage");
+  const popup = zedWrites.find((message) => message.method === "window/showMessageRequest");
   assert.ok(popup);
   assert.equal(popup.params.type, 1);
-  assert.match(popup.params.message, /requires the official Java extension/);
+  assert.match(popup.params.message, /requires a working official Java extension/);
+  assert.match(popup.params.message, /classpath-registration-failed-v1/);
   await coordinator.close();
 });
 
@@ -439,6 +937,7 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
     "--java-work-dir", javaWork,
     "--compatibility", compatibilityFile,
     "--host-os", "macos",
+    "--extension-version", "0.1.0-alpha.1",
   ], {
     input,
     output: new PassThrough(),

@@ -1,7 +1,7 @@
 # R011: VS Code Spring Tools capability surface
 
 - Status: Complete for the pinned release; LSP surface partially runtime-verified
-- Last updated: 2026-07-18
+- Last updated: 2026-07-19
 - Investigator: Claude Opus 4.8
 - Evidence baseline:
   - Spring Tools `5.2.0.RELEASE`, asset `vscode-spring-boot-2.2.0-RC1.vsix`,
@@ -42,10 +42,13 @@ Extracted mechanically from `extension/package.json` inside the pinned VSIX
    `query.explain`, `ls.start`, and `sts/common-properties/reload`.
 2. **One view**: `explorer.spring`, "Logical Structure", contributed to VS Code's
    explorer container, gated on `vscode-spring-boot.ls.started`.
-3. **18 settings** under the `boot-java.` prefix, covering live-information
-   connection and retry behaviour, Java reconcilers, XML config support,
-   code-lens highlighting, properties metadata, completion prefix elision, JPQL,
-   cron inlay hints, bean injection completion, and the beans structure tree.
+3. **118 settings in total**: 35 under `boot-java.`, one under
+   `boot-java-vscode-only.`, 80 under `spring-boot.ls.`, and two under
+   `spring.tools.`. They cover the earlier-listed feature switches plus Boot
+   2/3/4 and AOT diagnostics, property/YAML/SpEL/data-query/cron/Spring-AI
+   severities, version validation, language-server runtime tuning, embedded
+   MCP, conversion behaviour, and browser selection. The earlier count of 18
+   was an incomplete subset; R018 records the corrected outcome-level audit.
 4. **Four languages**: `spring-boot-properties`, `spring-boot-properties-yaml`,
    `spring-factories`, and `jpa-query-properties`.
 5. **Five `javaExtensions` bundles** contributed into JDT LS:

@@ -21,15 +21,33 @@ extension.
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested
   Structure/Live documents only where grouping or a table is essential. Those
-  generated documents, CodeLens adaptation, Run/Debug generation, and live-data
-  UX are plans, not implemented capabilities. The full preferred and fallback
-  mapping is in `docs/capability-delivery-plan.md`.
+  generated documents and Run/Debug generation remain plans. CodeLens
+  adaptation is implemented; its connected-process endpoint, bean, injection,
+  click and native-Hover path is verified on the first macOS tuple. All five
+  static Spring providers now have product activation, contract tests, and a
+  dedicated maintainer acceptance fixture, and each family has been observed.
+  Data AOT `CL-4d` now pre-resolves and caches Spring's authentic target, then
+  rewrites the lens to Zed's supported location command. A driven click opened
+  the exact generated method while `/target/` remained ignored. Aggregate live-
+  data UX remains a separate concern. The full preferred and fallback mapping is in
+  `docs/capability-delivery-plan.md`.
 - The final upstream audit found no hidden extension shortcut for those missing
   surfaces. Extension slash commands are removed, internal CodeLens task
   scheduling is not exported to extension LSP adapters, general
   `window/showDocument` is not supported by Zed's project LSP client, and
   Project Symbols does not render `containerName` as a hierarchy. URLs therefore
   require a verified Document Link/Markdown link plus copyable text fallback.
+- Spring's AI-only CodeLens provider is enabled by this product independent of
+  Zed's AI setting. Stock Zed exposes no public extension/CodeLens API to read
+  authoritative Agent state or open/prefill Agent, so this project can only keep
+  the requested blocked lens visible and avoid sending its prompt or source to
+  AI. The shipped notice explicitly states those boundaries. Direct integration
+  still requires an upstream Zed API.
+- Zed exposes no extension-controlled way to keep arbitrary Maven `target/`
+  files but sort them last in the file finder. The showcase owns `/target/` in
+  its local `.gitignore`; other projects retain their own `.gitignore` or local
+  `.git/info/exclude` policy. `file_scan_exclusions` is stronger—it removes paths
+  from scans, searches, and the tree—and is not an automatic product fallback.
 - There is no packaged extension, installer, release artifact, product CI, or
   Marketplace entry. Installation means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a
@@ -41,9 +59,10 @@ extension.
   not offer a reduced standalone JDT fallback.
 - Official Java 6.8.23 passed S016's versioned bridge, callbacks, product-owned
   cleanup, warm-cache, and ordinary-profile Maven Boot main-runnable gates on
-  macOS arm64/JDK 25. It is still not a shipped companion: the product remains
-  pinned to 6.8.21 until a separate compatibility-table change is reviewed.
-  Gradle/vanilla task execution, test runnables, and debugging remain untested.
+  macOS arm64/JDK 25. D006 no longer treats an exact release string as the
+  compatibility gate; the known route and bridge capabilities are attempted
+  optimistically. Gradle/vanilla task execution, test runnables, and debugging
+  remain untested.
 - Zed's Java 6.8.23 generated runnable resolves `java-task-helper` below the
   default Zed data directory. It works in the ordinary profile but fails under
   a custom `--user-data-dir`; this affects isolated evidence profiles.
@@ -55,7 +74,8 @@ extension.
 - The coordinator depends on a private Java-provider transport that the official
   Java extension does not document as public API. A future Java extension release
   may change it and break this project. The versioned adapter narrows that risk
-  but cannot remove it.
+  but cannot remove it. Exact release pre-admission is not required; an actual
+  capability failure must be visible and easy to report.
 - The PoC and the M2 slice prove attributable Spring Boot property completion and
   the cleanup path. They do not prove the rest of VS Code Spring Tools capability
   parity.
@@ -81,8 +101,20 @@ extension.
   or retry it. The cause is not established.
 - The missing/incompatible-Java diagnostic is implemented and, as of 2026-07-18,
   observed at runtime: the coordinator refuses to start on an incompatible JDK or
-  an unverified official-Java-extension contract, naming the reason, instead of
-  entering a reduced mode. Only the single macOS arm64 tuple has been exercised.
+  structurally invalid adapter contract, naming the reason, instead of entering
+  a reduced mode. D006 removes the embedded self-declared `extensionVersion`
+  comparison while retaining structural validation; that policy change has
+  contract coverage but has not yet had its own driven Zed run. Only the single
+  macOS arm64 tuple has been exercised.
+- GitHub Issues cannot be submitted anonymously, and Zed's GitHub sign-in grants
+  only `read:user` and exposes no issue-write token to extensions. The product
+  now shows a clickable Markdown notification containing a bounded title/body-
+  prefilled public issue URL. A non-destructive `Not now` action is required
+  because stock Zed immediately drops an actionless `showMessageRequest`. A
+  driven Zed click opened the populated GitHub composer in the existing browser
+  session; no issue was submitted. It is not automatic telemetry and must never include
+  raw logs, paths, classpaths, source, environment variables, or credentials,
+  and must direct suspected vulnerabilities to private reporting.
 - `sts/javaType`, its eight sibling `sts/java*` server→client requests, and the
   Boot-project `sts/project/gav` request are handled by the coordinator, which
   routes them to the official Java extension.

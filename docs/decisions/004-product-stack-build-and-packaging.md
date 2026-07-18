@@ -172,15 +172,18 @@ state path, event name, or test-only proxy becomes a product dependency.
 
 ### Java provider compatibility
 
-Store compatibility data in `protocol/java-providers.json`. Each entry contains
-the schema version, provider ID, observed extension version/source identity,
-route discovery algorithm, required proxy behavior, target JDT server ID,
-injected bundle contract, bridge command version, and verified JDT/Spring tuple.
+Store adapter contract data in `protocol/java-providers.json`. Each entry
+contains the schema version, provider ID, route discovery algorithm, required
+proxy behavior, target JDT server ID, injected bundle contract, and bridge
+command version. Observed extension/source and JDT/Spring tuples belong in the
+evidence table rather than a runtime release allowlist.
 
-Runtime selection is capability-based. A matching entry must find the owned
-route, validate a safe regular port record, reach the loopback proxy, and obtain
-the expected bridge command result. A version string alone is insufficient.
-Unknown behavior produces an actionable incompatible-Java diagnostic.
+Runtime selection is capability-based under
+[D006](006-capability-first-java-compatibility-and-reporting.md). The adapter
+must find the owned route, validate a safe regular port record, reach the
+loopback proxy, and obtain the expected bridge command result. A version string
+does not admit or reject a provider. Unknown behavior produces an actionable
+incompatible-Java diagnostic and a user-reviewed reporting route.
 
 ### Build, formatting, tests, and CI
 

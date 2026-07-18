@@ -8,8 +8,8 @@ contact_links:
   - name: What is tested, and what is not
     url: https://github.com/luceat-lux-vestra/zed-spring-tools/blob/main/COMPATIBILITY.md
     about: >-
-      Only macOS arm64 with JDK 25 is verified, and only for one vertical slice. Check
-      here before reporting that something does not work on another host.
+      Runtime evidence is still limited to macOS arm64 with JDK 25 and named
+      feature slices. Check here before reporting another host or combination.
   - name: Known limitations
     url: https://github.com/luceat-lux-vestra/zed-spring-tools/blob/main/LIMITATIONS.md
     about: >-
