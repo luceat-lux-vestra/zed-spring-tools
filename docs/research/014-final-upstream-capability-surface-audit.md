@@ -127,6 +127,28 @@ extension.
     deletion but exposes no virtual document. An explicitly requested generated
     Structure/Live file remains the smallest stock-Zed grouping/table surface.
 
+### Public Zed surfaces replace most unavailable API outcomes
+
+22. Zed's source-context Code Actions menu is not limited to LSP actions.
+    `CodeActionContents` combines resolved runnable tasks, available LSP Code
+    Actions, and debug scenarios, and dispatches each through its native owner.
+    This is a public user workflow even though an extension cannot contribute an
+    arbitrary top-level Command Palette action.
+23. Zed's task documentation allows a workspace task to bind a runnable tag with
+    precedence over a global or language-provided task. Official Java marks main
+    runnables with `java-main`. This makes a Spring-specific task bound to the
+    existing Java gutter runnable a source-supported experiment; it does not yet
+    prove correct filtering for Boot versus non-Boot main classes.
+24. The general LSP store handles `window/showMessageRequest`. Its notification
+    renders the message as Markdown and opens clicked links with
+    `open_url_or_file`. A request result can therefore present a clickable
+    application URL without general `window/showDocument`, subject to a driven
+    UX test.
+25. Hover Markdown links also call `open_url_or_file`. Document Links, hover
+    links, prompt links, and generated-document links are different public entry
+    contexts over the same reachable-URL outcome; they need not duplicate URL
+    discovery logic.
+
 ## Primary sources
 
 All paths and URLs below were accessed on 2026-07-18.
@@ -139,7 +161,13 @@ All paths and URLs below were accessed on 2026-07-18.
   - `crates/language/src/language.rs`, `LspAdapter::client_command`
   - `crates/editor/src/code_lens.rs`, `try_handle_client_command`
   - `crates/language_extension/src/extension_lsp_adapter.rs`
+  - `crates/editor/src/code_context_menus.rs`, `CodeActionContents::iter`
+  - `crates/editor/src/code_actions.rs`, task/action/debug dispatch
+  - `docs/src/tasks.md`, runnable-tag binding and Code Actions access
   - `crates/lsp/src/lsp.rs`, general client capabilities
+  - `crates/project/src/lsp_store.rs`, `ShowMessageRequest` handling
+  - `crates/workspace/src/notifications.rs`, Markdown URL dispatch
+  - `crates/editor/src/hover_popover.rs`, hover URL dispatch
   - `crates/copilot/src/copilot.rs`, Copilot-scoped ShowDocument handler
   - `crates/project_symbols/src/project_symbols.rs`, picker rendering
   - upstream: <https://github.com/zed-industries/zed/commit/c9e8e611dbc279afa0914d28c4d37ad07f38c03b>
@@ -185,6 +213,19 @@ All paths and URLs below were accessed on 2026-07-18.
    browser" until a driven Document Link/Markdown test proves the exact Zed UX.
 7. Extension slash commands must be removed from candidate product routes.
    Agent skills or MCP remain a separately scoped AI-explanation option only.
+8. Code Actions should be the general Spring operation entry point. CodeLens
+   should duplicate only a small high-frequency source-local subset, while tasks
+   and debug scenarios remain companions for execution-specific ownership.
+9. The combined source-context menu is the closest stock-Zed equivalent to an
+   integrated Spring menu. A `java-main` workspace task binding may improve Boot
+   execution ergonomics, but shipping it by default would be premature until a
+   runtime slice rules out duplicate rows and incorrect appearance on ordinary
+   Java main classes.
+10. A clickable `showMessageRequest` Markdown result is a stronger companion for
+    an action-produced URL than copy-only text. Copyable text remains the actual
+    fallback; an OS-specific opener task should remain an excluded contingency
+    unless the public link routes fail and a cross-platform security/quoting
+    experiment supports it.
 
 ## Unverified hypotheses
 
@@ -198,6 +239,12 @@ All paths and URLs below were accessed on 2026-07-18.
    application-URL workflow on all supported desktop platforms.
 5. A user-authored Java launch configuration with `noDebug` has equivalent stop
    and terminal behavior to a generated Run configuration.
+6. A Spring-specific workspace task bound to `java-main` appears once and only
+   on the intended Boot main runnable across single- and multi-module projects.
+7. LSP Code Actions, a bound task, and an available debug scenario form a clear,
+   non-duplicated source-context menu on the fixed runtime tuple.
+8. A `showMessageRequest` Markdown application URL is clickable and preserves a
+   usable copy path on every supported desktop platform.
 
 ## Runtime verification needed
 
@@ -207,9 +254,13 @@ All paths and URLs below were accessed on 2026-07-18.
 3. The Boot execution slice must separately test official-Java main runnables,
    explicit Run/Debug configuration, stop behavior, and safe file merge.
 4. A URL slice must test Document Link and Markdown behavior and retain a copyable
-   URL fallback.
+   URL fallback. It should separately exercise hover/generated content and a
+   `showMessageRequest` result.
 5. Generated Structure/Live documents retain their creation, merge, refresh,
    stale-data, deletion, and secret-redaction gates.
+6. The Boot execution slice must compare the unmodified official Java runnable
+   with a workspace `java-main` binding and record duplicate, non-Boot,
+   multi-module, task-picker, and Code Actions-menu behavior.
 
 ## Blockers and constraints
 
@@ -232,7 +283,11 @@ All paths and URLs below were accessed on 2026-07-18.
    runnable with generated Run/Debug configurations rather than generating a
    duplicate task by default.
 4. Include a Document Link and copyable-link comparison in the first live URL
-   slice.
+   slice, and add a clickable `showMessageRequest` Markdown result.
+5. In the Boot execution slice, test whether a Spring-specific `java-main` tag
+   binding improves the gutter/Code Actions workflow without leaking to ordinary
+   Java main classes. Retain it only if it is independently useful; do not build
+   it merely as insurance against the official Java runnable.
 
 ## Interim conclusion
 
@@ -241,5 +296,8 @@ did find one worthwhile refinement: compatibility-test official Java 6.8.23 and
 reuse its general main/test tasks where they fit. It also closes three tempting
 but unavailable routes—extension slash commands, internal CodeLens task
 scheduling, and general `window/showDocument`—so implementation does not depend
-on private or removed surfaces. The preferred/fallback plan remains additive,
-and no capability state changes from this source audit alone.
+on private or removed surfaces. Public Code Actions/task/debug composition and
+clickable prompt/hover links replace most of their user outcomes. The plan now
+distinguishes primary routes, independently useful companions, conditional
+fallbacks, and excluded contingencies; no capability state changes from this
+source audit alone.

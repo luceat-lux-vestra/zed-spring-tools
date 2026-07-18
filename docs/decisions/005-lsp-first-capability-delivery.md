@@ -82,6 +82,22 @@ boundary. Neither is proportionate while stock-Zed outcomes remain available.
 documents, while preserving the current per-capability plan as the documented
 fallback.**
 
+“Preserve” does not mean implementing every lower-ranked route in parallel.
+Every capability route is classified as one of four kinds:
+
+- **primary** — the first implementation and normal user path;
+- **companion** — implemented with the primary because it serves a different
+  user context, such as quick Run versus configurable Debug;
+- **conditional fallback** — kept in the plan with an explicit activation gate,
+  but implemented or promoted only when the primary fails its named runtime,
+  platform, safety, or usability criterion; or
+- **excluded contingency** — recorded for future reconsideration but not part of
+  the product until a new decision changes an ownership or private-API boundary.
+
+Fallbacks must name their trigger, expected degraded outcome, and constraints.
+Low confidence alone is not enough to build a duplicate path, and a companion is
+not mislabeled as a fallback merely because it is second in a table.
+
 The decision has these rules:
 
 1. D003 and D004 remain authoritative. Official Java keeps Java language
@@ -95,6 +111,10 @@ The decision has these rules:
    Code Actions/CodeLens/inlay hints for contextual interaction, compatibility-
    tested official Java tasks for matching main/test actions, and official Java
    DAP/reviewable Zed tasks for remaining execution.
+   Code Actions are the general Spring command entry point. CodeLens is a
+   companion only for a small, high-frequency, source-local subset. Runnable
+   tasks and debug scenarios remain execution-specific companions rather than
+   duplicate command implementations.
 4. Project Symbols remains the supported structure-navigation fallback until an
    enhanced route has stronger evidence on the same tuple. Manual
    `.zed/debug.json`, `.zed/tasks.json`, static hover, and external Actuator
@@ -119,7 +139,9 @@ The decision has these rules:
 11. Private or removed Zed surfaces are not product contracts. In particular,
     extension slash commands, built-in-only CodeLens task scheduling, Copilot's
     ShowDocument handler, and Project Symbols `containerName` do not provide a
-    general Spring action, browser, or tree route.
+    general Spring action, browser, or tree route. Their user outcomes may still
+    be delivered through public Zed surfaces; “API unavailable” does not mean
+    “no equivalent workflow.”
 
 The complete preferred and fallback mapping is maintained in the
 [M4 capability delivery plan](../capability-delivery-plan.md).

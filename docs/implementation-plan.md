@@ -211,6 +211,14 @@ The delivery order is:
 5. leave a capability `planned` when neither its preferred route nor its named
    fallback has runtime evidence.
 
+Routes are not simply “preferred versus second choice.” D005 classifies them as
+primary, independently useful companion, conditional fallback, or excluded
+contingency. A conditional fallback is retained with a trigger and degraded
+outcome, but is not pre-implemented solely because its primary lacks runtime
+evidence. Companions share one coordinator operation/state model and are added
+only for distinct contexts such as quick Run versus configurable Debug, or hover
+discovery versus a link returned by an explicit action.
+
 Zed 1.11.3 supports LSP Document Symbols behind the default-off
 `languages.Java.document_symbols` setting. The earlier zero-request run is a
 valid control for the default tree-sitter path, not evidence that Zed lacks the
@@ -226,6 +234,11 @@ commands are removed, built-in CodeLens task scheduling is not exported to an
 extension LSP adapter, general `window/showDocument` is not advertised or
 handled, and Project Symbols cannot become a tree through `containerName`.
 Those routes are excluded rather than treated as implementation shortcuts.
+Their user outcomes are not all blocked: Zed's source-context Code Actions menu
+combines runnable tasks, LSP actions, and available debug scenarios, while hover
+and `showMessageRequest` notifications render clickable Markdown links. These
+public substitutes require driven slices but make private task scheduling and
+general ShowDocument unnecessary product assumptions.
 
 Official Java 6.8.23 adds wrapper-aware Maven/Gradle/vanilla main and test tasks.
 They are a simplification candidate, not inherited support: the current product
@@ -248,7 +261,8 @@ Immediate M4 slice order after the current Boot-project transport work is:
 2. S016 official Java 6.8.23 compatibility and main-task verification;
 3. authentic `sts/highlight` to CodeLens adaptation;
 4. Boot-project selection and merge-safe Run/Debug configuration using official
-   Java task/DAP ownership;
+   Java task/DAP ownership, including a comparison of the default `java-main`
+   runnable with a Spring-specific workspace tag binding;
 5. properties/YAML conversion and metadata reload Code Actions;
 6. one opt-in Spring Structure document slice; and
 7. separately gated live-data, metrics, logger, upgrade, Modulith, and special
