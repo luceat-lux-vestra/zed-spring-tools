@@ -38,8 +38,8 @@ delivers the same user outcome is a legitimate result, recorded as
 | --- | --- |
 | `verified` | 10 |
 | `implemented` | 1 |
-| `planned` | 32 |
-| `blocked-zed-api` | 0 |
+| `planned` | 31 |
+| `blocked-zed-api` | 1 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 3 |
 
@@ -98,7 +98,7 @@ Debuggers are supported, so run/debug is not assumed blocked.
 | Request mapping navigation | `verified` | Observed 2026-07-18. `@/greeting -- GET` (kind 6) is returned by `workspace/symbol` as a navigable workspace symbol resolved to `GreetingController.java`, so Zed's symbol picker jumps to the mapping. |
 | Bean navigation | `verified` | Observed 2026-07-18. `@+ 'greetingPrefix' (@Bean)` and the `@Component`/`@Configuration` symbols are returned by `workspace/symbol` with resolved locations, navigable from Zed's symbol picker. |
 | Code lenses | `planned` | Server advertises `codeLensProvider`; setting `boot-java.highlight-codelens.on`. Driven run 2026-07-18: Zed **does** consume LSP code lenses — with Zed's `code_lens` setting on (it is off by default), jdtls reference-count lenses render via `textDocument/codeLens` + `codeLens/resolve` round-trips — so this is **not** a Zed-API block. But the Spring server returned no standard code lenses on the static fixture; Spring delivers element annotation through the custom `sts/highlight` notification, not `textDocument/codeLens`. Observing Spring code-lens content is coupled to `boot-java.highlight-codelens.on` and/or a live-data connection (Workstream 3). Evidence: `tmp/lsp-verify-20260718/`. |
-| Inlay hints (including cron) | `planned` | Server advertises `inlayHintProvider`; setting `boot-java.cron.inlay-hints`. Driven run 2026-07-18: with Zed's `inlay_hints.enabled` on, jdtls ready, both servers advertising `inlayHintProvider` (jdtls statically, plus dynamic registration), and the Java buffers viewed, Zed issued **zero** `textDocument/inlayHint` requests across the full trace, while issuing 7 `textDocument/codeLens` requests in the same viewport window. jdtls's own parameter/type hints were not requested either, so the gap is not Spring-specific: the `@Scheduled` cron inlay hint cannot render. Candidate `blocked-zed-api` (Zed 1.11.3 not issuing `textDocument/inlayHint`), pending one targeted confirmation (jdtls parameter-name hints on a method call) and ruling out a Zed-native cron-readability equivalent. Evidence: `tmp/lsp-verify-20260718/`. |
+| Inlay hints (including cron) | `blocked-zed-api` | Missing surface: **Zed 1.11.3 does not issue `textDocument/inlayHint` requests to the jdtls or Spring servers.** Driven runs 2026-07-18 eliminated every client-side cause: `inlay_hints.enabled` was on; the Spring server advertised `inlayHintProvider` statically (initialize result) and jdtls registered it dynamically; the buffer was the front rendered viewport (proven — `textDocument/codeLens` fired in the same window); and a clean relaunch with the settings pre-set (ruling out the settings-save regression, zed#15909) still produced zero `textDocument/inlayHint` and non-zero `textDocument/codeLens`. Because Zed never emits the request, no server-side setting (`boot-java.cron.inlay-hints`) or `initialization_options` can surface the `@Scheduled` cron hint, and the API contributes no decoration/inlay surface an extension could use instead (surface constraint 1). Zed does consume LSP inlay hints for other languages (Rust/TS), so this is a language/server-integration gap in the stable build, not a missing feature in the abstract; the exact internal trigger is in Zed's source (the LSP trace logs nothing about inlay). Evidence: `tmp/lsp-verify-20260718/`. |
 | Code actions / quick fixes | `planned` | Server advertises `codeActionProvider` with resolve. |
 | References and implementations | `planned` | Server advertises `referencesProvider`, `implementationProvider`. |
 | Boot project info | `planned` | `sts/spring-boot/bootProjectInfo`. |
