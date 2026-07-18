@@ -62,6 +62,32 @@ pushes, no force pushes, and no non-linear history.
 - Pull requests merge by rebase, or by squash when the intermediate commits are
   not worth keeping.
 
+## Issue and pull-request metadata
+
+Metadata records routing and ownership; empty fields are preferable to invented
+information.
+
+- Capability and product work receives at least one `area:*` label after initial
+  triage. A `state:*` label is used only when the item proposes or records that
+  inventory state.
+- `research`, `decision`, and `spike` identify evidence-bearing work. General
+  labels such as `bug` and `documentation` cover ordinary triage.
+- An assignee means that person owns the next action. Pull-request authors are
+  not assigned redundantly.
+- Work advancing the implementation plan belongs to its active milestone. A
+  future milestone is created when that phase starts, without a speculative due
+  date.
+- The implementation plan and capability inventory are the roadmap during solo
+  M4 work. A GitHub Project will be introduced only when multiple contributors
+  or a durable concurrent backlog makes a separate status board useful.
+- The maintainer applies or corrects metadata before merge; contributors do not
+  need repository triage permission to submit a complete change.
+
+The responsible human remains the Git author. Material Codex assistance may be
+recorded with `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`.
+GitHub currently resolves this trailer to the `codex` account. Update the model
+label when the active Codex model changes.
+
 ## Research and spikes
 
 - Separate confirmed facts, primary sources, inferences, hypotheses, runtime

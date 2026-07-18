@@ -132,6 +132,33 @@ mechanical.
   request; the pull request exists as the review and future CI surface.
 - Release branches are out of scope until M6 defines preview releases.
 
+## Issue and pull-request metadata
+
+- Apply at least one `area:*` label to capability and product work after its
+  scope is known. Multiple area labels are appropriate only when the change
+  genuinely crosses those boundaries.
+- Apply `state:*` labels only to issues or pull requests that propose or record
+  the corresponding capability-inventory state. More than one state label is
+  allowed when one reviewed slice moves different capabilities to different
+  states.
+- Use `research`, `decision`, and `spike` for those evidence types; use `bug`,
+  `documentation`, and the remaining general labels for ordinary triage.
+- Assign an issue only when someone owns its next action. A pull-request author
+  already owns that pull request, so do not add a redundant assignee by default.
+- Put delivery work in the active implementation milestone. Pure repository
+  hygiene may have no milestone. Create future milestones only when that phase
+  becomes active, and do not invent due dates without an actual commitment.
+- The implementation plan and capability inventory remain the roadmap during
+  solo M4 work, so do not duplicate them in a GitHub Project. Revisit Projects
+  when multiple contributors or a durable concurrent backlog needs a status
+  board.
+- The maintainer checks metadata before merge. Historical pull requests do not
+  need a complete retroactive relabeling.
+- Keep the responsible human as the Git author. For material Codex assistance,
+  add `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`. GitHub
+  currently resolves that trailer to the `codex` account; update the model label
+  when the active Codex model changes.
+
 ## Change discipline
 
 - Keep each task scoped to one investigation or experiment.

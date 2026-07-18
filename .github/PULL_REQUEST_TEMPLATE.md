@@ -1,6 +1,10 @@
 <!--
 Small contributions do not need every section. Delete what does not apply.
 Anything carrying runtime evidence or a support claim needs the tuple filled in.
+
+Maintainer before merge: apply the active milestone and relevant `area:*`,
+`state:*`, or evidence-type labels. Add an assignee only when someone other than
+the author owns the next action. GitHub Projects are not used during solo M4.
 -->
 
 ## Why
