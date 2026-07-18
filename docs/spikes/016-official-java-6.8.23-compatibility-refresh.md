@@ -188,16 +188,68 @@ runnable is Refuted. Record both outcomes instead of collapsing them.
 
 ## Observations
 
-Runtime steps not run. Preparation only (see the Preparation section): the
-environment is pinned and captured, 6.8.23 is confirmed absent locally, and the
-self-asserted-contract finding reframes step 3. No runtime behavior observed.
+### Driven run 1 — coordination arm (2026-07-19)
+
+Ran on macOS 26.5.2 arm64, Zed 1.11.3, Temurin JDK 25.0.3, product source at this
+branch (unchanged 6.8.21 compatibility record). Official Java **6.8.23** was
+dev-installed from the source clone (registry has no 6.8.23); `zed-spring-tools`
+was dev-installed alongside it into the isolated profile
+`tmp/s016-run-20260719/` before the fixture opened. Evidence:
+`tmp/s016-java-6.8.23-20260719/evidence/`.
+
+The **unchanged 6.8.21-contracted product connected end to end against 6.8.23**,
+confirming the Preparation finding that the gate is structural, not a version
+string:
+
+- Bridge bundle contributed and started in 6.8.23's jdtls: `zed-spring-bridge.jar`
+  Installed + Started, alongside all five Spring Tools JDT bundles
+  (`isolated-jdtls-metadata.log` lines 51/63 and 33–69).
+- Bridge commands registered in jdtls: `zed.spring.bridge.v1.addClasspathListener`
+  / `removeClasspathListener` plus the `sts.java.*` pair (same log, lines 84/90).
+- Official proxy discovered and the loopback handshake completed: the 6.8.23
+  proxy is at `work/java/bin/v6.8.23/java-lsp-proxy` (a version-tagged path — the
+  one observed 6.8.23 structural change), and the coordinator wrote the pinned
+  `utf8-worktree-hex-v1` route port file under `work/java/proxy/<hex>`, whose hex
+  decodes exactly to the worktree path (`arm1-process-snapshot.txt`).
+- Maven project import ran (`Importing Maven project(s)`); jdtls reconciled,
+  validated `FixtureApplication.java` with 0 problems, and served hover.
+- Spring Boot LS started and stayed up (coordinator PID drove
+  `spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar`).
+- **Visible `server.port` completion with its `Server HTTP port. Default: 8080`
+  metadata** appeared in `application.properties`, plus the fixture's
+  property-validation diagnostic (`server-port-completion.png`).
+- No reduced managed-JDT mode was entered; the coordinator ran with the default
+  `java-providers.json` (6.8.21) `--compatibility`.
+
+One non-fatal server error was logged: Spring's `org.springframework.tooling.jdt.ls.extension`
+sent `workspace/executeClientCommand`, which the coordinator answered
+`Unrecognized method` (jdtls log line 167). It is a server→client request the
+coordinator does not implement and did not block import, validation, hover, or
+completion. Whether it is also present on the 6.8.21 baseline (i.e. pre-existing,
+per [[coordinator-message-routing]]) rather than a 6.8.23 regression is an open
+comparison.
+
+Aside: an earlier non-isolated attempt in the user's main Zed (repo root, main
+data dir) failed jdtls init at 00:29 with a broken pipe; it is unrelated to the
+isolated run and not part of this result. Cause not investigated.
+
+### Pending
+
+- Step 5: the official `Run <main class>` runnable via 6.8.23's `task_helper`
+  and the Maven wrapper — the main-task-reuse half of the hypothesis.
+- Steps 6–7: stop, uninstall, and authentic-cleanup verification.
+- Steps 8–9: log-redaction scan and a warm offline restart.
+- The explicit-6.8.23-record arm and the 6.8.21 baseline comparison for the
+  `workspace/executeClientCommand` error.
 
 ## Result
 
-Pending. This plan adds no compatibility record and changes no capability state.
-Preparation confirmed the environment pin and surfaced that no installed-version
-guard exists today; the structural route/bridge gate is what the driven run must
-exercise.
+In progress. The **coordination and visible-Spring-behavior half is Supported on
+the tested tuple**: the unchanged product's bridge, callbacks, proxy route, and
+`server.port` completion all work against official Java 6.8.23 without a reduced
+mode. This still changes no capability-inventory state and adds no compatibility
+record: the main-runnable reuse, authentic cleanup, and redaction gates remain
+unrun, and per the plan a 6.8.23 record is only added after those pass.
 
 ## Remaining uncertainty
 
