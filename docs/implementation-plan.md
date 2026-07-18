@@ -244,13 +244,14 @@ public substitutes require driven slices but make private task scheduling and
 general ShowDocument unnecessary product assumptions.
 
 Official Java 6.8.23 adds wrapper-aware Maven/Gradle/vanilla main and test tasks.
-They are a simplification candidate, not inherited support: the current product
-contract remains 6.8.21 until
-[S016](spikes/016-official-java-6.8.23-compatibility-refresh.md) repeats the
-bridge, callback, cleanup, logging, and main-runnable gate. If Supported, matching
-official Java tasks take precedence over product-generated duplicate Java tasks;
-Spring-specific goals and Boot Debug still use reviewable Zed task/debug
-configuration.
+[S016](spikes/016-official-java-6.8.23-compatibility-refresh.md) Supported the
+bridge, callback, product cleanup, warm-cache, and ordinary-profile Maven main-
+runnable gates on macOS arm64/JDK 25; Gradle coordination also passed, while
+Gradle/vanilla task execution remains unrun. The current product contract still
+declares only 6.8.21 until a separate compatibility-table change lands. Once it
+does, matching official Java tasks take precedence over product-generated
+duplicate Java tasks; Spring-specific goals and Boot Debug still use reviewable
+Zed task/debug configuration.
 
 The baseline product continues to exclude Java language/query replacement, a
 custom Zed build, and an external dashboard. An opt-in Java query experiment may
@@ -258,13 +259,14 @@ be proposed later only through a new direction decision, after stock-Zed routes
 are tested, and only for a capability such as embedded syntax highlighting that
 has no safe equivalent.
 
-Immediate M4 slice order after S015 is:
+Immediate M4 slice order after S016 is:
 
-1. S016 official Java 6.8.23 compatibility and main-task verification;
-2. authentic `sts/highlight` to CodeLens adaptation;
-3. Boot-project selection and merge-safe Run/Debug configuration using official
-   Java task/DAP ownership, including a comparison of the default `java-main`
-   runnable with a Spring-specific workspace tag binding;
+1. admit official Java 6.8.23 through a reviewed compatibility-table product
+   change, including the installed-version-guard design and regression tests;
+2. implement authentic `sts/highlight` to CodeLens adaptation;
+3. deliver Boot-project selection and merge-safe Run/Debug configuration using
+   official Java task/DAP ownership, including a comparison of the default
+   `java-main` runnable with a Spring-specific workspace tag binding;
 4. properties/YAML conversion and metadata reload Code Actions;
 5. one opt-in Spring Structure document slice; and
 6. separately gated live-data, metrics, logger, upgrade, Modulith, and special
@@ -334,10 +336,16 @@ restart ordering dropped baseline Java symbols until a later edit. The per-file
 LSP Outline route is therefore not promoted, Project Symbols remains the
 fallback, and S016 becomes the next runtime gate.
 
-The highest known risks are the official proxy's private compatibility surface,
-third-party artifact distribution, unadapted Spring client methods, official
-Java 6.8.23 compatibility, multi-server Document Symbols restart refresh,
-generated-file merge/freshness, remote credential
-handling, shutdown-response mismatches, Java-provider updates, and the untested
-platform matrix. Each has an explicit decision or validation gate above; none is
-treated as already solved by the local PoC.
+Amended on 2026-07-19 after S016. Official Java 6.8.23 preserved the structural
+coordination boundary, product-owned cleanup, warm cached startup, and the
+ordinary-profile Maven main runnable on the tested tuple. A separate reviewed
+compatibility-table change now precedes CodeLens work; the official-Java
+JDT/port-file lifecycle caveat and untested task/platform tuples remain open.
+
+The highest known risks are the official proxy's private compatibility surface
+and observed JDT/port-file lifecycle caveat, third-party artifact distribution,
+unadapted Spring client methods, installed-version compatibility enforcement,
+multi-server Document Symbols restart refresh, generated-file merge/freshness,
+remote credential handling, shutdown-response mismatches, Java-provider updates,
+and the untested platform matrix. Each has an explicit decision or validation
+gate above; none is treated as already solved by the local PoC.

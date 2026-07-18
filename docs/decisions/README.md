@@ -45,5 +45,9 @@ shortcuts.
 S015 later Refutes the preferred per-file Document Symbols route on restart,
 which activates D005's Project Symbols/Structure fallback without changing the
 accepted architecture.
+S016 subsequently Supports official Java 6.8.23 coordination and the ordinary-
+profile Maven main runnable on macOS arm64/JDK 25. It does not change D003 or
+D005; admitting 6.8.23 to the shipped compatibility table remains a separate
+product change.
 
 Use [template.md](template.md) after sufficient evidence exists.

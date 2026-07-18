@@ -14,7 +14,7 @@ the required official Java extension.
 | Development phase | M4 capability-parity program |
 | Capability inventory | 14 `verified`, 3 `zed-native-equivalent`, 29 `planned` |
 | Distribution | Local development extension only; no package or Marketplace entry |
-| Runtime coverage | macOS 26.5.1 arm64 with Temurin JDK 25.0.3 |
+| Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
@@ -29,6 +29,9 @@ shortcuts.
 S015 found that Java and Spring Document Symbols merge well after both servers
 are ready, but restart can cache Spring-only results before JDT registers the
 capability. Project Symbols therefore remains the supported navigation fallback.
+S016 then verified official Java 6.8.23 coordination, warm-cache startup, and
+its normal-profile Maven main runnable on the tested tuple. The shipped product
+still declares only 6.8.21 until a separate compatibility-table change lands.
 
 ## What works today
 
@@ -99,7 +102,8 @@ pending.
 
 - This is not a stable release and does not claim multiplatform support.
 - The official Java extension `6.8.21` is required.
-- Official Java 6.8.23 is a planned compatibility refresh, not yet supported.
+- Official Java 6.8.23 passed S016 on the tested tuple but is not yet declared
+  by the shipped compatibility table.
 - Installation after JDT LS has already started requires a Zed restart.
 - The opt-in Java LSP Outline is not a supported Spring route: after restart it
   can omit ordinary Java symbols until a document edit forces recollection.

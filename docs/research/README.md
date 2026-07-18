@@ -15,9 +15,11 @@
   S010 then supported relocation of that state, and S011 supported the real
   Spring classpath-to-`server.port` flow on macOS arm64/JDK 25
 - Runtime-gate update: S015 Refuted the preferred Java/Spring Document Symbols
-  route on restart, so Project Symbols remains the fallback. S016 is next and
-  verifies official Java 6.8.23 before its new task helper can be reused.
-  Subsequent M4 slices follow D005's preferred/fallback mapping
+  route on restart, so Project Symbols remains the fallback. S016 then
+  Supported official Java 6.8.23 coordination and normal-profile Maven main-
+  task reuse on macOS arm64/JDK 25. A separate compatibility-table product
+  change remains before the shipped claim moves from 6.8.21. Subsequent M4
+  slices follow D005's preferred/fallback mapping
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -92,7 +94,9 @@ R014 repeats that decision audit against Zed main, official Java 6.8.23, and
 current Spring source. It finds no better stock-Zed architecture, removes
 extension slash commands/private task scheduling/general ShowDocument from the
 candidate routes, and defines S016 before the official Java task improvement is
-adopted.
+adopted. S016 subsequently Supported the structural coordination and ordinary-
+profile Maven main runnable on its tested tuple; compatibility-table promotion
+remains separately reviewed product work.
 
 R015 attributes the separate `server.p` completion-ordering observation from
 S016. The coordinator preserves Spring's response, which ranks `server.port`

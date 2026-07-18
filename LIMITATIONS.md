@@ -39,10 +39,19 @@ extension.
 - The product requires the official Zed Java extension. It does not replace Java
   debugging, tests, tasks, project import, or other Java ownership, and it will
   not offer a reduced standalone JDT fallback.
-- Official Java 6.8.23 adds useful wrapper-aware main/test tasks but is not yet a
-  supported companion. The product remains pinned to 6.8.21 until S016 verifies
-  the versioned bridge, callbacks, cleanup, logs, and representative Boot main
-  runnable; source compatibility alone is not a support claim.
+- Official Java 6.8.23 passed S016's versioned bridge, callbacks, product-owned
+  cleanup, warm-cache, and ordinary-profile Maven Boot main-runnable gates on
+  macOS arm64/JDK 25. It is still not a shipped companion: the product remains
+  pinned to 6.8.21 until a separate compatibility-table change is reviewed.
+  Gradle/vanilla task execution, test runnables, and debugging remain untested.
+- Zed's Java 6.8.23 generated runnable resolves `java-task-helper` below the
+  default Zed data directory. It works in the ordinary profile but fails under
+  a custom `--user-data-dir`; this affects isolated evidence profiles.
+- In S016, worktree closure twice left the official Java JDT child reparented to
+  PID 1 and its official port file stale after the proxy exited. Product-owned
+  coordinators, Spring servers, routes, and extension state were already gone.
+  This official-Java/Zed lifecycle uncertainty remains open and must not be
+  mistaken for a product uninstall failure.
 - The coordinator depends on a private Java-provider transport that the official
   Java extension does not document as public API. A future Java extension release
   may change it and break this project. The versioned adapter narrows that risk
@@ -93,9 +102,10 @@ extension.
 - The extension downloads the pinned, checksum-verified Spring Tools
   `5.2.0.RELEASE` VSIX from its official GitHub release on first use. It requires
   network access for that download and does not mirror or repackage the artifact.
-- Offline installation, rollback, and project-operated redistribution remain
-  undecided. Repackaging or mirroring stays blocked on a complete third-party
-  license inventory and an appropriate review.
+- S016 verified one warm cached start with outbound network denied on macOS
+  arm64/JDK 25. Offline installation, rollback, and project-operated
+  redistribution remain undecided. Repackaging or mirroring stays blocked on a
+  complete third-party license inventory and an appropriate review.
 - SSH remote development and WSL-hosted remote projects are not in the initial
   product scope.
 
