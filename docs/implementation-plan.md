@@ -158,9 +158,9 @@ Publication record:
 Status: in progress. Inventory version 4 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
-Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 10 `verified`, 1
-`implemented`, 3 `zed-native-equivalent`, and 32 `planned`. A capability is
-promoted to a blocked state
+Spring Tools `5.2.0.RELEASE`. It records 46 capabilities: 10 `verified`, 2
+`implemented`, 3 `zed-native-equivalent`, and 31 `planned`.
+A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
 Code widget that delivers it there.
