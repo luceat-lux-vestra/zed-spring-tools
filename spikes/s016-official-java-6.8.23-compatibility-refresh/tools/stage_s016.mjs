@@ -92,6 +92,12 @@ function stage(root, javaHome) {
 // auto-download, keep auto-update and AI off, and map the Java/Properties/YAML
 // language servers. The proxy and debug-jar paths are left to the dev-installed
 // java extension, which manages its own downloaded binaries.
+//
+// check_updates is "once", not "never": this profile has no pre-copied jdtls, so
+// the extension must be allowed to download it (and the v6.8.23 proxy) on the
+// first launch. "once" downloads then reuses the local install on relaunch,
+// unlike "never", which errors with no local install and unlike "always", which
+// re-checks the network every launch.
 function settings(jdk) {
   return {
     disable_ai: true,
@@ -110,7 +116,7 @@ function settings(jdk) {
           java_home: jdk,
           lombok_support: false,
           jdk_auto_download: false,
-          check_updates: "never",
+          check_updates: "once",
         },
       },
     },
@@ -178,6 +184,8 @@ function selfTest() {
     assert.equal(settingsOut.log.lsp, "trace");
     assert.equal(settingsOut.lsp.jdtls.settings.java_home, home);
     assert.equal(settingsOut.lsp.jdtls.settings.jdk_auto_download, false);
+    // "once", not "never": a fresh profile has no local jdtls to fall back to.
+    assert.equal(settingsOut.lsp.jdtls.settings.check_updates, "once");
     assert.equal(fs.existsSync(path.join(manifest.worktree, "pom.xml")), true);
     assert.equal(fs.existsSync(path.join(manifest.profile, "extensions", "installed")), true);
     // Re-staging into the same root must be refused (not fresh).
