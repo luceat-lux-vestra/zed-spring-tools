@@ -23,7 +23,7 @@ capability may use a Zed-native workflow instead of copying VS Code's UI, but it
 must not silently disappear from the target because the current Zed API lacks a
 surface. Such gaps remain tracked for an alternative design or upstream work.
 The auditable list is the [capability inventory](docs/capability-inventory.md).
-At inventory version 4, it tracks 46 capabilities, of which 4 are `verified`.
+At inventory version 4, it tracks 46 capabilities, of which 13 are `verified`.
 
 Development is local-first: complete a useful macOS arm64 PoC, publish the source
 repository on GitHub with an experimental status, and then develop capabilities
@@ -48,9 +48,10 @@ the official Java provider, and returns real Spring Boot property completions.
 An audit of the run's logs found no credential and no classpath payload, and no
 owned process or owned route survived it.
 
-Unhandled `vscode-spring-boot.ls.start` and `sts/javaType` client requests remain
-product work, and the extension is not yet a general Spring feature
-implementation. See [known limitations](LIMITATIONS.md).
+Zed-native startup replaces `vscode-spring-boot.ls.start`, and the coordinator's
+official-Java route now handles and has runtime-verified `sts/javaType`. The
+extension is not yet a general Spring feature implementation. See
+[known limitations](LIMITATIONS.md).
 
 [D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
 direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,

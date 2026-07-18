@@ -388,6 +388,94 @@ test("classpath bridge registers, relays one real callback, and removes", async 
   assert.deepEqual(javaCalls[1].arguments[0], registration);
 });
 
+test("owned classpath capability registration stays internal to preserve Spring commands", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: {
+      supportsSpringClientMethod: () => false,
+      async execute() {
+        return "ok";
+      },
+    },
+    worktree: "/tmp/project",
+  });
+  const callbackId = "sts4.classpath.AbCdEfGh";
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "register",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "classpath-registration",
+          method: "workspace/executeCommand",
+          registerOptions: { commands: [callbackId] },
+        },
+      ],
+    },
+  });
+  assert.deepEqual(zedWrites, []);
+  assert.deepEqual(springWrites.shift(), {
+    jsonrpc: "2.0",
+    id: "register",
+    result: null,
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "unregister",
+    method: "client/unregisterCapability",
+    params: {
+      unregisterations: [
+        { id: "classpath-registration", method: "workspace/executeCommand" },
+      ],
+    },
+  });
+  assert.deepEqual(zedWrites, []);
+  assert.deepEqual(springWrites.shift(), {
+    jsonrpc: "2.0",
+    id: "unregister",
+    result: null,
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "other-registration",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "watched-files",
+          method: "workspace/didChangeWatchedFiles",
+          registerOptions: { watchers: [] },
+        },
+      ],
+    },
+  });
+  assert.equal(zedWrites.length, 1);
+  assert.equal(zedWrites[0].id, "other-registration");
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lookalike-registration",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "numeric-classpath-callback",
+          method: "workspace/executeCommand",
+          registerOptions: { commands: ["sts4.classpath.12345678"] },
+        },
+      ],
+    },
+  });
+  assert.equal(zedWrites.length, 2);
+  assert.equal(zedWrites[1].id, "lookalike-registration");
+});
+
 function encodeForTest(message) {
   const body = Buffer.from(JSON.stringify(message), "utf8");
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]);
