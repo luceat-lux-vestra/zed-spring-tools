@@ -4,8 +4,12 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- Only property completion is proven. The extension installs and starts, but
-  most VS Code Spring Tools capabilities are not implemented at all.
+- A small set of capabilities is proven on the one tested tuple: Spring Boot
+  property/YAML completion and validation, and Spring workspace symbols (beans,
+  the request-mapping endpoint, and stereotypes reachable through Zed's project
+  symbol search). Most VS Code Spring Tools capabilities are still unimplemented
+  or unverified. Zed's per-file outline is tree-sitter-based and does not consume
+  the server's LSP document symbols.
 - There is no packaged extension, installer, release artifact, product CI, or
   Marketplace entry. Installation means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a

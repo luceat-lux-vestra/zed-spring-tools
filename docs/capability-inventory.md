@@ -36,12 +36,12 @@ delivers the same user outcome is a legitimate result, recorded as
 
 | State | Count |
 | --- | --- |
-| `verified` | 5 |
+| `verified` | 8 |
 | `implemented` | 1 |
-| `planned` | 39 |
+| `planned` | 34 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
-| `zed-native-equivalent` | 1 |
+| `zed-native-equivalent` | 3 |
 
 A capability is promoted to `blocked-*` only when the exact missing surface is
 named **and** no Zed-native workflow can deliver the outcome. A capability is
@@ -93,10 +93,10 @@ Debuggers are supported, so run/debug is not assumed blocked.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Document symbols | `planned` | Server advertises `documentSymbolProvider`. |
-| Workspace symbols (Spring symbols) | `planned` | Server advertises `workspaceSymbolProvider`. |
-| Request mapping navigation | `planned` | Expected via symbols/definition; exact surface not yet traced. |
-| Bean navigation | `planned` | Related settings: `boot-java.java.beans-structure-tree`, `boot-java.java.completions.inject-bean`. |
+| Document symbols | `zed-native-equivalent` | The server advertises `documentSymbolProvider`, but Zed does not consume it: across a driven run with the Java file open and the buffer outline invoked, Zed issued **zero** `textDocument/documentSymbol` requests. Zed's outline and breadcrumbs are built from tree-sitter, not LSP document symbols. The same Spring per-file elements are reachable through the verified workspace-symbol search below, so the outcome is delivered by a different Zed surface. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
+| Workspace symbols (Spring symbols) | `verified` | Observed 2026-07-18. Zed's "Go to Symbol in Project" issued `workspace/symbol`; the Spring server (through the coordinator) returned the logical structure — `@+ 'greetingController' (@RestController <: @Controller, @Component)`, `@+ 'greetingPrefix' (@Bean) String`, `@+ 'greetingConfiguration' (@Configuration)`, `@+ 'fixtureApplication' (@SpringBootApplication)`, and `@/greeting -- GET` — each with a resolved location in the fixture. jdtls returned 0 for the `@`-prefixed queries, so the symbols are attributable to Spring. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
+| Request mapping navigation | `verified` | Observed 2026-07-18. `@/greeting -- GET` (kind 6) is returned by `workspace/symbol` as a navigable workspace symbol resolved to `GreetingController.java`, so Zed's symbol picker jumps to the mapping. |
+| Bean navigation | `verified` | Observed 2026-07-18. `@+ 'greetingPrefix' (@Bean)` and the `@Component`/`@Configuration` symbols are returned by `workspace/symbol` with resolved locations, navigable from Zed's symbol picker. |
 | Code lenses | `planned` | Server advertises `codeLensProvider`; setting `boot-java.highlight-codelens.on`. |
 | Inlay hints (including cron) | `planned` | Server advertises `inlayHintProvider`; setting `boot-java.cron.inlay-hints`. |
 | Code actions / quick fixes | `planned` | Server advertises `codeActionProvider` with resolve. |
@@ -121,7 +121,7 @@ Debuggers are supported, so run/debug is not assumed blocked.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Browse / navigate the Spring logical structure | `planned` | VS Code delivers this as the `explorer.spring` tree view, which cannot be reproduced as a custom panel (see surface constraint 1). But the outcome — browsing beans, endpoints, and mappings — may be reachable through Zed's outline panel and symbol search: the Spring server advertises `documentSymbolProvider` and `workspaceSymbolProvider`, and Spring Tools is known to surface request mappings and beans as workspace symbols. Not yet verified. The fixture now carries a `@RestController` request mapping and a `@Bean`, so a driven run can capture the `documentSymbol`/`workspace/symbol` responses; that run is the pending step. This is the classification error corrected in the tree-view review: it was wrongly `blocked-zed-api`. Becomes `zed-native-equivalent` if symbols carry the structure, or `blocked-zed-api` only if they demonstrably do not. |
+| Browse / navigate the Spring logical structure | `zed-native-equivalent` | Resolved 2026-07-18. VS Code delivers this as the `explorer.spring` tree view, which cannot be reproduced as a custom panel (see surface constraint 1). The outcome — browsing beans, endpoints, and components — is delivered instead through Zed's project symbol search: a driven run confirmed `workspace/symbol` returns the beans (`@+ '...' (@Bean)`), the endpoint (`@/greeting -- GET`), and the `@Component`/`@Configuration`/`@SpringBootApplication` stereotypes, each with a resolved location. This closes the tree-view review's open question in favour of `zed-native-equivalent` (the symbols carry the structure), not `blocked-zed-api`. Evidence: `tmp/ws2-symbols-run2-20260718/`. Document-symbol-driven grouping in a per-file outline is not available because Zed's outline is tree-sitter-based (see the Document symbols row). |
 | Structure refresh / grouping | `planned` | `structure.refresh`, `structure.grouping`; `sts/spring-boot/structure`, `structure/groups`. Meaningful only once the structure has a Zed surface to refresh. |
 | Run / debug a Boot application | `planned` | Not blocked: Zed supports debugger extensions, and the API exposes DAP (`get-dap-binary`, `dap-request-kind`, `dap-config-to-scenario`, locators). |
 | Maven goal / Gradle build | `planned` | `sts.maven.goal`, `sts.gradle.build`. Build execution is official Java's ownership under D003. |
