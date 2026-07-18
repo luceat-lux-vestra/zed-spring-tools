@@ -16,6 +16,10 @@ const EXECUTE_SPRING_COMMAND = "workspace/executeCommand";
 const ENABLE_CLASSPATH = "sts.vscode-spring-boot.enableClasspathListening";
 const REFRESH_INLAY_HINTS = "workspace/inlayHint/refresh";
 const SPRING_INDEX_UPDATED = "spring/index/updated";
+const REGISTER_CAPABILITY = "client/registerCapability";
+const UNREGISTER_CAPABILITY = "client/unregisterCapability";
+const EXECUTE_COMMAND_CAPABILITY = "workspace/executeCommand";
+const CLASSPATH_CALLBACK_COMMAND = /^sts4\.classpath\.[A-Za-z]{8}$/;
 const CALLBACK_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const REQUEST_TIMEOUT_MS = 10_000;
 const JAVA_ROUTE_TIMEOUT_MS = 30_000;
@@ -42,6 +46,8 @@ export class Coordinator {
     this.sequence = 0;
     this.sessionId = randomUUID();
     this.javaFailureShown = false;
+    this.routedJavaMethods = new Set();
+    this.ownedCapabilityRegistrations = new Set();
     this.shutdownIds = new Set();
     this.abortController = new AbortController();
     this.enableTask = undefined;
@@ -98,14 +104,20 @@ export class Coordinator {
       await this.#answer(message, () => this.#removeClasspath(message.params));
       return;
     }
+    if (this.#ownsClasspathCapabilityRequest(message)) {
+      await this.#answer(message, () => null);
+      return;
+    }
     if (this.javaTransport.supportsSpringClientMethod(message.method)) {
       await this.#answer(message, async () => {
         try {
-          return await this.javaTransport.executeSpringClientMethod(
+          const result = await this.javaTransport.executeSpringClientMethod(
             message.method,
             message.params,
             { signal: this.abortController.signal },
           );
+          this.#noteJavaRoute(message.method);
+          return result;
         } catch (error) {
           if (!this.closed) this.#showJavaFailure();
           throw error;
@@ -265,6 +277,48 @@ export class Coordinator {
     } else {
       pending.reject(new Error("Spring Tools rejected an internal callback"));
     }
+  }
+
+  #noteJavaRoute(method) {
+    if (this.routedJavaMethods.has(method)) return;
+    this.routedJavaMethods.add(method);
+    this.logger(`official Java data request ${method} answered`);
+  }
+
+  #ownsClasspathCapabilityRequest(message) {
+    // Zed 1.11.3 replaces the server's static execute-command list when this
+    // internal callback is dynamically registered. The coordinator owns the
+    // callback route, so keeping the registration here preserves Spring's
+    // user-facing commands without changing the server or Zed.
+    if (message.method === REGISTER_CAPABILITY) {
+      const registrations = message.params?.registrations;
+      if (!Array.isArray(registrations) || registrations.length !== 1) return false;
+      const registration = registrations[0];
+      if (
+        typeof registration?.id !== "string" ||
+        registration.method !== EXECUTE_COMMAND_CAPABILITY ||
+        !Array.isArray(registration.registerOptions?.commands) ||
+        registration.registerOptions.commands.length !== 1 ||
+        !CLASSPATH_CALLBACK_COMMAND.test(registration.registerOptions.commands[0])
+      ) {
+        return false;
+      }
+      this.ownedCapabilityRegistrations.add(registration.id);
+      return true;
+    }
+
+    if (message.method !== UNREGISTER_CAPABILITY) return false;
+    const registrations = message.params?.unregisterations;
+    if (!Array.isArray(registrations) || registrations.length !== 1) return false;
+    const registration = registrations[0];
+    if (
+      typeof registration?.id !== "string" ||
+      registration.method !== EXECUTE_COMMAND_CAPABILITY ||
+      !this.ownedCapabilityRegistrations.delete(registration.id)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   #showJavaFailure() {

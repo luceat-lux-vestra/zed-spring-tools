@@ -51,12 +51,15 @@ extension.
   an unverified official-Java-extension contract, naming the reason, instead of
   entering a reduced mode. Only the single macOS arm64 tuple has been exercised.
 - `sts/javaType` and its eight sibling `sts/java*` server→client requests are
-  handled by the coordinator, which routes them to the official Java extension;
-  `sts/javaType` is contract-tested but not yet observed against a real server
-  request. `vscode-spring-boot.ls.start` is a VS Code client command, not a
-  coordinator request: Zed owns language-server start/restart and the coordinator
-  already wires the classpath bridge, the Java-data route, and classpath
-  listening that command's callback performs.
+  handled by the coordinator, which routes them to the official Java extension.
+  As of 2026-07-18 `sts/javaType` is observed at runtime — the Spring server
+  issued a real request during indexing and the coordinator routed it to the
+  official Java `sts.java.type` command and answered it — so it is `verified`;
+  the eight siblings share that path and its contract test but were not each
+  exercised individually. `vscode-spring-boot.ls.start` is a VS Code client
+  command, not a coordinator request: Zed owns language-server start/restart and
+  the coordinator already wires the classpath bridge, the Java-data route, and
+  classpath listening that command's callback performs.
 - No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
   binary is stored in Git. Reproduction requires separately acquired, pinned,
   checksum-verified inputs.

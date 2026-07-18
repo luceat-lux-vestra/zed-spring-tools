@@ -87,6 +87,53 @@ test("Java data requests are answered through the official Java transport", asyn
   assert.deepEqual(zedWrites, []);
 });
 
+test("an answered Java data request is logged once per method, with no parameters", async () => {
+  const logs = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed() {},
+    javaTransport: {
+      supportsSpringClientMethod: (method) => method === "sts/javaType",
+      executeSpringClientMethod: async () => ({ name: "example.Demo" }),
+    },
+    worktree: "/tmp/project",
+    logger: (message) => logs.push(message),
+  });
+  const request = (id) => ({
+    jsonrpc: "2.0",
+    id,
+    method: "sts/javaType",
+    params: { bindingKey: "Ljava/lang/Integer;", projectUri: "file:///tmp/project" },
+  });
+  await coordinator.handleSpringMessage(request(1));
+  await coordinator.handleSpringMessage(request(2));
+  assert.deepEqual(logs, ["official Java data request sts/javaType answered"]);
+  assert.ok(!logs[0].includes("Integer"), "route log must not carry request parameters");
+});
+
+test("a failed Java data request is not logged as answered", async () => {
+  const logs = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed() {},
+    javaTransport: {
+      supportsSpringClientMethod: () => true,
+      executeSpringClientMethod: async () => {
+        throw new Error("official Java route was not found");
+      },
+    },
+    worktree: "/tmp/project",
+    logger: (message) => logs.push(message),
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 9,
+    method: "sts/javaType",
+    params: {},
+  });
+  assert.deepEqual(logs, []);
+});
+
 test("ordinary LSP traffic remains visible to Zed", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
@@ -339,6 +386,94 @@ test("classpath bridge registers, relays one real callback, and removes", async 
   assert.equal(springWrites.shift().result, "ok");
   assert.equal(javaCalls[1].command, "zed.spring.bridge.v1.removeClasspathListener");
   assert.deepEqual(javaCalls[1].arguments[0], registration);
+});
+
+test("owned classpath capability registration stays internal to preserve Spring commands", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: {
+      supportsSpringClientMethod: () => false,
+      async execute() {
+        return "ok";
+      },
+    },
+    worktree: "/tmp/project",
+  });
+  const callbackId = "sts4.classpath.AbCdEfGh";
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "register",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "classpath-registration",
+          method: "workspace/executeCommand",
+          registerOptions: { commands: [callbackId] },
+        },
+      ],
+    },
+  });
+  assert.deepEqual(zedWrites, []);
+  assert.deepEqual(springWrites.shift(), {
+    jsonrpc: "2.0",
+    id: "register",
+    result: null,
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "unregister",
+    method: "client/unregisterCapability",
+    params: {
+      unregisterations: [
+        { id: "classpath-registration", method: "workspace/executeCommand" },
+      ],
+    },
+  });
+  assert.deepEqual(zedWrites, []);
+  assert.deepEqual(springWrites.shift(), {
+    jsonrpc: "2.0",
+    id: "unregister",
+    result: null,
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "other-registration",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "watched-files",
+          method: "workspace/didChangeWatchedFiles",
+          registerOptions: { watchers: [] },
+        },
+      ],
+    },
+  });
+  assert.equal(zedWrites.length, 1);
+  assert.equal(zedWrites[0].id, "other-registration");
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "lookalike-registration",
+    method: "client/registerCapability",
+    params: {
+      registrations: [
+        {
+          id: "numeric-classpath-callback",
+          method: "workspace/executeCommand",
+          registerOptions: { commands: ["sts4.classpath.12345678"] },
+        },
+      ],
+    },
+  });
+  assert.equal(zedWrites.length, 2);
+  assert.equal(zedWrites[1].id, "lookalike-registration");
 });
 
 function encodeForTest(message) {

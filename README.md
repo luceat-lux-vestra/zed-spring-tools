@@ -3,9 +3,12 @@
 This is an experimental repository. It has completed its source-based
 feasibility phase, its basic local end-to-end PoC, and the source-separated
 product scaffold that D004 requires. On macOS arm64/JDK 25 a clean development
-install now returns real Spring Boot property completions through the product
-extension. It is **not** a stable release and claims no tested platform other
-than that tuple.
+install now delivers real Spring Boot language intelligence through the product
+extension — property completion, hover, validation, and navigation; Spring
+symbol, request-mapping, and bean navigation; cron inlay hints; and Spring
+quick-fix code actions — each observed on that one tuple and recorded in the
+[capability inventory](docs/capability-inventory.md). It is **not** a stable
+release and claims no tested platform other than that tuple.
 
 S010 proved a managed JDT launch that keeps writable Equinox private state
 outside the fixed distribution. S011 then proved the real Spring classpath
@@ -23,7 +26,7 @@ capability may use a Zed-native workflow instead of copying VS Code's UI, but it
 must not silently disappear from the target because the current Zed API lacks a
 surface. Such gaps remain tracked for an alternative design or upstream work.
 The auditable list is the [capability inventory](docs/capability-inventory.md).
-At inventory version 4, it tracks 46 capabilities, of which 4 are `verified`.
+At inventory version 4, it tracks 46 capabilities, of which 13 are `verified`.
 
 Development is local-first: complete a useful macOS arm64 PoC, publish the source
 repository on GitHub with an experimental status, and then develop capabilities
@@ -48,9 +51,17 @@ the official Java provider, and returns real Spring Boot property completions.
 An audit of the run's logs found no credential and no classpath payload, and no
 owned process or owned route survived it.
 
-Unhandled `vscode-spring-boot.ls.start` and `sts/javaType` client requests remain
-product work, and the extension is not yet a general Spring feature
-implementation. See [known limitations](LIMITATIONS.md).
+The M4 capability-parity program builds on that PoC: each capability is driven
+against the running product and promoted only on observed evidence for the
+tested tuple. Thirteen capabilities are now `verified`, including property
+hover, validation, and definition navigation; Spring workspace symbols with
+request-mapping and bean navigation; cron inlay hints; and Spring quick-fix code
+actions applied end to end. Zed-native startup replaces
+`vscode-spring-boot.ls.start`, and the coordinator's official-Java route now
+handles and has runtime-verified `sts/javaType`. The extension is not yet a
+general Spring feature implementation; the full state-by-state list, including
+what stays `planned`, is the [capability inventory](docs/capability-inventory.md).
+See [known limitations](LIMITATIONS.md).
 
 [D002](docs/decisions/002-pivot-to-versioned-coordination.md) passes the
 direction gate with **Pivot**: `zed-spring-tools` is an official-Java companion,
