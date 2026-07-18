@@ -102,6 +102,14 @@ self-declared support, not any runtime gate. The driven run must therefore:
 This is the reusable design finding to carry into the follow-up decision on how
 6.8.23 should be admitted.
 
+### Profile-prep scaffolding staged
+
+`spikes/s016-official-java-6.8.23-compatibility-refresh/` holds a disposable
+6.8.23 analog of `scripts/prepare-local-poc.mjs` plus a driven-run runbook. Its
+`--self-test` passes against a synthetic 6.8.23 source without a live install, so
+step 2 (isolated-profile build) is automated once a real 6.8.23 install exists;
+the interactive Zed steps remain manual.
+
 ## Procedure
 
 1. Record the clean source commit, product artifacts, exact official Java 6.8.23
