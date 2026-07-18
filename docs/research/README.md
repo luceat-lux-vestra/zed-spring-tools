@@ -3,7 +3,7 @@
 - Phase status: Core research, the S013 local PoC, D003/D004 architecture and
   stack gates, and M3 public-source release complete; M4 capability parity is in
   progress under D005
-- Last completed on: 2026-07-18
+- Last completed on: 2026-07-19
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
   fixed-input direct managed-JDT runs both reached `ServiceReady`, but fresh-
@@ -50,6 +50,7 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R012](012-cold-cache-bridge-bundle-race.md) | Bridge/bundle startup ordering (mis-titled cold-cache) | Superseded by S014 | First concluded a cold-cache race; S014 corrected it to an install-ordering issue. jdtls that starts before the extension is installed is not re-queried for the bridge; a cold cache with the extension pre-installed works |
 | [R013](013-zed-native-capability-delivery-surfaces.md) | Stock-Zed capability delivery surfaces | Complete for source feasibility | LSP-first coordinator adaptation gives the highest stock-Zed coverage; S015 later Refuted Document Symbols on restart, current verified routes remain fallbacks, and Java query replacement is excluded from the baseline |
 | [R014](014-final-upstream-capability-surface-audit.md) | Final upstream capability-surface audit | Complete for source feasibility | Latest Zed still has no extension tree/panel or public task/show-document shortcut; Java 6.8.23 adds a useful compatibility-gated main/test task path without replacing D005 |
+| [R015](015-spring-completion-ranking.md) | Attribute Spring property completion ranking in stock Zed | Complete for attribution | Spring ranks `server.port` first and tags deprecated items correctly; Zed's single-word fuzzy pass precedes `sortText`, so the visible menu can reorder both |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -92,3 +93,11 @@ current Spring source. It finds no better stock-Zed architecture, removes
 extension slash commands/private task scheduling/general ShowDocument from the
 candidate routes, and defines S016 before the official Java task improvement is
 adopted.
+
+R015 attributes the separate `server.p` completion-ordering observation from
+S016. The coordinator preserves Spring's response, which ranks `server.port`
+first and places tagged deprecated items last. Official Java's Properties
+language does not include `.` in its completion-query characters, and Zed
+fuzzy-ranks the resulting single-word query before consulting LSP `sortText`.
+The result is an upstream Zed/Properties-language integration issue, not a
+product or Java 6.8.23 coordination regression.
