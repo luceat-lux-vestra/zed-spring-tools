@@ -1,0 +1,29 @@
+// Disposable S016 Gradle mirror of tests/fixtures/spring-boot-basic (Maven).
+// Same Java sources; exists only to exercise official Java 6.8.23's Gradle
+// import (jdtls Buildship) and its task_helper Gradle run path against the
+// unchanged Spring coordination bridge. Not product code.
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.springframework.boot' version '3.5.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'dev.zed.spring'
+version = '0.0.1-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+}
+
+// 6.8.23's task_helper runs `gradle run -PmainClass=<fqn>`; honor that property
+// while defaulting to the fixture's main class for a plain `gradle run`.
+application {
+    mainClass = providers.gradleProperty('mainClass').orElse('dev.zed.spring.fixture.FixtureApplication')
+}
