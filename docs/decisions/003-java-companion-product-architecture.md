@@ -88,15 +88,17 @@ versions, identities, or duplicate registrations fail closed.
 ### Compatibility
 
 Compatibility is capability-based, not “any installed Java version works” and
-not a permanent pin to 6.8.21. Each observed Java transport adapter declares the
+not a permanent pin to 6.8.21. Each Java transport adapter declares the
 port/route discovery shape and required capabilities it knows how to probe. A
 Java extension update may continue working unchanged, select another adapter,
 or be rejected with a precise compatibility message. It does not cause an
 automatic fork, source merge, proxy replacement, or fallback JDT LS.
 
-The initial compatibility table contains only the exact tested tuple. New Java
-extension/JDT LS combinations enter the table only after the bridge contract
-and Spring completion regression suite passes.
+[D006](006-capability-first-java-compatibility-and-reporting.md) supersedes the
+initial exact-per-release admission rule. The installed extension version is
+diagnostic evidence, not a startup gate; a new release proceeds when the known
+runtime capability contract works and fails visibly when a required capability
+does not.
 
 ### Missing and incompatible Java support
 

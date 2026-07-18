@@ -2,7 +2,7 @@
 
 - Phase status: Core research, the S013 local PoC, D003/D004 architecture and
   stack gates, and M3 public-source release complete; M4 capability parity is in
-  progress under D005
+  progress under D005 and D006
 - Last completed on: 2026-07-19
 - Local spike status: S001-S005 executed on macOS arm64; S003-S005 support the
   required coordination seams, while S006-S008 are Inconclusive. S008's two
@@ -17,9 +17,16 @@
 - Runtime-gate update: S015 Refuted the preferred Java/Spring Document Symbols
   route on restart, so Project Symbols remains the fallback. S016 then
   Supported official Java 6.8.23 coordination and normal-profile Maven main-
-  task reuse on macOS arm64/JDK 25. A separate compatibility-table product
-  change remains before the shipped claim moves from 6.8.21. Subsequent M4
-  slices follow D005's preferred/fallback mapping
+  task reuse on macOS arm64/JDK 25. R016 established that Zed's `read:user`
+  sign-in cannot authorize extension-created issues and selected a user-reviewed
+  prefilled issue as the stock-Zed reporting route; its bounded notification and
+  populated browser-composer gate now pass. D006 replaces exact
+  release admission with capability-first optimistic compatibility. R019 then
+  established that only `CL-4d` among the remaining AI/navigation/build-output
+  questions has a project-side one-click adaptation. That adaptation now passes
+  its ignored-`target/` runtime gate; direct Zed Agent dispatch, AI-state
+  detection, and file-finder sort-last remain editor/API boundaries.
+  Subsequent M4 slices follow D005's preferred/fallback mapping
 - Goal update: long-term capability parity with VS Code Spring Tools, using
   equivalent Zed-native workflows where editor surfaces differ
 - Delivery update: platform-neutral installation remains a design target, while
@@ -48,11 +55,15 @@ coordinate JDT LS and the Spring Tools Language Server?
 | [R008](008-equinox-private-configuration-area.md) | Attribute S009 Equinox private configuration state | Complete | Shared config is only a parent; writable install defaults private state to `<install>/configuration` |
 | [R009](009-unmodified-java-companion-boundary.md) | Attribute the unmodified official-Java companion boundary | Complete | Bundle contribution and JDT requests work; reverse callback requires an owned bridge and runtime verification |
 | [R010](010-experimental-public-source-audit.md) | Audit the experimental public-source boundary | Complete | Reachable history is source-only and pattern-clean; license, author identity, and namespace require owner decisions |
-| [R011](011-vscode-spring-tools-capability-surface.md) | Enumerate the VS Code Spring Tools capability surface | Complete | 15 commands, 18 settings, 4 languages, and 13 advertised LSP capabilities derived from the pinned release; seeds the capability inventory |
+| [R011](011-vscode-spring-tools-capability-surface.md) | Enumerate the VS Code Spring Tools capability surface | Complete | 15 commands, 118 settings, 4 languages, and 13 advertised LSP capabilities derived from the pinned release; seeds the capability inventory; R018 corrects the earlier partial setting count |
 | [R012](012-cold-cache-bridge-bundle-race.md) | Bridge/bundle startup ordering (mis-titled cold-cache) | Superseded by S014 | First concluded a cold-cache race; S014 corrected it to an install-ordering issue. jdtls that starts before the extension is installed is not re-queried for the bridge; a cold cache with the extension pre-installed works |
 | [R013](013-zed-native-capability-delivery-surfaces.md) | Stock-Zed capability delivery surfaces | Complete for source feasibility | LSP-first coordinator adaptation gives the highest stock-Zed coverage; S015 later Refuted Document Symbols on restart, current verified routes remain fallbacks, and Java query replacement is excluded from the baseline |
 | [R014](014-final-upstream-capability-surface-audit.md) | Final upstream capability-surface audit | Complete for source feasibility | Latest Zed still has no extension tree/panel or public task/show-document shortcut; Java 6.8.23 adds a useful compatibility-gated main/test task path without replacing D005 |
 | [R015](015-spring-completion-ranking.md) | Attribute Spring property completion ranking in stock Zed | Complete for attribution | Spring ranks `server.port` first and tags deprecated items correctly; Zed's single-word fuzzy pass precedes `sortText`, so the visible menu can reorder both |
+| [R016](016-zed-github-compatibility-reporting.md) | Zed-to-GitHub compatibility reporting | Complete; first browser gate passed | Zed sign-in cannot authorize issue creation; the bounded notification opened a populated GitHub composer for explicit user submission |
+| [R017](017-zed-codelens-hover-command-compatibility.md) | Zed CodeLens-to-Hover command compatibility | Complete for source feasibility | Zed has the native Hover outcome and CodeLens selects the right position, but its LSP client-command bridge exposes only locations/tasks; use one extra native Hover gesture until upstream adds a mapping |
+| [R018](018-spring-tools-zed-outcome-parity-audit.md) | Re-audit Spring Tools capabilities as Zed developer outcomes | Complete for source feasibility | Most features map directly to native Zed or standard LSP; only live highlights, client-only commands, aggregate dashboard data, and routing/configuration gaps need product adaptation |
+| [R019](019-zed-codelens-agent-navigation-and-build-output.md) | Bound AI lenses, generated implementation navigation, and Maven build-output visibility | Complete; first runtime gate passed | `CL-4d` pre-resolves Spring's authentic target and passed one-click ignored-`target/` navigation; direct Agent invocation/state detection and file-finder sort-last are unavailable |
 
 Use [template.md](template.md) for each investigation. A status may be `Not
 started`, `In progress`, `Blocked`, or `Complete`.
@@ -95,8 +106,9 @@ current Spring source. It finds no better stock-Zed architecture, removes
 extension slash commands/private task scheduling/general ShowDocument from the
 candidate routes, and defines S016 before the official Java task improvement is
 adopted. S016 subsequently Supported the structural coordination and ordinary-
-profile Maven main runnable on its tested tuple; compatibility-table promotion
-remains separately reviewed product work.
+profile Maven main runnable on its tested tuple. R016 and D006 then replace the
+per-release promotion gate with runtime capability probing and user-reviewed
+prefilled compatibility reporting.
 
 R015 attributes the separate `server.p` completion-ordering observation from
 S016. The coordinator preserves Spring's response, which ranks `server.port`
@@ -105,3 +117,11 @@ language does not include `.` in its completion-query characters, and Zed
 fuzzy-ranks the resulting single-word query before consulting LSP `sortText`.
 The result is an upstream Zed/Properties-language integration issue, not a
 product or Java 6.8.23 coordination regression.
+
+R018 then expands the capability audit by developer outcome and supplies the
+numbered CodeLens showcase. R019 narrows the remaining maintainer observations:
+AI-only lenses are always enabled by this product and can only receive accurate
+blocked-action wording until Zed exports an Agent action/state API; `CL-4d` has
+a completed project-side one-click translation with a driven ignored-target
+gate; and arbitrary Maven `target/` ordering remains
+user/editor policy, with the showcase itself fixed by its local `.gitignore`.

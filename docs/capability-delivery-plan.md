@@ -2,10 +2,11 @@
 
 - Status: Selected direction; implementation and runtime verification remain
   incremental
-- Last updated: 2026-07-18
+- Last updated: 2026-07-19
 - Decision: [D005](decisions/005-lsp-first-capability-delivery.md)
-- Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md) and
-  [R014](research/014-final-upstream-capability-surface-audit.md)
+- Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md),
+  [R014](research/014-final-upstream-capability-surface-audit.md), and
+  [R019](research/019-zed-codelens-agent-navigation-and-build-output.md)
 - Inventory authority: [capability-inventory.md](capability-inventory.md)
 
 ## How to read this plan
@@ -88,15 +89,15 @@ user outcome take precedence.
 | Per-file Spring Outline — show the current file's beans, endpoints, and components hierarchically | Preserve verified Project Symbols as the navigable fallback. | S015 Refuted enabling Zed's LSP Document Symbols setting as a supported route: the normal merge is usable, but restart can cache Spring-only results and lose Java symbols. Reopen only after a stock-Zed refresh fix passes the same gate. | The fallback trigger fired. Keep Project Symbols and use the planned Structure document for Spring-only grouping. | 5/5; fallback selected by runtime gate |
 | Project-wide Spring structure — browse beans, endpoints, configurations, and grouping across the worktree | Preserve verified Project Symbols and direct source navigation. | Keep Project Symbols for search and add an opt-in generated Spring Structure document for stable grouping and refresh. | If safe generation, refresh, or navigation cannot be proven, Project Symbols remains the supported equivalent. | 4/5 |
 | Bean and endpoint navigation — jump from Spring elements and request mappings to source | Preserve verified Workspace Symbols plus official Java definition, references, and implementations. | Combine the same surfaces with links from Outline or generated documents. | Links may be omitted without losing the verified symbol-search path. | 5/5 |
-| CodeLens — show bean, endpoint, reference, or live status above classes and methods | Keep this capability `planned`; Project Symbols and hover retain navigation and detail. | Translate Spring's `sts/highlight` data into standard CodeLens items and refresh them when the index or live state changes. | If refresh, ranges, or command execution are unreliable, retain hover/inlay/symbol surfaces and do not ship stale lenses. | 4/5 |
+| CodeLens — show endpoint/configuration/query summaries plus live bean, injection, and startup status | Both the live slice and all five static provider families are `verified` on the first macOS tuple. Project Symbols and hover retain navigation and detail. | Preserve Spring commands, translate source locations, merge version-matched `sts/highlight`, and keep unavailable client-only facts visible with precise explanations. `CL-4d` asynchronously pre-resolves Spring's authentic AOT target, caches it by source version/arguments, refreshes CodeLens, and rewrites the action to `editor.action.goToLocations`. AI-only titles state that this extension cannot detect or invoke Agent and sends nothing to AI. | The 2026-07-19 gates passed, including one-click generated-method navigation with ignored `/target/`. Failed target resolution falls back to an exact URI/line notice. Hover and URL client commands retain their documented native/manual fallbacks because Zed exposes no project-side action bridge. | 5/5 |
 | Inlay hints — render human-readable cron information and other compact inline facts | Preserve the verified standard-LSP inlay-hint path. | Extend only when another Spring result maps naturally to an inlay hint. | Disable individual hint classes that become noisy or stale. | 5/5 |
 | Quick fixes and Code Actions — repair Spring code and create metadata | Preserve the verified Spring Code Action and ApplyEdit path. | Add synthetic project, run/debug, live-data, conversion, and refresh actions around allowlisted Spring commands. | An action without a safe standard-LSP interaction remains `planned`; existing quick fixes are unaffected. | 5/5 |
 | Boot project discovery — find executable main classes and modules | The coordinator's GAV callback is implemented; no user-facing workflow is claimed. | Invoke executable-project and project-info commands from a Code Action, then let the user select a project and request configuration generation. | If Zed's action prompt is inadequate, generate a reviewable candidate document and require manual selection. | 4/5 |
-| Run and debug — launch, stop, or debug a Spring Boot application | Users may author `.zed/debug.json` manually and use the official Java DAP; official Java 6.8.21 remains the shipped baseline. S016 verified 6.8.23's normal-profile Maven main runnable on macOS arm64/JDK 25. | After the compatibility-table change, prefer official Java 6.8.23's main runnable for a matching Run action. Generate or merge explicit Run (`noDebug`) or Debug configurations when project choice, arguments, or debugging requires them; the user starts the selected Zed task or Debug entry. | Never overwrite unknown configuration or assume a runnable becomes a debug scenario. On compatibility or merge failure, retain 6.8.21 plus manual configuration. | 4/5; compatibility and debug gates |
-| Maven and Gradle execution — run a goal, task, or build | Official Java and manually authored Zed tasks remain the ownership boundary. S016 verified Maven main execution and Gradle coordination, not Gradle/vanilla task execution or test tasks. | After the compatibility-table change, reuse official Java 6.8.23's wrapper-aware main/test tasks where they have matching runtime evidence. Generate or merge reviewable `.zed/tasks.json` only for arbitrary goals, builds, or Spring-specific commands; do not launch them invisibly inside Spring LS. | On undeclared provider, unsafe merge, or platform ambiguity, retain 6.8.21/manual tasks and keep unmatched commands `planned`. | 4/5; remaining runtime gates |
+| Run and debug — launch, stop, or debug a Spring Boot application | Users may author `.zed/debug.json` manually and use the official Java DAP. S016 verified official Java 6.8.23's normal-profile Maven main runnable on macOS arm64/JDK 25. | Under D006's capability-first policy, prefer the installed official Java extension's matching main runnable when that route has the required evidence. Generate or merge explicit Run (`noDebug`) or Debug configurations when project choice, arguments, or debugging requires them; the user starts the selected Zed task or Debug entry. | Never overwrite unknown configuration or assume a runnable becomes a debug scenario. On capability or merge failure, retain manual configuration and offer a bounded user-reviewed compatibility report where applicable. | 4/5; capability and debug gates |
+| Maven and Gradle execution — run a goal, task, or build | Official Java and manually authored Zed tasks remain the ownership boundary. S016 verified Maven main execution and Gradle coordination, not Gradle/vanilla task execution or test tasks. | Reuse the installed official Java extension's wrapper-aware main/test tasks where they have matching runtime evidence. Generate or merge reviewable `.zed/tasks.json` only for arbitrary goals, builds, or Spring-specific commands; do not launch them invisibly inside Spring LS. | On capability failure, unsafe merge, or platform ambiguity, retain manual tasks and keep unmatched commands `planned`. Exact official-Java release strings do not activate or reject this route. | 4/5; remaining runtime gates |
 | Local process connection — connect live data to a running Boot process | Capability remains `planned`; no reduced connection mode is claimed. | Use a Code Action, Spring's process list, a bounded Zed message choice, and coordinator-owned connection state. | If the process list exceeds a usable prompt or identity is ambiguous, use the opt-in Live document; otherwise retain `planned`. | 3.5/5 |
 | Remote connection — connect to a remote Actuator/JMX target | Capability remains `planned`. | Read an explicit endpoint and non-secret options from Zed settings, then connect through a Code Action. Credentials must use a separately reviewed secure path. | No credentials in generated documents, settings examples, logs, or project files; without a secure input path, remote auth stays `planned`. | 3/5 |
-| Live hover and inline data — show runtime bean or endpoint information at source | Capability remains `planned`; static hover and Project Symbols remain available. | Cache live results in the coordinator and adapt them to hover, CodeLens, or inlay hints with explicit freshness. | Hide expired data and fall back to static Spring hover rather than showing stale runtime facts. | 4/5 |
+| Live hover and inline data — show runtime bean or endpoint information at source | Source-local bean, injection and endpoint facts are verified as live CodeLens plus native Hover; aggregate data remains planned. | Keep versioned live results in standard CodeLens and use Zed's composed Hover for detail until a one-click client-command bridge exists. | Reject old document versions, explain unavailable VS Code-only commands, and retain static Spring hover/Project Symbols when disconnected. | 4.5/5 |
 | Metrics — inspect memory and request/runtime measurements | Capability remains `planned`; users may use the application's own Actuator UI. | Generate an opt-in Spring Live document with timestamps and an explicit refresh Code Action. | If refresh or data redaction cannot be bounded, provide links to the application endpoint and keep the editor view `planned`. | 3/5 |
 | Loggers and log levels — list loggers and change a running level | Capability remains `planned`; users may use Actuator directly. | Render loggers in the opt-in Live document and attach item-level Code Actions to supported levels. | If selection or confirmation is ambiguous, keep the document read-only and link to the external endpoint. | 3/5 |
 | Boot Dashboard outcomes — discover applications, see state, and reach run/debug/connect/stop actions | Preserve Project Symbols, manually configured Debug UI, and existing terminal/process workflows as separate fallbacks. | Compose Structure/Live documents, Code Actions, Zed Debug UI, and status-bearing inline surfaces; do not claim a custom panel. | Each sub-capability falls back independently; absence of a panel does not erase verified navigation or manual run/debug. | 3.5/5 |
@@ -107,8 +108,8 @@ user outcome take precedence.
 | `spring.factories` and JPA query files — classify special Spring files for completion and validation | `jpa-named-queries.properties` still reaches the Properties route with an unverified language ID; `*.factories` has no route. | Add distinct, non-Java language contributions and grammars, then map their exact Spring language IDs. | Keep ordinary Properties behavior where classification is uncertain; do not take ownership of Java. | 4/5 |
 | Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | No baseline implementation. A future opt-in Java query pack may be investigated behind a new direction decision. | Default to correct official Java highlighting; never risk the whole Java language registration for this enhancement. | 2/5 |
 | Spring Initializr — create a new Spring project | It is outside the pinned VSIX capability surface and current runtime boundary. | Make a separate scope, network, artifact, and UX decision before adding it. | Remain out of scope; document external Initializr use. | 2/5 |
-| AI explanations — explain SpEL, queries, and AOP behavior | The pinned command is VS Code Copilot-specific and has no direct port. | Treat a Zed Agent, skill, or MCP workflow as a separate product capability only after a scope decision. | Keep it outside the extension parity claim. | 2/5 |
-| Offline, compatibility, and diagnostics — reuse artifacts and explain Java/Spring incompatibility | Preserve the current coordinator, compatibility table, checked artifact cache, and verified failure diagnostics. | Harden rollback, offline reuse, and per-capability diagnostics without changing the ownership boundary. | Reject unknown providers and retain the last verified artifact; never start a misleading reduced mode. | 4/5 |
+| AI explanations — explain SpEL, queries, and AOP behavior | The pinned command is VS Code Copilot-specific. The provider is enabled by this product regardless of Zed AI state, while the command is intercepted locally. | Keep the requested lens visible with wording that says the extension cannot detect or invoke Zed Agent and sends no source/prompt to AI. Revisit direct open/prefill only if Zed exports a user-consented Agent action/state API. | Manual analysis or a separate user-initiated Agent request. Do not imply conditional integration, auto-submit a prompt, or include the result in the current extension parity claim. | 2/5 |
+| Offline, compatibility, and diagnostics — reuse artifacts, explain Java/Spring incompatibility, and report contract breaks | Preserve the current coordinator, adapter contract, checked artifact cache, and verified failure diagnostics. | Attempt known capabilities independent of the installed official-Java release string. On a required-capability failure, show a bounded prefilled public GitHub issue for user review and submission; keep security reports private. | Never start a misleading reduced mode, submit telemetry or an issue automatically, handle a GitHub token, or include paths, classpaths, source, environment, credentials, or raw logs in the report. | 4/5 |
 
 ## Cross-cutting gates
 
@@ -127,21 +128,24 @@ user outcome take precedence.
   because the primary is unverified. Implement it when its named gate fails, or
   earlier only when it is independently useful and therefore reclassified as a
   companion.
-- **Upstream compatibility:** a newer official Java extension remains rejected
-  until its versioned bridge/proxy/lifecycle contract passes a named gate. New
-  upstream tasks are candidates, not inherited support.
+- **Upstream compatibility:** attempt a newer official Java extension with the
+  known adapter and accept it when required runtime capabilities work. Exact
+  release strings are diagnostic evidence rather than gates. New upstream tasks
+  remain candidates until their user-visible behavior has runtime evidence.
 - **Platform scope:** all new routes stay `untested` outside the declared matrix
   until driven there.
 
 ## Immediate order
 
-1. Add official Java 6.8.23 through a reviewed compatibility-table product
-   change, including installed-version-guard design and regression tests.
-2. Implement and verify the `sts/highlight` to CodeLens adaptation.
-3. Deliver Boot-project selection and merge-safe Run/Debug configuration,
+1. Completed on the current CodeLens/compatibility branch: corrected AI-boundary
+   notices; authentic asynchronous `CL-4d` target resolution, caching, refresh,
+   and one-click location rewriting; ignored-`target/` runtime navigation; and a
+   bounded compatibility-report URL/notification whose Zed click opened a
+   title/body-prefilled GitHub composer without submission.
+2. Deliver Boot-project selection and merge-safe Run/Debug configuration,
    reusing the verified official Java main task when it matches.
-4. Deliver properties/YAML conversion and metadata reload as Code Actions.
-5. Prototype the opt-in Structure document before using the same pattern for
+3. Deliver properties/YAML conversion and metadata reload as Code Actions.
+4. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
-6. Expand live-data and remaining command slices only after their interaction,
+5. Expand live-data and remaining command slices only after their interaction,
    freshness, and security gates are written.

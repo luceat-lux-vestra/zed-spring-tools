@@ -7,7 +7,9 @@ unmodified-companion architecture after S013's exact removal evidence. D004
 selects the source-first product stack and moves the basic product PoC ahead of
 the initial public push. D005 selects the stock-Zed LSP-first capability
 delivery strategy while preserving the existing per-capability routes as
-fallbacks.
+fallbacks. D006 replaces exact official-Java release admission with capability-
+first optimistic compatibility and selects user-reviewed prefilled GitHub issue
+reporting when a required capability fails.
 
 | ID | Decision | Status |
 | --- | --- | --- |
@@ -16,6 +18,7 @@ fallbacks.
 | [D003](003-java-companion-product-architecture.md) | Java-companion product architecture | Accepted |
 | [D004](004-product-stack-build-and-packaging.md) | Product stack, build, and packaging | Accepted |
 | [D005](005-lsp-first-capability-delivery.md) | LSP-first capability delivery with preserved fallbacks | Accepted |
+| [D006](006-capability-first-java-compatibility-and-reporting.md) | Capability-first Java compatibility and user-reviewed reporting | Accepted |
 
 Decision records in this directory must cite supporting research and spike
 results. S010 supported an isolated managed JDT runtime with private Equinox
@@ -46,8 +49,13 @@ S015 later Refutes the preferred per-file Document Symbols route on restart,
 which activates D005's Project Symbols/Structure fallback without changing the
 accepted architecture.
 S016 subsequently Supports official Java 6.8.23 coordination and the ordinary-
-profile Maven main runnable on macOS arm64/JDK 25. It does not change D003 or
-D005; admitting 6.8.23 to the shipped compatibility table remains a separate
-product change.
+profile Maven main runnable on macOS arm64/JDK 25. R016 confirms that Zed's
+GitHub `read:user` sign-in cannot authorize issue creation. D006 therefore
+supersedes D003/D004's exact-per-release admission rule, keeps their functional
+and security boundary, and made `sts/highlight` to CodeLens the next primary
+slice. That live slice is now runtime-verified; the current CodeLens follow-up
+was the `CL-4d` authentic-target one-click translation recorded by R019, and it
+now passes its first ignored-`target/` runtime gate. The bounded compatibility
+notification also opened a populated browser composer without submission.
 
 Use [template.md](template.md) after sufficient evidence exists.

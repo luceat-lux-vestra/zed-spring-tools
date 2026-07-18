@@ -173,9 +173,10 @@ server data already available.
   reclassified as a default-off control, not a missing Zed capability.
 - S015 completed Refuted, so per-file Spring LSP Outline is not claimed and the
   named Project Symbols/Structure fallback is active.
-- S016 is required before official Java 6.8.23 is accepted or its new task
-  helper becomes a preferred product route. Until then 6.8.21 remains the exact
-  supported companion.
+- S016 supplied bounded evidence for official Java 6.8.23 and its Maven main
+  task. D006 later supersedes this decision's exact-release admission language:
+  task behavior still needs evidence, but the release string itself is not a
+  runtime gate.
 - Project Symbols and manual configuration remain easy-to-find fallbacks in the
   plan and inventory.
 - Generated documents add worktree-mutation, merge, freshness, and ignore-policy

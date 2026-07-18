@@ -5,6 +5,13 @@ words `verified` and `untested` below describe exact observed coverage on one
 host. An installable extension now exists, but nothing here promises that it
 works on any tuple other than the one verified below.
 
+Official-Java releases are not admitted through an exact runtime allowlist.
+Under D006, the product attempts its known route and bridge capability contract
+with the installed official Java extension and fails visibly when a required
+capability is absent or incompatible. Exact versions below remain evidence and
+regression anchors, not a claim that unlisted point releases are rejected or
+supported.
+
 ## Verified PoC tuple
 
 S013 passed its stated functional and cleanup criteria on exactly this tuple:
@@ -29,7 +36,7 @@ development install on 2026-07-17, returning real Spring Boot property
 completions. That observation covers the M2 vertical slice only, not general
 Spring feature coverage.
 
-## S016 compatibility-candidate evidence
+## S016 later-release evidence
 
 S016 passed its official Java 6.8.23 coordination, product-owned cleanup, warm-
 cache, and normal-profile Maven main-runnable criteria on this later exact
@@ -45,10 +52,13 @@ tuple:
 | Server runtime | Eclipse Temurin JDK 25.0.3 |
 | Fixtures | Maven Spring Boot 3.5.5; disposable Gradle 9.5.1 coordination mirror |
 
-This is compatibility-candidate evidence, not the shipped compatibility claim.
-The product source still embeds only the 6.8.21 provider record. A separately
-reviewed product change must admit 6.8.23 and decide whether compatibility stays
-structurally self-declared or gains an installed-extension-version guard.
+This is bounded compatibility evidence, not a general support claim. S016 also
+showed that the product's former embedded `extensionVersion: 6.8.21` record was
+self-declared rather than an observation of the installed 6.8.23 extension.
+D006 therefore removes that release gate and makes the functional adapter
+contract authoritative. The structural change has contract coverage, and the
+CodeLens branch's driven run subsequently exercised the same optimistic route
+with official Java 6.8.21 while connecting a real Boot process.
 
 The supported observation is also bounded. Maven and Gradle coordination,
 visible Spring completion, product uninstall, warm cached startup with outbound
@@ -85,10 +95,14 @@ JDK 21 and all other runtime JDK versions remain untested for the integrated
 product path. The Java bridge targets Java 21 bytecode through `--release 21`,
 which is a compatibility property of the artifact, not a tested claim.
 
-The extension requires the official Zed Java extension. It probes a versioned
-capability boundary rather than assuming every past or future Java extension
-release is compatible. Missing or incompatible Java support must produce an
-explicit diagnostic and must not start a reduced second JDT LS.
+The extension requires the official Zed Java extension. It optimistically probes
+the known versioned capability boundary rather than admitting exact point
+releases. Missing or incompatible capabilities must produce an explicit
+diagnostic and must not start a reduced second JDT LS. The diagnostic is now
+implemented: it offers a bounded title/body-prefilled GitHub issue for
+user review and manual submission, without handling a GitHub token. Its first
+stock-Zed notification-to-browser gate passed on the macOS tuple; no issue was
+submitted.
 
 ## Out of scope
 

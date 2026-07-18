@@ -1,0 +1,104 @@
+name: Official Java compatibility report
+description: Review and submit a capability failure prepared by Zed Spring Tools.
+labels: ["bug", "area:settings-diagnostics", "area:protocol"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Zed Spring Tools accepts official Java extension releases by the
+        capabilities they provide, not by an exact version allowlist. This form
+        records a required route or command that did not work.
+
+        The extension's notification opens a bounded title/body-prefilled
+        composer; this structured form remains available for manual reports. It
+        **does not submit an issue automatically**. Review every field before
+        submitting. Do not add source code, private paths, classpaths, environment
+        variables, credentials, internal hostnames, or unredacted logs.
+
+        **Do not report a suspected vulnerability here.** Use
+        [private vulnerability reporting](https://github.com/luceat-lux-vestra/zed-spring-tools/security/advisories/new).
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failed capability
+      description: The bounded operation and failure summary prepared by the extension.
+      placeholder: "Example: official Java route was not found before the readiness deadline"
+    validations:
+      required: true
+
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Failure fingerprint
+      description: A stable non-secret identifier used to group equivalent reports.
+      placeholder: "java-route-not-found-v1"
+    validations:
+      required: true
+
+  - type: input
+    id: zed-version
+    attributes:
+      label: Zed version
+      placeholder: "1.11.3"
+    validations:
+      required: true
+
+  - type: input
+    id: official-java-version
+    attributes:
+      label: Official Zed Java extension version
+      description: Fill this in if the extension could not determine it safely.
+      placeholder: "6.8.23"
+    validations:
+      required: true
+
+  - type: input
+    id: spring-tools-version
+    attributes:
+      label: Spring Tools version
+      placeholder: "5.2.0.RELEASE"
+    validations:
+      required: true
+
+  - type: input
+    id: jdk-version
+    attributes:
+      label: Language-server JDK
+      placeholder: "Temurin 25.0.3"
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Operating system and architecture
+      placeholder: "macOS 26.5.2 arm64"
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Zed Spring Tools version
+      placeholder: "0.1.0-alpha.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and additional context
+      description: Add the smallest reproduction you can provide after removing private data.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: review
+    attributes:
+      label: Public report review
+      options:
+        - label: I reviewed all prepared or manually entered fields and removed private or identifying data.
+          required: true
+        - label: This is not a security vulnerability or credential exposure.
+          required: true
