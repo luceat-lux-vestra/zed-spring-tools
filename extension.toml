@@ -1,12 +1,12 @@
-id = "zed-spring-tools"
-name = "Zed Spring Tools"
+id = "spring-tools"
+name = "Spring Tools"
 version = "0.1.0"
 schema_version = 1
 authors = ["algorist"]
 description = "Spring Boot language intelligence for Zed. Requires the official Java extension; an XML extension enables pom.xml Maven hints."
 repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
-[language_servers.zed-spring-tools]
+[language_servers.spring-tools]
 name = "Spring Boot Language Server"
 # XML routes pom.xml to the server so its Maven inlay hints ("Add Spring Boot
 # Starters", "Upgrade to the Latest Patch") and Spring XML-config intelligence
@@ -15,7 +15,7 @@ name = "Spring Boot Language Server"
 # same way Java support requires the official Java extension.
 languages = ["Java", "Properties", "YAML", "XML"]
 
-[language_servers.zed-spring-tools.language_ids]
+[language_servers.spring-tools.language_ids]
 Java = "java"
 Properties = "spring-boot-properties"
 YAML = "spring-boot-properties-yaml"

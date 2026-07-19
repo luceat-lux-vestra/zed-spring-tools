@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     fn derives_the_official_java_sibling_work_directory() {
-        let extension = Path::new("/zed/extensions/work/zed-spring-tools");
+        let extension = Path::new("/zed/extensions/work/spring-tools");
         assert_eq!(
             official_java_work_dir(extension).unwrap(),
             Path::new("/zed/extensions/work/java")
