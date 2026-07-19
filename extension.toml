@@ -8,12 +8,18 @@ repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
 [language_servers.zed-spring-tools]
 name = "Spring Boot Language Server"
-languages = ["Java", "Properties", "YAML"]
+# XML routes pom.xml to the server so its Maven inlay hints ("Add Spring Boot
+# Starters", "Upgrade to the Latest Patch") and Spring XML-config intelligence
+# reach Zed. Zed has no built-in XML language, so this only takes effect when an
+# XML extension (e.g. sweetppro/zed-xml, language name "XML") is installed — the
+# same way Java support requires the official Java extension.
+languages = ["Java", "Properties", "YAML", "XML"]
 
 [language_servers.zed-spring-tools.language_ids]
 Java = "java"
 Properties = "spring-boot-properties"
 YAML = "spring-boot-properties-yaml"
+XML = "xml"
 
 [[capabilities]]
 kind = "download_file"
