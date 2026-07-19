@@ -81,11 +81,10 @@ commented or non-array file receives a reviewable sidecar instead). It emits one
 base entry plus one per discovered Spring profile (from `application-<profile>.*`
 filenames and multi-document `application.yml` activation, capped at eight) so
 Zed's task/debug picker becomes the profile selector, alongside editable
-`vmArgs`/`args`/`env` slots. A driven run on 2026-07-19 (macOS arm64, Zed 1.11.3,
-official Java 6.8.21, JDK 25) verified discovery, generation, and that the
-generated run task launched the app and served `GET /greeting`; the `adapter:
-"Java"` debug launch and the profile/slot entries are contract-tested but not yet
-driven.
+`vmArgs`/`args`/`env` slots. Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3,
+official Java 6.8.21, JDK 25) verified discovery, generation, profile entries,
+the generated run task serving `GET /greeting`, and a Java debug launch from the
+generated `dev` entry after editing all three debug slots.
 
 The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
 every standard provider, its user-visible subfeatures, the separate live-data

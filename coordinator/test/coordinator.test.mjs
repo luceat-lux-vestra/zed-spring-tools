@@ -1422,6 +1422,48 @@ test("profiles from filenames and multi-doc application.yml become picker entrie
   fs.rmSync(worktree, { recursive: true, force: true });
 });
 
+test("profile YAML recognizes exact flat and nested paths, lists, and boolean expressions", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  fs.writeFileSync(
+    path.join(resources, "application.yaml"),
+    [
+      "spring.config.activate.on-profile: '[blue, green]'",
+      "---",
+      "spring:",
+      "  profiles:",
+      "    - legacy",
+      "    - qa",
+      "---",
+      "spring:",
+      "  config:",
+      "    activate:",
+      "      on-profile: 'prod & !test' # expression tokens are editable entries",
+      "---",
+      "custom:",
+      "  profiles: ignored-legacy",
+      "  config:",
+      "    activate:",
+      "      on-profile: ignored-modern",
+      "",
+    ].join("\n"),
+  );
+
+  const { tasks } = await driveConfigureSingleProject(worktree, {
+    name: "yaml-app",
+    mainClass: "com.example.App",
+  });
+
+  assert.deepEqual(
+    tasks.slice(1).map((task) => task.label.match(/run: (.+)\)$/)[1]),
+    ["blue", "green", "legacy", "prod", "qa", "test"],
+  );
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
 test("Gradle profile entries forward the active profile as a program argument", async () => {
   const worktree = makeWorktree();
   fs.writeFileSync(path.join(worktree, "build.gradle"), "plugins {}\n");

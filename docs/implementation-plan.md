@@ -320,13 +320,15 @@ never overwriting a config it cannot parse without loss. It emits one base entry
 plus one per discovered Spring profile (from profile-specific filenames and
 multi-document `application.yml` activation, capped at eight) so the task/debug
 picker becomes the profile selector, with editable `vmArgs`/`args`/`env` slots.
-A 2026-07-19 driven run (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25)
-verified discovery, generation, and that the generated run task's
-`mvn spring-boot:run` launched the app and served `GET /greeting`; executable
+Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3, official Java 6.8.21,
+JDK 25) verified discovery, generation, the generated run task serving
+`GET /greeting`, generated `dev`/`prod`/`staging` picker entries, and a Java debug
+launch from the `dev` entry after editing `vmArgs`, `args`, and `env`. Executable
 Boot project discovery is therefore `verified`. Boot project info and Boot
-run/debug stay `implemented` — the `"adapter": "Java"` debug launch, the
-profile/slot entries, and multi-project selection are contract-tested but not yet
-driven.
+run/debug stay `implemented` because multi-project selection and the remaining
+platform/build-tool runtime tuples are not yet driven. The debug run also exposed
+an environment prerequisite in official Java 6.8.21: a system HTTP proxy must
+bypass its loopback `localhost` main-class resolver.
 
 The references-and-implementations verification also exposed a startup-order
 race after the official Java route appeared but while Java project import was

@@ -1060,11 +1060,10 @@ const PROFILE_CONFIG_SUBDIRS = ["src/main/resources", "src/main/resources/config
 const PROFILE_FILENAME = /^application-(.+)\.(?:properties|ya?ml)$/i;
 const APPLICATION_YAML = /^application\.ya?ml$/i;
 const PROFILE_NAME = /^[A-Za-z0-9_.-]+$/;
-// Modern `spring.config.activate.on-profile` (flat or nested) and the legacy
-// document-level `spring.profiles`. `.active`/`.include`/`.group` never match
-// because they place text between `profiles` and the colon.
-const ON_PROFILE_LINE = /(?:^\s*|\.)on-profile\s*:\s*(.+)$/;
-const LEGACY_PROFILE_LINE = /^\s*(?:spring\.)?profiles\s*:\s*(\S.*)$/;
+const MODERN_PROFILE_PATH = "spring.config.activate.on-profile";
+const LEGACY_PROFILE_PATH = "spring.profiles";
+const YAML_KEY_VALUE = /^(\s*)([A-Za-z0-9_.-]+)\s*:\s*(.*)$/;
+const YAML_LIST_ITEM = /^(\s*)-\s*(\S.*)$/;
 
 // Discover Spring profiles from both profile-specific filenames
 // (`application-<profile>.yml`) and multi-document `application.yml` activation.
@@ -1101,11 +1100,40 @@ function discoverProfiles(directory) {
 
 function profilesFromYaml(text) {
   const names = [];
+  const path = [];
+  let profileList;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/^\s*#.*$/, "").replace(/\s+#.*$/, "");
-    const match = ON_PROFILE_LINE.exec(line) ?? LEGACY_PROFILE_LINE.exec(line);
-    if (match === null) continue;
-    for (const token of tokenizeProfileExpression(match[1])) names.push(token);
+    if (line.trim().length === 0) continue;
+    if (/^\s*(?:---|\.\.\.)\s*$/.test(line)) {
+      path.length = 0;
+      profileList = undefined;
+      continue;
+    }
+
+    const listItem = YAML_LIST_ITEM.exec(line);
+    if (listItem !== null) {
+      const indent = listItem[1].length;
+      if (profileList !== undefined && indent > profileList.indent) {
+        names.push(...tokenizeProfileExpression(listItem[2]));
+      }
+      continue;
+    }
+
+    const property = YAML_KEY_VALUE.exec(line);
+    if (property === null) continue;
+    const indent = property[1].length;
+    const key = property[2];
+    const value = property[3].trim();
+    while (path.length > 0 && path.at(-1).indent >= indent) path.pop();
+    if (profileList !== undefined && indent <= profileList.indent) profileList = undefined;
+
+    const dotted = [...path.map((part) => part.key), key].join(".");
+    if (dotted === MODERN_PROFILE_PATH || dotted === LEGACY_PROFILE_PATH) {
+      if (value.length === 0) profileList = { indent };
+      else names.push(...tokenizeProfileExpression(value));
+    }
+    if (value.length === 0) path.push({ indent, key });
   }
   return names;
 }
