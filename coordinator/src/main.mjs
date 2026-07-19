@@ -567,6 +567,11 @@ export class Coordinator {
           const result = await this.requestSpring("textDocument/inlayHint", request.params);
           if (Array.isArray(result) && result.length > 0) {
             this.#cacheInlayHints(request, result);
+          } else if (Array.isArray(result)) {
+            // The pre-warm fires after a completed index update, so an empty
+            // result here is authoritative: the hint is genuinely gone. Drop any
+            // stale carry-over so a removed hint stops masking the empty.
+            this.#dropStaleInlayHints(request);
           }
         } catch {
           // Refresh still lets Zed retry if one pre-warm request fails.
@@ -584,7 +589,10 @@ export class Coordinator {
     const version = request.version ?? currentVersion;
     if (version !== currentVersion) return;
     const previous = this.inlayHints.get(request.uri);
-    const retained = previous !== undefined && previous.version === version
+    // A stale carry-over from a prior version is fully replaced by the first
+    // fresh non-empty response; only accumulate across ranges of the same,
+    // authoritative version.
+    const retained = previous !== undefined && previous.version === version && !previous.stale
       ? previous.hints.filter((hint) => !positionInRange(hint?.position, request.params?.range))
       : [];
     this.inlayHints.set(request.uri, { version, hints: [...retained, ...hints] });
@@ -595,6 +603,26 @@ export class Coordinator {
     const cached = this.inlayHints.get(request.uri);
     if (cached === undefined || cached.version !== request.version) return [];
     return cached.hints.filter((hint) => positionInRange(hint?.position, request.params?.range));
+  }
+
+  #dropStaleInlayHints(request) {
+    if (typeof request.uri !== "string") return;
+    const cached = this.inlayHints.get(request.uri);
+    if (cached?.stale && cached.version === request.version) {
+      this.inlayHints.delete(request.uri);
+    }
+  }
+
+  #carryInlayHintsForward(uri, version) {
+    const previous = this.inlayHints.get(uri);
+    if (previous === undefined || previous.hints.length === 0) {
+      this.inlayHints.delete(uri);
+      return;
+    }
+    // Retain the last non-empty hints under the new version, marked stale, so a
+    // transient empty response during re-indexing keeps masking (no blink)
+    // until the first authoritative Spring response replaces or clears them.
+    this.inlayHints.set(uri, { version, hints: previous.hints, stale: true });
   }
 
   #refreshZedCodeLenses() {
@@ -619,7 +647,7 @@ export class Coordinator {
       if (Number.isInteger(textDocument.version)) {
         if (this.documentVersions.get(uri) !== textDocument.version) {
           this.#invalidateGeneratedTargets(uri);
-          this.inlayHints.delete(uri);
+          this.#carryInlayHintsForward(uri, textDocument.version);
         }
         this.documentVersions.set(uri, textDocument.version);
       }
