@@ -1544,6 +1544,70 @@ test("converting properties to YAML executes the Spring command with a non-colli
   assert.match(notice.params.message, /original file was kept/i);
 });
 
+test("a conversion's post-create showDocument is acknowledged silently, not as a CodeLens notice", async () => {
+  const worktree = makeWorktree();
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  const source = path.join(resources, "application.properties");
+  fs.writeFileSync(source, "server.port=8080\n");
+  const sourceUri = pathToFileURL(source).href;
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "convert-show",
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.convert-properties-yaml",
+      arguments: [{ uri: sourceUri, direction: "props-to-yaml" }],
+    },
+  });
+
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/boot/props-to-yaml",
+    "props-to-yaml request",
+  );
+  const targetUri = request.params.arguments[1];
+
+  // While the conversion is in flight, Spring reveals the freshly created file.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "reveal-1",
+    method: "window/showDocument",
+    params: { uri: targetUri, selection: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } },
+  });
+
+  // Acknowledged as success, with no CodeLens/Spring-Data popup toward Zed.
+  const reveal = springWrites.find((message) => message.id === "reveal-1");
+  assert.deepEqual(reveal.result, { success: true });
+  assert.ok(
+    !zedWrites.some((message) => message.method?.startsWith("window/showMessage")),
+    "no showMessage before the conversion completes",
+  );
+
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "conversion notice",
+  );
+  assert.match(notice.params.message, /Converted application\.properties to application\.yml/);
+  // The only Zed-facing message is the success notice — never the CodeLens one.
+  assert.ok(
+    !zedWrites.some((message) => /does not support the LSP window\/showDocument/.test(message.params?.message ?? "")),
+    "no CodeLens showDocument fallback notice",
+  );
+});
+
 test("reload shared properties metadata executes the Spring command", async () => {
   const springWrites = [];
   const zedWrites = [];
