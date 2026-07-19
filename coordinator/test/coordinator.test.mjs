@@ -790,6 +790,140 @@ test("a transient empty inlay response cannot replace a non-empty result for the
   await coordinator.close();
 });
 
+test("the last non-empty inlay hints survive a document edit while Spring re-indexes", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const uri = "file:///tmp/project/Schedule.java";
+  const range = {
+    start: { line: 0, character: 0 },
+    end: { line: 20, character: 0 },
+  };
+  const hint = { position: { line: 8, character: 36 }, label: "every hour" };
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, version: 1, text: "class Schedule {}" } },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-v1",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "inlay-v1", result: [hint] });
+
+  // An unrelated edit bumps the document version. Before the fix this deleted the
+  // cache, disabling the stale-empty protection for the new version.
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didChange",
+    params: { textDocument: { uri, version: 2 }, contentChanges: [] },
+  });
+
+  // Zed re-requests hints for the new version while Spring is still re-indexing
+  // and returns empty. The last non-empty hints must keep masking the blank.
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-v2",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "inlay-v2", result: [] });
+
+  assert.deepEqual(zedWrites.at(-1), {
+    jsonrpc: "2.0",
+    id: "inlay-v2",
+    result: [hint],
+  });
+  await coordinator.close();
+});
+
+test("an authoritative empty pre-warm clears carried-over inlay hints once the hint is removed", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    inlayRefreshDelayMs: 0,
+  });
+  const uri = "file:///tmp/project/Schedule.java";
+  const range = {
+    start: { line: 0, character: 0 },
+    end: { line: 20, character: 0 },
+  };
+  const hint = { position: { line: 8, character: 36 }, label: "every hour" };
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, version: 1, text: "class Schedule {}" } },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-v1",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "inlay-v1", result: [hint] });
+
+  // The edit removes the cron; the hint is carried forward under version 2.
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didChange",
+    params: { textDocument: { uri, version: 2 }, contentChanges: [] },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-v2",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "inlay-v2", result: [] });
+  // Still masked while re-indexing.
+  assert.deepEqual(zedWrites.at(-1).result, [hint]);
+
+  // A completed index update triggers the authoritative pre-warm, which now
+  // reports no hint. The carried-over hint must be dropped, not re-cached.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "spring/index/updated",
+    params: { affectedProjects: ["example"] },
+  });
+  const rewarm = await waitFor(
+    springWrites,
+    (message) => message.method === "textDocument/inlayHint",
+    "inlay pre-warm after removal",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: rewarm.id, result: [] });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "workspace/inlayHint/refresh",
+    "inlay refresh after removal",
+  );
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-after-removal",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "inlay-after-removal", result: [] });
+  assert.deepEqual(zedWrites.at(-1), {
+    jsonrpc: "2.0",
+    id: "inlay-after-removal",
+    result: [],
+  });
+  await coordinator.close();
+});
+
 test("classpath enable waits for initialized and the official Java route", async () => {
   const springWrites = [];
   const zedWrites = [];
