@@ -80,12 +80,14 @@ extension.
   its generated entries go to a `.zed/<name>.zed-spring-tools.json` sidecar for
   the user to merge by hand. Comments in an existing `.zed` config are therefore
   not merged in place.
-- There is no packaged extension, installer, release artifact, product CI, or
-  Marketplace entry. Installation means a local development extension.
+- There is no packaged extension, installer, release artifact, or published
+  registry entry; product CI runs format, lint, tests, and the WASM release
+  build. Installation today means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a
   product implementation and will not be promoted directly into one.
-- Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. Every
-  other desktop and runtime tuple is untested.
+- Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. The
+  adapter and coordinator are written for Linux, macOS, and Windows, but every
+  other desktop and runtime tuple is untested at runtime.
 - The product requires the official Zed Java extension. It does not replace Java
   debugging, tests, tasks, project import, or other Java ownership, and it will
   not offer a reduced standalone JDT fallback.

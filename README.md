@@ -3,9 +3,10 @@
 Experimental Spring Boot language intelligence for Zed, built as a companion to
 the required official Java extension.
 
-> This is an early public-development project, not a stable release. It is
-> available only as a local development extension and has runtime evidence on
-> one macOS arm64/JDK 25 environment.
+> This is an early public-development project, not a stable release. The
+> platform-neutral WASM adapter and OS-aware coordinator are written for Linux,
+> macOS, and Windows; runtime evidence to date is on macOS arm64/JDK 25, and an
+> extension-registry submission is in preparation.
 
 ## Project status
 
@@ -13,9 +14,9 @@ the required official Java extension.
 | --- | --- |
 | Development phase | M4 capability-parity program |
 | Capability inventory | 17 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 33 `planned` |
-| Distribution | Local development extension only; no package or Marketplace entry |
+| Distribution | Local development extension today; extension-registry submission in preparation |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
-| Other desktop/JDK combinations | Untested |
+| Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -113,8 +114,12 @@ edit it.
 
 ### Prerequisites
 
-- Zed with the official Java extension installed; the product is not pinned to
-  one extension point release, while exact tested releases remain recorded;
+- Zed with the official Java extension installed (required); the product is not
+  pinned to one extension point release, while exact tested releases remain
+  recorded;
+- an XML extension that registers the `XML` language (e.g. `sweetppro/zed-xml`)
+  is optional but required for `pom.xml` Maven inlay hints — Zed has no built-in
+  XML language, the same way Java support requires the official Java extension;
 - JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
 - Rust installed through `rustup`, which Zed requires when building a local
   development extension; and
@@ -160,7 +165,9 @@ pending.
 
 ## Important limitations
 
-- This is not a stable release and does not claim multiplatform support.
+- This is not a stable release. The adapter and coordinator are written for
+  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence; other
+  platforms are supported in code and not yet driven.
 - The official Java extension is required. Compatibility is capability-based,
   so an upstream release can still break the private route and produce a visible
   failure until this project adapts.
@@ -173,8 +180,9 @@ pending.
 - The opt-in Java LSP Outline is not a supported Spring route: after restart it
   can omit ordinary Java symbols until a document edit forces recollection.
 - First-use artifact acquisition can hang until Zed is restarted.
-- There is no product continuous integration, packaged release, offline install,
-  rollback flow, or Marketplace entry yet.
+- Continuous integration runs format, lint, tests, and the WASM release build;
+  there is no packaged release, offline install, rollback flow, or published
+  registry entry yet.
 - SSH remote development and WSL-hosted projects are outside the current scope.
 
 Read [known limitations](LIMITATIONS.md) before relying on the extension.
@@ -194,6 +202,8 @@ Read [known limitations](LIMITATIONS.md) before relying on the extension.
 - [Research](docs/research/README.md) and [spikes](docs/spikes/README.md) — source
   findings and reproducible feasibility evidence
 - [Contributing](CONTRIBUTING.md) — branch, evidence, validation, and PR rules
+- [Contributors](CONTRIBUTORS.md) — generated from git history; AI assistants
+  are credited in commit trailers, not here
 
 ## Repository layout
 
@@ -218,8 +228,11 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --locked
 node --test "coordinator/test/*.test.mjs"
+node scripts/generate-contributors.mjs --check
 cargo build --locked --release --target wasm32-wasip2
 ```
+
+Continuous integration runs these same checks on every push and pull request.
 
 The Spring Boot fixture can be compiled independently with:
 

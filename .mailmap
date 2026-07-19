@@ -1,0 +1,4 @@
+# Canonicalize commit identities. Both handles are the same person and share
+# one email, so map everything on that address to a single name.
+algorist <heathkimdev@gmail.com>
+algorist <heathkimdev@gmail.com> luceat-lux-vestra <heathkimdev@gmail.com>
