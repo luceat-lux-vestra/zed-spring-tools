@@ -1,0 +1,43 @@
+name: Contributors
+
+# Keep CONTRIBUTORS.md in sync with git history on every push to main.
+# The generator credits human authors and co-authors only; AI assistants and
+# bots are excluded (see scripts/generate-contributors.mjs).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - CONTRIBUTORS.md
+
+permissions:
+  contents: write
+
+concurrency:
+  group: contributors-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so git log sees every author and co-author.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Regenerate CONTRIBUTORS.md
+        run: node scripts/generate-contributors.mjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- CONTRIBUTORS.md; then
+            echo "CONTRIBUTORS.md already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CONTRIBUTORS.md
+          git commit -m "chore: refresh contributors list [skip ci]"
+          git push
