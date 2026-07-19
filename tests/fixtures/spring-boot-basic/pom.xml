@@ -26,6 +26,22 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <!--
+            Spring Data JPA puts the repository/@Query annotations and the JPQL
+            query intelligence on the classpath. The Spring language server indexes
+            statically (it never starts the app), so the embedded-query inlay hints
+            (IH-2) need only the annotations to resolve; H2 is a runtime driver so a
+            plain `mvn` build still resolves without a real database.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!--
             Generates spring-configuration-metadata.json for the fixture's own
             @ConfigurationProperties at compile time. Without it the Spring
             language server has no metadata to document or navigate for the

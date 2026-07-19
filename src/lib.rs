@@ -105,6 +105,12 @@ fn spring_workspace_configuration() -> zed::serde_json::Value {
     // VS Code contributes these defaults through its settings schema. Zed has
     // no equivalent Spring settings schema, so provide the same effective
     // defaults explicitly or Spring's standard CodeLens providers stay off.
+    //
+    // `jpql` is off by default on the server (`BootJavaConfig.isJpqlEnabled()`
+    // returns false when the key is absent, unlike the cron inlay hint which
+    // defaults on). Without it `JpqlSupportState` stays disabled, so Spring Data
+    // query intelligence — embedded JPQL/HQL semantic tokens and the
+    // positional-parameter inlay hint — never runs. Enable it explicitly.
     zed::serde_json::json!({
         "boot-java": {
             "highlight-codelens": {
@@ -113,6 +119,7 @@ fn spring_workspace_configuration() -> zed::serde_json::Value {
             "highlight-copilot-codelens": {
                 "on": true
             },
+            "jpql": true,
             "java": {
                 "codelens-over-query-methods": true,
                 "codelens-web-configs-on-controller-classes": true
@@ -210,6 +217,7 @@ mod tests {
                 "boot-java": {
                     "highlight-codelens": { "on": true },
                     "highlight-copilot-codelens": { "on": true },
+                    "jpql": true,
                     "java": {
                         "codelens-over-query-methods": true,
                         "codelens-web-configs-on-controller-classes": true
@@ -217,5 +225,14 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_enables_jpql_query_intelligence() {
+        // `boot-java.jpql` defaults off on the server, so it must be sent
+        // explicitly or Spring Data query intelligence (semantic tokens +
+        // the positional-parameter inlay hint) never runs.
+        let config = spring_workspace_configuration();
+        assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
     }
 }
