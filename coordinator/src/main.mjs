@@ -29,6 +29,15 @@ const VSCODE_OPEN_COMMAND = "vscode.open";
 const ZED_SHOW_LOCATIONS_COMMAND = "editor.action.goToLocations";
 const GENERATED_IMPLEMENTATION_COMMAND = "sts/boot/open-data-query-method-aot-definition";
 const MAVEN_GOAL_COMMAND = "sts.maven.goal";
+const CODE_ACTION_REQUEST = "textDocument/codeAction";
+const EXECUTABLE_BOOT_PROJECTS_COMMAND = "sts/spring-boot/executableBootProjects";
+const CONFIGURE_BOOT_RUN_COMMAND = "zed-spring-tools.configure-boot-run";
+const CONFIGURE_BOOT_RUN_TITLE = "Spring Boot: Configure run/debug for a project…";
+const BOOT_CONFIG_ACTION_KIND = "source";
+const BOOT_CONFIG_LABEL_PREFIX = "Spring Boot (zed-spring-tools): ";
+const ALL_BOOT_PROJECTS_TITLE = "All projects";
+const MAX_BOOT_PROJECT_SELECTION = 8;
+const COORDINATOR_COMMANDS = [COORDINATOR_CODE_LENS_COMMAND, CONFIGURE_BOOT_RUN_COMMAND];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
 const EXECUTE_COMMAND_CAPABILITY = "workspace/executeCommand";
@@ -45,6 +54,10 @@ const JAVA_ROUTE_TIMEOUT_MS = 30_000;
 // room for several attempts against a cold project import.
 const JAVA_HANDSHAKE_GRACE_MS = 60_000;
 const CLASSPATH_RETRY_MS = 1_000;
+// A run/debug project selection is a human interaction, so it must outlive the
+// short internal request timeout. It is still bounded so a dismissed or lost
+// prompt cannot leak a pending request for the session lifetime.
+const ZED_REQUEST_TIMEOUT_MS = 5 * 60_000;
 const SERVER_JAR = "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar";
 const SPRING_TOOLS_VERSION = "5.2.0.RELEASE";
 const COMPATIBILITY_REPORT_URL =
@@ -83,6 +96,8 @@ export class Coordinator {
     this.pendingZedRequests = new Set();
     this.initializeRequests = new Set();
     this.codeLensRequests = new Map();
+    this.codeActionRequests = new Map();
+    this.zedRequests = new Map();
     this.documentVersions = new Map();
     this.liveCodeLenses = new Map();
     this.generatedTargets = new Map();
@@ -112,6 +127,10 @@ export class Coordinator {
 
   observeZedMessage(message) {
     const pendingKey = responseKey(message);
+    if (pendingKey !== null && this.zedRequests.has(pendingKey)) {
+      this.#settleZedRequest(pendingKey, message);
+      return false;
+    }
     if (pendingKey !== null && this.pendingZedRequests.delete(pendingKey)) {
       return false;
     }
@@ -130,9 +149,19 @@ export class Coordinator {
         });
       }
     }
+    if (isRequest(message) && message.method === CODE_ACTION_REQUEST) {
+      const uri = message.params?.textDocument?.uri;
+      if (typeof uri === "string") {
+        this.codeActionRequests.set(idKey(message.id), {
+          uri,
+          only: message.params?.context?.only,
+        });
+      }
+    }
     this.#observeDocumentVersion(message);
     this.#observeGeneratedTargetInvalidation(message);
     if (this.#handleCoordinatorCodeLensCommand(message)) return false;
+    if (this.#handleConfigureBootRunCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
@@ -157,7 +186,7 @@ export class Coordinator {
     }
 
     if (pendingKey !== null && this.initializeRequests.delete(pendingKey)) {
-      this.sendZed(encodeLsp(addCoordinatorCodeLensCommand(message)));
+      this.sendZed(encodeLsp(addCoordinatorCommands(message)));
       return;
     }
 
@@ -165,6 +194,13 @@ export class Coordinator {
       const request = this.codeLensRequests.get(pendingKey);
       this.codeLensRequests.delete(pendingKey);
       this.sendZed(encodeLsp(this.#mergeCodeLenses(message, request)));
+      return;
+    }
+
+    if (pendingKey !== null && this.codeActionRequests.has(pendingKey)) {
+      const request = this.codeActionRequests.get(pendingKey);
+      this.codeActionRequests.delete(pendingKey);
+      this.sendZed(encodeLsp(this.#mergeCodeActions(message, request)));
       return;
     }
 
@@ -239,6 +275,34 @@ export class Coordinator {
     });
   }
 
+  // A run/debug selection prompt is the only request the coordinator sends to
+  // Zed and awaits a response for. It reuses the Zed-namespaced id space and is
+  // settled by observeZedMessage; the timeout keeps a lost prompt from leaking.
+  requestZed(method, params) {
+    const id = `zed-spring-tools:${this.sessionId}:zed:${++this.sequence}`;
+    const key = idKey(id);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.zedRequests.delete(key);
+        reject(new Error("Zed request timed out"));
+      }, ZED_REQUEST_TIMEOUT_MS);
+      timer.unref?.();
+      this.zedRequests.set(key, { resolve, reject, timer });
+      this.sendZed(encodeLsp({ jsonrpc: "2.0", id, method, params }));
+    });
+  }
+
+  #settleZedRequest(key, message) {
+    const pending = this.zedRequests.get(key);
+    this.zedRequests.delete(key);
+    clearTimeout(pending.timer);
+    if (Object.hasOwn(message, "result")) {
+      pending.resolve(message.result);
+    } else {
+      pending.reject(new Error("Zed rejected a coordinator request"));
+    }
+  }
+
   beginClose() {
     if (this.closed) return;
     this.closed = true;
@@ -247,10 +311,16 @@ export class Coordinator {
       clearTimeout(timer);
       reject(new Error("Spring Tools coordinator stopped"));
     }
+    for (const { reject, timer } of this.zedRequests.values()) {
+      clearTimeout(timer);
+      reject(new Error("Spring Tools coordinator stopped"));
+    }
     this.pending.clear();
+    this.zedRequests.clear();
     this.pendingZedRequests.clear();
     this.initializeRequests.clear();
     this.codeLensRequests.clear();
+    this.codeActionRequests.clear();
     this.documentVersions.clear();
     this.liveCodeLenses.clear();
     this.generatedTargets.clear();
@@ -603,6 +673,116 @@ export class Coordinator {
     return true;
   }
 
+  #mergeCodeActions(message, request) {
+    if (!Object.hasOwn(message, "result")) return message;
+    if (!offersBootRunAction(request)) return message;
+    const existing = Array.isArray(message.result) ? message.result : [];
+    const action = {
+      title: CONFIGURE_BOOT_RUN_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: CONFIGURE_BOOT_RUN_TITLE,
+        command: CONFIGURE_BOOT_RUN_COMMAND,
+        arguments: [{ uri: request.uri }],
+      },
+    };
+    return { ...message, result: [...existing, action] };
+  }
+
+  #handleConfigureBootRunCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== CONFIGURE_BOOT_RUN_COMMAND
+    ) {
+      return false;
+    }
+    // Answer Zed's command immediately; the discovery, selection, and file
+    // generation run asynchronously and report their own outcome. Blocking the
+    // command response on a human selection prompt would stall Zed's UI.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#configureBootRun().catch((error) => {
+      if (this.closed) return;
+      this.logger(
+        `Spring Boot run configuration failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
+      this.#showInfo(
+        "Spring Boot run/debug configuration could not be prepared. Make sure the official Java extension has finished importing the project, then run the action again.",
+      );
+    });
+    return true;
+  }
+
+  async #configureBootRun() {
+    const discovered = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: EXECUTABLE_BOOT_PROJECTS_COMMAND,
+      arguments: [],
+    });
+    const projects = normalizeBootProjects(discovered);
+    if (projects.length === 0) {
+      this.#showInfo("No executable Spring Boot projects were found in this worktree.");
+      return;
+    }
+    const chosen = await this.#selectBootProjects(projects);
+    if (chosen.length === 0) return;
+    const outcome = this.#writeBootConfigurations(chosen);
+    this.#showInfo(describeBootConfiguration(outcome));
+  }
+
+  async #selectBootProjects(projects) {
+    if (projects.length === 1) return projects;
+    const shown = projects.slice(0, MAX_BOOT_PROJECT_SELECTION);
+    const actions = [
+      ...shown.map((project) => ({ title: project.name })),
+      { title: ALL_BOOT_PROJECTS_TITLE },
+    ];
+    const response = await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message:
+        "Select a Spring Boot project to add reviewable run/debug configuration for, or choose All projects. Nothing is written until you choose.",
+      actions,
+    });
+    const title = response?.title;
+    if (typeof title !== "string") return [];
+    if (title === ALL_BOOT_PROJECTS_TITLE) return projects;
+    const match = projects.find((project) => project.name === title);
+    return match === undefined ? [] : [match];
+  }
+
+  #writeBootConfigurations(projects) {
+    const worktree = this.worktree;
+    const hostOs = this.reportContext.hostOs;
+    const tasks = [];
+    const debugConfigs = [];
+    const skippedRun = [];
+    for (const project of projects) {
+      const directory = resolveProjectDirectory(project.uri, worktree);
+      const cwd = worktreeRelativeCwd(directory, worktree);
+      const runTask = bootRunTask(project, directory, cwd, hostOs);
+      if (runTask === undefined) skippedRun.push(project.name);
+      else tasks.push(runTask);
+      debugConfigs.push(bootDebugConfig(project, cwd));
+    }
+    const zedDirectory = path.join(worktree, ".zed");
+    return {
+      count: projects.length,
+      skippedRun,
+      tasks: writeMergedConfig(path.join(zedDirectory, "tasks.json"), tasks),
+      debug: writeMergedConfig(path.join(zedDirectory, "debug.json"), debugConfigs),
+    };
+  }
+
+  #showInfo(message) {
+    if (this.closed) return;
+    this.sendZed(
+      encodeLsp({
+        jsonrpc: "2.0",
+        method: "window/showMessage",
+        params: { type: 3, message },
+      }),
+    );
+  }
+
   #handleShowDocument(params) {
     if (this.activeGeneratedTargetResolution !== undefined) {
       const target = showDocumentTarget(params);
@@ -720,9 +900,11 @@ export class Coordinator {
   }
 }
 
-function addCoordinatorCodeLensCommand(message) {
+function addCoordinatorCommands(message) {
   const commands = message?.result?.capabilities?.executeCommandProvider?.commands;
-  if (!Array.isArray(commands) || commands.includes(COORDINATOR_CODE_LENS_COMMAND)) return message;
+  if (!Array.isArray(commands)) return message;
+  const missing = COORDINATOR_COMMANDS.filter((command) => !commands.includes(command));
+  if (missing.length === 0) return message;
   return {
     ...message,
     result: {
@@ -731,11 +913,264 @@ function addCoordinatorCodeLensCommand(message) {
         ...message.result.capabilities,
         executeCommandProvider: {
           ...message.result.capabilities.executeCommandProvider,
-          commands: [...commands, COORDINATOR_CODE_LENS_COMMAND],
+          commands: [...commands, ...missing],
         },
       },
     },
   };
+}
+
+function offersBootRunAction(request) {
+  if (!/\.java$/i.test(request?.uri ?? "")) return false;
+  const only = request?.only;
+  if (!Array.isArray(only) || only.length === 0) return true;
+  return only.some(
+    (kind) =>
+      typeof kind === "string" &&
+      (kind === BOOT_CONFIG_ACTION_KIND || BOOT_CONFIG_ACTION_KIND.startsWith(`${kind}.`)),
+  );
+}
+
+// The executableBootProjects command returns Spring's own project records. Keep
+// only the fields the run/debug generation needs, and require the ones without
+// which no safe configuration can be written.
+function normalizeBootProjects(discovered) {
+  if (!Array.isArray(discovered)) return [];
+  const seen = new Set();
+  const projects = [];
+  for (const item of discovered) {
+    if (item === null || typeof item !== "object") continue;
+    const name =
+      typeof item.name === "string" && item.name.length > 0
+        ? item.name
+        : typeof item.projectName === "string" && item.projectName.length > 0
+          ? item.projectName
+          : undefined;
+    const mainClass =
+      typeof item.mainClass === "string" && item.mainClass.length > 0 ? item.mainClass : undefined;
+    if (name === undefined || mainClass === undefined || seen.has(name)) continue;
+    seen.add(name);
+    const uri = typeof item.uri === "string" && item.uri.length > 0 ? item.uri : undefined;
+    projects.push({ name, mainClass, uri });
+  }
+  return projects;
+}
+
+// Only ever return a directory at or beneath the worktree, so a generated cwd
+// cannot point a task outside the project the user is working in.
+function resolveProjectDirectory(uri, worktree) {
+  const root = path.resolve(worktree);
+  if (typeof uri === "string") {
+    try {
+      const resolved = path.resolve(fileURLToPath(uri));
+      if ((resolved === root || resolved.startsWith(root + path.sep)) && isDirectory(resolved)) {
+        return resolved;
+      }
+    } catch {
+      // Fall through to the worktree root below.
+    }
+  }
+  return root;
+}
+
+// Emit a worktree-relative cwd so the generated config is portable across
+// machines instead of embedding an absolute host path.
+function worktreeRelativeCwd(directory, worktree) {
+  const relative = path.relative(path.resolve(worktree), directory);
+  if (relative === "" || relative === ".") return "$ZED_WORKTREE_ROOT";
+  return `$ZED_WORKTREE_ROOT/${relative.split(path.sep).join("/")}`;
+}
+
+function detectBuildRun(directory, hostOs) {
+  const windows = hostOs === "windows";
+  if (fileExists(path.join(directory, windows ? "mvnw.cmd" : "mvnw"))) {
+    return { command: windows ? "mvnw.cmd" : "./mvnw", args: ["spring-boot:run"] };
+  }
+  if (fileExists(path.join(directory, "pom.xml"))) {
+    return { command: "mvn", args: ["spring-boot:run"] };
+  }
+  if (fileExists(path.join(directory, windows ? "gradlew.bat" : "gradlew"))) {
+    return { command: windows ? "gradlew.bat" : "./gradlew", args: ["bootRun"] };
+  }
+  if (
+    fileExists(path.join(directory, "build.gradle")) ||
+    fileExists(path.join(directory, "build.gradle.kts"))
+  ) {
+    return { command: "gradle", args: ["bootRun"] };
+  }
+  return undefined;
+}
+
+function bootRunTask(project, directory, cwd, hostOs) {
+  const build = detectBuildRun(directory, hostOs);
+  if (build === undefined) return undefined;
+  return {
+    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (run)`,
+    command: build.command,
+    args: build.args,
+    cwd,
+  };
+}
+
+function bootDebugConfig(project, cwd) {
+  return {
+    adapter: "Java",
+    request: "launch",
+    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (debug)`,
+    mainClass: project.mainClass,
+    cwd,
+    stopOnEntry: false,
+  };
+}
+
+function isOwnedConfigEntry(entry) {
+  return (
+    entry !== null &&
+    typeof entry === "object" &&
+    typeof entry.label === "string" &&
+    entry.label.startsWith(BOOT_CONFIG_LABEL_PREFIX)
+  );
+}
+
+// Merge safety: create when absent, replace only our own previously generated
+// entries when the file is plain JSON, and never rewrite a file we cannot parse
+// without loss (comments or non-array) — write a sidecar for manual merge then.
+function writeMergedConfig(absolutePath, ours) {
+  if (ours.length === 0) return { status: "empty", path: absolutePath, added: 0 };
+  let existingText;
+  try {
+    existingText = fs.readFileSync(absolutePath, "utf8");
+  } catch {
+    existingText = undefined;
+  }
+  if (existingText === undefined || existingText.trim().length === 0) {
+    return finalizeConfig(absolutePath, ours, "created", 0, ours.length);
+  }
+  if (hasCommentsOutsideStrings(existingText)) {
+    return writeBootConfigSidecar(absolutePath, ours, "the existing file contains comments");
+  }
+  let parsed;
+  try {
+    parsed = parseTolerantJsonArray(existingText);
+  } catch {
+    parsed = undefined;
+  }
+  if (!Array.isArray(parsed)) {
+    return writeBootConfigSidecar(absolutePath, ours, "the existing file is not a plain JSON array");
+  }
+  const preserved = parsed.filter((entry) => !isOwnedConfigEntry(entry));
+  return finalizeConfig(absolutePath, [...preserved, ...ours], "merged", preserved.length, ours.length);
+}
+
+function finalizeConfig(absolutePath, entries, status, preserved, added) {
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  fs.writeFileSync(absolutePath, serializeConfigArray(entries));
+  return { status, path: absolutePath, preserved, added };
+}
+
+function writeBootConfigSidecar(absolutePath, ours, reason) {
+  const directory = path.dirname(absolutePath);
+  const sidecar = path.join(directory, `${path.basename(absolutePath, ".json")}.zed-spring-tools.json`);
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(sidecar, serializeConfigArray(ours));
+  return { status: "sidecar", path: sidecar, target: absolutePath, reason, added: ours.length };
+}
+
+function serializeConfigArray(entries) {
+  return `${JSON.stringify(entries, null, 2)}\n`;
+}
+
+function hasCommentsOutsideStrings(text) {
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const character = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+    } else if (character === "/" && (text[i + 1] === "/" || text[i + 1] === "*")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Zed writes JSON with trailing commas; tolerate only those (comments are
+// rejected earlier) so a machine-authored file still merges without loss.
+function parseTolerantJsonArray(text) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const character = text[i];
+    if (inString) {
+      result += character;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      result += character;
+      continue;
+    }
+    if (character === ",") {
+      let next = i + 1;
+      while (next < text.length && /\s/.test(text[next])) next += 1;
+      if (text[next] === "]" || text[next] === "}") continue;
+    }
+    result += character;
+  }
+  return JSON.parse(result);
+}
+
+function describeBootConfiguration(outcome) {
+  const parts = [
+    describeConfigResult("Run tasks", outcome.tasks, ".zed/tasks.json"),
+    describeConfigResult("Debug configurations", outcome.debug, ".zed/debug.json"),
+  ];
+  if (outcome.skippedRun.length > 0) {
+    parts.push(
+      `No Maven or Gradle build was detected for ${outcome.skippedRun.join(", ")}, so only a debug launch was written for ${outcome.skippedRun.length === 1 ? "it" : "them"}.`,
+    );
+  }
+  parts.push(
+    "Review the generated entries, then use Zed's task picker to run or the debug panel to launch; nothing runs automatically.",
+  );
+  return `Spring Boot: ${parts.join(" ")}`;
+}
+
+function describeConfigResult(label, result, file) {
+  if (result.status === "empty") return `${label}: none generated.`;
+  if (result.status === "sidecar") {
+    const written = result.added === 1 ? "entry was" : "entries were";
+    return `${label}: ${file} already exists and ${result.reason}, so ${result.added} reviewable ${written} written to ${path.join(".zed", path.basename(result.path))} to merge manually.`;
+  }
+  const verb = result.status === "created" ? "wrote" : "merged";
+  const kept = result.preserved > 0 ? ` (kept ${result.preserved} existing)` : "";
+  return `${label}: ${verb} ${result.added} ${result.added === 1 ? "entry" : "entries"} in ${file}${kept}.`;
+}
+
+function isDirectory(candidate) {
+  try {
+    return fs.statSync(candidate).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function fileExists(candidate) {
+  try {
+    return fs.statSync(candidate).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function normalizeCodeLens(lens) {

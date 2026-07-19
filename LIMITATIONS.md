@@ -48,6 +48,22 @@ extension.
   its local `.gitignore`; other projects retain their own `.gitignore` or local
   `.git/info/exclude` policy. `file_scan_exclusions` is stronger—it removes paths
   from scans, searches, and the tree—and is not an automatic product fallback.
+- The Boot run/debug configuration Code Action is `implemented` but not yet
+  driven in a real Zed install. It generates `.zed/tasks.json` (wrapper-aware
+  `spring-boot:run`/`bootRun`) and `.zed/debug.json` (`"adapter": "Java"` launch,
+  schema taken from Zed's Java debug documentation). The debug launch, the task
+  command execution, and `$ZED_WORKTREE_ROOT` cwd expansion are unobserved;
+  debug in particular has no runtime evidence anywhere yet. Windows wrapper forms
+  (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action currently offers
+  on any Java file rather than only Boot main classes.
+- Config-file merge is deliberately conservative and can lose formatting. The
+  writer creates the file when absent and, for a plain JSON array, replaces only
+  its own `Spring Boot (zed-spring-tools):` labelled entries while keeping foreign
+  ones — but it reserializes the array, so a hand-formatted plain-JSON file is
+  reformatted. A file containing comments or a non-array shape is never rewritten;
+  its generated entries go to a `.zed/<name>.zed-spring-tools.json` sidecar for
+  the user to merge by hand. Comments in an existing `.zed` config are therefore
+  not merged in place.
 - There is no packaged extension, installer, release artifact, product CI, or
   Marketplace entry. Installation means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a

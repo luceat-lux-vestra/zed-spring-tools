@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 9
+- Inventory version: 10
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-19
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -52,8 +52,8 @@ selected route or planning-confidence score does not change a state here.
 | State | Count |
 | --- | --- |
 | `verified` | 16 |
-| `implemented` | 0 |
-| `planned` | 36 |
+| `implemented` | 3 |
+| `planned` | 33 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
@@ -145,8 +145,8 @@ verified structure-navigation fallback.
 | SpEL language intelligence | `planned` | Spring supplies embedded semantic tokens and diagnostics, plus contextual hover/navigation paths; AI explanation is a separate client-only lens. Preferred route is standard Zed semantic tokens, diagnostics, hover and navigation. Do not conflate working language intelligence with the VS Code Copilot command. |
 | Spring Data query intelligence | `planned` | Includes repository-method completion and embedded JPQL/HQL/SQL semantic tokens, diagnostics, highlights, inlay hints, multiline conversion, AOT query display, implementation navigation and refactoring. These are standard LSP surfaces or advertised Spring commands; verify Java text blocks and the distinct `jpa-named-queries.properties` language identity. |
 | Cron completion, validation, and semantic highlighting | `planned` | Cron inlay hints are already verified separately. Completion, diagnostics and embedded semantic tokens use standard LSP and should be exercised independently. |
-| Boot project info | `planned` | `sts/spring-boot/bootProjectInfo` is advertised and forwarded unchanged. Preferred route: a Code Action reads project info after explicit selection and feeds reviewable debug/task generation. Manual `.zed/debug.json`/`.zed/tasks.json` remains fallback; server availability alone does not implement the outcome. |
-| Executable Boot projects discovery | `planned` | Its required `sts/project/gav` callback is contract-tested through the coordinator and official Java transport. Preferred route: a Code Action invokes `sts/spring-boot/executableBootProjects`, presents a bounded selection, and offers configuration generation. If the prompt is inadequate, a generated candidate document is fallback; a driven user-facing result remains required. |
+| Boot project info | `implemented` | The synthetic `zed-spring-tools.configure-boot-run` Code Action consumes `sts/spring-boot/executableBootProjects` project records (`name`/`projectName`, `mainClass`, `uri`) to generate reviewable run/debug configuration. `sts/spring-boot/bootProjectInfo` remains advertised and forwarded unchanged for detail. Contract-tested in `coordinator/test/coordinator.test.mjs`; not yet driven in Zed. |
+| Executable Boot projects discovery | `implemented` | A synthetic `source` Code Action on Java files invokes `sts/spring-boot/executableBootProjects` (its `sts/project/gav` callback routes through the official Java transport), presents a bounded `window/showMessageRequest` selection (single project skips the prompt; `All projects` covers overflow beyond eight), and generates merge-safe `.zed/tasks.json`/`.zed/debug.json`. Contract-tested; a driven user-facing run remains required to promote to `verified`. |
 | Spring XML config support | `planned` | Preferred route: pass reviewed `boot-java.support-spring-xml-config.*` settings and use standard completion, diagnostics, navigation, and Code Actions. A failing reconciler is disabled independently rather than weakening other Spring features. |
 
 ## Workstream 3 — live application data
@@ -167,7 +167,7 @@ verified structure-navigation fallback.
 | --- | --- | --- |
 | Browse / navigate the Spring logical structure | `zed-native-equivalent` | Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the supported equivalent. S015 Refuted the preferred per-file LSP Outline because restart can omit Java symbols; an explicitly requested, regenerable Spring Structure document remains the planned grouping companion. Evidence: `tmp/ws2-symbols-run2-20260718/` and `tmp/s015-document-symbols-20260718/evidence/`. |
 | Structure refresh / grouping | `planned` | Preferred route: `sts/spring-boot/structure` and `structure/groups` generate or refresh an opt-in, deterministic Structure document with source links. Project Symbols remains fallback. The document must be safe to delete, must not silently edit `.gitignore`, and needs stale/refresh verification. |
-| Run / debug a Boot application | `planned` | S016 verified official Java 6.8.23's matching Maven main runnable through ordinary-profile Zed on macOS arm64/JDK 25: it launched the Boot fixture, served `GET /greeting`, and stopped through the task terminal. D006 removes exact release admission, but debug remains untested, so the capability state does not change. Reuse an installed official Java runnable for matching Run actions only where its behavior has the required evidence. Reviewable Spring-specific `.zed/tasks.json` and explicit official-Java Run (`noDebug`) or Debug entries are companions only where profiles, arguments, project choice, or debugging require them. No route may overwrite unknown configuration or imply programmatic debug start. |
+| Run / debug a Boot application | `implemented` | The configure Code Action generates merge-safe `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`, portable `$ZED_WORKTREE_ROOT`-relative `cwd`) and `.zed/debug.json` (`"adapter": "Java"`, `"request": "launch"`, `mainClass`, `cwd`, `stopOnEntry: false`; schema confirmed from Zed's Java debug docs). Merge safety: create when absent, replace only its own labelled entries in plain JSON, and sidecar (never clobber) a commented or non-array file. S016 already verified official Java 6.8.23's matching Maven main runnable on macOS arm64/JDK 25, which underlies the run outcome; the generated Spring run task and the debug launch are contract-tested but **not yet driven** — debug in particular stays unobserved. No route overwrites unknown configuration or starts a debug session programmatically. |
 | Maven goal / Gradle build | `planned` | Build execution remains official Java/Zed task ownership under D003. S016 verified Maven main execution through `compile exec:java` and verified Gradle project coordination, but did not run a Gradle/vanilla task or Java test task. Under D006, prefer the installed official Java extension's wrapper-aware tasks only where matching runtime evidence exists; generate or merge reviewable `.zed/tasks.json` for arbitrary goals/builds or Spring-specific commands. Manual tasks remain fallback. Spring LS's direct `Runtime.exec` commands are not selected because they do not provide Zed task/terminal ownership. |
 | Open Boot app page URL | `planned` | Preferred route: expose a standard Document Link or clickable Markdown URL in hover or the opt-in Live document. A Code Action that discovers a URL may present it through Zed's general `window/showMessageRequest` Markdown prompt, whose source routes link clicks through `open_url_or_file`; this companion still needs a driven desktop test. Zed's general LSP client does not advertise or handle `window/showDocument`, so copyable text is the required fallback. OS-specific opener tasks remain an excluded contingency unless public links fail and a separate cross-platform security/quoting gate supports them. |
 

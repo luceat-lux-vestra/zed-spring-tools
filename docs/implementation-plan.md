@@ -293,24 +293,33 @@ Immediate M4 slice order after D006 is:
    navigation passed with ignored `target/`, removed the self-declared exact-
    release gate while preserving functional probes, and verified the bounded
    compatibility-report notification through the populated browser composer;
-2. deliver Boot-project selection and merge-safe Run/Debug configuration using
-   official Java task/DAP ownership, including a comparison of the default
-   `java-main` runnable with a Spring-specific workspace tag binding;
+2. delivered in code and contract-tested on `feat/boot-project-run-config`:
+   a synthetic Code Action discovers executable Boot projects, prompts a bounded
+   selection, and generates merge-safe `.zed/tasks.json` run tasks and
+   `.zed/debug.json` (`"adapter": "Java"`) launches under official Java DAP
+   ownership; a driven Zed run remains required to promote it, and debug is still
+   unobserved;
 3. properties/YAML conversion and metadata reload Code Actions;
 4. one opt-in Spring Structure document slice; and
 5. separately gated live-data, metrics, logger, upgrade, Modulith, and special
    language slices.
 
-The current Boot-project-discovery slice completes one missing dependency in
+The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's
 `sts/spring-boot/executableBootProjects` command calls the server-to-client
 `sts/project/gav` request before returning its project records; the coordinator
-must map that request to the official Java bundle's `sts.project.gav` delegate
-command, without rewriting the request or result. The slice adds exact transport
-and coordinator contract coverage and updates the inventory and limitations.
-It does not add a Zed command, task, or DAP surface, so Boot project info and
-executable-project discovery remain `planned` until a user-facing workflow is
-implemented and driven on a named tuple.
+maps that request to the official Java bundle's `sts.project.gav` delegate
+command, without rewriting the request or result.
+
+The `feat/boot-project-run-config` slice builds the user-facing workflow on top
+of that dependency. A synthetic `source` Code Action on Java files invokes
+`executableBootProjects`, presents a bounded `window/showMessageRequest`
+selection, and generates merge-safe `.zed/tasks.json` run tasks and
+`.zed/debug.json` (`"adapter": "Java"`) launches — portable, secret-free, and
+never overwriting a config it cannot parse without loss. Boot project info,
+executable-project discovery, and Boot run/debug are therefore now `implemented`
+and contract-tested; they stay short of `verified` until the action is driven in
+a real Zed install, and debug has no runtime evidence yet.
 
 The references-and-implementations verification also exposed a startup-order
 race after the official Java route appeared but while Java project import was

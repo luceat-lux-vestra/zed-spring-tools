@@ -12,7 +12,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 16 `verified`, 0 `implemented`, 5 `zed-native-equivalent`, 36 `planned` |
+| Capability inventory | 16 `verified`, 3 `implemented`, 5 `zed-native-equivalent`, 33 `planned` |
 | Distribution | Local development extension only; no package or Marketplace entry |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested |
@@ -71,6 +71,16 @@ fixture's `/target/` remained ignored. AI-only titles remain visible regardless
 of Zed AI state. Their notice now says precisely that current Zed APIs let this
 extension neither detect nor invoke Agent and that the extension sends no
 source or prompt to an AI service.
+
+Newly `implemented` and contract-tested, but not yet driven in Zed, is a Boot
+run/debug configuration Code Action. On a Java file it discovers executable
+Spring Boot projects, prompts a bounded selection, and generates merge-safe
+`.zed/tasks.json` run tasks (wrapper-aware `spring-boot:run`/`bootRun`) and
+`.zed/debug.json` (`"adapter": "Java"`) launches — portable across machines,
+secret-free, and never overwriting a config it cannot parse without loss (a
+commented or non-array file receives a reviewable sidecar instead). It stays
+short of `verified` until a driven run confirms it, and debug in particular has
+no runtime evidence yet.
 
 The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
 every standard provider, its user-visible subfeatures, the separate live-data

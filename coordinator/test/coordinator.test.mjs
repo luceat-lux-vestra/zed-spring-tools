@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import {
   compatibilityReportUrl,
@@ -218,7 +219,7 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   assert.deepEqual(zedWrites, [request]);
 });
 
-test("Spring initialize advertises the coordinator CodeLens explanation command", async () => {
+test("Spring initialize advertises the coordinator CodeLens and run/debug commands", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring() {},
@@ -238,7 +239,7 @@ test("Spring initialize advertises the coordinator CodeLens explanation command"
   });
   assert.deepEqual(
     zedWrites[0].result.capabilities.executeCommandProvider.commands,
-    ["sts/server-command", "zed-spring-tools.explain-code-lens"],
+    ["sts/server-command", "zed-spring-tools.explain-code-lens", "zed-spring-tools.configure-boot-run"],
   );
 });
 
@@ -1107,3 +1108,270 @@ function encodeForTest(message) {
   const body = Buffer.from(JSON.stringify(message), "utf8");
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]);
 }
+
+async function waitFor(list, predicate, label) {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const found = list.find(predicate);
+    if (found !== undefined) return found;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`timed out waiting for ${label}`);
+}
+
+function makeWorktree() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "zst-run-"));
+}
+
+const CONFIGURE_COMMAND = {
+  jsonrpc: "2.0",
+  id: "cmd-1",
+  method: "workspace/executeCommand",
+  params: { command: "zed-spring-tools.configure-boot-run", arguments: [] },
+};
+
+test("Boot run/debug code action is injected for Java files and respects the only filter", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "ca-java",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri: "file:///tmp/project/App.java" }, context: {} },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "ca-java",
+    result: [{ title: "Existing quick fix" }],
+  });
+  const injected = zedWrites.at(-1).result.at(-1);
+  assert.equal(injected.command.command, "zed-spring-tools.configure-boot-run");
+  assert.equal(injected.kind, "source");
+  assert.deepEqual(injected.command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "ca-yaml",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri: "file:///tmp/project/application.yml" }, context: {} },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-yaml", result: [] });
+  assert.deepEqual(zedWrites.at(-1).result, []);
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "ca-quickfix",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri: "file:///tmp/project/App.java" }, context: { only: ["quickfix"] } },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-quickfix", result: [] });
+  assert.deepEqual(zedWrites.at(-1).result, []);
+});
+
+test("configure run/debug discovers projects, prompts, and writes portable .zed configs", async () => {
+  const worktree = makeWorktree();
+  const moduleA = path.join(worktree, "service-a");
+  const moduleB = path.join(worktree, "service-b");
+  fs.mkdirSync(moduleA);
+  fs.mkdirSync(moduleB);
+  fs.writeFileSync(path.join(moduleA, "mvnw"), "#!/bin/sh\n");
+  fs.writeFileSync(path.join(moduleA, "pom.xml"), "<project/>\n");
+  fs.writeFileSync(path.join(moduleB, "build.gradle"), "plugins {}\n");
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+
+  assert.equal(coordinator.observeZedMessage({ ...CONFIGURE_COMMAND }), false);
+  assert.equal(zedWrites[0].id, "cmd-1");
+  assert.equal(zedWrites[0].result, null);
+
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: discovery.id,
+    result: [
+      { name: "service-a", mainClass: "com.example.a.AApp", uri: pathToFileURL(moduleA).href },
+      { name: "service-b", mainClass: "com.example.b.BApp", uri: pathToFileURL(moduleB).href },
+    ],
+  });
+
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "selection prompt",
+  );
+  assert.deepEqual(prompt.params.actions.map((action) => action.title), [
+    "service-a",
+    "service-b",
+    "All projects",
+  ]);
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: { title: "All projects" } });
+
+  await waitFor(zedWrites, (message) => message.method === "window/showMessage", "confirmation");
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  const debug = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "debug.json"), "utf8"));
+
+  assert.deepEqual(
+    tasks.map((task) => [task.label, task.command, task.args, task.cwd]),
+    [
+      ["Spring Boot (zed-spring-tools): service-a (run)", "./mvnw", ["spring-boot:run"], "$ZED_WORKTREE_ROOT/service-a"],
+      ["Spring Boot (zed-spring-tools): service-b (run)", "gradle", ["bootRun"], "$ZED_WORKTREE_ROOT/service-b"],
+    ],
+  );
+  assert.deepEqual(debug[0], {
+    adapter: "Java",
+    request: "launch",
+    label: "Spring Boot (zed-spring-tools): service-a (debug)",
+    mainClass: "com.example.a.AApp",
+    cwd: "$ZED_WORKTREE_ROOT/service-a",
+    stopOnEntry: false,
+  });
+  assert.equal(debug[1].mainClass, "com.example.b.BApp");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("a single project skips the prompt and merges without touching foreign entries", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  fs.mkdirSync(path.join(worktree, ".zed"));
+  fs.writeFileSync(
+    path.join(worktree, ".zed", "tasks.json"),
+    `${JSON.stringify(
+      [
+        { label: "My task", command: "echo" },
+        { label: "Spring Boot (zed-spring-tools): stale (run)", command: "gone" },
+      ],
+      null,
+      2,
+    )}\n`,
+  );
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+
+  coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: discovery.id,
+    result: [{ name: "root-app", mainClass: "com.example.App", uri: pathToFileURL(worktree).href }],
+  });
+
+  await waitFor(zedWrites, (message) => message.method === "window/showMessage", "confirmation");
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    false,
+    "a single project must not prompt",
+  );
+
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.deepEqual(tasks.map((task) => task.label), [
+    "My task",
+    "Spring Boot (zed-spring-tools): root-app (run)",
+  ]);
+  assert.equal(tasks[1].cwd, "$ZED_WORKTREE_ROOT");
+  const debug = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "debug.json"), "utf8"));
+  assert.equal(debug[0].mainClass, "com.example.App");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("a commented existing config is preserved and a sidecar is written instead", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  fs.mkdirSync(path.join(worktree, ".zed"));
+  const tasksPath = path.join(worktree, ".zed", "tasks.json");
+  const original = '[\n  // user note\n  { "label": "keep", "command": "echo" }\n]\n';
+  fs.writeFileSync(tasksPath, original);
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+
+  coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: discovery.id,
+    result: [{ name: "root-app", mainClass: "com.example.App", uri: pathToFileURL(worktree).href }],
+  });
+  const confirmation = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "confirmation",
+  );
+
+  assert.equal(fs.readFileSync(tasksPath, "utf8"), original, "the commented file must be untouched");
+  const sidecar = JSON.parse(
+    fs.readFileSync(path.join(worktree, ".zed", "tasks.zed-spring-tools.json"), "utf8"),
+  );
+  assert.equal(sidecar[0].label, "Spring Boot (zed-spring-tools): root-app (run)");
+  assert.match(confirmation.params.message, /tasks\.zed-spring-tools\.json/);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("no executable Boot project reports a notice and writes no files", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+
+  coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: discovery.id, result: [] });
+
+  const notice = await waitFor(zedWrites, (message) => message.method === "window/showMessage", "notice");
+  assert.match(notice.params.message, /No executable Spring Boot projects/);
+  assert.equal(fs.existsSync(path.join(worktree, ".zed")), false);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
