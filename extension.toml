@@ -1,6 +1,6 @@
 id = "zed-spring-tools"
 name = "Zed Spring Tools"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 schema_version = 1
 authors = ["algorist"]
 description = "Spring Boot language intelligence for Zed. Requires the official Java extension; an XML extension enables pom.xml Maven hints."
