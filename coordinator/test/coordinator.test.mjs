@@ -652,6 +652,7 @@ test("a completed Spring index update refreshes Zed inlay hints", async () => {
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: { supportsSpringClientMethod: () => false },
     worktree: "/tmp/project",
+    inlayRefreshDelayMs: 0,
   });
   const update = {
     jsonrpc: "2.0",
@@ -660,13 +661,133 @@ test("a completed Spring index update refreshes Zed inlay hints", async () => {
   };
 
   await coordinator.handleSpringMessage(update);
+  const refresh = await waitFor(
+    zedWrites,
+    (message) => message.method === "workspace/inlayHint/refresh",
+    "inlay refresh",
+  );
 
-  assert.equal(zedWrites[0].method, "workspace/inlayHint/refresh");
-  assert.deepEqual(zedWrites[1], update);
+  assert.deepEqual(zedWrites[0], update);
   assert.equal(
-    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites[0].id, result: null }),
+    coordinator.observeZedMessage({ jsonrpc: "2.0", id: refresh.id, result: null }),
     false,
   );
+});
+
+test("an early empty inlay response is pre-warmed after indexing before Zed refreshes", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    inlayRefreshDelayMs: 0,
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "early-inlay",
+    method: "textDocument/inlayHint",
+    params: {
+      textDocument: { uri: "file:///tmp/project/App.java" },
+      range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+    },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "early-inlay", result: [] });
+  assert.deepEqual(zedWrites.at(-1), { jsonrpc: "2.0", id: "early-inlay", result: [] });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "spring/index/updated",
+    params: { affectedProjects: ["example"] },
+  });
+  const retry = await waitFor(
+    springWrites,
+    (message) => message.method === "textDocument/inlayHint",
+    "inlay pre-warm",
+  );
+  const hint = { position: { line: 0, character: 1 }, label: "ready" };
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: retry.id,
+    result: [hint],
+  });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "workspace/inlayHint/refresh",
+    "inlay refresh after pre-warm",
+  );
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "inlay-after-refresh",
+    method: "textDocument/inlayHint",
+    params: {
+      textDocument: { uri: "file:///tmp/project/App.java" },
+      range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+    },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "inlay-after-refresh",
+    result: [],
+  });
+  assert.deepEqual(zedWrites.at(-1).result, [hint]);
+  await coordinator.close();
+});
+
+test("a transient empty inlay response cannot replace a non-empty result for the same document", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  const uri = "file:///tmp/project/Schedule.java";
+  const range = {
+    start: { line: 0, character: 0 },
+    end: { line: 20, character: 0 },
+  };
+  const hint = {
+    position: { line: 8, character: 36 },
+    label: "every hour",
+  };
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, version: 1, text: "class Schedule {}" } },
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "non-empty-inlay",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "non-empty-inlay",
+    result: [hint],
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "transient-empty-inlay",
+    method: "textDocument/inlayHint",
+    params: { textDocument: { uri }, range },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "transient-empty-inlay",
+    result: [],
+  });
+
+  assert.deepEqual(zedWrites.at(-1), {
+    jsonrpc: "2.0",
+    id: "transient-empty-inlay",
+    result: [hint],
+  });
+  await coordinator.close();
 });
 
 test("classpath enable waits for initialized and the official Java route", async () => {
@@ -720,12 +841,8 @@ test("classpath enable waits for initialized and the official Java route", async
     arguments: [true],
   });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: enable.id, result: "OK" });
-  while (zedWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(zedWrites[0].method, "workspace/inlayHint/refresh");
-  assert.equal(
-    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites[0].id, result: null }),
-    false,
-  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(zedWrites, []);
   await coordinator.close();
 });
 
@@ -1156,6 +1273,22 @@ test("Boot run/debug code action is injected for Java files and respects the onl
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
+    id: "ca-invalid-existing",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri: "file:///tmp/project/App.java" }, context: {} },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "ca-invalid-existing",
+    result: [{}, null, { title: "Valid existing action" }],
+  });
+  assert.deepEqual(
+    zedWrites.at(-1).result.map((action) => action.title),
+    ["Valid existing action", "Spring Boot: Configure run/debug for a project…"],
+  );
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
     id: "ca-yaml",
     method: "textDocument/codeAction",
     params: { textDocument: { uri: "file:///tmp/project/application.yml" }, context: {} },
@@ -1169,7 +1302,7 @@ test("Boot run/debug code action is injected for Java files and respects the onl
     method: "textDocument/codeAction",
     params: { textDocument: { uri: "file:///tmp/project/App.java" }, context: { only: ["quickfix"] } },
   });
-  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-quickfix", result: [] });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-quickfix", result: [{}] });
   assert.deepEqual(zedWrites.at(-1).result, []);
 });
 

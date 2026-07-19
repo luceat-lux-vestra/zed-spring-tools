@@ -57,6 +57,11 @@ const JAVA_ROUTE_TIMEOUT_MS = 30_000;
 // room for several attempts against a cold project import.
 const JAVA_HANDSHAKE_GRACE_MS = 60_000;
 const CLASSPATH_RETRY_MS = 1_000;
+// Spring can answer the editor's initial inlay request before its Java index is
+// ready. Pre-warm recently visible documents after indexing, then refresh Zed
+// so a premature empty result cannot become the stable editor state.
+const INLAY_REFRESH_DELAY_MS = 2_000;
+const INLAY_PREWARM_LIMIT = 8;
 // A run/debug project selection is a human interaction, so it must outlive the
 // short internal request timeout. It is still bounded so a dismissed or lost
 // prompt cannot leak a pending request for the session lifetime.
@@ -82,6 +87,7 @@ export class Coordinator {
     requestTimeoutMs = REQUEST_TIMEOUT_MS,
     javaHandshakeGraceMs = JAVA_HANDSHAKE_GRACE_MS,
     classpathRetryMs = CLASSPATH_RETRY_MS,
+    inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
     reportContext = {},
     targetExists = fileUriExists,
     logger = () => {},
@@ -93,6 +99,7 @@ export class Coordinator {
     this.requestTimeoutMs = requestTimeoutMs;
     this.javaHandshakeGraceMs = javaHandshakeGraceMs;
     this.classpathRetryMs = classpathRetryMs;
+    this.inlayRefreshDelayMs = inlayRefreshDelayMs;
     this.targetExists = targetExists;
     this.logger = logger;
     this.pending = new Map();
@@ -100,6 +107,9 @@ export class Coordinator {
     this.initializeRequests = new Set();
     this.codeLensRequests = new Map();
     this.codeActionRequests = new Map();
+    this.inlayHintRequests = new Map();
+    this.inlayHintParams = new Map();
+    this.inlayHints = new Map();
     this.zedRequests = new Map();
     this.documentVersions = new Map();
     this.liveCodeLenses = new Map();
@@ -113,6 +123,8 @@ export class Coordinator {
     this.javaFailureShown = false;
     this.coordinationStartedAt = Date.now();
     this.classpathRetryScheduled = false;
+    this.inlayRefreshTimer = undefined;
+    this.inlayRefreshPending = false;
     this.routedJavaMethods = new Set();
     this.ownedCapabilityRegistrations = new Set();
     this.shutdownIds = new Set();
@@ -129,6 +141,30 @@ export class Coordinator {
   }
 
   observeZedMessage(message) {
+    if (message?.method === "textDocument/inlayHint" && message.id !== undefined) {
+      const uri = message.params?.textDocument?.uri;
+      this.inlayHintRequests.set(idKey(message.id), {
+        id: message.id,
+        params: structuredClone(message.params),
+        uri,
+        version: typeof uri === "string" ? this.documentVersions.get(uri) : undefined,
+      });
+      if (typeof uri === "string") {
+        this.inlayHintParams.delete(uri);
+        this.inlayHintParams.set(uri, {
+          params: structuredClone(message.params),
+          uri,
+          version: this.documentVersions.get(uri),
+        });
+        while (this.inlayHintParams.size > INLAY_PREWARM_LIMIT) {
+          this.inlayHintParams.delete(this.inlayHintParams.keys().next().value);
+        }
+      }
+    }
+    if (message?.method === "$/cancelRequest") {
+      const cancelledKey = idKey(message.params?.id);
+      this.inlayHintRequests.delete(cancelledKey);
+    }
     const pendingKey = responseKey(message);
     if (pendingKey !== null && this.zedRequests.has(pendingKey)) {
       this.#settleZedRequest(pendingKey, message);
@@ -175,6 +211,18 @@ export class Coordinator {
   async handleSpringMessage(message) {
     if (this.closed) return;
     const pendingKey = responseKey(message);
+    const inlayRequest = pendingKey === null ? undefined : this.inlayHintRequests.get(pendingKey);
+    if (inlayRequest !== undefined) {
+      this.inlayHintRequests.delete(pendingKey);
+      if (Array.isArray(message.result) && message.result.length > 0) {
+        this.#cacheInlayHints(inlayRequest, message.result);
+      } else if (Array.isArray(message.result)) {
+        const cached = this.#cachedInlayHints(inlayRequest);
+        if (cached.length > 0) {
+          message = { ...message, result: cached };
+        }
+      }
+    }
     if (pendingKey !== null && this.pending.has(pendingKey)) {
       this.#settlePending(pendingKey, message);
       return;
@@ -217,8 +265,9 @@ export class Coordinator {
         Array.isArray(message.params?.affectedProjects) &&
         message.params.affectedProjects.length > 0
       ) {
+        this.inlayRefreshPending = true;
         this.#invalidateGeneratedTargets();
-        this.#refreshZedInlayHints();
+        this.#scheduleZedInlayHintsRefresh(this.inlayRefreshDelayMs);
       }
       this.sendZed(encodeLsp(message));
       return;
@@ -324,11 +373,18 @@ export class Coordinator {
     this.initializeRequests.clear();
     this.codeLensRequests.clear();
     this.codeActionRequests.clear();
+    this.inlayHintRequests.clear();
+    this.inlayHintParams.clear();
+    this.inlayHints.clear();
     this.documentVersions.clear();
     this.liveCodeLenses.clear();
     this.generatedTargets.clear();
     this.generatedTargetResolutions.clear();
     this.activeGeneratedTargetResolution = undefined;
+    if (this.inlayRefreshTimer !== undefined) {
+      clearTimeout(this.inlayRefreshTimer);
+      this.inlayRefreshTimer = undefined;
+    }
   }
 
   async close() {
@@ -467,7 +523,6 @@ export class Coordinator {
           command: ENABLE_CLASSPATH,
           arguments: [true],
         });
-        this.#refreshZedInlayHints();
         this.logger("Spring classpath coordination enabled");
         return;
       } catch (error) {
@@ -489,6 +544,57 @@ export class Coordinator {
         params: null,
       }),
     );
+  }
+
+  #scheduleZedInlayHintsRefresh(delayMs) {
+    if (this.closed) return;
+    if (this.inlayRefreshTimer !== undefined) clearTimeout(this.inlayRefreshTimer);
+    this.inlayRefreshTimer = setTimeout(() => {
+      this.inlayRefreshTimer = undefined;
+      if (this.closed) return;
+      if (this.inlayRefreshPending) void this.#warmAndRefreshZedInlayHints();
+    }, delayMs);
+    this.inlayRefreshTimer.unref?.();
+  }
+
+  async #warmAndRefreshZedInlayHints() {
+    const visible = [...this.inlayHintParams.values()].filter(
+      (request) => this.documentVersions.get(request.uri) === request.version,
+    );
+    await Promise.all(
+      visible.map(async (request) => {
+        try {
+          const result = await this.requestSpring("textDocument/inlayHint", request.params);
+          if (Array.isArray(result) && result.length > 0) {
+            this.#cacheInlayHints(request, result);
+          }
+        } catch {
+          // Refresh still lets Zed retry if one pre-warm request fails.
+        }
+      }),
+    );
+    if (this.closed) return;
+    this.inlayRefreshPending = false;
+    this.#refreshZedInlayHints();
+  }
+
+  #cacheInlayHints(request, hints) {
+    if (typeof request.uri !== "string") return;
+    const currentVersion = this.documentVersions.get(request.uri);
+    const version = request.version ?? currentVersion;
+    if (version !== currentVersion) return;
+    const previous = this.inlayHints.get(request.uri);
+    const retained = previous !== undefined && previous.version === version
+      ? previous.hints.filter((hint) => !positionInRange(hint?.position, request.params?.range))
+      : [];
+    this.inlayHints.set(request.uri, { version, hints: [...retained, ...hints] });
+  }
+
+  #cachedInlayHints(request) {
+    if (typeof request.uri !== "string") return [];
+    const cached = this.inlayHints.get(request.uri);
+    if (cached === undefined || cached.version !== request.version) return [];
+    return cached.hints.filter((hint) => positionInRange(hint?.position, request.params?.range));
   }
 
   #refreshZedCodeLenses() {
@@ -513,12 +619,15 @@ export class Coordinator {
       if (Number.isInteger(textDocument.version)) {
         if (this.documentVersions.get(uri) !== textDocument.version) {
           this.#invalidateGeneratedTargets(uri);
+          this.inlayHints.delete(uri);
         }
         this.documentVersions.set(uri, textDocument.version);
       }
     } else if (method === "textDocument/didClose") {
       this.documentVersions.delete(uri);
       this.liveCodeLenses.delete(uri);
+      this.inlayHintParams.delete(uri);
+      this.inlayHints.delete(uri);
       this.#invalidateGeneratedTargets(uri);
     }
   }
@@ -678,8 +787,14 @@ export class Coordinator {
 
   #mergeCodeActions(message, request) {
     if (!Object.hasOwn(message, "result")) return message;
-    if (!offersBootRunAction(request)) return message;
-    const existing = Array.isArray(message.result) ? message.result : [];
+    const normalized = Array.isArray(message.result)
+      ? {
+          ...message,
+          result: message.result.filter((candidate) => isValidCodeActionOrCommand(candidate)),
+        }
+      : message;
+    if (!offersBootRunAction(request)) return normalized;
+    const existing = Array.isArray(normalized.result) ? normalized.result : [];
     const action = {
       title: CONFIGURE_BOOT_RUN_TITLE,
       kind: BOOT_CONFIG_ACTION_KIND,
@@ -689,7 +804,7 @@ export class Coordinator {
         arguments: [{ uri: request.uri }],
       },
     };
-    return { ...message, result: [...existing, action] };
+    return { ...normalized, result: [...existing, action] };
   }
 
   #handleConfigureBootRunCommand(message) {
@@ -942,6 +1057,34 @@ function offersBootRunAction(request) {
       typeof kind === "string" &&
       (kind === BOOT_CONFIG_ACTION_KIND || BOOT_CONFIG_ACTION_KIND.startsWith(`${kind}.`)),
   );
+}
+
+function isValidCodeActionOrCommand(candidate) {
+  return (
+    candidate !== null &&
+    typeof candidate === "object" &&
+    typeof candidate.title === "string" &&
+    candidate.title.length > 0
+  );
+}
+
+function positionInRange(position, range) {
+  if (range === undefined) return true;
+  if (
+    !Number.isInteger(position?.line) ||
+    !Number.isInteger(position?.character) ||
+    !Number.isInteger(range?.start?.line) ||
+    !Number.isInteger(range?.start?.character) ||
+    !Number.isInteger(range?.end?.line) ||
+    !Number.isInteger(range?.end?.character)
+  ) {
+    return false;
+  }
+  return comparePositions(position, range.start) >= 0 && comparePositions(position, range.end) <= 0;
+}
+
+function comparePositions(left, right) {
+  return left.line === right.line ? left.character - right.character : left.line - right.line;
 }
 
 // The executableBootProjects command returns Spring's own project records. Keep
