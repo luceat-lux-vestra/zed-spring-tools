@@ -6,9 +6,9 @@ use std::env;
 use std::path::Path;
 use zed_extension_api as zed;
 
-const SERVER_ID: &str = "zed-spring-tools";
+const SERVER_ID: &str = "spring-tools";
 const JAVA_SERVER_ID: &str = "jdtls";
-const EXTENSION_VERSION: &str = "0.1.0-alpha.1";
+const EXTENSION_VERSION: &str = "0.1.0";
 
 struct SpringToolsExtension;
 
