@@ -48,6 +48,38 @@ extension.
   its local `.gitignore`; other projects retain their own `.gitignore` or local
   `.git/info/exclude` policy. `file_scan_exclusions` is stronger—it removes paths
   from scans, searches, and the tree—and is not an automatic product fallback.
+- The Boot run/debug configuration Code Action generates `.zed/tasks.json`
+  (wrapper-aware `spring-boot:run`/`bootRun`) and `.zed/debug.json`
+  (`"adapter": "Java"` launch). A 2026-07-19 driven run (macOS arm64, Zed 1.11.3,
+  official Java 6.8.21, JDK 25) verified discovery, generation, and that the
+  generated run task's `mvn spring-boot:run` launched the Boot app and served
+  `GET /greeting`. A second driven check generated `dev`/`prod`/`staging` picker
+  entries and launched the `dev` Java debug configuration after editing its
+  `vmArgs`, `args`, and `env` slots. The official Java 6.8.21 debug helper uses an
+  HTTP `localhost` callback, so a system HTTP proxy must bypass `localhost` and
+  `127.0.0.1`; otherwise main-class resolution times out before launch. The
+  isolated-profile DAP helper path remains an S016 caveat. Still unobserved:
+  multi-project selection. Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) are
+  untested. The synthetic action offers on any Java file, not only Boot mains.
+- Profile discovery and the editable slots are best-effort, not exhaustive.
+  Profiles come from `application-<profile>.{properties,yml,yaml}` filenames and
+  multi-document `application.{yml,yaml}` activation (`spring.config.activate.on-profile`
+  and legacy `spring.profiles`); profiles defined only inside a single
+  `application.properties`, or expressed as negations/booleans (`!test`,
+  `prod & cloud`) where each identifier still becomes its own entry, are not
+  modelled precisely — edit the generated slots for those. The installed official
+  Java 6.8.21 debug schema and its upstream documentation define the generated
+  `vmArgs`/`args`/`env` fields; a driven launch accepted an edited value in each
+  slot. Per-project profile entries are capped at eight; the overflow is named in
+  the confirmation notice.
+- Config-file merge is deliberately conservative and can lose formatting. The
+  writer creates the file when absent and, for a plain JSON array, replaces only
+  its own `Spring Boot (zed-spring-tools):` labelled entries while keeping foreign
+  ones — but it reserializes the array, so a hand-formatted plain-JSON file is
+  reformatted. A file containing comments or a non-array shape is never rewritten;
+  its generated entries go to a `.zed/<name>.zed-spring-tools.json` sidecar for
+  the user to merge by hand. Comments in an existing `.zed` config are therefore
+  not merged in place.
 - There is no packaged extension, installer, release artifact, product CI, or
   Marketplace entry. Installation means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a

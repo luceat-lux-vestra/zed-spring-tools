@@ -142,8 +142,12 @@ user outcome take precedence.
    and one-click location rewriting; ignored-`target/` runtime navigation; and a
    bounded compatibility-report URL/notification whose Zed click opened a
    title/body-prefilled GitHub composer without submission.
-2. Deliver Boot-project selection and merge-safe Run/Debug configuration,
-   reusing the verified official Java main task when it matches.
+2. Delivered in code on the `feat/boot-project-run-config` branch and
+   contract-tested: a synthetic `source` Code Action discovers executable Boot
+   projects, prompts a bounded selection, and writes merge-safe
+   `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`) and
+   `.zed/debug.json` (`"adapter": "Java"` launch). A driven Zed run is still
+   required to promote the outcome — debug has no runtime evidence yet.
 3. Deliver properties/YAML conversion and metadata reload as Code Actions.
 4. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
