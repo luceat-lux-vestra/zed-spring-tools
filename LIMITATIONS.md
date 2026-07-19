@@ -48,14 +48,26 @@ extension.
   its local `.gitignore`; other projects retain their own `.gitignore` or local
   `.git/info/exclude` policy. `file_scan_exclusions` is stronger—it removes paths
   from scans, searches, and the tree—and is not an automatic product fallback.
-- The Boot run/debug configuration Code Action is `implemented` but not yet
-  driven in a real Zed install. It generates `.zed/tasks.json` (wrapper-aware
-  `spring-boot:run`/`bootRun`) and `.zed/debug.json` (`"adapter": "Java"` launch,
-  schema taken from Zed's Java debug documentation). The debug launch, the task
-  command execution, and `$ZED_WORKTREE_ROOT` cwd expansion are unobserved;
-  debug in particular has no runtime evidence anywhere yet. Windows wrapper forms
-  (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action currently offers
-  on any Java file rather than only Boot main classes.
+- The Boot run/debug configuration Code Action generates `.zed/tasks.json`
+  (wrapper-aware `spring-boot:run`/`bootRun`) and `.zed/debug.json`
+  (`"adapter": "Java"` launch). A 2026-07-19 driven run (macOS arm64, Zed 1.11.3,
+  official Java 6.8.21, JDK 25) verified discovery, generation, and that the
+  generated run task's `mvn spring-boot:run` launched the Boot app and served
+  `GET /greeting`. Still unobserved: the `"adapter": "Java"` **debug launch**
+  (the isolated profile breaks the official Java DAP helper path — an S016 caveat
+  — so debug needs a non-isolated Zed), the per-profile and editable-slot entries,
+  and multi-project selection. Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`)
+  are untested. The synthetic action offers on any Java file, not only Boot mains.
+- Profile discovery and the editable slots are best-effort, not exhaustive.
+  Profiles come from `application-<profile>.{properties,yml,yaml}` filenames and
+  multi-document `application.{yml,yaml}` activation (`spring.config.activate.on-profile`
+  and legacy `spring.profiles`); profiles defined only inside a single
+  `application.properties`, or expressed as negations/booleans (`!test`,
+  `prod & cloud`) where each identifier still becomes its own entry, are not
+  modelled precisely — edit the generated slots for those. The debug slots
+  `vmArgs`/`args`/`env` are official-Java-debug fields that Zed's documentation
+  does not list, so their pass-through needs a driven check. Per-project profile
+  entries are capped at eight; the overflow is named in the confirmation notice.
 - Config-file merge is deliberately conservative and can lose formatting. The
   writer creates the file when absent and, for a plain JSON array, replaces only
   its own `Spring Boot (zed-spring-tools):` labelled entries while keeping foreign

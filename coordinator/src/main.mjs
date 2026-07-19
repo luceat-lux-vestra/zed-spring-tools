@@ -37,6 +37,9 @@ const BOOT_CONFIG_ACTION_KIND = "source";
 const BOOT_CONFIG_LABEL_PREFIX = "Spring Boot (zed-spring-tools): ";
 const ALL_BOOT_PROJECTS_TITLE = "All projects";
 const MAX_BOOT_PROJECT_SELECTION = 8;
+// Cap generated per-profile entries so a project with many profiles cannot flood
+// the task/debug pickers. Overflow profiles are named in the confirmation notice.
+const MAX_BOOT_PROFILE_ENTRIES = 8;
 const COORDINATOR_COMMANDS = [COORDINATOR_CODE_LENS_COMMAND, CONFIGURE_BOOT_RUN_COMMAND];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
@@ -755,18 +758,28 @@ export class Coordinator {
     const tasks = [];
     const debugConfigs = [];
     const skippedRun = [];
+    const cappedProfiles = [];
     for (const project of projects) {
       const directory = resolveProjectDirectory(project.uri, worktree);
       const cwd = worktreeRelativeCwd(directory, worktree);
-      const runTask = bootRunTask(project, directory, cwd, hostOs);
-      if (runTask === undefined) skippedRun.push(project.name);
-      else tasks.push(runTask);
-      debugConfigs.push(bootDebugConfig(project, cwd));
+      const discovered = discoverProfiles(directory);
+      const profiles = discovered.slice(0, MAX_BOOT_PROFILE_ENTRIES);
+      if (discovered.length > profiles.length) {
+        cappedProfiles.push({
+          project: project.name,
+          omitted: discovered.slice(MAX_BOOT_PROFILE_ENTRIES),
+        });
+      }
+      const runTasks = bootRunTasks(project, directory, cwd, hostOs, profiles);
+      if (runTasks.length === 0) skippedRun.push(project.name);
+      else tasks.push(...runTasks);
+      debugConfigs.push(...bootDebugConfigs(project, cwd, profiles));
     }
     const zedDirectory = path.join(worktree, ".zed");
     return {
       count: projects.length,
       skippedRun,
+      cappedProfiles,
       tasks: writeMergedConfig(path.join(zedDirectory, "tasks.json"), tasks),
       debug: writeMergedConfig(path.join(zedDirectory, "debug.json"), debugConfigs),
     };
@@ -981,46 +994,134 @@ function worktreeRelativeCwd(directory, worktree) {
   return `$ZED_WORKTREE_ROOT/${relative.split(path.sep).join("/")}`;
 }
 
-function detectBuildRun(directory, hostOs) {
+function detectBuildTool(directory, hostOs) {
   const windows = hostOs === "windows";
   if (fileExists(path.join(directory, windows ? "mvnw.cmd" : "mvnw"))) {
-    return { command: windows ? "mvnw.cmd" : "./mvnw", args: ["spring-boot:run"] };
+    return { command: windows ? "mvnw.cmd" : "./mvnw", tool: "maven" };
   }
   if (fileExists(path.join(directory, "pom.xml"))) {
-    return { command: "mvn", args: ["spring-boot:run"] };
+    return { command: "mvn", tool: "maven" };
   }
   if (fileExists(path.join(directory, windows ? "gradlew.bat" : "gradlew"))) {
-    return { command: windows ? "gradlew.bat" : "./gradlew", args: ["bootRun"] };
+    return { command: windows ? "gradlew.bat" : "./gradlew", tool: "gradle" };
   }
   if (
     fileExists(path.join(directory, "build.gradle")) ||
     fileExists(path.join(directory, "build.gradle.kts"))
   ) {
-    return { command: "gradle", args: ["bootRun"] };
+    return { command: "gradle", tool: "gradle" };
   }
   return undefined;
 }
 
-function bootRunTask(project, directory, cwd, hostOs) {
-  const build = detectBuildRun(directory, hostOs);
-  if (build === undefined) return undefined;
-  return {
-    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (run)`,
-    command: build.command,
-    args: build.args,
-    cwd,
-  };
+// Maven's Boot plugin takes profiles as a plugin property; Gradle's bootRun takes
+// them as forwarded program arguments. Both stay reviewable in the task entry.
+function runArgumentsFor(tool, profile) {
+  const goal = tool === "maven" ? "spring-boot:run" : "bootRun";
+  if (profile === undefined) return [goal];
+  if (tool === "maven") return [goal, `-Dspring-boot.run.profiles=${profile}`];
+  return [goal, `--args=--spring.profiles.active=${profile}`];
 }
 
-function bootDebugConfig(project, cwd) {
-  return {
+// One base entry plus one per discovered profile, so Zed's task picker becomes the
+// profile selector. `env` is an empty editable slot for anything project-specific.
+function bootRunTasks(project, directory, cwd, hostOs, profiles) {
+  const build = detectBuildTool(directory, hostOs);
+  if (build === undefined) return [];
+  const entry = (profile) => ({
+    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (run${profile === undefined ? "" : `: ${profile}`})`,
+    command: build.command,
+    args: runArgumentsFor(build.tool, profile),
+    cwd,
+    env: {},
+  });
+  return [entry(undefined), ...profiles.map((profile) => entry(profile))];
+}
+
+// `vmArgs`, `args`, and `env` are editable slots the official Java debug adapter
+// honors; the per-profile entries pre-fill `vmArgs` with the active profile.
+function bootDebugConfigs(project, cwd, profiles) {
+  const entry = (profile) => ({
     adapter: "Java",
     request: "launch",
-    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (debug)`,
+    label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (debug${profile === undefined ? "" : `: ${profile}`})`,
     mainClass: project.mainClass,
     cwd,
+    vmArgs: profile === undefined ? "" : `-Dspring.profiles.active=${profile}`,
+    args: [],
+    env: {},
     stopOnEntry: false,
-  };
+  });
+  return [entry(undefined), ...profiles.map((profile) => entry(profile))];
+}
+
+// Spring's default external-config locations, relative to the project directory.
+const PROFILE_CONFIG_SUBDIRS = ["src/main/resources", "src/main/resources/config", "config", "."];
+const PROFILE_FILENAME = /^application-(.+)\.(?:properties|ya?ml)$/i;
+const APPLICATION_YAML = /^application\.ya?ml$/i;
+const PROFILE_NAME = /^[A-Za-z0-9_.-]+$/;
+// Modern `spring.config.activate.on-profile` (flat or nested) and the legacy
+// document-level `spring.profiles`. `.active`/`.include`/`.group` never match
+// because they place text between `profiles` and the colon.
+const ON_PROFILE_LINE = /(?:^\s*|\.)on-profile\s*:\s*(.+)$/;
+const LEGACY_PROFILE_LINE = /^\s*(?:spring\.)?profiles\s*:\s*(\S.*)$/;
+
+// Discover Spring profiles from both profile-specific filenames
+// (`application-<profile>.yml`) and multi-document `application.yml` activation.
+function discoverProfiles(directory) {
+  const profiles = new Set();
+  for (const subdir of PROFILE_CONFIG_SUBDIRS) {
+    const resolved = path.resolve(directory, subdir);
+    let entries;
+    try {
+      entries = fs.readdirSync(resolved, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const named = PROFILE_FILENAME.exec(entry.name);
+      if (named !== null) {
+        addProfileName(profiles, named[1]);
+        continue;
+      }
+      if (APPLICATION_YAML.test(entry.name)) {
+        let text;
+        try {
+          text = fs.readFileSync(path.join(resolved, entry.name), "utf8");
+        } catch {
+          continue;
+        }
+        for (const name of profilesFromYaml(text)) addProfileName(profiles, name);
+      }
+    }
+  }
+  return [...profiles].sort();
+}
+
+function profilesFromYaml(text) {
+  const names = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^\s*#.*$/, "").replace(/\s+#.*$/, "");
+    const match = ON_PROFILE_LINE.exec(line) ?? LEGACY_PROFILE_LINE.exec(line);
+    if (match === null) continue;
+    for (const token of tokenizeProfileExpression(match[1])) names.push(token);
+  }
+  return names;
+}
+
+// A profile activation can be a scalar, a quoted value, a flow list, or a boolean
+// expression (`prod & cloud`); pull the identifier tokens out of any of those.
+function tokenizeProfileExpression(value) {
+  return value
+    .split(/[\s,&|!()"'[\]]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0 && PROFILE_NAME.test(token));
+}
+
+function addProfileName(set, name) {
+  const trimmed = name.trim();
+  if (PROFILE_NAME.test(trimmed)) set.add(trimmed);
 }
 
 function isOwnedConfigEntry(entry) {
@@ -1138,6 +1239,11 @@ function describeBootConfiguration(outcome) {
   if (outcome.skippedRun.length > 0) {
     parts.push(
       `No Maven or Gradle build was detected for ${outcome.skippedRun.join(", ")}, so only a debug launch was written for ${outcome.skippedRun.length === 1 ? "it" : "them"}.`,
+    );
+  }
+  for (const capped of outcome.cappedProfiles ?? []) {
+    parts.push(
+      `${capped.project} has more than ${MAX_BOOT_PROFILE_ENTRIES} profiles; entries were limited to the first ${MAX_BOOT_PROFILE_ENTRIES}, omitting ${capped.omitted.join(", ")} — add those by editing the files.`,
     );
   }
   parts.push(

@@ -316,10 +316,17 @@ of that dependency. A synthetic `source` Code Action on Java files invokes
 `executableBootProjects`, presents a bounded `window/showMessageRequest`
 selection, and generates merge-safe `.zed/tasks.json` run tasks and
 `.zed/debug.json` (`"adapter": "Java"`) launches — portable, secret-free, and
-never overwriting a config it cannot parse without loss. Boot project info,
-executable-project discovery, and Boot run/debug are therefore now `implemented`
-and contract-tested; they stay short of `verified` until the action is driven in
-a real Zed install, and debug has no runtime evidence yet.
+never overwriting a config it cannot parse without loss. It emits one base entry
+plus one per discovered Spring profile (from profile-specific filenames and
+multi-document `application.yml` activation, capped at eight) so the task/debug
+picker becomes the profile selector, with editable `vmArgs`/`args`/`env` slots.
+A 2026-07-19 driven run (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25)
+verified discovery, generation, and that the generated run task's
+`mvn spring-boot:run` launched the app and served `GET /greeting`; executable
+Boot project discovery is therefore `verified`. Boot project info and Boot
+run/debug stay `implemented` — the `"adapter": "Java"` debug launch, the
+profile/slot entries, and multi-project selection are contract-tested but not yet
+driven.
 
 The references-and-implementations verification also exposed a startup-order
 race after the official Java route appeared but while Java project import was

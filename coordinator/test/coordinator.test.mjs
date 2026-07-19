@@ -1240,6 +1240,9 @@ test("configure run/debug discovers projects, prompts, and writes portable .zed 
     label: "Spring Boot (zed-spring-tools): service-a (debug)",
     mainClass: "com.example.a.AApp",
     cwd: "$ZED_WORKTREE_ROOT/service-a",
+    vmArgs: "",
+    args: [],
+    env: {},
     stopOnEntry: false,
   });
   assert.equal(debug[1].mainClass, "com.example.b.BApp");
@@ -1345,6 +1348,119 @@ test("a commented existing config is preserved and a sidecar is written instead"
   );
   assert.equal(sidecar[0].label, "Spring Boot (zed-spring-tools): root-app (run)");
   assert.match(confirmation.params.message, /tasks\.zed-spring-tools\.json/);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+async function driveConfigureSingleProject(worktree, project) {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+  coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: discovery.id,
+    result: [{ name: project.name, mainClass: project.mainClass, uri: pathToFileURL(worktree).href }],
+  });
+  const confirmation = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "confirmation",
+  );
+  const read = (file) => JSON.parse(fs.readFileSync(path.join(worktree, ".zed", file), "utf8"));
+  return { confirmation, tasks: read("tasks.json"), debug: read("debug.json") };
+}
+
+test("profiles from filenames and multi-doc application.yml become picker entries", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  fs.writeFileSync(path.join(resources, "application-dev.yml"), "server.port: 8081\n");
+  fs.writeFileSync(path.join(resources, "application-prod.properties"), "server.port=9090\n");
+  fs.writeFileSync(
+    path.join(resources, "application.yml"),
+    "spring:\n  application:\n    name: demo\n---\nspring:\n  config:\n    activate:\n      on-profile: staging\n  datasource:\n    url: x\n",
+  );
+
+  const { tasks, debug } = await driveConfigureSingleProject(worktree, {
+    name: "root-app",
+    mainClass: "com.example.App",
+  });
+
+  assert.deepEqual(tasks.map((task) => task.label), [
+    "Spring Boot (zed-spring-tools): root-app (run)",
+    "Spring Boot (zed-spring-tools): root-app (run: dev)",
+    "Spring Boot (zed-spring-tools): root-app (run: prod)",
+    "Spring Boot (zed-spring-tools): root-app (run: staging)",
+  ]);
+  assert.deepEqual(tasks[0].args, ["spring-boot:run"]);
+  assert.deepEqual(tasks[1].args, ["spring-boot:run", "-Dspring-boot.run.profiles=dev"]);
+  assert.deepEqual(tasks[0].env, {});
+  assert.deepEqual(debug.map((config) => config.label), [
+    "Spring Boot (zed-spring-tools): root-app (debug)",
+    "Spring Boot (zed-spring-tools): root-app (debug: dev)",
+    "Spring Boot (zed-spring-tools): root-app (debug: prod)",
+    "Spring Boot (zed-spring-tools): root-app (debug: staging)",
+  ]);
+  assert.equal(debug[0].vmArgs, "");
+  assert.equal(debug[1].vmArgs, "-Dspring.profiles.active=dev");
+  assert.deepEqual(debug[0].args, []);
+  assert.deepEqual(debug[0].env, {});
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Gradle profile entries forward the active profile as a program argument", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "build.gradle"), "plugins {}\n");
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  fs.writeFileSync(path.join(resources, "application-dev.yaml"), "a: b\n");
+
+  const { tasks } = await driveConfigureSingleProject(worktree, {
+    name: "g",
+    mainClass: "com.example.G",
+  });
+  assert.deepEqual(tasks[1].args, ["bootRun", "--args=--spring.profiles.active=dev"]);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("more than eight profiles are capped and the omitted ones are named", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  for (let n = 1; n <= 10; n += 1) {
+    const name = `p${String(n).padStart(2, "0")}`;
+    fs.writeFileSync(path.join(resources, `application-${name}.yml`), "x: y\n");
+  }
+
+  const { tasks, debug, confirmation } = await driveConfigureSingleProject(worktree, {
+    name: "big",
+    mainClass: "com.example.Big",
+  });
+  // base + 8 capped profiles
+  assert.equal(tasks.length, 9);
+  assert.equal(debug.length, 9);
+  assert.deepEqual(
+    tasks.slice(1).map((task) => task.label.match(/run: (p\d\d)/)[1]),
+    ["p01", "p02", "p03", "p04", "p05", "p06", "p07", "p08"],
+  );
+  assert.match(confirmation.params.message, /more than 8 profiles/);
+  assert.match(confirmation.params.message, /omitting p09, p10/);
 
   fs.rmSync(worktree, { recursive: true, force: true });
 });
