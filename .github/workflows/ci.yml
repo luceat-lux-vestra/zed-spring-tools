@@ -38,6 +38,6 @@ jobs:
         with:
           node-version: 20
       - name: Coordinator tests
-        run: node --test "coordinator/test/*.test.mjs"
+        run: node --test coordinator/test/*.test.mjs
       - name: Contributors list is current
         run: node scripts/generate-contributors.mjs --check
