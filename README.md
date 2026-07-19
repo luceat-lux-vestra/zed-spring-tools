@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 17 `verified`, 5 `implemented`, 5 `zed-native-equivalent`, 30 `planned` |
+| Capability inventory | 19 `verified`, 3 `implemented`, 5 `zed-native-equivalent`, 29 `planned`, 1 `not-pursued` |
 | Distribution | Local development extension today; extension-registry submission in preparation |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |

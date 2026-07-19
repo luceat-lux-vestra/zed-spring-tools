@@ -146,6 +146,11 @@ export class Coordinator {
     this.generatedTargetResolutions = new Set();
     this.generatedResolutionTail = Promise.resolve();
     this.activeGeneratedTargetResolution = undefined;
+    // Target URIs of in-flight properties/YAML conversions. After the create,
+    // Spring drives a `window/showDocument` to reveal the new file; Zed already
+    // opens it from the applied create edit, so that request must be answered
+    // silently rather than through the CodeLens `showDocument` fallback notice.
+    this.pendingConversionTargets = new Set();
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -913,10 +918,18 @@ export class Coordinator {
     }
     const targetPath = convertedTargetPath(sourcePath, spec.extension);
     const targetUri = pathToFileURL(targetPath).href;
-    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
-      command: spec.command,
-      arguments: [sourceUri, targetUri, REPLACE_CONVERTED_FILE],
-    });
+    // Suppress the CodeLens `showDocument` fallback notice for Spring's
+    // post-conversion reveal of the freshly created file; Zed opens it from the
+    // applied create edit on its own.
+    this.pendingConversionTargets.add(targetUri);
+    try {
+      await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: spec.command,
+        arguments: [sourceUri, targetUri, REPLACE_CONVERTED_FILE],
+      });
+    } finally {
+      this.pendingConversionTargets.delete(targetUri);
+    }
     if (this.closed) return;
     this.#showInfo(
       `Spring Boot: Converted ${path.basename(sourcePath)} to ${path.basename(targetPath)}. The original file was kept so you can review the result before deleting it.`,
@@ -1037,6 +1050,11 @@ export class Coordinator {
       const target = showDocumentTarget(params);
       if (target === undefined) return { success: false };
       this.activeGeneratedTargetResolution.target = target;
+      return { success: true };
+    }
+    // A conversion's post-create reveal: Zed already opens the created file from
+    // the applied edit, so acknowledge without the CodeLens-oriented notice.
+    if (typeof params?.uri === "string" && this.pendingConversionTargets.has(params.uri)) {
       return { success: true };
     }
     const uri = typeof params?.uri === "string" ? params.uri : "the generated target";

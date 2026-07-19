@@ -162,15 +162,16 @@ Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 57
-capabilities: 16 `verified`, 0 `implemented`, 5 `zed-native-equivalent`, and 36
-`planned`.
+capabilities: 19 `verified`, 3 `implemented`, 5 `zed-native-equivalent`, 29
+`planned`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
 Code widget that delivers it there.
 
 Every user-visible capability has one state: `planned`, `implemented`,
-`zed-native-equivalent`, `blocked-zed-api`, `blocked-upstream`, or `verified`.
+`zed-native-equivalent`, `blocked-zed-api`, `blocked-upstream`, `not-pursued`,
+or `verified`.
 Initial workstreams are:
 
 - Spring Boot properties/YAML completion, hover, validation, navigation, and
