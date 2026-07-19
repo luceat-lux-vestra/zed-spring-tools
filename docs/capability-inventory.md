@@ -1,8 +1,8 @@
 # Capability inventory
 
-- Inventory version: 11
+- Inventory version: 12
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-19
+- Last updated: 2026-07-20
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -52,8 +52,8 @@ selected route or planning-confidence score does not change a state here.
 | State | Count |
 | --- | --- |
 | `verified` | 17 |
-| `implemented` | 2 |
-| `planned` | 33 |
+| `implemented` | 5 |
+| `planned` | 30 |
 | `blocked-zed-api` | 0 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
@@ -118,9 +118,9 @@ verified structure-navigation fallback.
 | Hover documentation on properties | `verified` | Observed 2026-07-18. Zed issued `textDocument/hover` on `application.properties` (Properties routes only to `zed-spring-tools`, so Spring-attributed) and Spring returned non-empty markdown for both a framework-provided key (`server.port` → type `java.lang.Integer`, `Default: 8080`, `Server HTTP port.`) and a project-provided key (`fixture.greeting.salutation` → the fixture's own javadoc, via generated `spring-configuration-metadata.json`). Evidence: `tmp/lsp-verify-20260718/`. |
 | Property validation / diagnostics | `verified` | Spring-attributed diagnostics observed for both files on the tested tuple: `'ser' is an unknown property. Did you mean 'server.address'?` in `.properties`, which requires classpath metadata, and `Expecting a 'Mapping' node but got 'ser'` in `.yaml`. Both carry `source: vscode-spring-boot`. |
 | Navigation from a property to its definition | `verified` | Observed 2026-07-18. `textDocument/definition` on `fixture.greeting.salutation` in `application.properties` returned a LocationLink to `GreetingProperties.java` at the `salutation` field (line 26). Spring-attributed (Properties routes only to `zed-spring-tools`); Zed jumps. Evidence: `tmp/lsp-verify-20260718/`. |
-| Shared properties metadata reload | `planned` | Preferred route: a standard Code Action executes `sts/common-properties/reload` and observes diagnostics/completion refresh. Manual server restart remains fallback. Setting: `boot-java.common.properties-metadata`. |
-| Convert `.properties` to `.yaml` | `planned` | Preferred route: a Code Action executes `sts/boot/props-to-yaml` and applies a reviewable create/replace workspace edit. Manual conversion remains fallback if safe file creation/merge is not verified. |
-| Convert `.yaml` to `.properties` | `planned` | Preferred route: a Code Action executes `sts/boot/yaml-to-props` and applies a reviewable create/replace workspace edit. Manual conversion remains fallback if safe file creation/merge is not verified. |
+| Shared properties metadata reload | `implemented` | A `source` Code Action on properties/YAML files runs the coordinator command `zed-spring-tools.reload-properties-metadata`, which executes Spring's `sts/common-properties/reload` (no arguments) and reports a notice. Contract-tested in `coordinator/test/coordinator.test.mjs`; a driven run to observe diagnostics/completion refresh is pending. Manual server restart remains fallback. Setting: `boot-java.common.properties-metadata`. |
+| Convert `.properties` to `.yaml` | `implemented` | A `source` Code Action on `.properties` files runs `zed-spring-tools.convert-properties-yaml` (direction `props-to-yaml`), which computes a non-colliding `.yml` target beside the source and executes `sts/boot/props-to-yaml` with `[sourceUri, targetUri, false]`. The Spring server drives the create via `workspace/applyEdit`; the `false` matches VS Code's `spring.tools.properties.replace-converted-file` default, keeping the original for review. Contract-tested; a driven run to confirm Zed applies the server's create edit is the promotion gate. |
+| Convert `.yaml` to `.properties` | `implemented` | Symmetric to the above with direction `yaml-to-props`, target `.properties`, executing `sts/boot/yaml-to-props`. Same coordinator command, edit contract, and pending driven gate. |
 | `spring-factories` language support | `planned` | VSIX associates `*.factories` and `META-INF/spring.factories` with a distinct language. Zed reaches a server only for files it classifies as a mapped language, and file classification needs a `languages/<name>/config.toml` with `path_suffixes` and a **required grammar** — the API has no grammar-less file-association surface. So this needs a language-plus-grammar contribution, which an extension *can* add; it is additional work, not a Zed API block. Until then, `.factories` files reach no server. |
 | `jpa-query-properties` language support | `planned` | VSIX pattern is `jpa-named-queries.properties`. Because that is a `.properties` file, Zed already routes it to this server as the `Properties` language, so it is **not** unhandled — but the language id sent is `spring-boot-properties`, not `jpa-query-properties`. Whether Spring keys JPA-query support off the filename (works today) or the language id (degraded) is unverified. Sending a distinct id for one filename requires defining a separate Zed language, same grammar constraint as above. |
 | Completion prefix elision | `planned` | Setting `boot-java.properties.completions.elide-prefix`. |

@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 17 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 33 `planned` |
+| Capability inventory | 17 `verified`, 5 `implemented`, 5 `zed-native-equivalent`, 30 `planned` |
 | Distribution | Local development extension today; extension-registry submission in preparation |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -86,6 +86,16 @@ Zed's task/debug picker becomes the profile selector, alongside editable
 official Java 6.8.21, JDK 25) verified discovery, generation, profile entries,
 the generated run task serving `GET /greeting`, and a Java debug launch from the
 generated `dev` entry after editing all three debug slots.
+
+Newly implemented and contract-tested, with a driven run still pending before
+promotion: `source` Code Actions on `.properties` and `.yaml`/`.yml` files that
+convert between the two formats and reload shared properties metadata. The
+coordinator computes a non-colliding target file beside the source and executes
+Spring's `sts/boot/props-to-yaml` / `yaml-to-props` (keeping the original, to
+match VS Code's default) or `sts/common-properties/reload`; the Spring server
+performs the file creation through a standard `workspace/applyEdit`. These rows
+stay `implemented` in the inventory until a driven Zed run confirms the edit is
+applied.
 
 The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
 every standard provider, its user-visible subfeatures, the separate live-data
