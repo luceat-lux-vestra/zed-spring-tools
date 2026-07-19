@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { BridgeSession } from "./bridge_session.mjs";
 import { JavaTransport } from "./java_transport.mjs";
@@ -35,12 +35,41 @@ const CONFIGURE_BOOT_RUN_COMMAND = "zed-spring-tools.configure-boot-run";
 const CONFIGURE_BOOT_RUN_TITLE = "Spring Boot: Configure run/debug for a project…";
 const BOOT_CONFIG_ACTION_KIND = "source";
 const BOOT_CONFIG_LABEL_PREFIX = "Spring Boot (zed-spring-tools): ";
+// Properties/YAML conversion and shared-metadata reload. The Spring server owns
+// the conversion: given [sourceUri, targetUri, replaceOriginal] it computes the
+// converted document and drives a `workspace/applyEdit` that creates the target
+// (and, when replaceOriginal is true, removes the source). The coordinator only
+// exposes the Code Action, computes a non-colliding target path the way the VS
+// Code client does, and keeps the original by default so the result stays
+// reviewable. See docs/research/011 for the client-command contract.
+const PROPS_TO_YAML_SPRING_COMMAND = "sts/boot/props-to-yaml";
+const YAML_TO_PROPS_SPRING_COMMAND = "sts/boot/yaml-to-props";
+const RELOAD_PROPERTIES_METADATA_SPRING_COMMAND = "sts/common-properties/reload";
+const CONVERT_PROPERTIES_YAML_COMMAND = "zed-spring-tools.convert-properties-yaml";
+const RELOAD_PROPERTIES_METADATA_COMMAND = "zed-spring-tools.reload-properties-metadata";
+const CONVERT_TO_YAML_TITLE = "Spring Boot: Convert .properties to .yaml";
+const CONVERT_TO_PROPS_TITLE = "Spring Boot: Convert .yaml to .properties";
+const RELOAD_PROPERTIES_METADATA_TITLE = "Spring Boot: Reload shared properties metadata";
+const PROPERTIES_ACTION_KIND = "source";
+// VS Code's `spring.tools.properties.replace-converted-file` defaults to false,
+// which keeps the original file after conversion. Match that safe default so a
+// conversion never deletes source the user has not yet reviewed.
+const REPLACE_CONVERTED_FILE = false;
+const CONVERSION_SPECS = Object.freeze({
+  "props-to-yaml": { command: PROPS_TO_YAML_SPRING_COMMAND, extension: "yml" },
+  "yaml-to-props": { command: YAML_TO_PROPS_SPRING_COMMAND, extension: "properties" },
+});
 const ALL_BOOT_PROJECTS_TITLE = "All projects";
 const MAX_BOOT_PROJECT_SELECTION = 8;
 // Cap generated per-profile entries so a project with many profiles cannot flood
 // the task/debug pickers. Overflow profiles are named in the confirmation notice.
 const MAX_BOOT_PROFILE_ENTRIES = 8;
-const COORDINATOR_COMMANDS = [COORDINATOR_CODE_LENS_COMMAND, CONFIGURE_BOOT_RUN_COMMAND];
+const COORDINATOR_COMMANDS = [
+  COORDINATOR_CODE_LENS_COMMAND,
+  CONFIGURE_BOOT_RUN_COMMAND,
+  CONVERT_PROPERTIES_YAML_COMMAND,
+  RELOAD_PROPERTIES_METADATA_COMMAND,
+];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
 const EXECUTE_COMMAND_CAPABILITY = "workspace/executeCommand";
@@ -201,6 +230,8 @@ export class Coordinator {
     this.#observeGeneratedTargetInvalidation(message);
     if (this.#handleCoordinatorCodeLensCommand(message)) return false;
     if (this.#handleConfigureBootRunCommand(message)) return false;
+    if (this.#handleConvertPropertiesYamlCommand(message)) return false;
+    if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
@@ -821,18 +852,10 @@ export class Coordinator {
           result: message.result.filter((candidate) => isValidCodeActionOrCommand(candidate)),
         }
       : message;
-    if (!offersBootRunAction(request)) return normalized;
+    const synthetic = syntheticCodeActions(request);
+    if (synthetic.length === 0) return normalized;
     const existing = Array.isArray(normalized.result) ? normalized.result : [];
-    const action = {
-      title: CONFIGURE_BOOT_RUN_TITLE,
-      kind: BOOT_CONFIG_ACTION_KIND,
-      command: {
-        title: CONFIGURE_BOOT_RUN_TITLE,
-        command: CONFIGURE_BOOT_RUN_COMMAND,
-        arguments: [{ uri: request.uri }],
-      },
-    };
-    return { ...normalized, result: [...existing, action] };
+    return { ...normalized, result: [...existing, ...synthetic] };
   }
 
   #handleConfigureBootRunCommand(message) {
@@ -857,6 +880,76 @@ export class Coordinator {
       );
     });
     return true;
+  }
+
+  #handleConvertPropertiesYamlCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== CONVERT_PROPERTIES_YAML_COMMAND
+    ) {
+      return false;
+    }
+    // Answer Zed's command immediately. The Spring server drives the file
+    // creation through its own workspace/applyEdit, which round-trips to Zed on
+    // its own; blocking the command response is unnecessary and would stall Zed.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#convertPropertiesYaml(message.params?.arguments?.[0]).catch((error) => {
+      if (this.closed) return;
+      this.#showInfo(
+        `Spring Boot: The properties/YAML conversion could not be completed. ${errorText(error)} Make sure the file is saved and the language server has finished importing the project, then try again.`,
+      );
+    });
+    return true;
+  }
+
+  async #convertPropertiesYaml(argument) {
+    const sourceUri = typeof argument?.uri === "string" ? argument.uri : undefined;
+    const spec = CONVERSION_SPECS[argument?.direction];
+    const sourcePath = sourceUri === undefined ? undefined : fileUriToPath(sourceUri);
+    if (spec === undefined || sourcePath === undefined) {
+      this.#showInfo("Spring Boot: No convertible properties or YAML file was provided.");
+      return;
+    }
+    const targetPath = convertedTargetPath(sourcePath, spec.extension);
+    const targetUri = pathToFileURL(targetPath).href;
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: spec.command,
+      arguments: [sourceUri, targetUri, REPLACE_CONVERTED_FILE],
+    });
+    if (this.closed) return;
+    this.#showInfo(
+      `Spring Boot: Converted ${path.basename(sourcePath)} to ${path.basename(targetPath)}. The original file was kept so you can review the result before deleting it.`,
+    );
+  }
+
+  #handleReloadPropertiesMetadataCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== RELOAD_PROPERTIES_METADATA_COMMAND
+    ) {
+      return false;
+    }
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#reloadPropertiesMetadata().catch((error) => {
+      if (this.closed) return;
+      this.#showInfo(
+        `Spring Boot: Shared properties metadata could not be reloaded. ${errorText(error)}`,
+      );
+    });
+    return true;
+  }
+
+  async #reloadPropertiesMetadata() {
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: RELOAD_PROPERTIES_METADATA_SPRING_COMMAND,
+      arguments: [],
+    });
+    if (this.closed) return;
+    this.#showInfo(
+      "Spring Boot: Reloaded shared properties metadata. Completion and validation now use the refreshed metadata.",
+    );
   }
 
   async #configureBootRun() {
@@ -1076,15 +1169,100 @@ function addCoordinatorCommands(message) {
   };
 }
 
+// The coordinator's synthetic Code Actions all use the `source` kind because
+// they apply to the whole file regardless of cursor position or diagnostics.
+// Compose them in one place so a single code-action response can offer the Java
+// run/debug action and the properties/YAML actions without duplicating the
+// only-filter handling.
+function syntheticCodeActions(request) {
+  const actions = [];
+  if (offersBootRunAction(request)) {
+    actions.push({
+      title: CONFIGURE_BOOT_RUN_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: CONFIGURE_BOOT_RUN_TITLE,
+        command: CONFIGURE_BOOT_RUN_COMMAND,
+        arguments: [{ uri: request.uri }],
+      },
+    });
+  }
+  const conversion = propertiesConversionFor(request);
+  if (conversion !== undefined) {
+    actions.push({
+      title: conversion.title,
+      kind: PROPERTIES_ACTION_KIND,
+      command: {
+        title: conversion.title,
+        command: CONVERT_PROPERTIES_YAML_COMMAND,
+        arguments: [{ uri: request.uri, direction: conversion.direction }],
+      },
+    });
+    actions.push({
+      title: RELOAD_PROPERTIES_METADATA_TITLE,
+      kind: PROPERTIES_ACTION_KIND,
+      command: {
+        title: RELOAD_PROPERTIES_METADATA_TITLE,
+        command: RELOAD_PROPERTIES_METADATA_COMMAND,
+        arguments: [],
+      },
+    });
+  }
+  return actions;
+}
+
 function offersBootRunAction(request) {
-  if (!/\.java$/i.test(request?.uri ?? "")) return false;
-  const only = request?.only;
+  return /\.java$/i.test(request?.uri ?? "") && onlyAllowsKind(request?.only, BOOT_CONFIG_ACTION_KIND);
+}
+
+// Offer conversion (and the reload companion) only on properties/YAML files, in
+// the direction that produces the other format.
+function propertiesConversionFor(request) {
+  if (!onlyAllowsKind(request?.only, PROPERTIES_ACTION_KIND)) return undefined;
+  const uri = request?.uri ?? "";
+  if (/\.properties$/i.test(uri)) {
+    return { direction: "props-to-yaml", title: CONVERT_TO_YAML_TITLE };
+  }
+  if (/\.ya?ml$/i.test(uri)) {
+    return { direction: "yaml-to-props", title: CONVERT_TO_PROPS_TITLE };
+  }
+  return undefined;
+}
+
+// An absent or empty `only` means Zed asked for every action; otherwise the
+// action's kind must match one of the requested kinds (or be a sub-kind of it).
+function onlyAllowsKind(only, kind) {
   if (!Array.isArray(only) || only.length === 0) return true;
   return only.some(
-    (kind) =>
-      typeof kind === "string" &&
-      (kind === BOOT_CONFIG_ACTION_KIND || BOOT_CONFIG_ACTION_KIND.startsWith(`${kind}.`)),
+    (requested) =>
+      typeof requested === "string" && (requested === kind || kind.startsWith(`${requested}.`)),
   );
+}
+
+function errorText(error) {
+  return error instanceof Error ? error.message : "The server reported an unknown error.";
+}
+
+function fileUriToPath(uri) {
+  try {
+    const url = new URL(uri);
+    return url.protocol === "file:" ? fileURLToPath(url) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Mirror the VS Code client's target naming: same directory and base name with
+// the converted extension, adding a numeric suffix when that file already
+// exists so a conversion never silently overwrites an unrelated file.
+function convertedTargetPath(sourcePath, extension) {
+  const directory = path.dirname(sourcePath);
+  const base = path.basename(sourcePath, path.extname(sourcePath));
+  let candidate = path.join(directory, `${base}.${extension}`);
+  for (let index = 1; index < Number.MAX_SAFE_INTEGER && fs.existsSync(candidate); index += 1) {
+    candidate = path.join(directory, `${base}${index}.${extension}`);
+  }
+  return candidate;
 }
 
 function isValidCodeActionOrCommand(candidate) {

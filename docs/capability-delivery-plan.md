@@ -148,7 +148,15 @@ user outcome take precedence.
    `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`) and
    `.zed/debug.json` (`"adapter": "Java"` launch). A driven Zed run is still
    required to promote the outcome — debug has no runtime evidence yet.
-3. Deliver properties/YAML conversion and metadata reload as Code Actions.
+3. Delivered in code on the `feat/properties-yaml-conversion` branch and
+   contract-tested: `source` Code Actions on properties/YAML files expose
+   `.properties`↔`.yaml` conversion and shared-metadata reload. The coordinator
+   computes a non-colliding target path and executes `sts/boot/props-to-yaml` /
+   `sts/boot/yaml-to-props` (with `replace-converted-file` left at VS Code's
+   `false` default so the original is kept) and `sts/common-properties/reload`.
+   The Spring server drives the file create via `workspace/applyEdit`. A driven
+   Zed run confirming Zed applies the server's create edit is the promotion gate;
+   until then these rows stay `implemented`, not `verified`.
 4. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
 5. Expand live-data and remaining command slices only after their interaction,

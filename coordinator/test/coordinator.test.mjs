@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   compatibilityReportUrl,
@@ -239,7 +239,13 @@ test("Spring initialize advertises the coordinator CodeLens and run/debug comman
   });
   assert.deepEqual(
     zedWrites[0].result.capabilities.executeCommandProvider.commands,
-    ["sts/server-command", "zed-spring-tools.explain-code-lens", "zed-spring-tools.configure-boot-run"],
+    [
+      "sts/server-command",
+      "zed-spring-tools.explain-code-lens",
+      "zed-spring-tools.configure-boot-run",
+      "zed-spring-tools.convert-properties-yaml",
+      "zed-spring-tools.reload-properties-metadata",
+    ],
   );
 });
 
@@ -1421,6 +1427,8 @@ test("Boot run/debug code action is injected for Java files and respects the onl
     ["Valid existing action", "Spring Boot: Configure run/debug for a project…"],
   );
 
+  // A YAML file gets the conversion and reload actions instead of the Java
+  // run/debug action.
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
     id: "ca-yaml",
@@ -1428,7 +1436,10 @@ test("Boot run/debug code action is injected for Java files and respects the onl
     params: { textDocument: { uri: "file:///tmp/project/application.yml" }, context: {} },
   });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-yaml", result: [] });
-  assert.deepEqual(zedWrites.at(-1).result, []);
+  assert.deepEqual(
+    zedWrites.at(-1).result.map((action) => action.title),
+    ["Spring Boot: Convert .yaml to .properties", "Spring Boot: Reload shared properties metadata"],
+  );
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1438,6 +1449,166 @@ test("Boot run/debug code action is injected for Java files and respects the onl
   });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-quickfix", result: [{}] });
   assert.deepEqual(zedWrites.at(-1).result, []);
+});
+
+test("properties files offer conversion and reload actions with the right direction", async () => {
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  const uri = "file:///tmp/project/src/main/resources/application.properties";
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "ca-props",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri }, context: {} },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-props", result: [] });
+  const actions = zedWrites.at(-1).result;
+  assert.deepEqual(
+    actions.map((action) => [action.title, action.kind, action.command.command]),
+    [
+      ["Spring Boot: Convert .properties to .yaml", "source", "zed-spring-tools.convert-properties-yaml"],
+      ["Spring Boot: Reload shared properties metadata", "source", "zed-spring-tools.reload-properties-metadata"],
+    ],
+  );
+  assert.deepEqual(actions[0].command.arguments, [{ uri, direction: "props-to-yaml" }]);
+  assert.deepEqual(actions[1].command.arguments, []);
+
+  // A restrictive only-filter that excludes source actions suppresses them.
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "ca-props-quickfix",
+    method: "textDocument/codeAction",
+    params: { textDocument: { uri }, context: { only: ["quickfix"] } },
+  });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-props-quickfix", result: [] });
+  assert.deepEqual(zedWrites.at(-1).result, []);
+});
+
+test("converting properties to YAML executes the Spring command with a non-colliding target", async () => {
+  const worktree = makeWorktree();
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  const source = path.join(resources, "application.properties");
+  fs.writeFileSync(source, "server.port=8080\n");
+  // A pre-existing application.yml forces the collision-avoiding suffix.
+  fs.writeFileSync(path.join(resources, "application.yml"), "server: {}\n");
+  const sourceUri = pathToFileURL(source).href;
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  assert.equal(
+    coordinator.observeZedMessage({
+      jsonrpc: "2.0",
+      id: "convert-1",
+      method: "workspace/executeCommand",
+      params: {
+        command: "zed-spring-tools.convert-properties-yaml",
+        arguments: [{ uri: sourceUri, direction: "props-to-yaml" }],
+      },
+    }),
+    false,
+  );
+  assert.equal(zedWrites[0].id, "convert-1");
+  assert.equal(zedWrites[0].result, null);
+
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/boot/props-to-yaml",
+    "props-to-yaml request",
+  );
+  const [requestSourceUri, targetUri, replace] = request.params.arguments;
+  assert.equal(requestSourceUri, sourceUri);
+  assert.equal(replace, false);
+  assert.equal(path.basename(fileURLToPath(targetUri)), "application1.yml");
+
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "conversion notice",
+  );
+  assert.match(notice.params.message, /Converted application\.properties to application1\.yml/);
+  assert.match(notice.params.message, /original file was kept/i);
+});
+
+test("reload shared properties metadata executes the Spring command", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  assert.equal(
+    coordinator.observeZedMessage({
+      jsonrpc: "2.0",
+      id: "reload-1",
+      method: "workspace/executeCommand",
+      params: { command: "zed-spring-tools.reload-properties-metadata", arguments: [] },
+    }),
+    false,
+  );
+  assert.equal(zedWrites[0].result, null);
+
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/common-properties/reload",
+    "reload request",
+  );
+  assert.deepEqual(request.params.arguments, []);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "reload notice",
+  );
+  assert.match(notice.params.message, /Reloaded shared properties metadata/);
+});
+
+test("an invalid conversion request reports no convertible file and calls no Spring command", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "convert-bad",
+    method: "workspace/executeCommand",
+    params: {
+      command: "zed-spring-tools.convert-properties-yaml",
+      arguments: [{ uri: "file:///tmp/project/application.properties", direction: "sideways" }],
+    },
+  });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "invalid-conversion notice",
+  );
+  assert.match(notice.params.message, /No convertible properties or YAML file/);
+  assert.equal(
+    springWrites.some((message) => message.params?.command?.startsWith("sts/boot/")),
+    false,
+  );
 });
 
 test("configure run/debug discovers projects, prompts, and writes portable .zed configs", async () => {
