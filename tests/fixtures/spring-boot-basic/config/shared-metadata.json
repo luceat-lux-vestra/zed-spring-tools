@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "shared.fleet.banner",
+      "type": "java.lang.String",
+      "description": "Banner text shared across every service in the fleet.",
+      "defaultValue": "zed-spring-tools"
+    }
+  ]
+}

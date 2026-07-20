@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 19 `verified`, 3 `implemented`, 5 `zed-native-equivalent`, 29 `planned`, 1 `not-pursued` |
+| Capability inventory | 22 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 27 `planned`, 1 `not-pursued` |
 | Distribution | Local development extension today; extension-registry submission in preparation |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -43,6 +43,10 @@ The following outcomes have been observed on the tested environment:
 
 - Spring Boot property and YAML completion, hover, validation, and definition
   navigation;
+- `.properties`↔`.yaml` conversion, and shared properties metadata reload once
+  `boot-java.common.properties-metadata` names a metadata file;
+- Spring's own languages for `*.factories` and `META-INF/jpa-named-queries.properties`,
+  including JPQL validation inside named queries;
 - Spring workspace symbols, request-mapping navigation, and bean navigation;
 - cron inlay hints;
 - Spring quick-fix code actions applied end to end;
@@ -146,10 +150,44 @@ edit it.
    indexing to finish. The integrated product path is verified only with the
    repository's Maven fixture.
 
+Keep at least one `.java` file open. Zed starts the official Java language
+server only for Java buffers, and no extension can start it for you, so a
+session with only `application.properties` open has no project classpath —
+property validation and completion fall back to syntax only until a Java file
+is opened. The extension says so once rather than reporting a failure.
+
 If Java was already running when this extension was installed, restart Zed so
 JDT LS receives the contributed bridge bundles. If the first Spring artifact
 download remains stuck, restart Zed and retry. Both conditions are documented in
 [known limitations](LIMITATIONS.md).
+
+### Settings
+
+Spring's own settings go under `lsp."spring-tools".settings` in Zed's settings
+and are merged over this extension's defaults, so any `boot-java.*` key the VS
+Code extension documents can be set here — including turning a default back off.
+
+```json
+{
+  "lsp": {
+    "spring-tools": {
+      "settings": {
+        "boot-java": {
+          "common": { "properties-metadata": "config/shared-metadata.json" }
+        }
+      }
+    }
+  }
+}
+```
+
+`boot-java.common.properties-metadata` names a shared
+`spring-configuration-metadata.json` whose keys validate and complete alongside
+the project's own. A relative path is resolved against the worktree root. After
+editing that file, run the **Spring Boot: Reload shared properties metadata**
+code action from any properties or YAML file to pick up the change without
+restarting the server; with no such file configured the action says so instead
+of claiming a reload.
 
 ## How it fits together
 

@@ -1,0 +1,5 @@
+# Classic Spring factories registration. Without a Zed language claiming
+# `*.factories` this file reaches no language server at all, so its presence in
+# the fixture is what makes that gap observable in a driven run.
+org.springframework.context.ApplicationListener=\
+  dev.zed.spring.fixture.GreetingConfiguration

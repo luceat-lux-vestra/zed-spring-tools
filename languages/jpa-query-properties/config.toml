@@ -1,0 +1,8 @@
+name = "JPA Query Properties"
+grammar = "properties"
+# Spring only treats this exact filename as named-query properties, so the
+# language must claim the whole name rather than the `properties` extension —
+# every other `.properties` file has to stay with the Properties language that
+# carries the `spring-boot-properties` id.
+path_suffixes = ["jpa-named-queries.properties"]
+line_comments = ["# ", "! "]

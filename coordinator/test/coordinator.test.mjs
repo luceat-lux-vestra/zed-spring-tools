@@ -1106,6 +1106,16 @@ test("a classpath registration that keeps failing past the grace window surfaces
     classpathRetryMs: 1,
   });
 
+  // The grace window only starts once a Java file is open, so the notice
+  // describes a route the session actually needs.
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: {
+      textDocument: { uri: "file:///tmp/project/App.java", languageId: "java", version: 0, text: "" },
+    },
+  });
+
   await coordinator.handleSpringMessage({
     jsonrpc: "2.0",
     id: "add",
@@ -1118,6 +1128,91 @@ test("a classpath registration that keeps failing past the grace window surfaces
   assert.equal(popup.params.type, 1);
   assert.match(popup.params.message, /requires a working official Java extension/);
   assert.match(popup.params.message, /classpath-registration-failed-v1/);
+  await coordinator.close();
+});
+
+test("a session that never opens a Java file is not told the Java route failed", async () => {
+  // Zed starts the official Java server lazily. Opening only properties/YAML
+  // leaves its route legitimately absent, and `window/showMessageRequest`
+  // cannot be retracted, so a premature notice would be permanent.
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: () => {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: {
+      supportsSpringClientMethod: () => false,
+      async execute() {
+        throw new Error("official Java rejected command: timed out after 5000ms");
+      },
+    },
+    worktree: "/tmp/project",
+    javaHandshakeGraceMs: 0,
+    classpathRetryMs: 1,
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: {
+      textDocument: {
+        uri: "file:///tmp/project/application.properties",
+        languageId: "spring-boot-properties",
+        version: 0,
+        text: "server.port=8080\n",
+      },
+    },
+  });
+
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "add",
+    method: "sts/addClasspathListener",
+    params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: true },
+  });
+
+  assert.ok(
+    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    "no Java requirement notice without a Java file",
+  );
+  await coordinator.close();
+});
+
+test("an absent Java route without a Java file is explained, not reported as a failure", async () => {
+  // Nothing this extension can do starts the official Java server, so the user
+  // gets the one instruction that works instead of a compatibility report.
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: () => {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: {
+      supportsSpringClientMethod: () => false,
+      async waitUntilReady() {
+        throw new Error("The official Zed Java extension is required and its route was not found");
+      },
+      async execute() {
+        throw new Error("official Java rejected command");
+      },
+    },
+    worktree: "/tmp/project",
+    javaHandshakeGraceMs: 0,
+    classpathRetryMs: 1,
+  });
+
+  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "java not started notice",
+  );
+  assert.match(notice.params.message, /has not started/);
+  assert.match(notice.params.message, /Open any \.java file/);
+  // It must not borrow the compatibility-failure framing.
+  assert.ok(!/compatibility report/.test(notice.params.message));
+  assert.ok(
+    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    "no compatibility report popup",
+  );
   await coordinator.close();
 });
 
@@ -1635,13 +1730,53 @@ test("reload shared properties metadata executes the Spring command", async () =
     "reload request",
   );
   assert.deepEqual(request.params.arguments, []);
-  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: true });
   const notice = await waitFor(
     zedWrites,
     (message) => message.method === "window/showMessage",
     "reload notice",
   );
   assert.match(notice.params.message, /Reloaded shared properties metadata/);
+});
+
+test("an unconfigured shared metadata file is reported instead of a false refresh", async () => {
+  // `SpringPropertiesIndexManager.reloadCommonProperties()` returns false when
+  // `boot-java.common.properties-metadata` is unset — nothing was reloaded, so
+  // the notice must say so and name the setting.
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "reload-unset",
+    method: "workspace/executeCommand",
+    params: { command: "zed-spring-tools.reload-properties-metadata", arguments: [] },
+  });
+
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/common-properties/reload",
+    "reload request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: false });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "reload notice",
+  );
+  assert.match(notice.params.message, /nothing to reload/);
+  assert.match(notice.params.message, /boot-java/);
+  assert.match(notice.params.message, /properties-metadata/);
+  assert.ok(
+    !/Reloaded shared properties metadata/.test(notice.params.message),
+    "no success claim when nothing was reloaded",
+  );
 });
 
 test("an invalid conversion request reports no convertible file and calls no Spring command", async () => {

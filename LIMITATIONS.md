@@ -17,6 +17,19 @@ extension.
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
   fallback; the opt-in Structure document remains planned.
+- The official Java language server starts only when a Java file is open, and
+  this extension cannot start it. Zed's extension API exposes no call for
+  starting another extension's language server, and `languages.<Language>.
+  language_servers` only orders the servers already declared for that language:
+  a 2026-07-20 driven run added `jdtls` to `languages.Properties.language_servers`
+  and opened only `application.properties`, and Zed started this extension's
+  coordinator alone; opening one `.java` file in the same session immediately
+  started the official Java proxy. Until that server runs, Spring has no project
+  classpath, so property support is limited to syntax — unknown-property
+  validation, metadata completion and hover all need the classpath. The
+  coordinator now says so once, naming the action that works (open a Java file),
+  instead of reporting a compatibility failure; a genuine handshake failure
+  after a Java file is open still raises the bounded compatibility report.
 - Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested

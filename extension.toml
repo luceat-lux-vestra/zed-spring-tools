@@ -6,6 +6,23 @@ authors = ["algorist"]
 description = "Spring Boot language intelligence for Zed. Requires the official Java extension; an XML extension enables pom.xml Maven hints."
 repository = "https://github.com/luceat-lux-vestra/zed-spring-tools"
 
+# Spring dispatches features by the language id the client sends on didOpen
+# (`SimpleTextDocumentService.didOpen` → `LanguageId.of(...)`, then
+# `CompositeLanguageServerComponents.componentsByLanguageId`). Its filename
+# fallback only covers documents the editor never opened, so these two files
+# need real Zed languages or they reach the wrong component set — or, for
+# `*.factories`, no server at all. Zed classifies a file only through a language,
+# and a language requires a grammar, hence the pinned properties grammar.
+languages = ["languages/spring-factories", "languages/jpa-query-properties"]
+
+# Same grammar and same revision the official Java extension already pins for
+# its own Properties language, so this adds no new upstream source to the set a
+# user of this extension already builds. The revision is that project's v0.3.0
+# release commit; later upstream commits are CI-only.
+[grammars.properties]
+repository = "https://github.com/tree-sitter-grammars/tree-sitter-properties"
+rev = "579b62f5ad8d96c2bb331f07d1408c92767531d9"
+
 [language_servers.spring-tools]
 name = "Spring Boot Language Server"
 # XML routes pom.xml to the server so its Maven inlay hints ("Add Spring Boot
@@ -13,13 +30,22 @@ name = "Spring Boot Language Server"
 # reach Zed. Zed has no built-in XML language, so this only takes effect when an
 # XML extension (e.g. sweetppro/zed-xml, language name "XML") is installed — the
 # same way Java support requires the official Java extension.
-languages = ["Java", "Properties", "YAML", "XML"]
+languages = [
+  "Java",
+  "Properties",
+  "YAML",
+  "XML",
+  "Spring Factories",
+  "JPA Query Properties",
+]
 
 [language_servers.spring-tools.language_ids]
 Java = "java"
 Properties = "spring-boot-properties"
 YAML = "spring-boot-properties-yaml"
 XML = "xml"
+"Spring Factories" = "spring-factories"
+"JPA Query Properties" = "jpa-query-properties"
 
 [[capabilities]]
 kind = "download_file"

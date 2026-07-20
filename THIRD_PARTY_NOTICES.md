@@ -43,3 +43,20 @@ the production acquisition decision remains open.
 See [`docs/research/005-distribution-and-licensing.md`](docs/research/005-distribution-and-licensing.md)
 for exact artifact identity, checksums, primary sources, inferences, and
 unresolved compliance questions.
+
+## Tree-sitter properties grammar
+
+`extension.toml` declares one grammar dependency so Zed can classify
+`*.factories` and `jpa-named-queries.properties` as their own languages — Zed
+routes a file to a language server only through a language, and a language
+requires a grammar.
+
+- Upstream source:
+  <https://github.com/tree-sitter-grammars/tree-sitter-properties>
+- Pinned revision: `579b62f5ad8d96c2bb331f07d1408c92767531d9` (upstream v0.3.0, the same revision the official Java extension pins)
+- Upstream license: MIT
+- Local use: the two `languages/*/highlights.scm` files are adapted from that
+  repository's `queries/highlights.scm`.
+
+Zed fetches and builds this grammar at extension install time. No grammar source
+or generated parser is committed here.
