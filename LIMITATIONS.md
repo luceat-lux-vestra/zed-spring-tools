@@ -4,11 +4,17 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- A small set of capabilities is proven on the one tested tuple: Spring Boot
-  property/YAML completion and validation, and Spring workspace symbols (beans,
-  the request-mapping endpoint, and stereotypes reachable through Zed's project
-  symbol search). Most VS Code Spring Tools capabilities are still unimplemented
-  or unverified. Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
+- 22 of 57 tracked capabilities are proven on the tested tuple, and most of the
+  VS Code Spring Tools surface is still unimplemented or unverified. The proven
+  set is the properties/YAML line (completion, hover, validation, definition,
+  `.properties`↔`.yaml` conversion, shared-metadata reload, and the
+  `spring-factories` / `jpa-query-properties` languages), Spring workspace
+  symbols with bean and request-mapping navigation, static and live CodeLens,
+  inlay hints, quick fixes, and Boot run/debug configuration generation. Live
+  application data, the Structure document, Boot upgrade, Modulith, and most of
+  WS2's remaining Java language intelligence are untouched. See the
+  [capability inventory](docs/capability-inventory.md) for the per-row evidence.
+  Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
   `document_symbols` setting is enabled. The earlier zero-request run was the
   default tree-sitter control. S015 found a clear nested JDT/Spring merge and
@@ -17,6 +23,19 @@ extension.
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
   fallback; the opt-in Structure document remains planned.
+- The official Java language server starts only when a Java file is open, and
+  this extension cannot start it. Zed's extension API exposes no call for
+  starting another extension's language server, and `languages.<Language>.
+  language_servers` only orders the servers already declared for that language:
+  a 2026-07-20 driven run added `jdtls` to `languages.Properties.language_servers`
+  and opened only `application.properties`, and Zed started this extension's
+  coordinator alone; opening one `.java` file in the same session immediately
+  started the official Java proxy. Until that server runs, Spring has no project
+  classpath, so property support is limited to syntax — unknown-property
+  validation, metadata completion and hover all need the classpath. The
+  coordinator now says so once, naming the action that works (open a Java file),
+  instead of reporting a compatibility failure; a genuine handshake failure
+  after a Java file is open still raises the bounded compatibility report.
 - Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested

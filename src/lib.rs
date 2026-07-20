@@ -59,10 +59,16 @@ impl zed::Extension for SpringToolsExtension {
     fn language_server_workspace_configuration(
         &mut self,
         language_server_id: &zed::LanguageServerId,
-        _worktree: &zed::Worktree,
+        worktree: &zed::Worktree,
     ) -> zed::Result<Option<zed::serde_json::Value>> {
         require_server(language_server_id)?;
-        Ok(Some(spring_workspace_configuration()))
+        let user = zed::settings::LspSettings::for_worktree(SERVER_ID, worktree)
+            .ok()
+            .and_then(|settings| settings.settings);
+        Ok(Some(spring_workspace_configuration(
+            user,
+            &worktree.root_path(),
+        )))
     }
 
     fn language_server_additional_initialization_options(
@@ -101,16 +107,16 @@ fn spring_initialization_options() -> zed::serde_json::Value {
     zed::serde_json::json!({ "enableJdtClasspath": false })
 }
 
-fn spring_workspace_configuration() -> zed::serde_json::Value {
-    // VS Code contributes these defaults through its settings schema. Zed has
-    // no equivalent Spring settings schema, so provide the same effective
-    // defaults explicitly or Spring's standard CodeLens providers stay off.
-    //
-    // `jpql` is off by default on the server (`BootJavaConfig.isJpqlEnabled()`
-    // returns false when the key is absent, unlike the cron inlay hint which
-    // defaults on). Without it `JpqlSupportState` stays disabled, so Spring Data
-    // query intelligence — embedded JPQL/HQL semantic tokens and the
-    // positional-parameter inlay hint — never runs. Enable it explicitly.
+// VS Code contributes these defaults through its settings schema. Zed has no
+// equivalent Spring settings schema, so provide the same effective defaults
+// explicitly or Spring's standard CodeLens providers stay off.
+//
+// `jpql` is off by default on the server (`BootJavaConfig.isJpqlEnabled()`
+// returns false when the key is absent, unlike the cron inlay hint which
+// defaults on). Without it `JpqlSupportState` stays disabled, so Spring Data
+// query intelligence — embedded JPQL/HQL semantic tokens and the
+// positional-parameter inlay hint — never runs. Enable it explicitly.
+fn spring_default_configuration() -> zed::serde_json::Value {
     zed::serde_json::json!({
         "boot-java": {
             "highlight-codelens": {
@@ -126,6 +132,69 @@ fn spring_workspace_configuration() -> zed::serde_json::Value {
             }
         }
     })
+}
+
+// The user's `lsp."spring-tools".settings` wins over our defaults so any
+// `boot-java.*` key VS Code exposes can be set in Zed, including
+// `boot-java.common.properties-metadata` — the path Spring reads in
+// `BootJavaConfig.getCommonPropertiesFile()`. Without that key
+// `SpringPropertiesIndexManager.reloadCommonProperties()` returns false and the
+// reload command cannot do anything, so this passthrough is what makes shared
+// metadata reachable at all.
+fn spring_workspace_configuration(
+    user: Option<zed::serde_json::Value>,
+    worktree_root: &str,
+) -> zed::serde_json::Value {
+    let mut configuration = spring_default_configuration();
+    if let Some(user) = user {
+        merge_configuration(&mut configuration, user);
+    }
+    absolutize_common_properties_file(&mut configuration, worktree_root);
+    configuration
+}
+
+// Deep-merge objects key by key; any non-object user value replaces ours
+// outright, so a user can turn an enabled default back off.
+fn merge_configuration(target: &mut zed::serde_json::Value, source: zed::serde_json::Value) {
+    match (target, source) {
+        (zed::serde_json::Value::Object(target), zed::serde_json::Value::Object(source)) => {
+            for (key, value) in source {
+                merge_configuration(
+                    target.entry(key).or_insert(zed::serde_json::Value::Null),
+                    value,
+                );
+            }
+        }
+        (target, source) => *target = source,
+    }
+}
+
+// Spring resolves this path with `Paths.get(String)`, so a relative path would
+// resolve against the coordinator's working directory rather than the project.
+// Anchor it to the worktree root instead, which is what a user writing a
+// project-relative path means.
+fn absolutize_common_properties_file(
+    configuration: &mut zed::serde_json::Value,
+    worktree_root: &str,
+) {
+    let Some(configured) = configuration
+        .get("boot-java")
+        .and_then(|boot| boot.get("common"))
+        .and_then(|common| common.get("properties-metadata"))
+        .and_then(|value| value.as_str())
+    else {
+        return;
+    };
+    let configured = configured.trim();
+    if configured.is_empty() || Path::new(configured).is_absolute() {
+        return;
+    }
+    let resolved = Path::new(worktree_root).join(configured);
+    let Some(resolved) = resolved.to_str() else {
+        return;
+    };
+    configuration["boot-java"]["common"]["properties-metadata"] =
+        zed::serde_json::Value::String(resolved.to_owned());
 }
 
 fn coordinator_arguments(
@@ -202,6 +271,29 @@ mod tests {
     }
 
     #[test]
+    fn spring_only_files_are_classified_and_carry_their_own_language_ids() {
+        // Spring keys its component set off the didOpen language id, so routing
+        // these files as ordinary Properties would silently hand them to the
+        // Boot properties components instead of the JPA/factories ones.
+        let manifest = include_str!("../extension.toml");
+        assert!(manifest.contains(r#""Spring Factories" = "spring-factories""#));
+        assert!(manifest.contains(r#""JPA Query Properties" = "jpa-query-properties""#));
+        assert!(manifest.contains(
+            r#"languages = ["languages/spring-factories", "languages/jpa-query-properties"]"#
+        ));
+        // The grammar is a third-party dependency, so it stays pinned to an
+        // exact revision rather than a branch — and to the same revision the
+        // official Java extension already pins, so this adds no new upstream
+        // source for a user who already has that extension installed.
+        assert!(manifest.contains(r#"rev = "579b62f5ad8d96c2bb331f07d1408c92767531d9""#));
+
+        let factories = include_str!("../languages/spring-factories/config.toml");
+        assert!(factories.contains(r#"path_suffixes = ["factories"]"#));
+        let jpa = include_str!("../languages/jpa-query-properties/config.toml");
+        assert!(jpa.contains(r#"path_suffixes = ["jpa-named-queries.properties"]"#));
+    }
+
+    #[test]
     fn spring_initialization_does_not_race_the_official_java_server() {
         assert_eq!(
             spring_initialization_options(),
@@ -212,7 +304,7 @@ mod tests {
     #[test]
     fn spring_workspace_configuration_enables_every_codelens_provider() {
         assert_eq!(
-            spring_workspace_configuration(),
+            spring_workspace_configuration(None, "/work"),
             zed::serde_json::json!({
                 "boot-java": {
                     "highlight-codelens": { "on": true },
@@ -232,7 +324,59 @@ mod tests {
         // `boot-java.jpql` defaults off on the server, so it must be sent
         // explicitly or Spring Data query intelligence (semantic tokens +
         // the positional-parameter inlay hint) never runs.
-        let config = spring_workspace_configuration();
+        let config = spring_workspace_configuration(None, "/work");
         assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
+    }
+
+    #[test]
+    fn user_settings_reach_spring_without_dropping_defaults() {
+        // Without this passthrough `BootJavaConfig.getCommonPropertiesFile()`
+        // is always null, so `reloadCommonProperties()` returns false and the
+        // reload command is a guaranteed no-op.
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": { "common": { "properties-metadata": "/shared/metadata.json" } }
+            })),
+            "/work",
+        );
+        assert_eq!(
+            config["boot-java"]["common"]["properties-metadata"],
+            zed::serde_json::json!("/shared/metadata.json")
+        );
+        assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
+        assert_eq!(
+            config["boot-java"]["highlight-codelens"]["on"],
+            zed::serde_json::json!(true)
+        );
+    }
+
+    #[test]
+    fn user_settings_override_an_enabled_default() {
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({ "boot-java": { "jpql": false } })),
+            "/work",
+        );
+        assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(false));
+        // A sibling under the same object survives the merge.
+        assert_eq!(
+            config["boot-java"]["java"]["codelens-over-query-methods"],
+            zed::serde_json::json!(true)
+        );
+    }
+
+    #[test]
+    fn a_relative_metadata_path_anchors_to_the_worktree_root() {
+        // Spring calls `Paths.get(value)`, which would otherwise resolve
+        // against the coordinator's working directory.
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": { "common": { "properties-metadata": "config/shared-metadata.json" } }
+            })),
+            "/work/project",
+        );
+        assert_eq!(
+            config["boot-java"]["common"]["properties-metadata"],
+            zed::serde_json::json!("/work/project/config/shared-metadata.json")
+        );
     }
 }

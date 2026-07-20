@@ -1,5 +1,11 @@
 .DS_Store
 .zed/
+# The fixture's Zed settings are part of the fixture — they configure the shared
+# properties metadata path a driven run reloads. Run/debug configuration that
+# the configure action generates into the same directory stays ignored.
+!tests/fixtures/spring-boot-basic/.zed/
+tests/fixtures/spring-boot-basic/.zed/*
+!tests/fixtures/spring-boot-basic/.zed/settings.json
 *.log
 tmp/
 target/
@@ -7,3 +13,5 @@ target/
 spikes/**/extension/extension.wasm
 /extension.wasm
 /artifacts/
+# Zed compiles the pinned grammar here at install time.
+/grammars/

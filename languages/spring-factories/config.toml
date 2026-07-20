@@ -1,0 +1,4 @@
+name = "Spring Factories"
+grammar = "properties"
+path_suffixes = ["factories"]
+line_comments = ["# ", "! "]

@@ -155,7 +155,11 @@ export class Coordinator {
     this.sequence = 0;
     this.sessionId = randomUUID();
     this.javaFailureShown = false;
+    this.javaNotStartedShown = false;
     this.coordinationStartedAt = Date.now();
+    // Set on the first Java document Zed opens; until then the official Java
+    // server is not expected to be running, so no handshake failure is real.
+    this.javaDocumentSeenAt = undefined;
     this.classpathRetryScheduled = false;
     this.inlayRefreshTimer = undefined;
     this.inlayRefreshPending = false;
@@ -175,6 +179,7 @@ export class Coordinator {
   }
 
   observeZedMessage(message) {
+    this.#observeJavaDocument(message);
     if (message?.method === "textDocument/inlayHint" && message.id !== undefined) {
       const uri = message.params?.textDocument?.uri;
       this.inlayHintRequests.set(idKey(message.id), {
@@ -488,7 +493,7 @@ export class Coordinator {
       // server is ready; only surface the requirement error once that keeps
       // failing past the grace window.
       if (!this.closed) {
-        if (Date.now() - this.coordinationStartedAt >= this.javaHandshakeGraceMs) {
+        if (this.#javaHandshakeGraceElapsed()) {
           this.#showJavaFailure("classpath-registration-failed-v1");
         } else {
           this.#scheduleClasspathRetry();
@@ -505,7 +510,7 @@ export class Coordinator {
       await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
       this.classpathRetryScheduled = false;
       if (this.closed || this.session !== undefined) return;
-      if (Date.now() - this.coordinationStartedAt >= this.javaHandshakeGraceMs) {
+      if (this.#javaHandshakeGraceElapsed()) {
         this.#showJavaFailure("classpath-registration-failed-v1");
         return;
       }
@@ -538,7 +543,6 @@ export class Coordinator {
 
   #startClasspathCoordination() {
     if (this.enableTask !== undefined || this.closed) return;
-    this.coordinationStartedAt = Date.now();
     this.enableTask = this.#enableClasspathWhenJavaReady();
   }
 
@@ -550,6 +554,7 @@ export class Coordinator {
       } catch (error) {
         if (this.closed || error?.name === "AbortError") return;
         this.logger("official Java route is not ready; continuing to wait");
+        this.#showJavaNotStarted();
         await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
         continue;
       }
@@ -671,6 +676,43 @@ export class Coordinator {
         method: REFRESH_CODE_LENSES,
         params: null,
       }),
+    );
+  }
+
+  // Zed starts the official Java server lazily, on the first Java file, and
+  // nothing this extension can do starts it: the extension API has no call for
+  // starting another extension's language server, and `languages.<Lang>.
+  // language_servers` only chooses among servers already declared for that
+  // language — adding `jdtls` to Properties was driven-refuted on 2026-07-20.
+  // So the two situations get different messages instead of one failure claim:
+  // no Java file open yet is normal and needs an instruction, while a Java file
+  // open with no route is a real compatibility failure.
+  #observeJavaDocument(message) {
+    if (this.javaDocumentSeenAt !== undefined) return;
+    if (message?.method !== "textDocument/didOpen") return;
+    const textDocument = message.params?.textDocument;
+    if (textDocument?.languageId !== "java" && !/\.java$/i.test(textDocument?.uri ?? "")) {
+      return;
+    }
+    this.javaDocumentSeenAt = Date.now();
+    this.logger("a Java document was opened; the official Java route is now expected");
+  }
+
+  #javaHandshakeGraceElapsed() {
+    if (this.javaDocumentSeenAt === undefined) return false;
+    return Date.now() - this.javaDocumentSeenAt >= this.javaHandshakeGraceMs;
+  }
+
+  // Said once, when the classpath is genuinely absent rather than broken. The
+  // user is not left guessing why validation is thin, and the only action that
+  // actually works is the one named.
+  #showJavaNotStarted() {
+    if (this.javaNotStartedShown || this.javaFailureShown || this.closed) return;
+    if (this.javaDocumentSeenAt !== undefined) return;
+    if (Date.now() - this.coordinationStartedAt < this.javaHandshakeGraceMs) return;
+    this.javaNotStartedShown = true;
+    this.#showInfo(
+      "Spring Boot: the official Java extension has not started, because this project has no Java file open. Until it does, property validation and completion only see syntax — key metadata comes from the project classpath. Open any .java file in this project to start it.",
     );
   }
 
@@ -955,13 +997,19 @@ export class Coordinator {
   }
 
   async #reloadPropertiesMetadata() {
-    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+    // Spring answers `false` when no shared metadata file is configured:
+    // `SpringPropertiesIndexManager.reloadCommonProperties()` returns early
+    // unless `boot-java.common.properties-metadata` gave it a path. Reporting
+    // success in that case would claim a refresh that never happened.
+    const reloaded = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
       command: RELOAD_PROPERTIES_METADATA_SPRING_COMMAND,
       arguments: [],
     });
     if (this.closed) return;
     this.#showInfo(
-      "Spring Boot: Reloaded shared properties metadata. Completion and validation now use the refreshed metadata.",
+      reloaded === true
+        ? "Spring Boot: Reloaded shared properties metadata. Completion and validation now use the refreshed metadata."
+        : 'Spring Boot: No shared properties metadata file is configured, so there was nothing to reload. Set "boot-java": {"common": {"properties-metadata": "<path to a metadata JSON file>"}} under lsp."spring-tools".settings in your Zed settings.',
     );
   }
 
