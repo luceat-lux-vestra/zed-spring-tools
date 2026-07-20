@@ -13,8 +13,8 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 22 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 27 `planned`, 1 `not-pursued` |
-| Distribution | Local development extension today; extension-registry submission in preparation |
+| Capability inventory | 25 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 24 `planned`, 1 `not-pursued` |
+| Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
 
@@ -48,15 +48,30 @@ The following outcomes have been observed on the tested environment:
 - Spring's own languages for `*.factories` and `META-INF/jpa-named-queries.properties`,
   including JPQL validation inside named queries;
 - Spring workspace symbols, request-mapping navigation, and bean navigation;
-- cron inlay hints;
+- Spring-aware Java completion — property keys in `@Value`, bean names in
+  `@Qualifier`, scopes, profiles, Spring Data query methods derived from the
+  entity, and bean-injection proposals inside `@Component` methods;
+- `@RequestMapping`/`@GetMapping`/`@PostMapping`/`@PutMapping` method templates
+  inside controllers, with their imports added on insertion;
+- cron inlay hints, cron expression completion, and cron syntax validation;
 - Spring quick-fix code actions applied end to end;
 - Java references and implementations through the official Java language
   server; and
 - the `sts/javaType` Spring-to-Java data route.
 
 Zed-native language-server startup replaces the VS Code-specific
-`vscode-spring-boot.ls.start` command. Most of the broader VS Code Spring Tools
-surface is still planned or unverified.
+`vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
+surface is still planned or unverified, and live application data in particular
+is not yet delivered.
+
+Highlighting embedded SpEL and query fragments *inside* Java strings is not
+delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
+Spring registers the provider dynamically — though it advertises full support,
+so a route through static declaration is still open and untested. Java code
+itself highlights correctly through Zed's own grammar meanwhile; only
+token-level colouring within those strings is affected, and the diagnostics,
+hover, and navigation for the same embedded languages ride ordinary LSP and
+work today.
 
 The coordinator also implements Spring CodeLens compatibility: standard Spring
 lenses retain server actions, source-opening lenses use Zed's native location

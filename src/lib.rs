@@ -116,6 +116,13 @@ fn spring_initialization_options() -> zed::serde_json::Value {
 // defaults on). Without it `JpqlSupportState` stays disabled, so Spring Data
 // query intelligence — embedded JPQL/HQL semantic tokens and the
 // positional-parameter inlay hint — never runs. Enable it explicitly.
+//
+// `java.completions.inject-bean` is the same trap: VS Code's schema defaults it
+// `true`, but `BootJavaConfig.isBeanInjectionCompletionEnabled()` is
+// `Boolean.TRUE.equals(...)`, so an absent key reads false and
+// `BeanCompletionProvider` returns nothing. Only this one provider is gated
+// that way; every other Spring-aware Java completion family in
+// `BootJavaCompletionEngineConfigurer` is registered unconditionally.
 fn spring_default_configuration() -> zed::serde_json::Value {
     zed::serde_json::json!({
         "boot-java": {
@@ -128,7 +135,10 @@ fn spring_default_configuration() -> zed::serde_json::Value {
             "jpql": true,
             "java": {
                 "codelens-over-query-methods": true,
-                "codelens-web-configs-on-controller-classes": true
+                "codelens-web-configs-on-controller-classes": true,
+                "completions": {
+                    "inject-bean": true
+                }
             }
         }
     })
@@ -312,10 +322,23 @@ mod tests {
                     "jpql": true,
                     "java": {
                         "codelens-over-query-methods": true,
-                        "codelens-web-configs-on-controller-classes": true
+                        "codelens-web-configs-on-controller-classes": true,
+                        "completions": { "inject-bean": true }
                     }
                 }
             })
+        );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_enables_bean_injection_completion() {
+        // `boot-java.java.completions.inject-bean` reads false when absent
+        // (`Boolean.TRUE.equals`), while VS Code's schema defaults it true, so
+        // without this key `BeanCompletionProvider` is silently dead.
+        let config = spring_workspace_configuration(None, "/work");
+        assert_eq!(
+            config["boot-java"]["java"]["completions"]["inject-bean"],
+            zed::serde_json::json!(true)
         );
     }
 
