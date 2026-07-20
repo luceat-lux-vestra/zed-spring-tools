@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 25 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 23 `planned`, 1 `not-pursued`, 1 `blocked-zed-api` |
+| Capability inventory | 25 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 24 `planned`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -64,13 +64,14 @@ Zed-native language-server startup replaces the VS Code-specific
 surface is still planned or unverified, and live application data in particular
 is not yet delivered.
 
-One capability is blocked rather than pending. Highlighting embedded SpEL and
-query fragments *inside* Java strings would need LSP semantic tokens, and Zed
-1.11.3 never requests them — it advertises full support, but issues no request
-after Spring registers the provider dynamically. Java code itself still
-highlights correctly through Zed's own grammar; only token-level colouring
-within those strings is unavailable. The diagnostics, hover, and navigation for
-the same embedded languages ride ordinary LSP and are unaffected.
+Highlighting embedded SpEL and query fragments *inside* Java strings is not
+delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
+Spring registers the provider dynamically — though it advertises full support,
+so a route through static declaration is still open and untested. Java code
+itself highlights correctly through Zed's own grammar meanwhile; only
+token-level colouring within those strings is affected, and the diagnostics,
+hover, and navigation for the same embedded languages ride ordinary LSP and
+work today.
 
 The coordinator also implements Spring CodeLens compatibility: standard Spring
 lenses retain server actions, source-opening lenses use Zed's native location

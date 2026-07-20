@@ -83,6 +83,7 @@ Tentative sequence:
 | [S014](014-jdtls-bundle-startup-ordering.md) | Find why jdtls starts without the bridge bundle on a cold cache and test the two fixes | Gate A complete: install ordering identified; reload gate shelved |
 | [S015](015-stock-zed-java-spring-document-symbols.md) | Test official Java/Spring LSP Document Symbols in stock Zed without replacing Java queries | Refuted on macOS arm64/JDK 25: the normal merge worked, but restart cached Spring-only results before JDT's later dynamic registration |
 | [S016](016-official-java-6.8.23-compatibility-refresh.md) | Verify official Java 6.8.23's coordination contract and matching main-task reuse | Supported on macOS arm64/JDK 25: Maven/Gradle coordination, product cleanup, warm-cache startup, and the normal-profile Maven main runnable passed. The `--user-data-dir` helper path and an upstream official-Java JDT/port-file cleanup caveat remain; D006 later replaced per-release promotion with capability-first admission |
+| [S017](017-static-semantic-token-declaration.md) | Test whether Zed requests semantic tokens when the coordinator declares `semanticTokensProvider` statically in the `initialize` result, after the dynamic-registration path produced no request | Proposed |
 
 Use [template.md](template.md) before adding any spike code.
 
