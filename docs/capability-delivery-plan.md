@@ -2,7 +2,7 @@
 
 - Status: Selected direction; implementation and runtime verification remain
   incremental
-- Last updated: 2026-07-19
+- Last updated: 2026-07-20
 - Decision: [D005](decisions/005-lsp-first-capability-delivery.md)
 - Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md), and
@@ -85,7 +85,7 @@ user outcome take precedence.
 | Capability and outcome | Current baseline / fallback | Preferred route | Fallback trigger and result | Confidence |
 | --- | --- | --- | --- | ---: |
 | Properties/YAML completion, hover, and validation — recommend keys and values, show documentation, and diagnose invalid configuration | Preserve the verified Spring LS standard-LSP path. | No replacement; continue standard completion, hover, diagnostics, and definition. | Any regression stays on the last compatibility-tested Spring/Java tuple. | 5/5 |
-| Property conversion and metadata reload — convert properties and YAML and reload shared metadata | Commands remain `planned`; users can edit files or restart the server manually. | Expose a Code Action, execute the Spring command, and apply the returned workspace edit. | If create/replace edits are not safe, retain the command as `planned` and document the manual workflow. | 4/5 |
+| Property conversion and metadata reload — convert properties and YAML and reload shared metadata | Delivered: all three commands are `verified`. Manual editing and a server restart remain the fallback. | Route taken: `source` Code Actions execute the Spring command and let the server drive the workspace edit. Reload additionally required passing the user's `boot-java.common.properties-metadata` through, since the server no-ops without it. | Both gates passed on 2026-07-20 (Zed applied the create edit; the reload cleared one key and left a control diagnostic). No fallback was activated. | 5/5; gates closed |
 | Per-file Spring Outline — show the current file's beans, endpoints, and components hierarchically | Preserve verified Project Symbols as the navigable fallback. | S015 Refuted enabling Zed's LSP Document Symbols setting as a supported route: the normal merge is usable, but restart can cache Spring-only results and lose Java symbols. Reopen only after a stock-Zed refresh fix passes the same gate. | The fallback trigger fired. Keep Project Symbols and use the planned Structure document for Spring-only grouping. | 5/5; fallback selected by runtime gate |
 | Project-wide Spring structure — browse beans, endpoints, configurations, and grouping across the worktree | Preserve verified Project Symbols and direct source navigation. | Keep Project Symbols for search and add an opt-in generated Spring Structure document for stable grouping and refresh. | If safe generation, refresh, or navigation cannot be proven, Project Symbols remains the supported equivalent. | 4/5 |
 | Bean and endpoint navigation — jump from Spring elements and request mappings to source | Preserve verified Workspace Symbols plus official Java definition, references, and implementations. | Combine the same surfaces with links from Outline or generated documents. | Links may be omitted without losing the verified symbol-search path. | 5/5 |
@@ -105,7 +105,7 @@ user outcome take precedence.
 | Spring Boot upgrade — update the Boot version and apply migration edits | Capability remains `planned`; manual upgrade remains possible. | Expose the Spring upgrade command as a Code Action and apply only reviewable workspace edits. | If the command needs unsupported multi-step UI or external content, stop before mutation and retain the manual workflow. | 3.5/5 |
 | Modulith — inspect application modules and refresh their metadata | Capability remains `planned`; source navigation remains available through Java. | Use Workspace Symbols for search and an opt-in Structure document for module/dependency grouping. | If metadata generation or links are incomplete, keep the view `planned` and retain ordinary Java navigation. | 3/5 |
 | Spring XML and Java reconcilers — analyze XML configuration and additional Java sources | Capability remains `planned`. | Pass reviewed settings to Spring LS and surface standard completion, diagnostics, navigation, and Code Actions. | Disable only the failing reconciler and preserve the rest of Spring LS. | 4/5 |
-| `spring.factories` and JPA query files — classify special Spring files for completion and validation | `jpa-named-queries.properties` still reaches the Properties route with an unverified language ID; `*.factories` has no route. | Add distinct, non-Java language contributions and grammars, then map their exact Spring language IDs. | Keep ordinary Properties behavior where classification is uncertain; do not take ownership of Java. | 4/5 |
+| `spring.factories` and JPA query files — classify special Spring files for completion and validation | Delivered: both are `verified`. Ordinary Properties behaviour is untouched for every other `.properties` file. | Route taken: distinct Zed languages on a pinned `tree-sitter-properties` grammar, mapped to the Spring language IDs `spring-factories` and `jpa-query-properties`. The open question — filename or language ID — resolved to **language ID**, so the grammar cost was unavoidable. | The 2026-07-20 gates passed: both IDs reached the server and Spring returned `JPQL_SYNTAX` on the broken named query. Java ownership is unchanged. | 5/5; gates closed |
 | Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | No baseline implementation. A future opt-in Java query pack may be investigated behind a new direction decision. | Default to correct official Java highlighting; never risk the whole Java language registration for this enhancement. | 2/5 |
 | Spring Initializr — create a new Spring project | It is outside the pinned VSIX capability surface and current runtime boundary. | Make a separate scope, network, artifact, and UX decision before adding it. | Remain out of scope; document external Initializr use. | 2/5 |
 | AI explanations — explain SpEL, queries, and AOP behavior | The pinned command is VS Code Copilot-specific. The provider is enabled by this product regardless of Zed AI state, while the command is intercepted locally. | Keep the requested lens visible with wording that says the extension cannot detect or invoke Zed Agent and sends no source/prompt to AI. Revisit direct open/prefill only if Zed exports a user-consented Agent action/state API. | Manual analysis or a separate user-initiated Agent request. Do not imply conditional integration, auto-submit a prompt, or include the result in the current extension parity claim. | 2/5 |
@@ -137,27 +137,25 @@ user outcome take precedence.
 
 ## Immediate order
 
-1. Completed on the current CodeLens/compatibility branch: corrected AI-boundary
-   notices; authentic asynchronous `CL-4d` target resolution, caching, refresh,
-   and one-click location rewriting; ignored-`target/` runtime navigation; and a
-   bounded compatibility-report URL/notification whose Zed click opened a
-   title/body-prefilled GitHub composer without submission.
-2. Delivered in code on the `feat/boot-project-run-config` branch and
-   contract-tested: a synthetic `source` Code Action discovers executable Boot
-   projects, prompts a bounded selection, and writes merge-safe
-   `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`) and
-   `.zed/debug.json` (`"adapter": "Java"` launch). A driven Zed run is still
-   required to promote the outcome — debug has no runtime evidence yet.
-3. Delivered in code on the `feat/properties-yaml-conversion` branch and
-   contract-tested: `source` Code Actions on properties/YAML files expose
-   `.properties`↔`.yaml` conversion and shared-metadata reload. The coordinator
-   computes a non-colliding target path and executes `sts/boot/props-to-yaml` /
-   `sts/boot/yaml-to-props` (with `replace-converted-file` left at VS Code's
-   `false` default so the original is kept) and `sts/common-properties/reload`.
-   The Spring server drives the file create via `workspace/applyEdit`. A driven
-   Zed run confirming Zed applies the server's create edit is the promotion gate;
-   until then these rows stay `implemented`, not `verified`.
-4. Prototype the opt-in Structure document before using the same pattern for
+Items 1-3 of the previous order are complete and their rows are `verified` in the
+inventory: CodeLens/compatibility, Boot run/debug configuration generation, and
+the properties line (conversion, shared-metadata reload, and the two Spring file
+languages). What remains:
+
+1. Close the one runtime gap left in run/debug: the multi-project selection
+   prompt and other platform/build-tool tuples have no driven evidence.
+2. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
+3. Take WS2's remaining language-intelligence rows in cost order. Cron
+   completion/validation, Spring-aware Java completion, and request-mapping
+   snippets are verification-shaped: the server already registers them through
+   standard LSP. Spring XML config is settings-plus-verification. Spring-specific
+   references and document highlights need real multi-server composition work,
+   since JDT advertises the same providers.
+4. Spike whether Zed consumes `textDocument/semanticTokens` before committing to
+   SpEL and embedded-query intelligence. Their diagnostics, hover, and navigation
+   are ordinary LSP and will work regardless; only the embedded highlighting
+   depends on that answer, so the spike sets the scope rather than blocking the
+   rest.
 5. Expand live-data and remaining command slices only after their interaction,
    freshness, and security gates are written.

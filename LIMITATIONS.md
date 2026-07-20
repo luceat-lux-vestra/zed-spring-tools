@@ -4,11 +4,17 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- A small set of capabilities is proven on the one tested tuple: Spring Boot
-  property/YAML completion and validation, and Spring workspace symbols (beans,
-  the request-mapping endpoint, and stereotypes reachable through Zed's project
-  symbol search). Most VS Code Spring Tools capabilities are still unimplemented
-  or unverified. Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
+- 22 of 57 tracked capabilities are proven on the tested tuple, and most of the
+  VS Code Spring Tools surface is still unimplemented or unverified. The proven
+  set is the properties/YAML line (completion, hover, validation, definition,
+  `.properties`↔`.yaml` conversion, shared-metadata reload, and the
+  `spring-factories` / `jpa-query-properties` languages), Spring workspace
+  symbols with bean and request-mapping navigation, static and live CodeLens,
+  inlay hints, quick fixes, and Boot run/debug configuration generation. Live
+  application data, the Structure document, Boot upgrade, Modulith, and most of
+  WS2's remaining Java language intelligence are untouched. See the
+  [capability inventory](docs/capability-inventory.md) for the per-row evidence.
+  Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
   `document_symbols` setting is enabled. The earlier zero-request run was the
   default tree-sitter control. S015 found a clear nested JDT/Spring merge and
