@@ -1,6 +1,6 @@
 # S017: Static semantic-token declaration through the coordinator
 
-- Status: Proposed
+- Status: Refuted
 - Date: 2026-07-21
 - Related research: [R013](../research/013-zed-native-capability-delivery-surfaces.md),
   [capability inventory](../capability-inventory.md) rows *Embedded language
@@ -98,11 +98,59 @@ Both are required. The request alone proves only the protocol path.
 
 ## Observations
 
-Not yet executed.
+Driven run 2026-07-21 22:16, Zed 1.11.3, the warmed profile from
+`tmp/ws2-symbols-20260718` copied to the short path `/tmp/zst-s017`, JDK 25 for
+jdtls. Evidence: `tmp/s017-static-semantic-tokens-20260721/evidence/`
+(`trace-s017-run.log`, `request-audit.txt`, `greeting-repo-highlight.png`).
+
+The mechanism was first nailed down from the server jar before writing code.
+`boot-java.embedded-syntax-highlighting` is read by
+`BootJavaConfig.isJavaEmbeddedLanguagesSyntaxHighlighting()`, and
+`EmbeddedLanguagesSemanticTokensSupport.setEnabled(true)` reacts by keeping
+`java` in the semantic-token document selector and **dynamically**
+(`client/registerCapability`) registering `textDocument/semanticTokens`; when the
+flag is off it strips `java`, leaving the `[jpa-query-properties]` selector the
+2026-07-21 baseline captured. So the baseline "Zed requested nothing" reading was
+never about Zed ignoring a *Java* provider — with the flag off Spring never
+offered one for `java` at all.
+
+With the flag on and the coordinator changes in place:
+
+1. The coordinator's static `semanticTokensProvider` **did reach Zed** in the
+   `initialize` result (`{legend, range:false, full:true}`, no delta, no
+   selector — `trace-s017-run.log:1208`).
+2. The fixture's `GreetingRepository.java` was opened as `languageId:"java"` and
+   was the focused tab; Zed actively drove LSP against it — 70
+   `textDocument/codeAction`, 48 `documentHighlight`, 37 `codeLens`, 24
+   `completion`, 24 `inlayHint`, 2 `hover`.
+3. Zed issued **zero** `textDocument/semanticTokens/*` requests — to the
+   coordinator **or** to jdtls (`request-audit.txt`).
+4. The decisive control: **jdtls, the primary Java server, also declares its own
+   `semanticTokensProvider` statically** in its `initialize` result
+   (`full:{delta:false}`, `documentSelector:[{java,file},{java,jdt}]` —
+   `trace-s017-run.log:1345`), and Zed ignored that too. A static declaration on
+   the primary server drew no request either.
+5. The screenshot shows the fallback intact: tree-sitter colours Java normally
+   and the `@Query` JPQL text block renders as one uniform string (no `?1` /
+   `select` / `from` differentiation), while Spring's non-token features stay
+   live in the same buffer (CodeLens "1 reference"/"0 references", the IH-2 inlay
+   bolt on line 27) — so this is a semantic-token-specific gap, not a dead server.
 
 ## Result
 
-Not yet executed.
+**Refuted, and more decisively than the hypothesis anticipated.** The failure is
+not registration timing. Zed 1.11.3 advertises the full `semanticTokens` client
+capability yet issues no semantic-token request for a Java buffer even when the
+provider is declared **statically** — including from jdtls, the primary server.
+The missing surface is Zed's semantic-token **request/render path for Java**, not
+the static-vs-dynamic distinction the Code Action precedent turned on. Per the
+Failure criteria this is the first bullet: the inventory row *Embedded language
+syntax highlighting* is promoted to `blocked-zed-api`, naming the renderer (Zed
+never asks) as the missing surface. The coordinator adaptation is correct and
+harmless but cannot deliver the feature while Zed stays silent, so it is not
+carried into the product from this spike — see the branch
+`spike/s017-static-semantic-tokens` for the reference implementation and its
+contract tests if a future Zed starts honouring the declaration.
 
 ## Remaining uncertainty
 

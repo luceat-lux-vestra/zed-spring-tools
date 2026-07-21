@@ -157,14 +157,14 @@ question below. What remains:
    multi-server composition work, since JDT advertises the same providers — the
    completion run showed Zed composing both servers' results cleanly, which is
    encouraging evidence but not the same protocol.
-4. Finish the semantic-token spike. Its *dynamic-registration* half is answered
-   negatively — Zed advertises full support in `initialize` yet requests nothing
-   after Spring registers the provider dynamically, even after a
-   `workspace/semanticTokens/refresh`. Its *static-declaration* half is the open
-   question and the one worth running: have the coordinator declare
-   `semanticTokensProvider` in the `initialize` result and consume Spring's
-   dynamic registration. See [S017](spikes/017-static-semantic-token-declaration.md).
-   Either way SpEL and embedded-query diagnostics, hover and navigation stay in
-   scope as ordinary LSP; only token-level colouring depends on this answer.
+4. The semantic-token spike is **closed, refuted** ([S017](spikes/017-static-semantic-token-declaration.md),
+   driven 2026-07-21). Both halves failed: Zed requests nothing after Spring's
+   *dynamic* registration, and — the decisive part — nothing after a *static*
+   `semanticTokensProvider` declaration in the `initialize` result either,
+   including jdtls's own static declaration. Zed 1.11.3 has no semantic-token
+   request/render path for Java, so the *Embedded language syntax highlighting*
+   row is now `blocked-zed-api`. SpEL and embedded-query diagnostics, hover and
+   navigation stay in scope as ordinary LSP; only token-level colouring was
+   gated on this answer, and it is now settled negative.
 5. Expand live-data and remaining command slices only after their interaction,
    freshness, and security gates are written.
