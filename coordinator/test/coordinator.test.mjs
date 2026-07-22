@@ -248,6 +248,7 @@ test("Spring initialize advertises the coordinator-owned commands", async () => 
       "zed-spring-tools.reload-properties-metadata",
       "zed-spring-tools.manage-live-process",
       "zed-spring-tools.generate-live-metrics-document",
+      "zed-spring-tools.configure-live-log-level",
     ],
   );
 });
@@ -1498,6 +1499,13 @@ const GENERATE_LIVE_METRICS_COMMAND = {
   params: { command: "zed-spring-tools.generate-live-metrics-document", arguments: [] },
 };
 
+const CONFIGURE_LIVE_LOG_LEVEL_COMMAND = {
+  jsonrpc: "2.0",
+  id: "live-log-level-1",
+  method: "workspace/executeCommand",
+  params: { command: "zed-spring-tools.configure-live-log-level", arguments: [] },
+};
+
 test("project Code Actions are injected for Java files and respect the only filter", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
@@ -1538,9 +1546,14 @@ test("project Code Actions are injected for Java files and respect the only filt
         "zed-spring-tools.manage-live-process",
       ],
       [
-        "Spring Boot: Generate or refresh Live metrics document…",
+        "Spring Boot: Generate or refresh Live data document…",
         "source",
         "zed-spring-tools.generate-live-metrics-document",
+      ],
+      [
+        "Spring Boot: Set a live logger level…",
+        "source",
+        "zed-spring-tools.configure-live-log-level",
       ],
     ],
   );
@@ -1548,6 +1561,7 @@ test("project Code Actions are injected for Java files and respect the only filt
   assert.deepEqual(injected[1].command.arguments, []);
   assert.deepEqual(injected[2].command.arguments, []);
   assert.deepEqual(injected[3].command.arguments, []);
+  assert.deepEqual(injected[4].command.arguments, []);
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1567,7 +1581,8 @@ test("project Code Actions are injected for Java files and respect the only filt
       "Spring Boot: Configure run/debug for a project…",
       "Spring Boot: Generate or refresh Structure document",
       "Spring Boot: Connect or disconnect live process data…",
-      "Spring Boot: Generate or refresh Live metrics document…",
+      "Spring Boot: Generate or refresh Live data document…",
+      "Spring Boot: Set a live logger level…",
     ],
   );
 
@@ -1958,21 +1973,54 @@ test("Live metrics generation explicitly refreshes bounded data and writes a tim
     ],
   }] });
 
+  const loggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "live loggers request",
+  );
+  assert.deepEqual(loggers.params.arguments, [
+    {
+      processKey: "opaque-secret-process-key",
+      processName: "demo [prod]",
+      type: "local",
+      pid: "4242",
+    },
+    { endpoint: "loggers" },
+  ]);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: loggers.id,
+    result: {
+      processType: "local",
+      processName: "demo [prod]",
+      processID: "4242",
+      loggers: {
+        levels: ["OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"],
+        loggers: {
+          ROOT: { configuredLevel: "INFO", effectiveLevel: "INFO" },
+          "com.example.Demo": { configuredLevel: null, effectiveLevel: "INFO" },
+        },
+      },
+    },
+  });
+
   const notice = await waitFor(
     zedWrites,
     (message) => message.method === "window/showMessage" && /Generated \.zed\/spring-live\.md/.test(message.params.message),
     "Live metrics confirmation",
   );
-  assert.match(notice.params.message, /3 live metric measurements/);
+  assert.match(notice.params.message, /3 live metric measurements and 2 loggers/);
   const target = path.join(worktree, ".zed", "spring-live.md");
   const contents = fs.readFileSync(target, "utf8");
-  assert.match(contents, /^<!-- zed-spring-tools:generated-live-metrics:v1 -->\n/);
+  assert.match(contents, /^<!-- zed-spring-tools:generated-live-data:v2 -->\n/);
   assert.ok(contents.includes("Process: demo \\[prod\\] (pid: 4242)"));
   assert.match(contents, /Captured at: 2026-07-23T12:34:56\.000Z/);
   assert.match(contents, /VALUE: 1024 bytes/);
   assert.match(contents, /COUNT: 2 seconds/);
   assert.ok(contents.includes("TOTAL\\_TIME: 0.5 seconds"));
   assert.match(contents, /returned no metrics for this family/);
+  assert.match(contents, /`ROOT` — effective: `INFO`; configured: `INFO`/);
+  assert.match(contents, /`com\.example\.Demo` — effective: `INFO`; configured: `inherited`/);
   assert.doesNotMatch(contents, /opaque-secret-process-key|secret-runtime-identifier|NOT_FINITE|Infinity/);
   assert.equal(fs.existsSync(path.join(worktree, ".gitignore")), false);
 
@@ -2022,6 +2070,23 @@ test("Live metrics generation preserves foreign targets and writes nothing witho
   assert.equal(
     springWrites.some((message) => message.params?.command === "sts/livedata/refresh/metrics"),
     false,
+  );
+
+  fs.writeFileSync(
+    target,
+    "<!-- zed-spring-tools:generated-live-metrics:v1 -->\n# Previous generated snapshot\n",
+  );
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND, id: "live-metrics-legacy" });
+  const legacyConnected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected"
+      && message.id !== connected.id,
+    "legacy Live document connected-process request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: legacyConnected.id, result: [] });
+  assert.match(
+    fs.readFileSync(target, "utf8"),
+    /^<!-- zed-spring-tools:generated-live-metrics:v1 -->/,
   );
 
   fs.rmSync(worktree, { recursive: true, force: true });
@@ -2124,6 +2189,26 @@ test("Live metrics document bounds metric models and measurements with a visible
     );
     await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result });
   }
+  const loggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "bounded loggers request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: loggers.id,
+    result: {
+      loggers: {
+        levels: ["INFO", "DEBUG"],
+        loggers: Object.fromEntries(
+          Array.from({ length: 513 }, (_, index) => [
+            `com.example.logger${String(index).padStart(3, "0")}`,
+            { effectiveLevel: "INFO", configuredLevel: null },
+          ]),
+        ),
+      },
+    },
+  });
   await waitFor(
     zedWrites,
     (message) => message.method === "window/showMessage" && /Generated \.zed\/spring-live\.md/.test(message.params.message),
@@ -2131,12 +2216,283 @@ test("Live metrics document bounds metric models and measurements with a visible
   );
 
   const contents = fs.readFileSync(path.join(worktree, ".zed", "spring-live.md"), "utf8");
-  assert.equal(contents.split("\n").filter((line) => /^### metric-\d+$/.test(line)).length, 64);
+  assert.equal(contents.split("\n").filter((line) => /^#### metric-\d+$/.test(line)).length, 64);
   assert.equal(contents.split("\n").filter((line) => /^- VALUE\\?_\d+:/.test(line)).length, 64 * 16);
   assert.match(contents, /limited to 64 metric models and 16 measurements per model/);
-  assert.doesNotMatch(contents, /### metric-64|VALUE\\?_16:/);
+  assert.doesNotMatch(contents, /#### metric-64|VALUE\\?_16:/);
+  assert.equal(contents.split("\n").filter((line) => /^- `com\.example\.logger\d+`/.test(line)).length, 512);
+  assert.match(contents, /Logger output was limited to 512 of 513 entries/);
+  assert.doesNotMatch(contents, /com\.example\.logger512/);
 
   fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Live logger configuration pages choices and reports success only after the matching update", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  assert.equal(coordinator.observeZedMessage({ ...CONFIGURE_LIVE_LOG_LEVEL_COMMAND }), false);
+  assert.deepEqual(zedWrites[0], { jsonrpc: "2.0", id: "live-log-level-1", result: null });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "logger connected-process request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{
+      type: "local",
+      processKey: "opaque-logger-process",
+      processName: "logger-demo",
+      pid: "8123",
+    }],
+  });
+  const getLoggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "logger data request",
+  );
+  assert.deepEqual(getLoggers.params.arguments, [
+    {
+      processKey: "opaque-logger-process",
+      processName: "logger-demo",
+      type: "local",
+      pid: "8123",
+    },
+    { endpoint: "loggers" },
+  ]);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: getLoggers.id,
+    result: {
+      loggers: {
+        levels: ["INFO", "DEBUG", "TRACE"],
+        loggers: Object.fromEntries(
+          Array.from({ length: 12 }, (_, index) => [
+            `logger-${String(index).padStart(2, "0")}`,
+            { effectiveLevel: "INFO", configuredLevel: null },
+          ]),
+        ),
+      },
+    },
+  });
+
+  const firstPage = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /page 1 of 2/.test(message.params.message),
+    "first logger page",
+  );
+  assert.equal(firstPage.params.actions.length, 11);
+  assert.deepEqual(firstPage.params.actions.at(-1), { title: "More loggers →" });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: firstPage.id,
+    result: { title: "More loggers →" },
+  });
+  const secondPage = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /page 2 of 2/.test(message.params.message),
+    "second logger page",
+  );
+  assert.deepEqual(secondPage.params.actions.at(-1), { title: "← Previous loggers" });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: secondPage.id,
+    result: { title: "logger-10 — INFO" },
+  });
+  const levelPrompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest"
+      && /Select a configured level for `logger-10`/.test(message.params.message),
+    "logger level prompt",
+  );
+  assert.deepEqual(levelPrompt.params.actions, [
+    { title: "INFO" },
+    { title: "DEBUG" },
+    { title: "TRACE" },
+  ]);
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: levelPrompt.id,
+    result: { title: "DEBUG" },
+  });
+  const confirmation = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest"
+      && /Set logger `logger-10`/.test(message.params.message),
+    "logger confirmation",
+  );
+  assert.deepEqual(confirmation.params.actions, [{ title: "Apply DEBUG" }]);
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: confirmation.id,
+    result: { title: "Apply DEBUG" },
+  });
+
+  const configure = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/configure/logLevel",
+    "configure logger request",
+  );
+  assert.deepEqual(configure.params.arguments, [
+    { processKey: "opaque-logger-process" },
+    { packageName: "logger-10", effectiveLevel: "INFO" },
+    { configuredLevel: "DEBUG" },
+  ]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: configure.id, result: null });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/liveprocess/loglevel/updated",
+    params: {
+      processKey: "opaque-logger-process",
+      packageName: "logger-10",
+      configuredLevel: "TRACE",
+    },
+  });
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessage" && /Set `logger-10`/.test(message.params.message)),
+    false,
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/liveprocess/loglevel/updated",
+    params: {
+      processKey: "opaque-logger-process",
+      packageName: "logger-10",
+      configuredLevel: "DEBUG",
+    },
+  });
+  const success = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Set `logger-10` to `DEBUG`/.test(message.params.message),
+    "confirmed logger update",
+  );
+  assert.match(success.params.message, /Rerun the Live data document action/);
+});
+
+test("Live logger configuration reports an unconfirmed request instead of false success", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    liveLogLevelConfirmMs: 5,
+  });
+
+  coordinator.observeZedMessage({ ...CONFIGURE_LIVE_LOG_LEVEL_COMMAND });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "unconfirmed logger connected request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{ type: "local", processKey: "unconfirmed", processName: "demo", pid: "9" }],
+  });
+  const getLoggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "unconfirmed logger data request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: getLoggers.id,
+    result: {
+      loggers: {
+        levels: ["INFO", "DEBUG"],
+        loggers: { ROOT: { effectiveLevel: "INFO", configuredLevel: "INFO" } },
+      },
+    },
+  });
+  const loggerPrompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /page 1 of 1/.test(message.params.message),
+    "unconfirmed logger selection",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: loggerPrompt.id, result: { title: "ROOT — INFO" } });
+  const levelPrompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /Select a configured level/.test(message.params.message),
+    "unconfirmed level selection",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: levelPrompt.id, result: { title: "DEBUG" } });
+  const confirmation = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /Set logger `ROOT`/.test(message.params.message),
+    "unconfirmed logger confirmation",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: confirmation.id, result: { title: "Apply DEBUG" } });
+  const configure = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/configure/logLevel",
+    "unconfirmed configure request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: configure.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /did not confirm the runtime change/.test(message.params.message),
+    "unconfirmed logger notice",
+  );
+  assert.doesNotMatch(notice.params.message, /Set ROOT to DEBUG/);
+});
+
+test("dismissing a live logger selection changes nothing", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...CONFIGURE_LIVE_LOG_LEVEL_COMMAND });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "dismissed logger connected request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{ type: "local", processKey: "dismissed", processName: "demo", pid: "10" }],
+  });
+  const getLoggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "dismissed logger data request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: getLoggers.id,
+    result: {
+      loggers: {
+        levels: ["INFO", "DEBUG"],
+        loggers: { ROOT: { effectiveLevel: "INFO", configuredLevel: "INFO" } },
+      },
+    },
+  });
+  const loggerPrompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest" && /page 1 of 1/.test(message.params.message),
+    "dismissed logger selection",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: loggerPrompt.id, result: null });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/configure/logLevel"),
+    false,
+  );
 });
 
 test("properties files offer conversion and reload actions with the right direction", async () => {
