@@ -123,6 +123,21 @@ fn spring_initialization_options() -> zed::serde_json::Value {
 // `BeanCompletionProvider` returns nothing. Only this one provider is gated
 // that way; every other Spring-aware Java completion family in
 // `BootJavaCompletionEngineConfigurer` is registered unconditionally.
+//
+// `support-spring-xml-config` is the same trap with a twist. Its master switch
+// `on` is genuinely opt-in — `BootJavaConfig.isSpringXMLSupportEnabled()` reads
+// false when absent *and* VS Code's schema also defaults it false — so we must
+// NOT force it on. But once a user opts in, the three sub-settings decide
+// whether the feature does anything, and each reads off/empty when absent while
+// VS Code's schema defaults it on: `hyperlinks` and `content-assist` are
+// `enabled != null && enabled.booleanValue()` (schema default `true`), and
+// `scan-folders` returns an empty folder list when the string is absent (schema
+// default `"src/main"`). Without these, a user who sets `on: true` in Zed gets
+// XML config "enabled" but inert — no content assist, no hyperlinks, and no
+// scanned folders. All three getters are gated behind `isSpringXMLSupportEnabled`
+// in the server (`SpringXMLCompletionEngine`, `XmlBeansConfigDefinitionHandler`,
+// `SpringSymbolIndex`), so supplying these defaults unconditionally never turns
+// the feature on by itself; it only makes the opt-in match VS Code's behavior.
 fn spring_default_configuration() -> zed::serde_json::Value {
     zed::serde_json::json!({
         "boot-java": {
@@ -133,6 +148,11 @@ fn spring_default_configuration() -> zed::serde_json::Value {
                 "on": true
             },
             "jpql": true,
+            "support-spring-xml-config": {
+                "content-assist": true,
+                "hyperlinks": true,
+                "scan-folders": "src/main"
+            },
             "java": {
                 "codelens-over-query-methods": true,
                 "codelens-web-configs-on-controller-classes": true,
@@ -320,6 +340,11 @@ mod tests {
                     "highlight-codelens": { "on": true },
                     "highlight-copilot-codelens": { "on": true },
                     "jpql": true,
+                    "support-spring-xml-config": {
+                        "content-assist": true,
+                        "hyperlinks": true,
+                        "scan-folders": "src/main"
+                    },
                     "java": {
                         "codelens-over-query-methods": true,
                         "codelens-web-configs-on-controller-classes": true,
@@ -328,6 +353,44 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_makes_opt_in_xml_config_functional() {
+        // The master switch `support-spring-xml-config.on` stays absent: it is
+        // false-when-absent on the server *and* in VS Code, so it is genuinely
+        // opt-in and must not be forced on.
+        let config = spring_workspace_configuration(None, "/work");
+        assert!(
+            config["boot-java"]["support-spring-xml-config"]
+                .get("on")
+                .is_none(),
+            "the XML master switch must remain user opt-in, not defaulted on"
+        );
+        // The three sub-settings read off/empty when absent while VS Code's
+        // schema defaults them on, so once a user sets `on: true` these must be
+        // present or the feature is enabled-but-inert.
+        let xml = &config["boot-java"]["support-spring-xml-config"];
+        assert_eq!(xml["content-assist"], zed::serde_json::json!(true));
+        assert_eq!(xml["hyperlinks"], zed::serde_json::json!(true));
+        assert_eq!(xml["scan-folders"], zed::serde_json::json!("src/main"));
+    }
+
+    #[test]
+    fn a_user_can_enable_xml_config_without_losing_the_sub_setting_defaults() {
+        // Opting in through user settings must deep-merge over our sub-defaults
+        // rather than replacing the whole object and re-introducing the gap.
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": { "support-spring-xml-config": { "on": true } }
+            })),
+            "/work",
+        );
+        let xml = &config["boot-java"]["support-spring-xml-config"];
+        assert_eq!(xml["on"], zed::serde_json::json!(true));
+        assert_eq!(xml["content-assist"], zed::serde_json::json!(true));
+        assert_eq!(xml["hyperlinks"], zed::serde_json::json!(true));
+        assert_eq!(xml["scan-folders"], zed::serde_json::json!("src/main"));
     }
 
     #[test]

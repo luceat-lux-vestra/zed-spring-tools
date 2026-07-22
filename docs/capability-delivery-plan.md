@@ -104,7 +104,7 @@ user outcome take precedence.
 | Open application URL — reach a running app or endpoint in a browser | Capability remains `planned`; users can copy a known URL. | Expose a standard Document Link or clickable Markdown URL in hover/generated content. When a Code Action discovers the URL, use a clickable Markdown `showMessageRequest` result as a companion after runtime verification. Do not assume general `window/showDocument` support. | Always show copyable text if clicking or automatic external opening is unavailable. An OS-specific opener task is recorded only as a future contingency and requires a separate cross-platform security/quoting gate. | 4/5 |
 | Spring Boot upgrade — update the Boot version and apply migration edits | Capability remains `planned`; manual upgrade remains possible. | Expose the Spring upgrade command as a Code Action and apply only reviewable workspace edits. | If the command needs unsupported multi-step UI or external content, stop before mutation and retain the manual workflow. | 3.5/5 |
 | Modulith — inspect application modules and refresh their metadata | Capability remains `planned`; source navigation remains available through Java. | Use Workspace Symbols for search and an opt-in Structure document for module/dependency grouping. | If metadata generation or links are incomplete, keep the view `planned` and retain ordinary Java navigation. | 3/5 |
-| Spring XML and Java reconcilers — analyze XML configuration and additional Java sources | Capability remains `planned`. | Pass reviewed settings to Spring LS and surface standard completion, diagnostics, navigation, and Code Actions. | Disable only the failing reconciler and preserve the rest of Spring LS. | 4/5 |
+| Spring XML and Java reconcilers — analyze XML configuration and additional Java sources | XML config is now `verified`; Java reconcilers remain `planned`. | Route taken for XML: XML already reaches the server through the `xml` language id, the opt-in master switch stays user-controlled, and the extension supplies the `content-assist`, `hyperlinks`, and `scan-folders` sub-defaults that read off/empty when absent — closing the same silent-gap trap as `jpql`/`inject-bean`. Driven 2026-07-22: with only `on: true` user-set, reconcile diagnostic, XML symbol scan, class/property completion, and property→source definition all fired on the named macOS tuple. | Disable only the failing reconciler and preserve the rest of Spring LS. | 5/5; driven gate closed |
 | `spring.factories` and JPA query files — classify special Spring files for completion and validation | Delivered: both are `verified`. Ordinary Properties behaviour is untouched for every other `.properties` file. | Route taken: distinct Zed languages on a pinned `tree-sitter-properties` grammar, mapped to the Spring language IDs `spring-factories` and `jpa-query-properties`. The open question — filename or language ID — resolved to **language ID**, so the grammar cost was unavoidable. | The 2026-07-20 gates passed: both IDs reached the server and Spring returned `JPQL_SYNTAX` on the broken named query. Java ownership is unchanged. | 5/5; gates closed |
 | Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | S017 closed the stock-Zed route negatively on 2026-07-21: Zed issues no semantic-token request after either dynamic or static registration, including jdtls's own static provider. A future opt-in Java query pack is an independent tree-sitter alternative and requires a new direction decision. | The fallback is the supported state: official Java tree-sitter highlighting renders these strings correctly; only token-level colouring inside them is lost. Never risk the whole Java language registration for this enhancement. | 2/5; blocked on Zed's Java semantic-token request/render path |
 | Spring Initializr — create a new Spring project | It is outside the pinned VSIX capability surface and current runtime boundary. | Make a separate scope, network, artifact, and UX decision before adding it. | Remain out of scope; document external Initializr use. | 2/5 |
@@ -160,11 +160,19 @@ question below. What remains:
    linked file's `#L…` fragment, so Project Symbols remains the exact-location
    fallback. Custom `structure/groups` visibility selection remains a later
    enhancement rather than part of this verified default-group prototype.
-3. Take WS2's remaining language-intelligence rows. Spring XML config is
-   settings-plus-verification, and its master switch
-   `boot-java.support-spring-xml-config.on` defaults false in VS Code too, so it
-   is genuinely opt-in and needs only passthrough plus a driven check.
-   Spring-specific references and document highlights **split** on the
+3. Take WS2's remaining language-intelligence rows. Spring XML config is now
+   `verified`: its master switch `boot-java.support-spring-xml-config.on`
+   defaults false in VS Code too, so it stays genuinely opt-in and is not
+   forced on, but the three sub-settings (`content-assist`, `hyperlinks`,
+   `scan-folders`) read off/empty when absent while VS Code's schema defaults
+   them on, so the extension supplies them — otherwise `on: true` yields an
+   inert feature. This is the same silent-gap trap as `jpql`/`inject-bean`.
+   The 2026-07-22 driven run closed the gate on macOS arm64/Zed 1.11.3 with
+   sweetppro/zed-xml: with only `on: true` user-set, the four keys reached the
+   server, `beans.xml` opened as `languageId: xml`, and all four gates fired
+   (SpEL reconcile diagnostic → `on`; 1 XML scanned/1 bean symbol →
+   `scan-folders`; class + property completion → `content-assist`;
+   property→source definition → `hyperlinks`). Spring-specific references and document highlights **split** on the
    composition question, settled by [S018](spikes/018-references-highlights-multiserver-composition.md)
    and its U4 follow-up (driven 2026-07-21/22): `textDocument/references`
    fans to both servers and Zed **unions** the results. The qualifier→bean,
