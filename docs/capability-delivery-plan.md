@@ -153,10 +153,16 @@ question below. What remains:
    settings-plus-verification, and its master switch
    `boot-java.support-spring-xml-config.on` defaults false in VS Code too, so it
    is genuinely opt-in and needs only passthrough plus a driven check.
-   Spring-specific references and document highlights still need real
-   multi-server composition work, since JDT advertises the same providers — the
-   completion run showed Zed composing both servers' results cleanly, which is
-   encouraging evidence but not the same protocol.
+   Spring-specific references and document highlights **split** on the
+   composition question, settled by [S018](spikes/018-references-highlights-multiserver-composition.md)
+   (driven 2026-07-21): `textDocument/references` fans to both servers and Zed
+   **unions** the results — Spring's `@Qualifier`→`@Bean` link appeared in the
+   same multibuffer as jdtls's Java references — so the references/implementation
+   row needs no coordinator merge code, only Spring-attributable fixture targets
+   plus a driven verification. `textDocument/documentHighlight`, by contrast,
+   goes to the single primary server (jdtls); Spring is never queried, so the
+   Spring-specific highlight slice is `blocked-zed-api`, the same class as the
+   S017 semantic-token result. Do not build coordinator highlight code.
 4. The semantic-token spike is **closed, refuted** ([S017](spikes/017-static-semantic-token-declaration.md),
    driven 2026-07-21). Both halves failed: Zed requests nothing after Spring's
    *dynamic* registration, and — the decisive part — nothing after a *static*
