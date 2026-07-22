@@ -61,12 +61,15 @@ The following outcomes have been observed on the tested environment:
 
 Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
-surface is still planned or unverified. Live application data has its first
-verified slice — connect/disconnect to a running Boot process. A Code Action
-lists processes, prompts a bounded choice, and reports connect success only when
-the server announces the process is connected, never on the command's
-always-null result. The 2026-07-23 macOS arm64 gate connected and disconnected a
-Boot 3.5.5 process with JMX and Actuator live-data endpoints exposed. A separate
+surface is still planned or unverified. For live application data, a Code Action
+lists processes, prompts a bounded connect/refresh/disconnect choice, and reports
+connect success only when the server announces the process is connected, never
+on the command's always-null result. This is the Zed-native equivalent of VS
+Code's show/hide/refresh commands, which only wrap the same Spring operations for
+its active debug app. The 2026-07-23 macOS arm64 gate connected a Boot 3.5.5
+process, exposed refresh/disconnect choices, refreshed live CodeLens, and then
+disconnected with JMX cleanup. The fixture had JMX and Actuator live-data
+endpoints exposed. A separate
 Code Action generates a bounded, timestamped `.zed/spring-live.md` snapshot for
 heap, non-heap, and GC-pause measurements. The 2026-07-23 driven gate verified
 authentic values, rendered preview, explicit refresh, and deletion/recreation
