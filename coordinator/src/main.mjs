@@ -67,6 +67,37 @@ const CONVERSION_SPECS = Object.freeze({
   "props-to-yaml": { command: PROPS_TO_YAML_SPRING_COMMAND, extension: "yml" },
   "yaml-to-props": { command: YAML_TO_PROPS_SPRING_COMMAND, extension: "properties" },
 });
+// Live application data — connect/disconnect to a running Boot process. The
+// Spring server owns process discovery and the JMX/actuator connection: given no
+// arguments, `sts/livedata/listProcesses` returns one command descriptor per
+// available or connected process ({processKey, label, action, projectName,
+// processId}), where `action` is the exact live-data command to run for that
+// entry (connect for an available process, disconnect/refresh for a connected
+// one). `connect`/`disconnect`/`refresh` take [{processKey}] and every one of
+// them resolves to `null` whether or not anything happened, so a null result is
+// not evidence of success — the same trap as the shared-metadata reload. The
+// authoritative connect signal is the server→client `sts/liveprocess/connected`
+// notification, which fires exactly once after the process is reached and its
+// first live data is stored, so the coordinator waits for that (keyed by
+// processKey) before claiming a connection.
+const LIST_LIVE_PROCESSES_COMMAND = "sts/livedata/listProcesses";
+const LIVE_CONNECT_COMMAND = "sts/livedata/connect";
+const LIVE_DISCONNECT_COMMAND = "sts/livedata/disconnect";
+const LIVE_REFRESH_COMMAND = "sts/livedata/refresh";
+const LIVE_PROCESS_CONNECTED = "sts/liveprocess/connected";
+const LIVE_PROCESS_DISCONNECTED = "sts/liveprocess/disconnected";
+const LIVE_PROCESS_ACTIONS = new Set([
+  LIVE_CONNECT_COMMAND,
+  LIVE_DISCONNECT_COMMAND,
+  LIVE_REFRESH_COMMAND,
+]);
+const MANAGE_LIVE_PROCESS_COMMAND = "zed-spring-tools.manage-live-process";
+const MANAGE_LIVE_PROCESS_TITLE = "Spring Boot: Connect or disconnect live process data…";
+const MAX_LIVE_PROCESS_SELECTION = 12;
+// How long to wait for the server's `sts/liveprocess/connected` notification
+// after issuing a connect before reporting a bounded "requested" message. A JMX
+// handshake plus the first actuator poll can take a few seconds.
+const LIVE_CONNECT_CONFIRM_MS = 12_000;
 const ALL_BOOT_PROJECTS_TITLE = "All projects";
 const MAX_BOOT_PROJECT_SELECTION = 8;
 // Cap generated per-profile entries so a project with many profiles cannot flood
@@ -78,6 +109,7 @@ const COORDINATOR_COMMANDS = [
   GENERATE_STRUCTURE_DOCUMENT_COMMAND,
   CONVERT_PROPERTIES_YAML_COMMAND,
   RELOAD_PROPERTIES_METADATA_COMMAND,
+  MANAGE_LIVE_PROCESS_COMMAND,
 ];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
@@ -126,6 +158,7 @@ export class Coordinator {
     javaHandshakeGraceMs = JAVA_HANDSHAKE_GRACE_MS,
     classpathRetryMs = CLASSPATH_RETRY_MS,
     inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
+    liveConnectConfirmMs = LIVE_CONNECT_CONFIRM_MS,
     reportContext = {},
     targetExists = fileUriExists,
     logger = () => {},
@@ -138,6 +171,7 @@ export class Coordinator {
     this.javaHandshakeGraceMs = javaHandshakeGraceMs;
     this.classpathRetryMs = classpathRetryMs;
     this.inlayRefreshDelayMs = inlayRefreshDelayMs;
+    this.liveConnectConfirmMs = liveConnectConfirmMs;
     this.targetExists = targetExists;
     this.logger = logger;
     this.pending = new Map();
@@ -160,6 +194,13 @@ export class Coordinator {
     // opens it from the applied create edit, so that request must be answered
     // silently rather than through the CodeLens `showDocument` fallback notice.
     this.pendingConversionTargets = new Set();
+    // Coordinator-owned live-process connection state. `connectedProcesses` maps
+    // a Spring processKey to the last `sts/liveprocess/connected` summary so a
+    // disconnect/report is accurate; `pendingConnectWaiters` holds a one-shot
+    // resolver per key that a connect awaits until Spring announces the process
+    // is connected (or the confirm timeout elapses).
+    this.connectedProcesses = new Map();
+    this.pendingConnectWaiters = new Map();
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -252,6 +293,7 @@ export class Coordinator {
     if (this.#handleGenerateStructureDocumentCommand(message)) return false;
     if (this.#handleConvertPropertiesYamlCommand(message)) return false;
     if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
+    if (this.#handleManageLiveProcessCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
@@ -309,6 +351,16 @@ export class Coordinator {
     if (!isRequest(message)) {
       if (message?.method === SPRING_HIGHLIGHT) {
         this.#cacheLiveCodeLenses(message.params);
+        return;
+      }
+      if (message?.method === LIVE_PROCESS_CONNECTED) {
+        this.#noteLiveProcessConnected(message.params?.processKey, message.params);
+        this.sendZed(encodeLsp(message));
+        return;
+      }
+      if (message?.method === LIVE_PROCESS_DISCONNECTED) {
+        this.#noteLiveProcessDisconnected(message.params?.processKey);
+        this.sendZed(encodeLsp(message));
         return;
       }
       if (
@@ -418,6 +470,12 @@ export class Coordinator {
       clearTimeout(timer);
       reject(new Error("Spring Tools coordinator stopped"));
     }
+    for (const { resolve, timer } of this.pendingConnectWaiters.values()) {
+      clearTimeout(timer);
+      resolve(false);
+    }
+    this.pendingConnectWaiters.clear();
+    this.connectedProcesses.clear();
     this.pending.clear();
     this.zedRequests.clear();
     this.pendingZedRequests.clear();
@@ -1079,6 +1137,143 @@ export class Coordinator {
     );
   }
 
+  #handleManageLiveProcessCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== MANAGE_LIVE_PROCESS_COMMAND
+    ) {
+      return false;
+    }
+    // Answer Zed's command immediately; discovery, the selection prompt, and the
+    // connect/disconnect round trip run asynchronously and report their own
+    // outcome. A connect additionally waits for the server's connected
+    // notification, which would stall Zed's UI if it blocked the response.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#manageLiveProcess().catch((error) => {
+      if (this.closed) return;
+      this.logger(`Spring live-process management failed: ${errorText(error)}`);
+      this.#showInfo(
+        `Spring Boot: Live process data could not be managed. ${errorText(error)} Make sure the official Java extension has finished importing the project, then try again.`,
+      );
+    });
+    return true;
+  }
+
+  async #manageLiveProcess() {
+    const discovered = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: LIST_LIVE_PROCESSES_COMMAND,
+      arguments: [],
+    });
+    const entries = normalizeLiveProcesses(discovered);
+    if (entries.length === 0) {
+      this.#showInfo(
+        "Spring Boot: No running Spring Boot processes were found. Start your application with Spring Boot Actuator (or JMX) enabled, then run this action again.",
+      );
+      return;
+    }
+    const chosen = await this.#selectLiveProcess(entries);
+    if (chosen === undefined) return;
+    if (chosen.action === LIVE_CONNECT_COMMAND) {
+      await this.#connectLiveProcess(chosen);
+      return;
+    }
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: chosen.action,
+      arguments: [{ processKey: chosen.processKey }],
+    });
+    if (this.closed) return;
+    // Disconnect and refresh both resolve to null, but unlike connect their
+    // outcome is not asynchronous: the server removed or refreshed the connector
+    // synchronously, so reporting the requested action is accurate.
+    this.#showInfo(
+      chosen.action === LIVE_DISCONNECT_COMMAND
+        ? `Spring Boot: Disconnected live data from ${chosen.label}.`
+        : `Spring Boot: Refreshed live data from ${chosen.label}.`,
+    );
+  }
+
+  async #connectLiveProcess(entry) {
+    // Register the confirmation waiter before issuing connect so the server's
+    // `sts/liveprocess/connected` notification cannot race ahead of it.
+    const confirmed = this.#awaitLiveConnection(entry.processKey);
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: LIVE_CONNECT_COMMAND,
+      arguments: [{ processKey: entry.processKey }],
+    });
+    const connected = await confirmed;
+    if (this.closed) return;
+    this.#showInfo(
+      connected
+        ? `Spring Boot: Connected live data from ${entry.label}. Live CodeLens and native Hover now show runtime beans, endpoints and injection data; run this action again to disconnect.`
+        : `Spring Boot: Requested a live-data connection to ${entry.label}, but no runtime data has arrived yet. Make sure the process exposes Spring Boot Actuator (or JMX). If it connects, live CodeLens and Hover will update on their own.`,
+    );
+  }
+
+  // Resolve true when the server announces the process is connected, false when
+  // the confirm timeout elapses. Connect itself always resolves to null, so this
+  // notification is the only trustworthy success signal.
+  #awaitLiveConnection(processKey) {
+    if (typeof processKey !== "string") return Promise.resolve(false);
+    if (this.connectedProcesses.has(processKey)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const existing = this.pendingConnectWaiters.get(processKey);
+      if (existing !== undefined) {
+        clearTimeout(existing.timer);
+        existing.resolve(false);
+      }
+      const timer = setTimeout(() => {
+        const waiter = this.pendingConnectWaiters.get(processKey);
+        if (waiter !== undefined && waiter.resolve === resolve) {
+          this.pendingConnectWaiters.delete(processKey);
+        }
+        resolve(false);
+      }, this.liveConnectConfirmMs);
+      timer.unref?.();
+      this.pendingConnectWaiters.set(processKey, { resolve, timer });
+    });
+  }
+
+  #noteLiveProcessConnected(processKey, summary) {
+    if (typeof processKey !== "string") return;
+    this.connectedProcesses.set(processKey, summary);
+    const waiter = this.pendingConnectWaiters.get(processKey);
+    if (waiter !== undefined) {
+      clearTimeout(waiter.timer);
+      this.pendingConnectWaiters.delete(processKey);
+      waiter.resolve(true);
+    }
+  }
+
+  #noteLiveProcessDisconnected(processKey) {
+    if (typeof processKey === "string") this.connectedProcesses.delete(processKey);
+  }
+
+  async #selectLiveProcess(entries) {
+    const shown = entries.slice(0, MAX_LIVE_PROCESS_SELECTION);
+    const byTitle = new Map();
+    const actions = [];
+    for (const entry of shown) {
+      const base = `${liveActionVerb(entry.action)} — ${entry.label}`;
+      let title = base;
+      for (let index = 2; byTitle.has(title); index += 1) title = `${base} (${index})`;
+      byTitle.set(title, entry);
+      actions.push({ title });
+    }
+    const overflow = entries.length - shown.length;
+    const message = overflow > 0
+      ? `Select a Spring Boot process to connect, disconnect or refresh its live data. ${overflow} more ${overflow === 1 ? "process is" : "processes are"} not shown; disconnect one first or rerun this action. Nothing happens until you choose.`
+      : "Select a Spring Boot process to connect its live data, or disconnect/refresh a connected one. Nothing happens until you choose.";
+    const response = await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message,
+      actions,
+    });
+    const title = response?.title;
+    if (typeof title !== "string") return undefined;
+    return byTitle.get(title);
+  }
+
   async #configureBootRun() {
     const discovered = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
       command: EXECUTABLE_BOOT_PROJECTS_COMMAND,
@@ -1327,6 +1522,15 @@ function syntheticCodeActions(request) {
         arguments: [],
       },
     });
+    actions.push({
+      title: MANAGE_LIVE_PROCESS_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: MANAGE_LIVE_PROCESS_TITLE,
+        command: MANAGE_LIVE_PROCESS_COMMAND,
+        arguments: [],
+      },
+    });
   }
   const conversion = propertiesConversionFor(request);
   if (conversion !== undefined) {
@@ -1350,6 +1554,32 @@ function syntheticCodeActions(request) {
     });
   }
   return actions;
+}
+
+// Keep only well-formed live-process descriptors whose action is one of the
+// commands this route is prepared to execute. Spring returns connect entries for
+// available processes and disconnect/refresh entries for connected ones; an
+// entry with an unknown action or missing key is dropped rather than offered.
+function normalizeLiveProcesses(discovered) {
+  if (!Array.isArray(discovered)) return [];
+  const entries = [];
+  for (const item of discovered) {
+    if (item === null || typeof item !== "object") continue;
+    const processKey = typeof item.processKey === "string" ? item.processKey : undefined;
+    const action = typeof item.action === "string" ? item.action : undefined;
+    if (processKey === undefined || action === undefined || !LIVE_PROCESS_ACTIONS.has(action)) {
+      continue;
+    }
+    const label = typeof item.label === "string" && item.label.length > 0 ? item.label : processKey;
+    entries.push({ processKey, action, label });
+  }
+  return entries;
+}
+
+function liveActionVerb(action) {
+  if (action === LIVE_CONNECT_COMMAND) return "Connect";
+  if (action === LIVE_DISCONNECT_COMMAND) return "Disconnect";
+  return "Refresh";
 }
 
 function offersBootRunAction(request) {

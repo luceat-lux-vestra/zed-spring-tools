@@ -246,6 +246,7 @@ test("Spring initialize advertises the coordinator-owned commands", async () => 
       "zed-spring-tools.generate-structure-document",
       "zed-spring-tools.convert-properties-yaml",
       "zed-spring-tools.reload-properties-metadata",
+      "zed-spring-tools.manage-live-process",
     ],
   );
 });
@@ -1523,10 +1524,16 @@ test("project Code Actions are injected for Java files and respect the only filt
         "source",
         "zed-spring-tools.generate-structure-document",
       ],
+      [
+        "Spring Boot: Connect or disconnect live process data…",
+        "source",
+        "zed-spring-tools.manage-live-process",
+      ],
     ],
   );
   assert.deepEqual(injected[0].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
   assert.deepEqual(injected[1].command.arguments, []);
+  assert.deepEqual(injected[2].command.arguments, []);
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1545,6 +1552,7 @@ test("project Code Actions are injected for Java files and respect the only filt
       "Valid existing action",
       "Spring Boot: Configure run/debug for a project…",
       "Spring Boot: Generate or refresh Structure document",
+      "Spring Boot: Connect or disconnect live process data…",
     ],
   );
 
@@ -2069,6 +2077,276 @@ test("an unconfigured shared metadata file is reported instead of a false refres
   assert.ok(
     !/Reloaded shared properties metadata/.test(notice.params.message),
     "no success claim when nothing was reloaded",
+  );
+});
+
+const MANAGE_LIVE_PROCESS_COMMAND_MESSAGE = {
+  jsonrpc: "2.0",
+  id: "live-1",
+  method: "workspace/executeCommand",
+  params: { command: "zed-spring-tools.manage-live-process", arguments: [] },
+};
+
+test("connecting a live process reports success only after the server confirms the connection", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  // The command is answered immediately so Zed's UI never blocks on discovery.
+  assert.equal(coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE }), false);
+  assert.equal(zedWrites[0].id, "live-1");
+  assert.equal(zedWrites[0].result, null);
+
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  assert.deepEqual(listRequest.params.arguments, []);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      {
+        processKey: "app:1234",
+        label: "demo (pid: 1234)",
+        action: "sts/livedata/connect",
+        projectName: "demo",
+        processId: "1234",
+      },
+    ],
+  });
+
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "process selection prompt",
+  );
+  assert.deepEqual(prompt.params.actions.map((action) => action.title), [
+    "Connect — demo (pid: 1234)",
+  ]);
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: prompt.id,
+    result: { title: "Connect — demo (pid: 1234)" },
+  });
+
+  const connectRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/connect",
+    "connect request",
+  );
+  assert.deepEqual(connectRequest.params.arguments, [{ processKey: "app:1234" }]);
+  // Connect resolves to null whether or not the process was reached, so a null
+  // result must not be treated as success.
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: connectRequest.id, result: null });
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessage"),
+    false,
+    "no notice before the server confirms the connection",
+  );
+
+  // The authoritative success signal: the server announces the connected process.
+  coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/liveprocess/connected",
+    params: { type: "local", processKey: "app:1234", processName: "demo", pid: "1234" },
+  });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "connect confirmation",
+  );
+  assert.match(notice.params.message, /Connected live data from demo \(pid: 1234\)/);
+  // The connected notification is still forwarded to Zed unchanged.
+  assert.ok(
+    zedWrites.some(
+      (message) => message.method === "sts/liveprocess/connected" && message.params?.processKey === "app:1234",
+    ),
+    "connected notification forwarded to Zed",
+  );
+});
+
+test("a connect that never confirms reports a bounded request, not a false success", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    // Keep the confirm window short so the test does not wait for the real one.
+    liveConnectConfirmMs: 20,
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      { processKey: "app:1234", label: "demo", action: "sts/livedata/connect" },
+    ],
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "prompt",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: { title: "Connect — demo" } });
+  const connectRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/connect",
+    "connect request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: connectRequest.id, result: null });
+
+  // Let the confirm timer elapse in real time; waitFor polls with setImmediate,
+  // which can drain before a wall-clock timer fires, so give the timer room.
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "requested notice",
+  );
+  assert.match(notice.params.message, /Requested a live-data connection to demo/);
+  assert.match(notice.params.message, /Actuator/);
+  assert.ok(
+    !/Connected live data from/.test(notice.params.message),
+    "no success claim without a confirmation",
+  );
+});
+
+test("disconnecting a connected process issues disconnect and reports it", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  // A connected process offers both refresh and disconnect entries.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      { processKey: "app:1234", label: "demo", action: "sts/livedata/refresh" },
+      { processKey: "app:1234", label: "demo", action: "sts/livedata/disconnect" },
+    ],
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "prompt",
+  );
+  assert.deepEqual(prompt.params.actions.map((action) => action.title), [
+    "Refresh — demo",
+    "Disconnect — demo",
+  ]);
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: { title: "Disconnect — demo" } });
+
+  const disconnectRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/disconnect",
+    "disconnect request",
+  );
+  assert.deepEqual(disconnectRequest.params.arguments, [{ processKey: "app:1234" }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: disconnectRequest.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "disconnect notice",
+  );
+  assert.match(notice.params.message, /Disconnected live data from demo/);
+});
+
+test("no running processes reports a notice and issues no connect command", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: listRequest.id, result: [] });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "empty notice",
+  );
+  assert.match(notice.params.message, /No running Spring Boot processes were found/);
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    false,
+    "no selection prompt for an empty process list",
+  );
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/connect"),
+    false,
+    "no connect command for an empty process list",
+  );
+});
+
+test("dismissing the process prompt runs no live-data command", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [{ processKey: "app:1234", label: "demo", action: "sts/livedata/connect" }],
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "prompt",
+  );
+  // Zed dropping the prompt returns a response with no chosen action.
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: null });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/connect"),
+    false,
+    "no connect after a dismissed prompt",
   );
 });
 
