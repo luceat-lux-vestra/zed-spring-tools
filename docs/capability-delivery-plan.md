@@ -152,8 +152,14 @@ question below. What remains:
    suppressed during bounded retries, and registered the bridge after the same
    jdtls process resumed. Gradle interaction and other desktop tuples remain
    untested rather than blocking this named-tuple result.
-2. Next, prototype the opt-in Structure document before using the same pattern
-   for live metrics or loggers.
+2. The opt-in Structure-document prototype passed its macOS arm64 driven gate.
+   Its Java-file source action renders Spring's authentic default hierarchy to
+   the owned, regenerable `.zed/spring-structure.md`; real Zed opened its
+   worktree-only source links, refreshed byte-identically, and recreated the
+   document after deletion without creating `.gitignore`. Zed 1.11.3 discards a
+   linked file's `#L…` fragment, so Project Symbols remains the exact-location
+   fallback. Custom `structure/groups` visibility selection remains a later
+   enhancement rather than part of this verified default-group prototype.
 3. Take WS2's remaining language-intelligence rows. Spring XML config is
    settings-plus-verification, and its master switch
    `boot-java.support-spring-xml-config.on` defaults false in VS Code too, so it

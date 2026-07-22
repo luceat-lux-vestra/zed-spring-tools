@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 25 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 24 `planned`, 1 `not-pursued` |
+| Capability inventory | 28 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 21 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -109,15 +109,15 @@ multi-project run then displayed `service-a`, `service-b`, and `All projects`;
 selecting all generated one task/debug pair per module with the correct portable
 working directory and launched nothing automatically.
 
-Newly implemented and contract-tested, with a driven run still pending before
-promotion: `source` Code Actions on `.properties` and `.yaml`/`.yml` files that
-convert between the two formats and reload shared properties metadata. The
-coordinator computes a non-colliding target file beside the source and executes
-Spring's `sts/boot/props-to-yaml` / `yaml-to-props` (keeping the original, to
-match VS Code's default) or `sts/common-properties/reload`; the Spring server
-performs the file creation through a standard `workspace/applyEdit`. These rows
-stay `implemented` in the inventory until a driven Zed run confirms the edit is
-applied.
+Now verified on the named macOS tuple: a Java-file `source` Code Action executes
+Spring's authentic `sts/spring-boot/structure` command and writes
+`.zed/spring-structure.md`. The opt-in Markdown snapshot preserves Spring's
+project/group hierarchy, links only to source files inside the current worktree,
+marks itself as regenerable and safe to delete, and refreshes only files carrying
+its ownership marker. A driven Zed run proved authentic generation, rendered
+hierarchy, source-file opening, byte-stable refresh, and deletion/recreation
+without creating `.gitignore`. Zed 1.11.3 opens the linked file but discards the
+Markdown `#L…` fragment, so Project Symbols remains the exact-location fallback.
 
 The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
 every standard provider, its user-visible subfeatures, the separate live-data

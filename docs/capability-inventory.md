@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 16
+- Inventory version: 17
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-22
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -53,9 +53,9 @@ selected route or planning-confidence score does not change a state here.
 
 | State | Count |
 | --- | --- |
-| `verified` | 27 |
+| `verified` | 28 |
 | `implemented` | 1 |
-| `planned` | 22 |
+| `planned` | 21 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
@@ -86,6 +86,20 @@ same run forced the official-Java bridge command to time out while jdtls was
 paused and then observed the coordinator re-enable classpath listening and
 register the bridge after that exact jdtls process resumed, without a misleading
 compatibility notification.
+
+Inventory version 17 records and verifies the first opt-in Structure document.
+A Java-file source Code Action explicitly runs Spring's pinned
+`sts/spring-boot/structure` contract with metadata refresh and renders the
+returned project/group hierarchy into `.zed/spring-structure.md`. Contract tests
+cover deterministic refresh, worktree-only relative links (including Spring's
+`reference` nodes), visible snapshot/stale guidance, deletion and recreation,
+bounded output, unknown-file preservation, and no `.gitignore` mutation. The
+2026-07-22 driven macOS arm64 gate then proved the authentic hierarchy, rendered
+preview, source-file opening, byte-identical refresh, deletion/recreation, and
+`.gitignore` non-mutation. Zed 1.11.3 discards a Markdown file link's `#L…`
+fragment after opening the file; Project Symbols retains exact-location
+navigation. `structure/groups` visibility selection is not part of this first
+all-default-groups prototype.
 
 ## Known surface constraints
 
@@ -154,7 +168,7 @@ verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Document symbols | `zed-native-equivalent` | S015 Refuted the preferred LSP Outline route on the tested tuple. With `languages.Java.document_symbols: on` after both servers were ready, Zed merged package/type/method plus nested Spring component/bean/endpoint results with no exact duplicate labels; navigation and saved-edit refresh worked. After restart, however, Spring answered before JDT dynamically registered Document Symbols, and Zed cached a Spring-only Outline that omitted ordinary Java symbols until another source edit forced recollection. The setting was restored to `off`; verified Project Symbols remains the supported fallback and an opt-in Structure document remains planned. Evidence: `tmp/s015-document-symbols-20260718/evidence/`; earlier tree-sitter control: `tmp/ws2-symbols-run2-20260718/`. |
+| Document symbols | `zed-native-equivalent` | S015 Refuted the preferred LSP Outline route on the tested tuple. With `languages.Java.document_symbols: on` after both servers were ready, Zed merged package/type/method plus nested Spring component/bean/endpoint results with no exact duplicate labels; navigation and saved-edit refresh worked. After restart, however, Spring answered before JDT dynamically registered Document Symbols, and Zed cached a Spring-only Outline that omitted ordinary Java symbols until another source edit forced recollection. The setting was restored to `off`; verified Project Symbols remains the supported fallback and the verified opt-in Structure-document companion now supplies stable Spring grouping. Evidence: `tmp/s015-document-symbols-20260718/evidence/`; earlier tree-sitter control: `tmp/ws2-symbols-run2-20260718/`. |
 | Workspace symbols (Spring symbols) | `verified` | Observed 2026-07-18. Zed's "Go to Symbol in Project" issued `workspace/symbol`; the Spring server (through the coordinator) returned the logical structure — `@+ 'greetingController' (@RestController <: @Controller, @Component)`, `@+ 'greetingPrefix' (@Bean) String`, `@+ 'greetingConfiguration' (@Configuration)`, `@+ 'fixtureApplication' (@SpringBootApplication)`, and `@/greeting -- GET` — each with a resolved location in the fixture. jdtls returned 0 for the `@`-prefixed queries, so the symbols are attributable to Spring. Evidence: `tmp/ws2-symbols-run2-20260718/`. |
 | Request mapping navigation | `verified` | Observed 2026-07-18. `@/greeting -- GET` (kind 6) is returned by `workspace/symbol` as a navigable workspace symbol resolved to `GreetingController.java`, so Zed's symbol picker jumps to the mapping. |
 | Bean navigation | `verified` | Observed 2026-07-18. `@+ 'greetingPrefix' (@Bean)` and the `@Component`/`@Configuration` symbols are returned by `workspace/symbol` with resolved locations, navigable from Zed's symbol picker. |
@@ -191,8 +205,8 @@ verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Browse / navigate the Spring logical structure | `zed-native-equivalent` | Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the supported equivalent. S015 Refuted the preferred per-file LSP Outline because restart can omit Java symbols; an explicitly requested, regenerable Spring Structure document remains the planned grouping companion. Evidence: `tmp/ws2-symbols-run2-20260718/` and `tmp/s015-document-symbols-20260718/evidence/`. |
-| Structure refresh / grouping | `planned` | Preferred route: `sts/spring-boot/structure` and `structure/groups` generate or refresh an opt-in, deterministic Structure document with source links. Project Symbols remains fallback. The document must be safe to delete, must not silently edit `.gitignore`, and needs stale/refresh verification. |
+| Browse / navigate the Spring logical structure | `zed-native-equivalent` | Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the supported equivalent. S015 Refuted the preferred per-file LSP Outline because restart can omit Java symbols. The explicitly requested, regenerable Spring Structure document is now a verified grouping companion. Its Markdown links open the right source files, while Project Symbols remains the exact-location path because Zed 1.11.3 discards their `#L…` fragments. Evidence: `tmp/ws2-symbols-run2-20260718/`, `tmp/s015-document-symbols-20260718/evidence/`, and `tmp/structure-document-20260722-runtime/evidence/`. |
+| Structure refresh / grouping | `verified` | A Java-file `source` Code Action runs `sts/spring-boot/structure` with `{updateMetadata:true}` and renders Spring's default project/group hierarchy to the opt-in `.zed/spring-structure.md`. It includes a visible snapshot/stale warning, only links `location`/`reference` file URIs inside the worktree, caps output at 2,000 nodes/16 levels, deterministically replaces only a file with its versioned ownership marker, recreates after deletion, and never edits `.gitignore`; an unknown target is preserved with a notice before Spring is called. Contract tests cover those rules. **Driven on 2026-07-22** (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25.0.3): Spring returned the authentic project and default groups, Markdown preview rendered them, a request-mapping link opened `GreetingController.java`, explicit refresh retained SHA-256 `006ad20227f9e4a09a6c230382bc9411d2e15b81ab02b721cea666c1cf8d97d1`, and moving the file away then rerunning recreated the same bytes while `.gitignore` remained absent. Zed discarded the `#L16` fragment when opening that link, matching its Markdown Preview implementation, so Project Symbols remains the exact-location fallback. Custom visibility selection via `structure/groups` remains a later enhancement. Evidence: `tmp/structure-document-20260722-runtime/evidence/`. |
 | Run / debug a Boot application | `verified` | The configure Code Action generates merge-safe `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`, portable `$ZED_WORKTREE_ROOT`-relative `cwd`, editable `env`) and `.zed/debug.json` (`"adapter": "Java"` launch with `mainClass`, `cwd`, and editable `vmArgs`/`args`/`env`). One base entry plus one per discovered Spring profile (from `application-<profile>.*` filenames and multi-document `application.{yml,yaml}` activation), capped at eight with the overflow named. Merge safety: create when absent, replace only its own labelled entries in plain JSON, and sidecar (never clobber) a commented or non-array file. **Driven checks verified on 2026-07-19** (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25): the generated run task's exact `mvn spring-boot:run` launched the Boot app and served `GET /greeting` (HTTP 200); a second check generated `dev`/`prod`/`staging` entries and launched the `dev` Java debug configuration after editing `vmArgs`, `args`, and `env`. The 2026-07-22 macOS 26.5.2 Maven multi-project gate then displayed `service-a`, `service-b`, and `All projects`; selecting all generated two task and two debug entries with the correct module `cwd` values and ran nothing automatically. Official Java's loopback main-class resolver requires system HTTP proxies to bypass `localhost`/`127.0.0.1`; its isolated-profile DAP helper path remains an S016 caveat. Gradle interaction and every non-macOS-arm64 desktop tuple remain untested. No route overwrites unknown configuration or starts a debug session programmatically. Evidence: `tmp/run-debug-gates-20260722/evidence/`. |
 | Maven goal / Gradle build | `planned` | Build execution remains official Java/Zed task ownership under D003. S016 verified Maven main execution through `compile exec:java` and verified Gradle project coordination, but did not run a Gradle/vanilla task or Java test task. Under D006, prefer the installed official Java extension's wrapper-aware tasks only where matching runtime evidence exists; generate or merge reviewable `.zed/tasks.json` for arbitrary goals/builds or Spring-specific commands. Manual tasks remain fallback. Spring LS's direct `Runtime.exec` commands are not selected because they do not provide Zed task/terminal ownership. |
 | Open Boot app page URL | `planned` | Preferred route: expose a standard Document Link or clickable Markdown URL in hover or the opt-in Live document. A Code Action that discovers a URL may present it through Zed's general `window/showMessageRequest` Markdown prompt, whose source routes link clicks through `open_url_or_file`; this companion still needs a driven desktop test. Zed's general LSP client does not advertise or handle `window/showDocument`, so copyable text is the required fallback. OS-specific opener tasks remain an excluded contingency unless public links fail and a separate cross-platform security/quoting gate supports them. |

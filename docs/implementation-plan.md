@@ -155,14 +155,14 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 16 exists at
+Status: in progress. Inventory version 17 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 27 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 22
+capabilities: 28 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 21
 `planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
@@ -298,8 +298,12 @@ Immediate M4 slice order after D006 is now:
 4. the remaining Run/Debug runtime gates are verified on the macOS arm64/Maven
    tuple: multi-project selection and the real-Zed forced-timeout recovery run;
    and
-5. next, prototype the opt-in Structure document, then take the separately gated
-   live-data, build/task, upgrade, Modulith, XML, and remaining language slices.
+5. the opt-in Structure-document prototype is verified on macOS arm64: authentic
+   generation, rendered default grouping, source-file opening, stale guidance,
+   byte-stable refresh, deletion/recreation, and `.gitignore` non-mutation passed.
+   Zed 1.11.3 drops Markdown `#L…` fragments, so Project Symbols remains the
+   exact-location fallback. Next take the separately gated live-data, build/task,
+   upgrade, Modulith, XML, and remaining language slices.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's
