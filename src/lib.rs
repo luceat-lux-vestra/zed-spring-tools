@@ -138,6 +138,14 @@ fn spring_initialization_options() -> zed::serde_json::Value {
 // in the server (`SpringXMLCompletionEngine`, `XmlBeansConfigDefinitionHandler`,
 // `SpringSymbolIndex`), so supplying these defaults unconditionally never turns
 // the feature on by itself; it only makes the opt-in match VS Code's behavior.
+//
+// Local live-data discovery has another server-side gate that is easy to miss:
+// `SpringProcessConnectorLocal.isAvailable()` returns false unless
+// `live-information.all-local-java-processes` is true. VS Code defaults that
+// setting off because its dashboard supplies other process presentation, but
+// this product's explicit connect Code Action depends on Spring's local Attach
+// API list. Enable only discovery here; automatic connection remains separate
+// and off, and the user-settings deep merge below can turn discovery back off.
 fn spring_default_configuration() -> zed::serde_json::Value {
     zed::serde_json::json!({
         "boot-java": {
@@ -148,6 +156,9 @@ fn spring_default_configuration() -> zed::serde_json::Value {
                 "on": true
             },
             "jpql": true,
+            "live-information": {
+                "all-local-java-processes": true
+            },
             "support-spring-xml-config": {
                 "content-assist": true,
                 "hyperlinks": true,
@@ -340,6 +351,9 @@ mod tests {
                     "highlight-codelens": { "on": true },
                     "highlight-copilot-codelens": { "on": true },
                     "jpql": true,
+                    "live-information": {
+                        "all-local-java-processes": true
+                    },
                     "support-spring-xml-config": {
                         "content-assist": true,
                         "hyperlinks": true,
@@ -415,6 +429,24 @@ mod tests {
     }
 
     #[test]
+    fn spring_workspace_configuration_enables_explicit_local_process_discovery() {
+        // `SpringProcessConnectorLocal.isAvailable()` returns false when this
+        // key is absent or false, making `sts/livedata/listProcesses` return no
+        // local JVMs even when a JMX-enabled Boot process is running.
+        let config = spring_workspace_configuration(None, "/work");
+        assert_eq!(
+            config["boot-java"]["live-information"]["all-local-java-processes"],
+            zed::serde_json::json!(true)
+        );
+        assert!(
+            config["boot-java"]["live-information"]
+                .get("automatic-connection")
+                .is_none(),
+            "explicit discovery must not opt into automatic connection"
+        );
+    }
+
+    #[test]
     fn user_settings_reach_spring_without_dropping_defaults() {
         // Without this passthrough `BootJavaConfig.getCommonPropertiesFile()`
         // is always null, so `reloadCommonProperties()` returns false and the
@@ -439,10 +471,19 @@ mod tests {
     #[test]
     fn user_settings_override_an_enabled_default() {
         let config = spring_workspace_configuration(
-            Some(zed::serde_json::json!({ "boot-java": { "jpql": false } })),
+            Some(zed::serde_json::json!({
+                "boot-java": {
+                    "jpql": false,
+                    "live-information": { "all-local-java-processes": false }
+                }
+            })),
             "/work",
         );
         assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(false));
+        assert_eq!(
+            config["boot-java"]["live-information"]["all-local-java-processes"],
+            zed::serde_json::json!(false)
+        );
         // A sibling under the same object survives the merge.
         assert_eq!(
             config["boot-java"]["java"]["codelens-over-query-methods"],
