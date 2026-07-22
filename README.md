@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 28 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 21 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 28 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 20 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -150,8 +150,10 @@ edit it.
   pinned to one extension point release, while exact tested releases remain
   recorded;
 - an XML extension that registers the `XML` language (e.g. `sweetppro/zed-xml`)
-  is optional but required for `pom.xml` Maven inlay hints — Zed has no built-in
-  XML language, the same way Java support requires the official Java extension;
+  is optional but required for `pom.xml` Maven inlay hints and for opt-in Spring
+  XML-config intelligence (set `boot-java.support-spring-xml-config.on`) — Zed
+  has no built-in XML language, the same way Java support requires the official
+  Java extension;
 - JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
 - Rust installed through `rustup`, which Zed requires when building a local
   development extension; and
