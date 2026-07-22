@@ -219,7 +219,7 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   assert.deepEqual(zedWrites, [request]);
 });
 
-test("Spring initialize advertises the coordinator CodeLens and run/debug commands", async () => {
+test("Spring initialize advertises the coordinator-owned commands", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring() {},
@@ -243,6 +243,7 @@ test("Spring initialize advertises the coordinator CodeLens and run/debug comman
       "sts/server-command",
       "zed-spring-tools.explain-code-lens",
       "zed-spring-tools.configure-boot-run",
+      "zed-spring-tools.generate-structure-document",
       "zed-spring-tools.convert-properties-yaml",
       "zed-spring-tools.reload-properties-metadata",
     ],
@@ -1481,7 +1482,14 @@ const CONFIGURE_COMMAND = {
   params: { command: "zed-spring-tools.configure-boot-run", arguments: [] },
 };
 
-test("Boot run/debug code action is injected for Java files and respects the only filter", async () => {
+const GENERATE_STRUCTURE_COMMAND = {
+  jsonrpc: "2.0",
+  id: "structure-1",
+  method: "workspace/executeCommand",
+  params: { command: "zed-spring-tools.generate-structure-document", arguments: [] },
+};
+
+test("project Code Actions are injected for Java files and respect the only filter", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring() {},
@@ -1501,10 +1509,24 @@ test("Boot run/debug code action is injected for Java files and respects the onl
     id: "ca-java",
     result: [{ title: "Existing quick fix" }],
   });
-  const injected = zedWrites.at(-1).result.at(-1);
-  assert.equal(injected.command.command, "zed-spring-tools.configure-boot-run");
-  assert.equal(injected.kind, "source");
-  assert.deepEqual(injected.command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
+  const injected = zedWrites.at(-1).result.slice(1);
+  assert.deepEqual(
+    injected.map((action) => [action.title, action.kind, action.command.command]),
+    [
+      [
+        "Spring Boot: Configure run/debug for a project…",
+        "source",
+        "zed-spring-tools.configure-boot-run",
+      ],
+      [
+        "Spring Boot: Generate or refresh Structure document",
+        "source",
+        "zed-spring-tools.generate-structure-document",
+      ],
+    ],
+  );
+  assert.deepEqual(injected[0].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
+  assert.deepEqual(injected[1].command.arguments, []);
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1519,7 +1541,11 @@ test("Boot run/debug code action is injected for Java files and respects the onl
   });
   assert.deepEqual(
     zedWrites.at(-1).result.map((action) => action.title),
-    ["Valid existing action", "Spring Boot: Configure run/debug for a project…"],
+    [
+      "Valid existing action",
+      "Spring Boot: Configure run/debug for a project…",
+      "Spring Boot: Generate or refresh Structure document",
+    ],
   );
 
   // A YAML file gets the conversion and reload actions instead of the Java
@@ -1544,6 +1570,273 @@ test("Boot run/debug code action is injected for Java files and respects the onl
   });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: "ca-quickfix", result: [{}] });
   assert.deepEqual(zedWrites.at(-1).result, []);
+});
+
+test("Structure document generation preserves hierarchy, safe source links, and stable refresh", async () => {
+  const worktree = makeWorktree();
+  const source = path.join(worktree, "src", "main", "java", "demo", "Greeting Controller.java");
+  fs.mkdirSync(path.dirname(source), { recursive: true });
+  fs.writeFileSync(source, "package demo;\n\nclass GreetingController {}\n");
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  assert.equal(coordinator.observeZedMessage({ ...GENERATE_STRUCTURE_COMMAND }), false);
+  assert.deepEqual(zedWrites[0], { jsonrpc: "2.0", id: "structure-1", result: null });
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/structure",
+    "structure request",
+  );
+  assert.deepEqual(request.params.arguments, [{ updateMetadata: true }]);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: [
+      {
+        attributes: { text: "demo-app", projectId: "demo-app" },
+        children: [
+          {
+            attributes: { text: "Web [Spring]" },
+            children: [
+              {
+                attributes: {
+                  text: "GreetingController",
+                  location: {
+                    uri: pathToFileURL(source).href,
+                    range: { start: { line: 2, character: 6 }, end: { line: 2, character: 24 } },
+                  },
+                },
+                children: [],
+              },
+              {
+                attributes: {
+                  text: "Dependency source",
+                  reference: {
+                    uri: pathToFileURL(path.join(os.tmpdir(), "outside.java")).href,
+                    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                  },
+                },
+                children: [],
+              },
+              {
+                attributes: {
+                  text: "Source stereotype",
+                  reference: {
+                    uri: pathToFileURL(source).href,
+                    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                  },
+                },
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  const target = path.join(worktree, ".zed", "spring-structure.md");
+  const first = fs.readFileSync(target, "utf8");
+  assert.match(first, /^<!-- zed-spring-tools:generated-structure:v1 -->\n/);
+  assert.match(first, /- demo-app\n  - Web \\\[Spring\\\]/);
+  assert.match(first, /\[GreetingController\]\(\.\.\/src\/main\/java\/demo\/Greeting%20Controller\.java#L3\)/);
+  assert.match(first, /- Dependency source/);
+  assert.match(first, /\[Source stereotype\]\(\.\.\/src\/main\/java\/demo\/Greeting%20Controller\.java#L1\)/);
+  assert.doesNotMatch(first, /outside\.java|file:\/\/|zst-run-/);
+  assert.equal(fs.existsSync(path.join(worktree, ".gitignore")), false);
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "structure confirmation",
+  );
+  assert.match(notice.params.message, /Generated \.zed\/spring-structure\.md with 5 logical nodes/);
+
+  // The same authentic result is a byte-stable refresh, not an append. Deleting
+  // the generated file also makes the next explicit action recreate it.
+  coordinator.observeZedMessage({
+    ...GENERATE_STRUCTURE_COMMAND,
+    id: "structure-2",
+  });
+  const refresh = await waitFor(
+    springWrites,
+    (message) => message.id !== request.id && message.params?.command === "sts/spring-boot/structure",
+    "structure refresh request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: refresh.id, result: [
+    {
+      attributes: { text: "demo-app", projectId: "demo-app" },
+      children: [
+        {
+          attributes: { text: "Web [Spring]" },
+          children: [
+            {
+              attributes: {
+                text: "GreetingController",
+                location: {
+                  uri: pathToFileURL(source).href,
+                  range: { start: { line: 2, character: 6 }, end: { line: 2, character: 24 } },
+                },
+              },
+              children: [],
+            },
+            {
+              attributes: {
+                text: "Dependency source",
+                reference: {
+                  uri: pathToFileURL(path.join(os.tmpdir(), "outside.java")).href,
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                },
+              },
+              children: [],
+            },
+            {
+              attributes: {
+                text: "Source stereotype",
+                reference: {
+                  uri: pathToFileURL(source).href,
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                },
+              },
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  ] });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Refreshed/.test(message.params.message),
+    "structure refresh confirmation",
+  );
+  assert.equal(fs.readFileSync(target, "utf8"), first);
+
+  fs.rmSync(target);
+  coordinator.observeZedMessage({ ...GENERATE_STRUCTURE_COMMAND, id: "structure-3" });
+  const recreate = await waitFor(
+    springWrites,
+    (message) => ![request.id, refresh.id].includes(message.id) && message.params?.command === "sts/spring-boot/structure",
+    "structure recreation request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: recreate.id, result: [] });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Generated/.test(message.params.message) && /0 logical nodes/.test(message.params.message),
+    "structure recreation confirmation",
+  );
+  assert.match(fs.readFileSync(target, "utf8"), /returned no logical structure/);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Structure generation never overwrites an unowned target", async () => {
+  const worktree = makeWorktree();
+  const zedDirectory = path.join(worktree, ".zed");
+  const target = path.join(zedDirectory, "spring-structure.md");
+  fs.mkdirSync(zedDirectory);
+  fs.writeFileSync(target, "# My hand-written structure\n");
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_STRUCTURE_COMMAND });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "foreign target notice",
+  );
+  assert.match(notice.params.message, /is not owned by Zed Spring Tools/);
+  assert.equal(fs.readFileSync(target, "utf8"), "# My hand-written structure\n");
+  assert.equal(springWrites.length, 0);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Structure generation preserves a target created while Spring is responding", async () => {
+  const worktree = makeWorktree();
+  const target = path.join(worktree, ".zed", "spring-structure.md");
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_STRUCTURE_COMMAND });
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/structure",
+    "in-flight structure request",
+  );
+  fs.mkdirSync(path.dirname(target));
+  fs.writeFileSync(target, "# Created while Spring was responding\n");
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: [] });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /changed while Spring Tools/.test(message.params.message),
+    "in-flight target notice",
+  );
+
+  assert.match(notice.params.message, /left unchanged/);
+  assert.equal(fs.readFileSync(target, "utf8"), "# Created while Spring was responding\n");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Structure document output is bounded and visibly marks truncation", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_STRUCTURE_COMMAND });
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/structure",
+    "bounded structure request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: Array.from({ length: 2_005 }, (_, index) => ({
+      attributes: { text: `node-${index}` },
+      children: [],
+    })),
+  });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "bounded structure confirmation",
+  );
+
+  const contents = fs.readFileSync(
+    path.join(worktree, ".zed", "spring-structure.md"),
+    "utf8",
+  );
+  assert.equal(contents.split("\n").filter((line) => line.startsWith("- node-")).length, 2_000);
+  assert.match(contents, /Output was limited to 2000 nodes and 16 levels/);
+  assert.doesNotMatch(contents, /node-2000/);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
 });
 
 test("properties files offer conversion and reload actions with the right direction", async () => {

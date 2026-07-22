@@ -33,6 +33,14 @@ const CODE_ACTION_REQUEST = "textDocument/codeAction";
 const EXECUTABLE_BOOT_PROJECTS_COMMAND = "sts/spring-boot/executableBootProjects";
 const CONFIGURE_BOOT_RUN_COMMAND = "zed-spring-tools.configure-boot-run";
 const CONFIGURE_BOOT_RUN_TITLE = "Spring Boot: Configure run/debug for a project…";
+const SPRING_STRUCTURE_COMMAND = "sts/spring-boot/structure";
+const GENERATE_STRUCTURE_DOCUMENT_COMMAND = "zed-spring-tools.generate-structure-document";
+const GENERATE_STRUCTURE_DOCUMENT_TITLE = "Spring Boot: Generate or refresh Structure document";
+const STRUCTURE_DOCUMENT_RELATIVE_PATH = path.join(".zed", "spring-structure.md");
+const STRUCTURE_DOCUMENT_MARKER = "<!-- zed-spring-tools:generated-structure:v1 -->";
+const MAX_STRUCTURE_NODES = 2_000;
+const MAX_STRUCTURE_DEPTH = 16;
+const MAX_STRUCTURE_LABEL_LENGTH = 300;
 const BOOT_CONFIG_ACTION_KIND = "source";
 const BOOT_CONFIG_LABEL_PREFIX = "Spring Boot (zed-spring-tools): ";
 // Properties/YAML conversion and shared-metadata reload. The Spring server owns
@@ -67,6 +75,7 @@ const MAX_BOOT_PROFILE_ENTRIES = 8;
 const COORDINATOR_COMMANDS = [
   COORDINATOR_CODE_LENS_COMMAND,
   CONFIGURE_BOOT_RUN_COMMAND,
+  GENERATE_STRUCTURE_DOCUMENT_COMMAND,
   CONVERT_PROPERTIES_YAML_COMMAND,
   RELOAD_PROPERTIES_METADATA_COMMAND,
 ];
@@ -240,6 +249,7 @@ export class Coordinator {
     this.#observeGeneratedTargetInvalidation(message);
     if (this.#handleCoordinatorCodeLensCommand(message)) return false;
     if (this.#handleConfigureBootRunCommand(message)) return false;
+    if (this.#handleGenerateStructureDocumentCommand(message)) return false;
     if (this.#handleConvertPropertiesYamlCommand(message)) return false;
     if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
@@ -929,6 +939,62 @@ export class Coordinator {
     return true;
   }
 
+  #handleGenerateStructureDocumentCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== GENERATE_STRUCTURE_DOCUMENT_COMMAND
+    ) {
+      return false;
+    }
+    // Structure collection may rebuild Spring's stereotype metadata. Answer the
+    // editor command immediately and report the generated snapshot separately.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#generateStructureDocument().catch((error) => {
+      if (this.closed) return;
+      this.logger(`Spring Structure document failed: ${errorText(error)}`);
+      this.#showInfo(`Spring Boot: The Structure document could not be generated. ${errorText(error)}`);
+    });
+    return true;
+  }
+
+  async #generateStructureDocument() {
+    const target = path.join(this.worktree, STRUCTURE_DOCUMENT_RELATIVE_PATH);
+    const ownership = structureDocumentOwnership(target);
+    if (ownership === "foreign") {
+      this.#showInfo(
+        `Spring Boot: ${STRUCTURE_DOCUMENT_RELATIVE_PATH} already exists and is not owned by Zed Spring Tools, so it was left unchanged. Rename or remove that file before generating the Structure document.`,
+      );
+      return;
+    }
+    const result = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: SPRING_STRUCTURE_COMMAND,
+      // Match the pinned VS Code client's explicit refresh contract. Omitting
+      // affectedProjects and groups asks Spring for every project and its
+      // default visible groups.
+      arguments: [{ updateMetadata: true }],
+    });
+    if (!Array.isArray(result)) {
+      throw new Error("Spring Tools returned an invalid logical-structure result.");
+    }
+    // Spring may rebuild metadata before answering. Recheck after that await so
+    // a file created or edited while the request was in flight is never treated
+    // as the previously observed target.
+    const currentOwnership = structureDocumentOwnership(target);
+    if (currentOwnership === "foreign") {
+      this.#showInfo(
+        `Spring Boot: ${STRUCTURE_DOCUMENT_RELATIVE_PATH} changed while Spring Tools was collecting the structure and is not owned by Zed Spring Tools, so it was left unchanged.`,
+      );
+      return;
+    }
+    const rendered = renderStructureDocument(result, target, this.worktree);
+    writeStructureDocument(target, rendered);
+    if (this.closed) return;
+    this.#showInfo(
+      `Spring Boot: ${currentOwnership === "missing" ? "Generated" : "Refreshed"} ${STRUCTURE_DOCUMENT_RELATIVE_PATH} with ${rendered.renderedNodes} logical ${rendered.renderedNodes === 1 ? "node" : "nodes"}. It is a regenerable snapshot; open the file to browse its source links and rerun this action after source changes.`,
+    );
+  }
+
   #handleConvertPropertiesYamlCommand(message) {
     if (
       !isRequest(message) ||
@@ -1252,6 +1318,15 @@ function syntheticCodeActions(request) {
         arguments: [{ uri: request.uri }],
       },
     });
+    actions.push({
+      title: GENERATE_STRUCTURE_DOCUMENT_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: GENERATE_STRUCTURE_DOCUMENT_TITLE,
+        command: GENERATE_STRUCTURE_DOCUMENT_COMMAND,
+        arguments: [],
+      },
+    });
   }
   const conversion = propertiesConversionFor(request);
   if (conversion !== undefined) {
@@ -1316,6 +1391,121 @@ function fileUriToPath(uri) {
   } catch {
     return undefined;
   }
+}
+
+function structureDocumentOwnership(target) {
+  let status;
+  try {
+    status = fs.lstatSync(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return "missing";
+    throw error;
+  }
+  if (!status.isFile() || status.isSymbolicLink()) return "foreign";
+  let contents;
+  try {
+    contents = fs.readFileSync(target, "utf8");
+  } catch (error) {
+    throw error;
+  }
+  return contents.startsWith(`${STRUCTURE_DOCUMENT_MARKER}\n`) ? "owned" : "foreign";
+}
+
+function writeStructureDocument(target, rendered) {
+  const directory = path.dirname(target);
+  try {
+    const status = fs.lstatSync(directory);
+    if (!status.isDirectory() || status.isSymbolicLink()) {
+      throw new Error(`${STRUCTURE_DOCUMENT_RELATIVE_PATH} requires an ordinary .zed directory.`);
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    fs.mkdirSync(directory, { recursive: true });
+  }
+  const flags = fs.constants.O_WRONLY
+    | fs.constants.O_CREAT
+    | fs.constants.O_TRUNC
+    | (fs.constants.O_NOFOLLOW ?? 0);
+  const descriptor = fs.openSync(target, flags, 0o644);
+  try {
+    fs.writeFileSync(descriptor, rendered.contents, "utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function renderStructureDocument(roots, target, worktree) {
+  const state = { renderedNodes: 0, truncated: false };
+  const lines = [
+    STRUCTURE_DOCUMENT_MARKER,
+    "# Spring Structure",
+    "",
+    "> Regenerable snapshot from Spring Tools. Rerun **Spring Boot: Generate or refresh Structure document** after source changes. This file is safe to delete and is not a live view.",
+    "",
+  ];
+  for (const root of roots) renderStructureNode(root, 0, lines, state, target, worktree);
+  if (state.renderedNodes === 0) {
+    lines.push("_Spring Tools returned no logical structure for this worktree._", "");
+  }
+  if (state.truncated) {
+    lines.push(
+      `> Output was limited to ${MAX_STRUCTURE_NODES} nodes and ${MAX_STRUCTURE_DEPTH} levels. Use Project Symbols to reach omitted elements.`,
+      "",
+    );
+  }
+  return { contents: `${lines.join("\n").trimEnd()}\n`, renderedNodes: state.renderedNodes };
+}
+
+function renderStructureNode(node, depth, lines, state, target, worktree) {
+  if (
+    state.renderedNodes >= MAX_STRUCTURE_NODES ||
+    depth >= MAX_STRUCTURE_DEPTH
+  ) {
+    state.truncated = true;
+    return;
+  }
+  if (node === null || typeof node !== "object" || Array.isArray(node)) return;
+  const label = structureLabel(node.attributes?.text);
+  if (label === undefined) return;
+  state.renderedNodes += 1;
+  const location = safeStructureLocation(node.attributes?.location, target, worktree)
+    ?? safeStructureLocation(node.attributes?.reference, target, worktree);
+  const renderedLabel = location === undefined
+    ? escapeMarkdownLabel(label)
+    : `[${escapeMarkdownLabel(label)}](${location})`;
+  lines.push(`${"  ".repeat(depth)}- ${renderedLabel}`);
+  if (!Array.isArray(node.children)) return;
+  for (const child of node.children) {
+    renderStructureNode(child, depth + 1, lines, state, target, worktree);
+  }
+}
+
+function structureLabel(value) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
+  if (normalized.length === 0) return undefined;
+  return normalized.slice(0, MAX_STRUCTURE_LABEL_LENGTH);
+}
+
+function escapeMarkdownLabel(value) {
+  return value.replace(/([\\`*_[\]<>])/g, "\\$1");
+}
+
+function safeStructureLocation(location, target, worktree) {
+  const absolute = fileUriToPath(location?.uri);
+  if (absolute === undefined) return undefined;
+  const root = path.resolve(worktree);
+  const resolved = path.resolve(absolute);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) return undefined;
+  const relative = path.relative(path.dirname(target), resolved);
+  const encoded = relative
+    .split(path.sep)
+    .map((part) => part === ".." || part === "." ? part : encodeURIComponent(part))
+    .join("/");
+  const line = Number.isInteger(location?.range?.start?.line) && location.range.start.line >= 0
+    ? `#L${location.range.start.line + 1}`
+    : "";
+  return `${encoded}${line}`;
 }
 
 // Mirror the VS Code client's target naming: same directory and base name with
