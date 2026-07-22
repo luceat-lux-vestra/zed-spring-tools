@@ -247,6 +247,7 @@ test("Spring initialize advertises the coordinator-owned commands", async () => 
       "zed-spring-tools.convert-properties-yaml",
       "zed-spring-tools.reload-properties-metadata",
       "zed-spring-tools.manage-live-process",
+      "zed-spring-tools.generate-live-metrics-document",
     ],
   );
 });
@@ -1490,6 +1491,13 @@ const GENERATE_STRUCTURE_COMMAND = {
   params: { command: "zed-spring-tools.generate-structure-document", arguments: [] },
 };
 
+const GENERATE_LIVE_METRICS_COMMAND = {
+  jsonrpc: "2.0",
+  id: "live-metrics-1",
+  method: "workspace/executeCommand",
+  params: { command: "zed-spring-tools.generate-live-metrics-document", arguments: [] },
+};
+
 test("project Code Actions are injected for Java files and respect the only filter", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
@@ -1529,11 +1537,17 @@ test("project Code Actions are injected for Java files and respect the only filt
         "source",
         "zed-spring-tools.manage-live-process",
       ],
+      [
+        "Spring Boot: Generate or refresh Live metrics document…",
+        "source",
+        "zed-spring-tools.generate-live-metrics-document",
+      ],
     ],
   );
   assert.deepEqual(injected[0].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
   assert.deepEqual(injected[1].command.arguments, []);
   assert.deepEqual(injected[2].command.arguments, []);
+  assert.deepEqual(injected[3].command.arguments, []);
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1553,6 +1567,7 @@ test("project Code Actions are injected for Java files and respect the only filt
       "Spring Boot: Configure run/debug for a project…",
       "Spring Boot: Generate or refresh Structure document",
       "Spring Boot: Connect or disconnect live process data…",
+      "Spring Boot: Generate or refresh Live metrics document…",
     ],
   );
 
@@ -1843,6 +1858,283 @@ test("Structure document output is bounded and visibly marks truncation", async 
   assert.equal(contents.split("\n").filter((line) => line.startsWith("- node-")).length, 2_000);
   assert.match(contents, /Output was limited to 2000 nodes and 16 levels/);
   assert.doesNotMatch(contents, /node-2000/);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Live metrics generation explicitly refreshes bounded data and writes a timestamped owned snapshot", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    now: () => new Date("2026-07-23T12:34:56.000Z"),
+  });
+
+  assert.equal(coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND }), false);
+  assert.deepEqual(zedWrites[0], { jsonrpc: "2.0", id: "live-metrics-1", result: null });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "connected-process request",
+  );
+  assert.deepEqual(connected.params.arguments, []);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{
+      type: "local",
+      processKey: "opaque-secret-process-key",
+      processName: "demo [prod]",
+      pid: "4242",
+    }],
+  });
+
+  const memoryRefresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/refresh/metrics"
+      && message.params.arguments?.[0]?.metricName === "memory",
+    "memory metrics refresh",
+  );
+  assert.deepEqual(memoryRefresh.params.arguments, [{
+    processKey: "opaque-secret-process-key",
+    endpoint: "metrics",
+    metricName: "memory",
+    tags: "",
+  }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: memoryRefresh.id, result: null });
+  const gcRefresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/refresh/metrics"
+      && message.params.arguments?.[0]?.metricName === "gcPauses",
+    "GC metrics refresh",
+  );
+  assert.deepEqual(gcRefresh.params.arguments, [{
+    processKey: "opaque-secret-process-key",
+    endpoint: "metrics",
+    metricName: "gcPauses",
+    tags: "",
+  }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: gcRefresh.id, result: null });
+
+  const heap = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/get/metrics"
+      && message.params.arguments?.[0]?.metricName === "heapMemory",
+    "heap metrics request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: heap.id, result: [{
+    name: "jvm.memory.used",
+    description: "Memory [used] by the JVM",
+    baseUnit: "bytes",
+    measurements: [
+      { statistic: "VALUE", value: 1024 },
+      { statistic: "NOT_FINITE", value: Number.POSITIVE_INFINITY },
+    ],
+    availableTags: [{ tag: "area", values: ["secret-runtime-identifier"] }],
+  }] });
+  const nonHeap = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/get/metrics"
+      && message.params.arguments?.[0]?.metricName === "nonHeapMemory",
+    "non-heap metrics request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: nonHeap.id, result: [] });
+  const gc = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/get/metrics"
+      && message.params.arguments?.[0]?.metricName === "gcPauses",
+    "GC metrics request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: gc.id, result: [{
+    name: "jvm.gc.pause",
+    baseUnit: "seconds",
+    measurements: [
+      { statistic: "COUNT", value: 2 },
+      { statistic: "TOTAL_TIME", value: 0.5 },
+    ],
+  }] });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Generated \.zed\/spring-live\.md/.test(message.params.message),
+    "Live metrics confirmation",
+  );
+  assert.match(notice.params.message, /3 live metric measurements/);
+  const target = path.join(worktree, ".zed", "spring-live.md");
+  const contents = fs.readFileSync(target, "utf8");
+  assert.match(contents, /^<!-- zed-spring-tools:generated-live-metrics:v1 -->\n/);
+  assert.ok(contents.includes("Process: demo \\[prod\\] (pid: 4242)"));
+  assert.match(contents, /Captured at: 2026-07-23T12:34:56\.000Z/);
+  assert.match(contents, /VALUE: 1024 bytes/);
+  assert.match(contents, /COUNT: 2 seconds/);
+  assert.ok(contents.includes("TOTAL\\_TIME: 0.5 seconds"));
+  assert.match(contents, /returned no metrics for this family/);
+  assert.doesNotMatch(contents, /opaque-secret-process-key|secret-runtime-identifier|NOT_FINITE|Infinity/);
+  assert.equal(fs.existsSync(path.join(worktree, ".gitignore")), false);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Live metrics generation preserves foreign targets and writes nothing without a connected process", async () => {
+  const worktree = makeWorktree();
+  const zedDirectory = path.join(worktree, ".zed");
+  const target = path.join(zedDirectory, "spring-live.md");
+  fs.mkdirSync(zedDirectory);
+  fs.writeFileSync(target, "# My live notes\n");
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND });
+  const foreignNotice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "foreign Live target notice",
+  );
+  assert.match(foreignNotice.params.message, /is not owned by Zed Spring Tools/);
+  assert.equal(fs.readFileSync(target, "utf8"), "# My live notes\n");
+  assert.equal(springWrites.length, 0);
+
+  fs.rmSync(target);
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND, id: "live-metrics-empty" });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "empty connected-process request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: connected.id, result: [] });
+  const emptyNotice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /No connected Spring Boot process/.test(message.params.message),
+    "no connected process notice",
+  );
+  assert.match(emptyNotice.params.message, /Connect or disconnect live process data/);
+  assert.equal(fs.existsSync(target), false);
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/refresh/metrics"),
+    false,
+  );
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Live metrics process selection is bounded and dismissal does not refresh or write", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "multi-process request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: Array.from({ length: 14 }, (_, index) => ({
+      type: "local",
+      processKey: `process-${index}`,
+      processName: "demo",
+      pid: String(1000 + index),
+    })),
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "Live metrics process prompt",
+  );
+  assert.equal(prompt.params.actions.length, 12);
+  assert.match(prompt.params.message, /2 more processes are not shown/);
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: null });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/refresh/metrics"),
+    false,
+  );
+  assert.equal(fs.existsSync(path.join(worktree, ".zed", "spring-live.md")), false);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("Live metrics document bounds metric models and measurements with a visible truncation notice", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "bounded metrics process request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{ type: "local", processKey: "bounded", processName: "bounded-app", pid: "9" }],
+  });
+  for (const metricName of ["memory", "gcPauses"]) {
+    const refresh = await waitFor(
+      springWrites,
+      (message) => message.params?.command === "sts/livedata/refresh/metrics"
+        && message.params.arguments?.[0]?.metricName === metricName,
+      `${metricName} bounded refresh`,
+    );
+    await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: refresh.id, result: null });
+  }
+  const oversized = Array.from({ length: 65 }, (_, model) => ({
+    name: `metric-${model}`,
+    baseUnit: "bytes",
+    measurements: Array.from({ length: 17 }, (_, measurement) => ({
+      statistic: `VALUE_${measurement}`,
+      value: measurement,
+    })),
+  }));
+  for (const [metricName, result] of [
+    ["heapMemory", oversized],
+    ["nonHeapMemory", []],
+    ["gcPauses", []],
+  ]) {
+    const request = await waitFor(
+      springWrites,
+      (message) => message.params?.command === "sts/livedata/get/metrics"
+        && message.params.arguments?.[0]?.metricName === metricName,
+      `${metricName} bounded get`,
+    );
+    await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result });
+  }
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Generated \.zed\/spring-live\.md/.test(message.params.message),
+    "bounded Live metrics confirmation",
+  );
+
+  const contents = fs.readFileSync(path.join(worktree, ".zed", "spring-live.md"), "utf8");
+  assert.equal(contents.split("\n").filter((line) => /^### metric-\d+$/.test(line)).length, 64);
+  assert.equal(contents.split("\n").filter((line) => /^- VALUE\\?_\d+:/.test(line)).length, 64 * 16);
+  assert.match(contents, /limited to 64 metric models and 16 measurements per model/);
+  assert.doesNotMatch(contents, /### metric-64|VALUE\\?_16:/);
 
   fs.rmSync(worktree, { recursive: true, force: true });
 });

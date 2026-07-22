@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 21
+- Inventory version: 22
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-23
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -54,8 +54,8 @@ selected route or planning-confidence score does not change a state here.
 | State | Count |
 | --- | --- |
 | `verified` | 30 |
-| `implemented` | 1 |
-| `planned` | 19 |
+| `implemented` | 2 |
+| `planned` | 18 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
@@ -124,6 +124,19 @@ that Spring's explicit local-process provider is false-when-absent unless
 `boot-java.live-information.all-local-java-processes` is true. The extension now
 supplies that default while preserving an explicit user override to false;
 automatic connection remains off and `planned`.
+
+Inventory version 22 records aggregate live metrics as `implemented`. A new
+Java-file source Code Action lists Spring's connected processes, bounds an
+explicit process choice, refreshes the pinned server's `memory` and `gcPauses`
+metric families, and reads `heapMemory`, `nonHeapMemory`, and `gcPauses` into the
+owned `.zed/spring-live.md` snapshot. The document carries the selected process
+name/type and an ISO timestamp, is safe to delete and regenerate, never mutates
+`.gitignore`, and omits the opaque process key plus all metric tag names/values
+so arbitrary runtime identifiers are not persisted. Contract tests cover the
+exact command sequence (including the pinned JMX extractor's required explicit
+empty tag filter), finite-number filtering, 64-model/16-measurement bounds,
+dismissal, empty state, and foreign-file preservation. A driven connected-Boot
+run is still required before this row can become `verified`.
 
 ## Known surface constraints
 
@@ -219,9 +232,9 @@ verified structure-navigation fallback.
 | --- | --- | --- |
 | Connect / disconnect to a local Boot process | `verified` | A synthetic `source` Code Action on Java files (**Spring Boot: Connect or disconnect live process data…**) runs `sts/livedata/listProcesses` and renders the returned descriptors — Spring already labels each and tags it with the exact `action` (`connect` for an available process, `disconnect`/`refresh` for a connected one) — as a bounded `window/showMessageRequest` choice (capped at 12 with an overflow notice; nothing happens until the user chooses). The chosen action executes with `[{processKey}]`. **A static read closed the same silent-gap trap as the shared-metadata reload**: `SpringProcessCommandHandler.connect/disconnect/refresh` each `return CompletableFuture.completedFuture(null)` regardless of outcome, so a null result is not evidence of success. The authoritative connect signal is instead the server→client `sts/liveprocess/connected` notification, which `SpringProcessLiveDataProvider.add` fires exactly once after the process is reached and its first live data is stored; the coordinator registers a per-`processKey` waiter before issuing connect and only reports "Connected …" when that notification arrives, otherwise a bounded "Requested … make sure the process exposes Actuator/JMX" (never a false success). Coordinator-owned identity/cleanup: it tracks connected keys from the connected/disconnected notifications (still forwarding both to Zed) and clears the map plus any pending waiter on shutdown. Contract-tested in `coordinator/test/coordinator.test.mjs` (confirmed connect, unconfirmed-connect bounded report, disconnect, empty list, dismissed prompt). **Driven 2026-07-23** on macOS 26.5.2 arm64, Zed 1.11.3, official Java 6.8.21, Spring Tools 5.2.0, JDK 25.0.3 and Boot 3.5.5: the bounded choice listed the fixture after the extension supplied Spring's false-when-absent `boot-java.live-information.all-local-java-processes: true`; selecting it opened JMX, stored the first Actuator live-data result, emitted `sts/liveprocess/connected`, showed the confirmed success notice and refreshed CodeLens. Running the action again exposed `Refresh` and `Disconnect`; selecting `Disconnect` emitted `sts/liveprocess/disconnected`, closed JMX, refreshed CodeLens and showed the disconnect notice. The fixture enabled JMX and exposed its Actuator JMX endpoints; without that exposure the coordinator correctly avoided false success. The opt-in Live document remains the fallback presentation only if the bounded prompt cannot hold the list; no reduced connection mode is claimed. Evidence: `tmp/live-process-connect-runtime-20260723/evidence/`. |
 | Remote connect | `planned` | Preferred route: an explicit Code Action reads endpoint and non-secret options from Zed settings before `sts/livedata/remoteConnect`. Credential input/storage needs a separate security decision; credentials may not enter project files, generated documents, action arguments, or logs. |
-| Live hover data | `zed-native-equivalent` | Source-local live bean and injection facts are verified through live CodeLens followed by Zed's native Hover gesture. The connected run rendered Spring bean name, type, resource, bean id and process together with JDT hover. One-click dispatch remains blocked by Zed's client-command bridge. Explicit connect/disconnect is now a separate `verified` capability (see the row above); aggregate live data, show/hide/refresh, metrics and loggers remain separate planned capabilities. |
+| Live hover data | `zed-native-equivalent` | Source-local live bean and injection facts are verified through live CodeLens followed by Zed's native Hover gesture. The connected run rendered Spring bean name, type, resource, bean id and process together with JDT hover. One-click dispatch remains blocked by Zed's client-command bridge. Explicit connect/disconnect is a separate `verified` capability (see the row above); aggregate show/hide/refresh and loggers remain planned, while the separate metrics snapshot is implemented but not yet driven. |
 | Show / hide / refresh live data | `planned` | Preferred route: contextual Code Actions drive `live.show.active`, `live.hide.active`, and `live.refresh.active`, with explicit refresh state shared by inline surfaces and an optional Live document. |
-| Metrics | `planned` | Preferred route: `sts/livedata/get/metrics` and `refresh/metrics` feed an opt-in, timestamped Spring Live document. A link to the application's own endpoint is fallback if editor refresh/redaction cannot be bounded. |
+| Metrics | `implemented` | A synthetic Java-file source Code Action (**Spring Boot: Generate or refresh Live metrics document…**) first runs `sts/livedata/listConnected`; one connected process skips the prompt, while multiple processes use a bounded 12-item `window/showMessageRequest` and dismissal writes nothing. For the chosen opaque `processKey`, the coordinator explicitly refreshes `memory` and `gcPauses` with `tags: ""` (the pinned JMX extractor otherwise concatenates a literal `null,id:…` filter), then reads the server's `heapMemory`, `nonHeapMemory`, and `gcPauses` models into the owned, timestamped `.zed/spring-live.md`. The file shows finite measurements only, caps output at 64 models and 16 measurements per model, omits `availableTags` and the opaque key, preserves foreign/in-flight targets, and is regenerable/deletable without `.gitignore` mutation. The contract is sourced from `SpringProcessCommandHandler`, `SpringProcessConnectorService`, `SpringProcessLiveDataExtractorOverJMX`, `LiveMemoryMetricsModel`, and `Measurements` at pinned Spring Tools commit `18d1a975dbea4f9314fd736d0237bd9e23f243f9`; coordinator tests cover command order, redaction, bounds, empty/dismissed selection, and ownership. State remains `implemented` until a real Zed/connected-Boot run proves authentic values, rendered preview, explicit refresh, and deletion/recreation on a named tuple. |
 | Loggers and log levels | `planned` | Preferred route: an opt-in Live document lists `getLoggers` results and exposes confirmed item-level `configure/logLevel` Code Actions. Read-only data or the external Actuator endpoint is fallback if selection/confirmation is unsafe. |
 | Automatic connection | `planned` | Settings `boot-java.live-information.automatic-connection.on` and `all-local-java-processes`. Automatic behavior must reuse the verified explicit connection lifecycle and fail closed on ambiguous process identity. |
 

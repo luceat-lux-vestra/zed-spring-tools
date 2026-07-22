@@ -86,6 +86,9 @@ const LIVE_DISCONNECT_COMMAND = "sts/livedata/disconnect";
 const LIVE_REFRESH_COMMAND = "sts/livedata/refresh";
 const LIVE_PROCESS_CONNECTED = "sts/liveprocess/connected";
 const LIVE_PROCESS_DISCONNECTED = "sts/liveprocess/disconnected";
+const LIST_CONNECTED_LIVE_PROCESSES_COMMAND = "sts/livedata/listConnected";
+const REFRESH_LIVE_METRICS_COMMAND = "sts/livedata/refresh/metrics";
+const GET_LIVE_METRICS_COMMAND = "sts/livedata/get/metrics";
 const LIVE_PROCESS_ACTIONS = new Set([
   LIVE_CONNECT_COMMAND,
   LIVE_DISCONNECT_COMMAND,
@@ -93,7 +96,14 @@ const LIVE_PROCESS_ACTIONS = new Set([
 ]);
 const MANAGE_LIVE_PROCESS_COMMAND = "zed-spring-tools.manage-live-process";
 const MANAGE_LIVE_PROCESS_TITLE = "Spring Boot: Connect or disconnect live process data…";
+const GENERATE_LIVE_METRICS_DOCUMENT_COMMAND = "zed-spring-tools.generate-live-metrics-document";
+const GENERATE_LIVE_METRICS_DOCUMENT_TITLE = "Spring Boot: Generate or refresh Live metrics document…";
+const LIVE_DOCUMENT_RELATIVE_PATH = path.join(".zed", "spring-live.md");
+const LIVE_DOCUMENT_MARKER = "<!-- zed-spring-tools:generated-live-metrics:v1 -->";
 const MAX_LIVE_PROCESS_SELECTION = 12;
+const MAX_LIVE_METRIC_MODELS = 64;
+const MAX_LIVE_METRIC_MEASUREMENTS = 16;
+const MAX_LIVE_METRIC_TEXT_LENGTH = 300;
 // How long to wait for the server's `sts/liveprocess/connected` notification
 // after issuing a connect before reporting a bounded "requested" message. A JMX
 // handshake plus the first actuator poll can take a few seconds.
@@ -110,6 +120,7 @@ const COORDINATOR_COMMANDS = [
   CONVERT_PROPERTIES_YAML_COMMAND,
   RELOAD_PROPERTIES_METADATA_COMMAND,
   MANAGE_LIVE_PROCESS_COMMAND,
+  GENERATE_LIVE_METRICS_DOCUMENT_COMMAND,
 ];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
@@ -159,6 +170,7 @@ export class Coordinator {
     classpathRetryMs = CLASSPATH_RETRY_MS,
     inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
     liveConnectConfirmMs = LIVE_CONNECT_CONFIRM_MS,
+    now = () => new Date(),
     reportContext = {},
     targetExists = fileUriExists,
     logger = () => {},
@@ -172,6 +184,7 @@ export class Coordinator {
     this.classpathRetryMs = classpathRetryMs;
     this.inlayRefreshDelayMs = inlayRefreshDelayMs;
     this.liveConnectConfirmMs = liveConnectConfirmMs;
+    this.now = now;
     this.targetExists = targetExists;
     this.logger = logger;
     this.pending = new Map();
@@ -294,6 +307,7 @@ export class Coordinator {
     if (this.#handleConvertPropertiesYamlCommand(message)) return false;
     if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
     if (this.#handleManageLiveProcessCommand(message)) return false;
+    if (this.#handleGenerateLiveMetricsDocumentCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
@@ -1193,6 +1207,107 @@ export class Coordinator {
     );
   }
 
+  #handleGenerateLiveMetricsDocumentCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== GENERATE_LIVE_METRICS_DOCUMENT_COMMAND
+    ) {
+      return false;
+    }
+    // Collecting metrics can include a process-selection prompt and two
+    // actuator refreshes. Answer the editor command immediately, then report the
+    // generated point-in-time snapshot separately.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#generateLiveMetricsDocument().catch((error) => {
+      if (this.closed) return;
+      this.logger(`Spring Live metrics document failed: ${errorText(error)}`);
+      this.#showInfo(
+        `Spring Boot: The Live metrics document could not be generated. ${errorText(error)} Make sure the selected process is still connected and exposes the Actuator metrics endpoint, then try again.`,
+      );
+    });
+    return true;
+  }
+
+  async #generateLiveMetricsDocument() {
+    const target = path.join(this.worktree, LIVE_DOCUMENT_RELATIVE_PATH);
+    const ownership = liveDocumentOwnership(target);
+    if (ownership === "foreign") {
+      this.#showInfo(
+        `Spring Boot: ${LIVE_DOCUMENT_RELATIVE_PATH} already exists and is not owned by Zed Spring Tools, so it was left unchanged. Rename or remove that file before generating the Live metrics document.`,
+      );
+      return;
+    }
+    const connected = normalizeConnectedLiveProcesses(
+      await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: LIST_CONNECTED_LIVE_PROCESSES_COMMAND,
+        arguments: [],
+      }),
+    );
+    if (connected.length === 0) {
+      this.#showInfo(
+        "Spring Boot: No connected Spring Boot process has live metrics. Connect one with “Connect or disconnect live process data…” first, then run this action again.",
+      );
+      return;
+    }
+    const process = await this.#selectConnectedLiveProcess(connected);
+    if (process === undefined) return;
+
+    // Spring refreshes both heap and non-heap data through the single `memory`
+    // metric family, while GC pauses has its own refresh. Each future completes
+    // only after the connector has stored the new result, so the reads below are
+    // a coherent explicit-refresh snapshot rather than stale cached data.
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: REFRESH_LIVE_METRICS_COMMAND,
+      // The pinned JMX extractor concatenates this value with per-memory-pool
+      // filters. Omitting it becomes the literal `null,id:…`; an explicit empty
+      // filter is the untagged contract used by the metrics endpoint.
+      arguments: [{
+        processKey: process.processKey,
+        endpoint: "metrics",
+        metricName: "memory",
+        tags: "",
+      }],
+    });
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: REFRESH_LIVE_METRICS_COMMAND,
+      arguments: [{
+        processKey: process.processKey,
+        endpoint: "metrics",
+        metricName: "gcPauses",
+        tags: "",
+      }],
+    });
+    const metricSections = [];
+    for (const [title, metricName] of [
+      ["Heap memory", "heapMemory"],
+      ["Non-heap memory", "nonHeapMemory"],
+      ["GC pauses", "gcPauses"],
+    ]) {
+      const models = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: GET_LIVE_METRICS_COMMAND,
+        arguments: [{ processKey: process.processKey, endpoint: "metrics", metricName }],
+      });
+      metricSections.push({ title, models });
+    }
+
+    // Recheck after every server await so a hand-written file created while
+    // metrics were loading is never mistaken for the initially missing target.
+    const currentOwnership = liveDocumentOwnership(target);
+    if (currentOwnership === "foreign") {
+      this.#showInfo(
+        `Spring Boot: ${LIVE_DOCUMENT_RELATIVE_PATH} changed while Spring Tools was collecting metrics and is not owned by Zed Spring Tools, so it was left unchanged.`,
+      );
+      return;
+    }
+    const rendered = renderLiveMetricsDocument(process, metricSections, this.now());
+    writeLiveDocument(target, rendered.contents);
+    if (this.closed) return;
+    this.#showInfo(
+      `Spring Boot: ${currentOwnership === "missing" ? "Generated" : "Refreshed"} ${LIVE_DOCUMENT_RELATIVE_PATH} with ${rendered.renderedMeasurements} live metric ${rendered.renderedMeasurements === 1 ? "measurement" : "measurements"}. It is a timestamped snapshot; open the file to inspect it and rerun this action to refresh.`,
+    );
+  }
+
   async #connectLiveProcess(entry) {
     // Register the confirmation waiter before issuing connect so the server's
     // `sts/liveprocess/connected` notification cannot race ahead of it.
@@ -1272,6 +1387,28 @@ export class Coordinator {
     const title = response?.title;
     if (typeof title !== "string") return undefined;
     return byTitle.get(title);
+  }
+
+  async #selectConnectedLiveProcess(entries) {
+    if (entries.length === 1) return entries[0];
+    const shown = entries.slice(0, MAX_LIVE_PROCESS_SELECTION);
+    const byTitle = new Map();
+    const actions = [];
+    for (const entry of shown) {
+      let title = entry.label;
+      for (let index = 2; byTitle.has(title); index += 1) title = `${entry.label} (${index})`;
+      byTitle.set(title, entry);
+      actions.push({ title });
+    }
+    const overflow = entries.length - shown.length;
+    const response = await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message: overflow > 0
+        ? `Select a connected Spring Boot process for the Live metrics snapshot. ${overflow} more ${overflow === 1 ? "process is" : "processes are"} not shown. Nothing is written until you choose.`
+        : "Select a connected Spring Boot process for the Live metrics snapshot. Nothing is written until you choose.",
+      actions,
+    });
+    return typeof response?.title === "string" ? byTitle.get(response.title) : undefined;
   }
 
   async #configureBootRun() {
@@ -1531,6 +1668,15 @@ function syntheticCodeActions(request) {
         arguments: [],
       },
     });
+    actions.push({
+      title: GENERATE_LIVE_METRICS_DOCUMENT_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: GENERATE_LIVE_METRICS_DOCUMENT_TITLE,
+        command: GENERATE_LIVE_METRICS_DOCUMENT_COMMAND,
+        arguments: [],
+      },
+    });
   }
   const conversion = propertiesConversionFor(request);
   if (conversion !== undefined) {
@@ -1572,6 +1718,31 @@ function normalizeLiveProcesses(discovered) {
     }
     const label = typeof item.label === "string" && item.label.length > 0 ? item.label : processKey;
     entries.push({ processKey, action, label });
+  }
+  return entries;
+}
+
+// The server's listConnected command returns only process summaries. Retain the
+// opaque key for subsequent commands, but never render it into the generated
+// document: remote keys may contain endpoints and local keys are usually PIDs.
+function normalizeConnectedLiveProcesses(discovered) {
+  if (!Array.isArray(discovered)) return [];
+  const entries = [];
+  const seen = new Set();
+  for (const item of discovered) {
+    if (item === null || typeof item !== "object") continue;
+    const processKey = typeof item.processKey === "string" && item.processKey.length > 0
+      ? item.processKey
+      : undefined;
+    if (processKey === undefined || seen.has(processKey)) continue;
+    seen.add(processKey);
+    const processName = boundedMetricText(item.processName) ?? "Spring Boot process";
+    const type = boundedMetricText(item.type);
+    const pid = type === "local" && typeof item.pid === "string" && /^\d{1,20}$/.test(item.pid)
+      ? item.pid
+      : undefined;
+    const label = pid === undefined ? processName : `${processName} (pid: ${pid})`;
+    entries.push({ processKey, processName, type, pid, label });
   }
   return entries;
 }
@@ -1641,6 +1812,19 @@ function structureDocumentOwnership(target) {
   return contents.startsWith(`${STRUCTURE_DOCUMENT_MARKER}\n`) ? "owned" : "foreign";
 }
 
+function liveDocumentOwnership(target) {
+  let status;
+  try {
+    status = fs.lstatSync(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return "missing";
+    throw error;
+  }
+  if (!status.isFile() || status.isSymbolicLink()) return "foreign";
+  const contents = fs.readFileSync(target, "utf8");
+  return contents.startsWith(`${LIVE_DOCUMENT_MARKER}\n`) ? "owned" : "foreign";
+}
+
 function writeStructureDocument(target, rendered) {
   const directory = path.dirname(target);
   try {
@@ -1659,6 +1843,29 @@ function writeStructureDocument(target, rendered) {
   const descriptor = fs.openSync(target, flags, 0o644);
   try {
     fs.writeFileSync(descriptor, rendered.contents, "utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function writeLiveDocument(target, contents) {
+  const directory = path.dirname(target);
+  try {
+    const status = fs.lstatSync(directory);
+    if (!status.isDirectory() || status.isSymbolicLink()) {
+      throw new Error(`${LIVE_DOCUMENT_RELATIVE_PATH} requires an ordinary .zed directory.`);
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    fs.mkdirSync(directory, { recursive: true });
+  }
+  const flags = fs.constants.O_WRONLY
+    | fs.constants.O_CREAT
+    | fs.constants.O_TRUNC
+    | (fs.constants.O_NOFOLLOW ?? 0);
+  const descriptor = fs.openSync(target, flags, 0o644);
+  try {
+    fs.writeFileSync(descriptor, contents, "utf8");
   } finally {
     fs.closeSync(descriptor);
   }
@@ -1684,6 +1891,87 @@ function renderStructureDocument(roots, target, worktree) {
     );
   }
   return { contents: `${lines.join("\n").trimEnd()}\n`, renderedNodes: state.renderedNodes };
+}
+
+function renderLiveMetricsDocument(process, sections, capturedAt) {
+  const timestamp = capturedAt instanceof Date && Number.isFinite(capturedAt.getTime())
+    ? capturedAt.toISOString()
+    : new Date().toISOString();
+  const processLabel = escapeMarkdownLabel(process.label);
+  const type = process.type === undefined ? "unknown" : escapeMarkdownLabel(process.type);
+  const lines = [
+    LIVE_DOCUMENT_MARKER,
+    "# Spring Live Metrics",
+    "",
+    "> Regenerable point-in-time snapshot from Spring Tools. Rerun **Spring Boot: Generate or refresh Live metrics document…** to fetch current values. This file is safe to delete and is not a live view.",
+    "",
+    `- Process: ${processLabel}`,
+    `- Connection type: ${type}`,
+    `- Captured at: ${timestamp}`,
+    "",
+  ];
+  let renderedModels = 0;
+  let renderedMeasurements = 0;
+  let truncated = false;
+  for (const section of sections) {
+    lines.push(`## ${escapeMarkdownLabel(section.title)}`, "");
+    const models = Array.isArray(section.models) ? section.models : [];
+    let sectionModels = 0;
+    for (const model of models) {
+      if (renderedModels >= MAX_LIVE_METRIC_MODELS) {
+        truncated = true;
+        break;
+      }
+      if (model === null || typeof model !== "object" || Array.isArray(model)) continue;
+      renderedModels += 1;
+      sectionModels += 1;
+      const name = boundedMetricText(model.name) ?? `Metric ${sectionModels}`;
+      lines.push(`### ${escapeMarkdownLabel(name)}`, "");
+      const description = boundedMetricText(model.description);
+      if (description !== undefined) {
+        lines.push(`${escapeMarkdownLabel(description)}`, "");
+      }
+      const unit = boundedMetricText(model.baseUnit);
+      const measurements = Array.isArray(model.measurements) ? model.measurements : [];
+      let modelMeasurements = 0;
+      for (const measurement of measurements.slice(0, MAX_LIVE_METRIC_MEASUREMENTS)) {
+        const statistic = boundedMetricText(measurement?.statistic);
+        const value = measurement?.value;
+        if (statistic === undefined || typeof value !== "number" || !Number.isFinite(value)) continue;
+        modelMeasurements += 1;
+        renderedMeasurements += 1;
+        lines.push(
+          `- ${escapeMarkdownLabel(statistic)}: ${value}${unit === undefined ? "" : ` ${escapeMarkdownLabel(unit)}`}`,
+        );
+      }
+      if (measurements.length > MAX_LIVE_METRIC_MEASUREMENTS) truncated = true;
+      if (modelMeasurements === 0) lines.push("- No finite measurements returned.");
+      lines.push("");
+    }
+    if (models.length > sectionModels && renderedModels >= MAX_LIVE_METRIC_MODELS) truncated = true;
+    if (sectionModels === 0) lines.push("_Spring Tools returned no metrics for this family._", "");
+  }
+  lines.push(
+    "> Metric tag names and values are intentionally omitted from this snapshot so arbitrary runtime identifiers cannot be persisted into the worktree.",
+    "",
+  );
+  if (truncated) {
+    lines.push(
+      `> Output was limited to ${MAX_LIVE_METRIC_MODELS} metric models and ${MAX_LIVE_METRIC_MEASUREMENTS} measurements per model.`,
+      "",
+    );
+  }
+  return {
+    contents: `${lines.join("\n").trimEnd()}\n`,
+    renderedMeasurements,
+  };
+}
+
+function boundedMetricText(value) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
+  if (normalized.length === 0) return undefined;
+  return normalized.slice(0, MAX_LIVE_METRIC_TEXT_LENGTH);
 }
 
 function renderStructureNode(node, depth, lines, state, target, worktree) {
