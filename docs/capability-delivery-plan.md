@@ -2,7 +2,7 @@
 
 - Status: Selected direction; implementation and runtime verification remain
   incremental
-- Last updated: 2026-07-21
+- Last updated: 2026-07-22
 - Decision: [D005](decisions/005-lsp-first-capability-delivery.md)
 - Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md), and
@@ -92,8 +92,8 @@ user outcome take precedence.
 | CodeLens — show endpoint/configuration/query summaries plus live bean, injection, and startup status | Both the live slice and all five static provider families are `verified` on the first macOS tuple. Project Symbols and hover retain navigation and detail. | Preserve Spring commands, translate source locations, merge version-matched `sts/highlight`, and keep unavailable client-only facts visible with precise explanations. `CL-4d` asynchronously pre-resolves Spring's authentic AOT target, caches it by source version/arguments, refreshes CodeLens, and rewrites the action to `editor.action.goToLocations`. AI-only titles state that this extension cannot detect or invoke Agent and sends nothing to AI. | The 2026-07-19 gates passed, including one-click generated-method navigation with ignored `/target/`. Failed target resolution falls back to an exact URI/line notice. Hover and URL client commands retain their documented native/manual fallbacks because Zed exposes no project-side action bridge. | 5/5 |
 | Inlay hints — render human-readable cron information and other compact inline facts | Preserve the verified standard-LSP inlay-hint path. | Extend only when another Spring result maps naturally to an inlay hint. | Disable individual hint classes that become noisy or stale. | 5/5 |
 | Quick fixes and Code Actions — repair Spring code and create metadata | Preserve the verified Spring Code Action and ApplyEdit path. | Add synthetic project, run/debug, live-data, conversion, and refresh actions around allowlisted Spring commands. | An action without a safe standard-LSP interaction remains `planned`; existing quick fixes are unaffected. | 5/5 |
-| Boot project discovery — find executable main classes and modules | The coordinator's GAV callback is implemented; no user-facing workflow is claimed. | Invoke executable-project and project-info commands from a Code Action, then let the user select a project and request configuration generation. | If Zed's action prompt is inadequate, generate a reviewable candidate document and require manual selection. | 4/5 |
-| Run and debug — launch, stop, or debug a Spring Boot application | Users may author `.zed/debug.json` manually and use the official Java DAP. S016 verified official Java 6.8.23's normal-profile Maven main runnable on macOS arm64/JDK 25. | Under D006's capability-first policy, prefer the installed official Java extension's matching main runnable when that route has the required evidence. Generate or merge explicit Run (`noDebug`) or Debug configurations when project choice, arguments, or debugging requires them; the user starts the selected Zed task or Debug entry. | Never overwrite unknown configuration or assume a runnable becomes a debug scenario. On capability or merge failure, retain manual configuration and offer a bounded user-reviewed compatibility report where applicable. | 4/5; capability and debug gates |
+| Boot project discovery — find executable main classes and modules | The coordinator's GAV callback and generated-configuration workflow are verified on the macOS arm64/Maven tuple. | Route taken: invoke executable projects from a Code Action, let the user select one discovered project or `All projects`, then generate reviewable configuration. `bootProjectInfo` detail remains separately implemented but undriven. | The bounded Zed prompt passed its multi-project gate; a generated candidate document was not needed. Other build tools and desktop tuples remain untested. | 5/5; interaction gate closed |
+| Run and debug — launch, stop, or debug a Spring Boot application | The generated task and official-Java DAP routes are verified on macOS arm64/Maven, including a two-module `All projects` selection. Users may still author `.zed/tasks.json` and `.zed/debug.json` manually. | Route taken: generate or merge explicit Run tasks and Debug configurations when project choice, profiles, arguments, or debugging requires them; the user starts the selected Zed task or Debug entry. Reuse the installed official Java extension's matching main runnable when that route has the required evidence. | Never overwrite unknown configuration or assume a runnable becomes a debug scenario. On capability or merge failure, retain manual configuration and offer a bounded user-reviewed compatibility report where applicable. | 5/5 on tested tuple; platform/build-tool matrix remains |
 | Maven and Gradle execution — run a goal, task, or build | Official Java and manually authored Zed tasks remain the ownership boundary. S016 verified Maven main execution and Gradle coordination, not Gradle/vanilla task execution or test tasks. | Reuse the installed official Java extension's wrapper-aware main/test tasks where they have matching runtime evidence. Generate or merge reviewable `.zed/tasks.json` only for arbitrary goals, builds, or Spring-specific commands; do not launch them invisibly inside Spring LS. | On capability failure, unsafe merge, or platform ambiguity, retain manual tasks and keep unmatched commands `planned`. Exact official-Java release strings do not activate or reject this route. | 4/5; remaining runtime gates |
 | Local process connection — connect live data to a running Boot process | Capability remains `planned`; no reduced connection mode is claimed. | Use a Code Action, Spring's process list, a bounded Zed message choice, and coordinator-owned connection state. | If the process list exceeds a usable prompt or identity is ambiguous, use the opt-in Live document; otherwise retain `planned`. | 3.5/5 |
 | Remote connection — connect to a remote Actuator/JMX target | Capability remains `planned`. | Read an explicit endpoint and non-secret options from Zed settings, then connect through a Code Action. Credentials must use a separately reviewed secure path. | No credentials in generated documents, settings examples, logs, or project files; without a secure input path, remote auth stays `planned`. | 3/5 |
@@ -145,10 +145,15 @@ cron completion/validation, Spring-aware Java completion across six families, an
 all four request-mapping snippets are `verified` — and settled the semantic-token
 question below. What remains:
 
-1. Close the one runtime gap left in run/debug: the multi-project selection
-   prompt and other platform/build-tool tuples have no driven evidence.
-2. Prototype the opt-in Structure document before using the same pattern for
-   live metrics or loggers.
+1. Run/debug's remaining macOS arm64/Maven interaction gate is closed. On
+   2026-07-22 Zed displayed two discovered modules plus `All projects`, generated
+   two task/debug pairs, and ran nothing automatically. The same session forced
+   official Java's five-second bridge timeout, kept the compatibility notice
+   suppressed during bounded retries, and registered the bridge after the same
+   jdtls process resumed. Gradle interaction and other desktop tuples remain
+   untested rather than blocking this named-tuple result.
+2. Next, prototype the opt-in Structure document before using the same pattern
+   for live metrics or loggers.
 3. Take WS2's remaining language-intelligence rows. Spring XML config is
    settings-plus-verification, and its master switch
    `boot-java.support-spring-xml-config.on` defaults false in VS Code too, so it

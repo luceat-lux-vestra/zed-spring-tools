@@ -155,15 +155,15 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 9 exists at
+Status: in progress. Inventory version 16 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
-[R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 57
-capabilities: 19 `verified`, 3 `implemented`, 5 `zed-native-equivalent`, 29
-`planned`, and 1 `not-pursued`.
+[R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
+capabilities: 27 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 22
+`planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
@@ -295,9 +295,10 @@ Immediate M4 slice order after D006 is now:
 3. the references half of S018 is verified by U4, while Spring-specific document
    highlights are recorded as `blocked-zed-api` because Zed queries only the
    primary Java server;
-4. close the remaining Run/Debug runtime gates (multi-project selection and the
-   real-Zed forced-timeout recovery run); and
-5. prototype the opt-in Structure document, then take the separately gated
+4. the remaining Run/Debug runtime gates are verified on the macOS arm64/Maven
+   tuple: multi-project selection and the real-Zed forced-timeout recovery run;
+   and
+5. next, prototype the opt-in Structure document, then take the separately gated
    live-data, build/task, upgrade, Modulith, XML, and remaining language slices.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
@@ -320,10 +321,14 @@ Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3, official Java 6.8.21,
 JDK 25) verified discovery, generation, the generated run task serving
 `GET /greeting`, generated `dev`/`prod`/`staging` picker entries, and a Java debug
 launch from the `dev` entry after editing `vmArgs`, `args`, and `env`. Executable
-Boot project discovery is therefore `verified`. Boot project info and Boot
-run/debug stay `implemented` because multi-project selection and the remaining
-platform/build-tool runtime tuples are not yet driven. The debug run also exposed
-an environment prerequisite in official Java 6.8.21: a system HTTP proxy must
+Boot project discovery is therefore `verified`. Boot project info stays
+`implemented` because `sts/spring-boot/bootProjectInfo` detail is not separately
+exercised. Boot run/debug is now `verified` on the named macOS arm64/Maven tuple:
+the 2026-07-22 follow-up presented `service-a`, `service-b`, and `All projects`,
+and selecting all generated one task/debug pair per module with the correct
+worktree-relative `cwd` and no automatic launch. Gradle interaction and the
+other desktop tuples remain untested. The earlier debug run also exposed an
+environment prerequisite in official Java 6.8.21: a system HTTP proxy must
 bypass its loopback `localhost` main-class resolver.
 
 The references-and-implementations verification also exposed a startup-order
@@ -333,10 +338,13 @@ classpath listening, and no automatic retry followed. The coordinator now
 re-drives that handshake within a bounded grace window and defers only the
 classpath-specific missing-extension diagnostic during that interval.
 Coordinator regression tests cover transient recovery, grace-window exhaustion,
-and immediate reporting for unrelated Java data-route failures. S018/U4 then
-verified Spring qualifier, property, and distinct `@Named` references through
-Zed's composed References result without coordinator merge code. A real-Zed
-forced-timeout recovery run remains pending.
+and immediate reporting for unrelated Java data-route failures. The real-Zed
+gate passed on 2026-07-22: pausing the isolated jdtls process forced the
+unmodified official-Java route to return its five-second command timeout; the
+coordinator re-enabled classpath listening without a compatibility notice, and
+registered the bridge after the same jdtls PID resumed. S018/U4 then verified
+Spring qualifier, property, and distinct `@Named` references through Zed's
+composed References result without coordinator merge code.
 
 ### M5: Installability and platform validation
 

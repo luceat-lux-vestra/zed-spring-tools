@@ -104,7 +104,10 @@ Zed's task/debug picker becomes the profile selector, alongside editable
 `vmArgs`/`args`/`env` slots. Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3,
 official Java 6.8.21, JDK 25) verified discovery, generation, profile entries,
 the generated run task serving `GET /greeting`, and a Java debug launch from the
-generated `dev` entry after editing all three debug slots.
+generated `dev` entry after editing all three debug slots. A 2026-07-22
+multi-project run then displayed `service-a`, `service-b`, and `All projects`;
+selecting all generated one task/debug pair per module with the correct portable
+working directory and launched nothing automatically.
 
 Newly implemented and contract-tested, with a driven run still pending before
 promotion: `source` Code Actions on `.properties` and `.yaml`/`.yml` files that
@@ -223,8 +226,10 @@ self-managed JDT fallback.
 The coordinator now retries a classpath-listener handshake that times out while
 the official Java server is still importing the project. Regression tests cover
 transient recovery, grace-window exhaustion, and immediate reporting for
-unrelated Java-route failures. A forced-timeout recovery run in real Zed remains
-pending.
+unrelated Java-route failures. A 2026-07-22 real-Zed run paused the isolated
+jdtls process, observed the official-Java route's five-second bridge timeout and
+bounded re-enablement without a misleading compatibility notice, then observed
+bridge registration after that same jdtls process resumed.
 
 ## Important limitations
 
