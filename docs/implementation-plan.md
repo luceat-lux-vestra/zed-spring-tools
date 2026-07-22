@@ -155,14 +155,14 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 22 exists at
+Status: in progress. Inventory version 24 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 31 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 18
+capabilities: 31 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 17
 `planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
@@ -304,8 +304,12 @@ Immediate M4 slice order after D006 is now:
    Zed 1.11.3 drops Markdown `#L…` fragments, so Project Symbols remains the
    exact-location fallback. The next live-data slices are also verified: bounded
    local-process connection plus the timestamped metrics document passed their
-   connected-Boot/JMX gates, including metrics refresh and deletion/recreation;
-   build/task, upgrade, Modulith, loggers, and remaining commands stay separate.
+   connected-Boot/JMX gates, including metrics refresh and deletion/recreation.
+   The next logger slice is implemented and contract-tested: the same Live
+   document adds a bounded read-only logger snapshot, while a separate paged and
+   confirmed source action reports success only after Spring's matching update
+   notification. Its authentic Boot/JMX runtime gate remains open; build/task,
+   upgrade, Modulith, and remaining commands stay separate.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's

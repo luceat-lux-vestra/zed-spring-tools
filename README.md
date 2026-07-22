@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 31 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 18 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 31 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 17 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -70,7 +70,12 @@ Boot 3.5.5 process with JMX and Actuator live-data endpoints exposed. A separate
 Code Action generates a bounded, timestamped `.zed/spring-live.md` snapshot for
 heap, non-heap, and GC-pause measurements. The 2026-07-23 driven gate verified
 authentic values, rendered preview, explicit refresh, and deletion/recreation
-against that connected process. Loggers and automatic connection remain planned.
+against that connected process. The document now also includes a bounded
+read-only logger snapshot, and another source action pages logger choices,
+requires a final level-change confirmation, and reports success only after
+Spring sends the matching update notification. That logger slice is implemented
+and contract-tested but not yet runtime-verified; automatic connection remains
+planned.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after

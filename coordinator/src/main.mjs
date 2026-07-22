@@ -89,6 +89,9 @@ const LIVE_PROCESS_DISCONNECTED = "sts/liveprocess/disconnected";
 const LIST_CONNECTED_LIVE_PROCESSES_COMMAND = "sts/livedata/listConnected";
 const REFRESH_LIVE_METRICS_COMMAND = "sts/livedata/refresh/metrics";
 const GET_LIVE_METRICS_COMMAND = "sts/livedata/get/metrics";
+const GET_LIVE_LOGGERS_COMMAND = "sts/livedata/getLoggers";
+const CONFIGURE_LIVE_LOG_LEVEL_COMMAND = "sts/livedata/configure/logLevel";
+const LIVE_LOG_LEVEL_UPDATED = "sts/liveprocess/loglevel/updated";
 const LIVE_PROCESS_ACTIONS = new Set([
   LIVE_CONNECT_COMMAND,
   LIVE_DISCONNECT_COMMAND,
@@ -97,17 +100,24 @@ const LIVE_PROCESS_ACTIONS = new Set([
 const MANAGE_LIVE_PROCESS_COMMAND = "zed-spring-tools.manage-live-process";
 const MANAGE_LIVE_PROCESS_TITLE = "Spring Boot: Connect or disconnect live process data…";
 const GENERATE_LIVE_METRICS_DOCUMENT_COMMAND = "zed-spring-tools.generate-live-metrics-document";
-const GENERATE_LIVE_METRICS_DOCUMENT_TITLE = "Spring Boot: Generate or refresh Live metrics document…";
+const GENERATE_LIVE_METRICS_DOCUMENT_TITLE = "Spring Boot: Generate or refresh Live data document…";
+const CONFIGURE_LIVE_LOG_LEVEL_COORDINATOR_COMMAND = "zed-spring-tools.configure-live-log-level";
+const CONFIGURE_LIVE_LOG_LEVEL_TITLE = "Spring Boot: Set a live logger level…";
 const LIVE_DOCUMENT_RELATIVE_PATH = path.join(".zed", "spring-live.md");
-const LIVE_DOCUMENT_MARKER = "<!-- zed-spring-tools:generated-live-metrics:v1 -->";
+const LIVE_DOCUMENT_MARKER = "<!-- zed-spring-tools:generated-live-data:v2 -->";
+const LEGACY_LIVE_DOCUMENT_MARKER = "<!-- zed-spring-tools:generated-live-metrics:v1 -->";
 const MAX_LIVE_PROCESS_SELECTION = 12;
 const MAX_LIVE_METRIC_MODELS = 64;
 const MAX_LIVE_METRIC_MEASUREMENTS = 16;
 const MAX_LIVE_METRIC_TEXT_LENGTH = 300;
+const MAX_LIVE_LOGGERS = 512;
+const MAX_LIVE_LOG_LEVELS = 12;
+const MAX_LIVE_LOGGER_SELECTION_PAGE = 10;
 // How long to wait for the server's `sts/liveprocess/connected` notification
 // after issuing a connect before reporting a bounded "requested" message. A JMX
 // handshake plus the first actuator poll can take a few seconds.
 const LIVE_CONNECT_CONFIRM_MS = 12_000;
+const LIVE_LOG_LEVEL_CONFIRM_MS = 12_000;
 const ALL_BOOT_PROJECTS_TITLE = "All projects";
 const MAX_BOOT_PROJECT_SELECTION = 8;
 // Cap generated per-profile entries so a project with many profiles cannot flood
@@ -121,6 +131,7 @@ const COORDINATOR_COMMANDS = [
   RELOAD_PROPERTIES_METADATA_COMMAND,
   MANAGE_LIVE_PROCESS_COMMAND,
   GENERATE_LIVE_METRICS_DOCUMENT_COMMAND,
+  CONFIGURE_LIVE_LOG_LEVEL_COORDINATOR_COMMAND,
 ];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
@@ -170,6 +181,7 @@ export class Coordinator {
     classpathRetryMs = CLASSPATH_RETRY_MS,
     inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
     liveConnectConfirmMs = LIVE_CONNECT_CONFIRM_MS,
+    liveLogLevelConfirmMs = LIVE_LOG_LEVEL_CONFIRM_MS,
     now = () => new Date(),
     reportContext = {},
     targetExists = fileUriExists,
@@ -184,6 +196,7 @@ export class Coordinator {
     this.classpathRetryMs = classpathRetryMs;
     this.inlayRefreshDelayMs = inlayRefreshDelayMs;
     this.liveConnectConfirmMs = liveConnectConfirmMs;
+    this.liveLogLevelConfirmMs = liveLogLevelConfirmMs;
     this.now = now;
     this.targetExists = targetExists;
     this.logger = logger;
@@ -214,6 +227,7 @@ export class Coordinator {
     // is connected (or the confirm timeout elapses).
     this.connectedProcesses = new Map();
     this.pendingConnectWaiters = new Map();
+    this.pendingLogLevelWaiters = new Map();
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -308,6 +322,7 @@ export class Coordinator {
     if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
     if (this.#handleManageLiveProcessCommand(message)) return false;
     if (this.#handleGenerateLiveMetricsDocumentCommand(message)) return false;
+    if (this.#handleConfigureLiveLogLevelCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
@@ -374,6 +389,11 @@ export class Coordinator {
       }
       if (message?.method === LIVE_PROCESS_DISCONNECTED) {
         this.#noteLiveProcessDisconnected(message.params?.processKey);
+        this.sendZed(encodeLsp(message));
+        return;
+      }
+      if (message?.method === LIVE_LOG_LEVEL_UPDATED) {
+        this.#noteLiveLogLevelUpdated(message.params);
         this.sendZed(encodeLsp(message));
         return;
       }
@@ -489,6 +509,11 @@ export class Coordinator {
       resolve(false);
     }
     this.pendingConnectWaiters.clear();
+    for (const { resolve, timer } of this.pendingLogLevelWaiters.values()) {
+      clearTimeout(timer);
+      resolve(undefined);
+    }
+    this.pendingLogLevelWaiters.clear();
     this.connectedProcesses.clear();
     this.pending.clear();
     this.zedRequests.clear();
@@ -1215,15 +1240,15 @@ export class Coordinator {
     ) {
       return false;
     }
-    // Collecting metrics can include a process-selection prompt and two
-    // actuator refreshes. Answer the editor command immediately, then report the
-    // generated point-in-time snapshot separately.
+    // Collecting live data can include a process-selection prompt, two metrics
+    // refreshes, and a logger read. Answer the editor command immediately, then
+    // report the generated point-in-time snapshot separately.
     this.sendZed(encodeLsp(responseFor(message, null)));
     void this.#generateLiveMetricsDocument().catch((error) => {
       if (this.closed) return;
-      this.logger(`Spring Live metrics document failed: ${errorText(error)}`);
+      this.logger(`Spring Live data document failed: ${errorText(error)}`);
       this.#showInfo(
-        `Spring Boot: The Live metrics document could not be generated. ${errorText(error)} Make sure the selected process is still connected and exposes the Actuator metrics endpoint, then try again.`,
+        `Spring Boot: The Live data document could not be generated. ${errorText(error)} Make sure the selected process is still connected and exposes the Actuator metrics endpoint, then try again.`,
       );
     });
     return true;
@@ -1234,7 +1259,7 @@ export class Coordinator {
     const ownership = liveDocumentOwnership(target);
     if (ownership === "foreign") {
       this.#showInfo(
-        `Spring Boot: ${LIVE_DOCUMENT_RELATIVE_PATH} already exists and is not owned by Zed Spring Tools, so it was left unchanged. Rename or remove that file before generating the Live metrics document.`,
+        `Spring Boot: ${LIVE_DOCUMENT_RELATIVE_PATH} already exists and is not owned by Zed Spring Tools, so it was left unchanged. Rename or remove that file before generating the Live data document.`,
       );
       return;
     }
@@ -1250,7 +1275,7 @@ export class Coordinator {
       );
       return;
     }
-    const process = await this.#selectConnectedLiveProcess(connected);
+    const process = await this.#selectConnectedLiveProcess(connected, "the Live data snapshot");
     if (process === undefined) return;
 
     // Spring refreshes both heap and non-heap data through the single `memory`
@@ -1291,6 +1316,21 @@ export class Coordinator {
       metricSections.push({ title, models });
     }
 
+    // Logger exposure is independent from metrics exposure. A process without
+    // the Actuator loggers endpoint must not lose the already-verified metrics
+    // snapshot, so retain a visible unavailable section instead of failing the
+    // whole document.
+    let loggerSnapshot;
+    try {
+      const loggerData = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: GET_LIVE_LOGGERS_COMMAND,
+        arguments: [liveProcessArgument(process), { endpoint: "loggers" }],
+      });
+      loggerSnapshot = normalizeLiveLoggers(loggerData);
+    } catch (error) {
+      this.logger(`Spring Live logger snapshot unavailable: ${errorText(error)}`);
+    }
+
     // Recheck after every server await so a hand-written file created while
     // metrics were loading is never mistaken for the initially missing target.
     const currentOwnership = liveDocumentOwnership(target);
@@ -1300,11 +1340,93 @@ export class Coordinator {
       );
       return;
     }
-    const rendered = renderLiveMetricsDocument(process, metricSections, this.now());
+    const rendered = renderLiveDataDocument(process, metricSections, loggerSnapshot, this.now());
     writeLiveDocument(target, rendered.contents);
     if (this.closed) return;
     this.#showInfo(
-      `Spring Boot: ${currentOwnership === "missing" ? "Generated" : "Refreshed"} ${LIVE_DOCUMENT_RELATIVE_PATH} with ${rendered.renderedMeasurements} live metric ${rendered.renderedMeasurements === 1 ? "measurement" : "measurements"}. It is a timestamped snapshot; open the file to inspect it and rerun this action to refresh.`,
+      `Spring Boot: ${currentOwnership === "missing" ? "Generated" : "Refreshed"} ${LIVE_DOCUMENT_RELATIVE_PATH} with ${rendered.renderedMeasurements} live metric ${rendered.renderedMeasurements === 1 ? "measurement" : "measurements"} and ${rendered.renderedLoggers} ${rendered.renderedLoggers === 1 ? "logger" : "loggers"}. It is a timestamped snapshot; open the file to inspect it and rerun this action to refresh.`,
+    );
+  }
+
+  #handleConfigureLiveLogLevelCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== CONFIGURE_LIVE_LOG_LEVEL_COORDINATOR_COMMAND
+    ) {
+      return false;
+    }
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#configureLiveLogLevel().catch((error) => {
+      if (this.closed) return;
+      this.logger(`Spring Live logger configuration failed: ${errorText(error)}`);
+      this.#showInfo(
+        `Spring Boot: The logger level could not be configured. ${errorText(error)} Make sure the selected process is still connected and exposes the Actuator loggers endpoint, then try again.`,
+      );
+    });
+    return true;
+  }
+
+  async #configureLiveLogLevel() {
+    const connected = normalizeConnectedLiveProcesses(
+      await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: LIST_CONNECTED_LIVE_PROCESSES_COMMAND,
+        arguments: [],
+      }),
+    );
+    if (connected.length === 0) {
+      this.#showInfo(
+        "Spring Boot: No connected Spring Boot process has live loggers. Connect one with “Connect or disconnect live process data…” first, then run this action again.",
+      );
+      return;
+    }
+    const process = await this.#selectConnectedLiveProcess(connected, "a logger-level change");
+    if (process === undefined) return;
+    const loggerData = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: GET_LIVE_LOGGERS_COMMAND,
+      arguments: [liveProcessArgument(process), { endpoint: "loggers" }],
+    });
+    const snapshot = normalizeLiveLoggers(loggerData);
+    if (snapshot === undefined || snapshot.loggers.length === 0 || snapshot.levels.length === 0) {
+      this.#showInfo(
+        "Spring Boot: The selected process returned no configurable loggers or levels. Make sure its Actuator loggers endpoint is exposed.",
+      );
+      return;
+    }
+    const selectedLogger = await this.#selectLiveLogger(snapshot.loggers);
+    if (selectedLogger === undefined) return;
+    const selectedLevel = await this.#selectLiveLogLevel(snapshot.levels, selectedLogger);
+    if (selectedLevel === undefined) return;
+    const confirmationTitle = `Apply ${selectedLevel}`;
+    const confirmation = await this.requestZed("window/showMessageRequest", {
+      type: 2,
+      message: `Set logger ${inlineCode(selectedLogger.packageName)} from effective level ${inlineCode(selectedLogger.effectiveLevel ?? "unknown")} to ${inlineCode(selectedLevel)} for ${inlineCode(process.label)}? The running process changes only after you confirm.`,
+      actions: [{ title: confirmationTitle }],
+    });
+    if (confirmation?.title !== confirmationTitle) return;
+
+    const updated = this.#awaitLiveLogLevelUpdate(
+      process.processKey,
+      selectedLogger.packageName,
+      selectedLevel,
+    );
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: CONFIGURE_LIVE_LOG_LEVEL_COMMAND,
+      arguments: [
+        { processKey: process.processKey },
+        {
+          packageName: selectedLogger.packageName,
+          effectiveLevel: selectedLogger.effectiveLevel,
+        },
+        { configuredLevel: selectedLevel },
+      ],
+    });
+    const confirmationData = await updated;
+    if (this.closed) return;
+    this.#showInfo(
+      confirmationData === undefined
+        ? `Spring Boot: Requested ${inlineCode(selectedLevel)} for ${inlineCode(selectedLogger.packageName)}, but Spring Tools did not confirm the runtime change. Check the Actuator loggers endpoint and rerun the Live data document action before relying on it.`
+        : `Spring Boot: Set ${inlineCode(confirmationData.packageName)} to ${inlineCode(confirmationData.configuredLevel)} for ${inlineCode(process.label)}. Rerun the Live data document action to refresh the logger snapshot.`,
     );
   }
 
@@ -1361,7 +1483,49 @@ export class Coordinator {
   }
 
   #noteLiveProcessDisconnected(processKey) {
-    if (typeof processKey === "string") this.connectedProcesses.delete(processKey);
+    if (typeof processKey !== "string") return;
+    this.connectedProcesses.delete(processKey);
+    for (const [key, waiter] of this.pendingLogLevelWaiters) {
+      if (waiter.processKey !== processKey) continue;
+      clearTimeout(waiter.timer);
+      waiter.resolve(undefined);
+      this.pendingLogLevelWaiters.delete(key);
+    }
+  }
+
+  #awaitLiveLogLevelUpdate(processKey, packageName, configuredLevel) {
+    const key = logLevelWaiterKey(processKey, packageName);
+    return new Promise((resolve) => {
+      const existing = this.pendingLogLevelWaiters.get(key);
+      if (existing !== undefined) {
+        clearTimeout(existing.timer);
+        existing.resolve(undefined);
+      }
+      const timer = setTimeout(() => {
+        const waiter = this.pendingLogLevelWaiters.get(key);
+        if (waiter?.resolve === resolve) {
+          this.pendingLogLevelWaiters.delete(key);
+          resolve(undefined);
+        }
+      }, this.liveLogLevelConfirmMs);
+      timer.unref?.();
+      this.pendingLogLevelWaiters.set(key, { resolve, timer, processKey, configuredLevel });
+    });
+  }
+
+  #noteLiveLogLevelUpdated(params) {
+    const processKey = typeof params?.processKey === "string" ? params.processKey : undefined;
+    const packageName = typeof params?.packageName === "string" ? params.packageName : undefined;
+    const configuredLevel = typeof params?.configuredLevel === "string"
+      ? params.configuredLevel
+      : undefined;
+    if (processKey === undefined || packageName === undefined || configuredLevel === undefined) return;
+    const key = logLevelWaiterKey(processKey, packageName);
+    const waiter = this.pendingLogLevelWaiters.get(key);
+    if (waiter === undefined || waiter.configuredLevel !== configuredLevel) return;
+    clearTimeout(waiter.timer);
+    this.pendingLogLevelWaiters.delete(key);
+    waiter.resolve({ processKey, packageName, configuredLevel });
   }
 
   async #selectLiveProcess(entries) {
@@ -1389,7 +1553,7 @@ export class Coordinator {
     return byTitle.get(title);
   }
 
-  async #selectConnectedLiveProcess(entries) {
+  async #selectConnectedLiveProcess(entries, purpose = "the Live data snapshot") {
     if (entries.length === 1) return entries[0];
     const shown = entries.slice(0, MAX_LIVE_PROCESS_SELECTION);
     const byTitle = new Map();
@@ -1404,11 +1568,58 @@ export class Coordinator {
     const response = await this.requestZed("window/showMessageRequest", {
       type: 3,
       message: overflow > 0
-        ? `Select a connected Spring Boot process for the Live metrics snapshot. ${overflow} more ${overflow === 1 ? "process is" : "processes are"} not shown. Nothing is written until you choose.`
-        : "Select a connected Spring Boot process for the Live metrics snapshot. Nothing is written until you choose.",
+        ? `Select a connected Spring Boot process for ${purpose}. ${overflow} more ${overflow === 1 ? "process is" : "processes are"} not shown. Nothing changes until you choose.`
+        : `Select a connected Spring Boot process for ${purpose}. Nothing changes until you choose.`,
       actions,
     });
     return typeof response?.title === "string" ? byTitle.get(response.title) : undefined;
+  }
+
+  async #selectLiveLogger(loggers) {
+    let page = 0;
+    const pages = Math.ceil(loggers.length / MAX_LIVE_LOGGER_SELECTION_PAGE);
+    while (!this.closed) {
+      const start = page * MAX_LIVE_LOGGER_SELECTION_PAGE;
+      const shown = loggers.slice(start, start + MAX_LIVE_LOGGER_SELECTION_PAGE);
+      const byTitle = new Map();
+      const actions = shown.map((logger) => {
+        const base = `${logger.packageName} — ${logger.effectiveLevel ?? "unknown"}`;
+        let title = base;
+        for (let index = 2; byTitle.has(title); index += 1) title = `${base} (${index})`;
+        byTitle.set(title, logger);
+        return { title };
+      });
+      if (page > 0) actions.push({ title: "← Previous loggers" });
+      if (page + 1 < pages) actions.push({ title: "More loggers →" });
+      const response = await this.requestZed("window/showMessageRequest", {
+        type: 3,
+        message: `Select a logger to change (page ${page + 1} of ${pages}). No runtime setting changes until you choose a level and confirm it.`,
+        actions,
+      });
+      const title = response?.title;
+      if (typeof title !== "string") return undefined;
+      if (title === "← Previous loggers") {
+        page -= 1;
+        continue;
+      }
+      if (title === "More loggers →") {
+        page += 1;
+        continue;
+      }
+      return byTitle.get(title);
+    }
+    return undefined;
+  }
+
+  async #selectLiveLogLevel(levels, logger) {
+    const response = await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message: `Select a configured level for ${inlineCode(logger.packageName)}. Its current effective level is ${inlineCode(logger.effectiveLevel ?? "unknown")}. Nothing changes until a separate confirmation.`,
+      actions: levels.map((title) => ({ title })),
+    });
+    return typeof response?.title === "string" && levels.includes(response.title)
+      ? response.title
+      : undefined;
   }
 
   async #configureBootRun() {
@@ -1677,6 +1888,15 @@ function syntheticCodeActions(request) {
         arguments: [],
       },
     });
+    actions.push({
+      title: CONFIGURE_LIVE_LOG_LEVEL_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: CONFIGURE_LIVE_LOG_LEVEL_TITLE,
+        command: CONFIGURE_LIVE_LOG_LEVEL_COORDINATOR_COMMAND,
+        arguments: [],
+      },
+    });
   }
   const conversion = propertiesConversionFor(request);
   if (conversion !== undefined) {
@@ -1745,6 +1965,76 @@ function normalizeConnectedLiveProcesses(discovered) {
     entries.push({ processKey, processName, type, pid, label });
   }
   return entries;
+}
+
+function liveProcessArgument(process) {
+  const argument = {
+    processKey: process.processKey,
+    processName: process.processName,
+  };
+  if (process.type !== undefined) argument.type = process.type;
+  if (process.pid !== undefined) argument.pid = process.pid;
+  return argument;
+}
+
+function normalizeLiveLoggers(data) {
+  const payload = data?.loggers;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+  const levels = [];
+  const seenLevels = new Set();
+  for (const candidate of Array.isArray(payload.levels) ? payload.levels : []) {
+    const level = liveLoggerIdentifier(candidate, 64);
+    if (level === undefined || seenLevels.has(level) || levels.length >= MAX_LIVE_LOG_LEVELS) continue;
+    seenLevels.add(level);
+    levels.push(level);
+  }
+  const rawLoggers = payload.loggers;
+  if (rawLoggers === null || typeof rawLoggers !== "object" || Array.isArray(rawLoggers)) {
+    return { levels, loggers: [], totalLoggers: 0, truncated: false };
+  }
+  const loggers = [];
+  let totalLoggers = 0;
+  for (const [rawName, rawInfo] of Object.entries(rawLoggers)) {
+    // These values are sent back to Spring when a user changes a level. Never
+    // trim or truncate them: a display-safe mutation could address a different
+    // logger. Invalid identifiers are omitted instead.
+    const packageName = liveLoggerIdentifier(rawName, MAX_LIVE_METRIC_TEXT_LENGTH);
+    if (packageName === undefined || rawInfo === null || typeof rawInfo !== "object") continue;
+    totalLoggers += 1;
+    if (loggers.length >= MAX_LIVE_LOGGERS) continue;
+    loggers.push({
+      packageName,
+      effectiveLevel: liveLoggerIdentifier(rawInfo.effectiveLevel, 64),
+      configuredLevel: liveLoggerIdentifier(rawInfo.configuredLevel, 64),
+    });
+  }
+  loggers.sort((left, right) => {
+    if (left.packageName < right.packageName) return -1;
+    if (left.packageName > right.packageName) return 1;
+    return 0;
+  });
+  return {
+    levels,
+    loggers,
+    totalLoggers,
+    truncated: totalLoggers > loggers.length,
+  };
+}
+
+function liveLoggerIdentifier(value, maxLength) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > maxLength ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
+    return undefined;
+  }
+  return value;
+}
+
+function logLevelWaiterKey(processKey, packageName) {
+  return JSON.stringify([processKey, packageName]);
 }
 
 function liveActionVerb(action) {
@@ -1822,7 +2112,10 @@ function liveDocumentOwnership(target) {
   }
   if (!status.isFile() || status.isSymbolicLink()) return "foreign";
   const contents = fs.readFileSync(target, "utf8");
-  return contents.startsWith(`${LIVE_DOCUMENT_MARKER}\n`) ? "owned" : "foreign";
+  return contents.startsWith(`${LIVE_DOCUMENT_MARKER}\n`)
+      || contents.startsWith(`${LEGACY_LIVE_DOCUMENT_MARKER}\n`)
+    ? "owned"
+    : "foreign";
 }
 
 function writeStructureDocument(target, rendered) {
@@ -1893,7 +2186,7 @@ function renderStructureDocument(roots, target, worktree) {
   return { contents: `${lines.join("\n").trimEnd()}\n`, renderedNodes: state.renderedNodes };
 }
 
-function renderLiveMetricsDocument(process, sections, capturedAt) {
+function renderLiveDataDocument(process, sections, loggerSnapshot, capturedAt) {
   const timestamp = capturedAt instanceof Date && Number.isFinite(capturedAt.getTime())
     ? capturedAt.toISOString()
     : new Date().toISOString();
@@ -1901,20 +2194,22 @@ function renderLiveMetricsDocument(process, sections, capturedAt) {
   const type = process.type === undefined ? "unknown" : escapeMarkdownLabel(process.type);
   const lines = [
     LIVE_DOCUMENT_MARKER,
-    "# Spring Live Metrics",
+    "# Spring Live Data",
     "",
-    "> Regenerable point-in-time snapshot from Spring Tools. Rerun **Spring Boot: Generate or refresh Live metrics document…** to fetch current values. This file is safe to delete and is not a live view.",
+    "> Regenerable point-in-time snapshot from Spring Tools. Rerun **Spring Boot: Generate or refresh Live data document…** to fetch current values. This file is safe to delete and is not a live view.",
     "",
     `- Process: ${processLabel}`,
     `- Connection type: ${type}`,
     `- Captured at: ${timestamp}`,
+    "",
+    "## Metrics",
     "",
   ];
   let renderedModels = 0;
   let renderedMeasurements = 0;
   let truncated = false;
   for (const section of sections) {
-    lines.push(`## ${escapeMarkdownLabel(section.title)}`, "");
+    lines.push(`### ${escapeMarkdownLabel(section.title)}`, "");
     const models = Array.isArray(section.models) ? section.models : [];
     let sectionModels = 0;
     for (const model of models) {
@@ -1926,7 +2221,7 @@ function renderLiveMetricsDocument(process, sections, capturedAt) {
       renderedModels += 1;
       sectionModels += 1;
       const name = boundedMetricText(model.name) ?? `Metric ${sectionModels}`;
-      lines.push(`### ${escapeMarkdownLabel(name)}`, "");
+      lines.push(`#### ${escapeMarkdownLabel(name)}`, "");
       const description = boundedMetricText(model.description);
       if (description !== undefined) {
         lines.push(`${escapeMarkdownLabel(description)}`, "");
@@ -1961,10 +2256,45 @@ function renderLiveMetricsDocument(process, sections, capturedAt) {
       "",
     );
   }
+  lines.push("## Loggers", "");
+  let renderedLoggers = 0;
+  if (loggerSnapshot === undefined) {
+    lines.push(
+      "_Spring Tools could not read live loggers. Make sure the Actuator loggers endpoint is exposed._",
+      "",
+    );
+  } else {
+    for (const logger of loggerSnapshot.loggers) {
+      renderedLoggers += 1;
+      lines.push(
+        `- ${inlineCode(logger.packageName)} — effective: ${inlineCode(logger.effectiveLevel ?? "unknown")}; configured: ${inlineCode(logger.configuredLevel ?? "inherited")}`,
+      );
+    }
+    if (renderedLoggers === 0) {
+      lines.push("_Spring Tools returned no loggers for this process._");
+    }
+    lines.push("");
+    if (loggerSnapshot.truncated) {
+      lines.push(
+        `> Logger output was limited to ${MAX_LIVE_LOGGERS} of ${loggerSnapshot.totalLoggers} entries. Use the Actuator endpoint for omitted entries.`,
+        "",
+      );
+    } else {
+      lines.push(
+        "> To change a level, run **Spring Boot: Set a live logger level…** from a Java file. Zed Spring Tools requires a separate final confirmation and never treats the command's null response as success.",
+        "",
+      );
+    }
+  }
   return {
     contents: `${lines.join("\n").trimEnd()}\n`,
     renderedMeasurements,
+    renderedLoggers,
   };
+}
+
+function inlineCode(value) {
+  return `\`${String(value).replace(/`/g, "ˋ")}\``;
 }
 
 function boundedMetricText(value) {
