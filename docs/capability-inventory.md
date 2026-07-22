@@ -1,15 +1,16 @@
 # Capability inventory
 
-- Inventory version: 14
+- Inventory version: 15
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-21
+- Last updated: 2026-07-22
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
   [R016](research/016-zed-github-compatibility-reporting.md),
   [R017](research/017-zed-codelens-hover-command-compatibility.md),
-  [R018](research/018-spring-tools-zed-outcome-parity-audit.md), and
-  [R019](research/019-zed-codelens-agent-navigation-and-build-output.md)
+  [R018](research/018-spring-tools-zed-outcome-parity-audit.md),
+  [R019](research/019-zed-codelens-agent-navigation-and-build-output.md), and
+  [S018](spikes/018-references-highlights-multiserver-composition.md)
 - Delivery routes: [M4 capability delivery plan](capability-delivery-plan.md),
   selected by [D005](decisions/005-lsp-first-capability-delivery.md), with
   compatibility/reporting policy from
@@ -48,14 +49,14 @@ selected route or planning-confidence score does not change a state here.
 
 ## Summary
 
-57 capabilities tracked.
+58 capabilities tracked.
 
 | State | Count |
 | --- | --- |
-| `verified` | 25 |
+| `verified` | 26 |
 | `implemented` | 2 |
-| `planned` | 24 |
-| `blocked-zed-api` | 0 |
+| `planned` | 22 |
+| `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
 | `not-pursued` | 1 |
@@ -155,7 +156,8 @@ verified structure-navigation fallback.
 | Code actions / quick fixes | `verified` | Observed end to end on 2026-07-18 with macOS 26.5.1 arm64, Temurin JDK 25.0.3, official Java 6.8.21, the development extension, and unmodified Zed 1.11.3. Spring initially advertises `sts.vscode-spring-boot.codeAction`, but enabling its classpath listener dynamically registers one internal `sts4.classpath.<letters>` command. Zed 1.11.3 replaces rather than extends the static `executeCommandProvider` command list for that registration, so it received Spring quickfix responses but filtered them out of the menu as unavailable commands. The coordinator already owns and relays that exact callback without Zed, so it now consumes the callback's registration and unregistration, preserving Spring's static command list. After rebuilding, Zed's standard code-action menu displayed `Remove 'public' from @Bean method`; selecting it emitted `workspace/executeCommand`, Spring returned `workspace/applyEdit`, the saved disposable fixture lost `public`, and `mvn test` passed. The property diagnostic also returned `Create metadata for 'ser'`, but that separate action was not executed. Evidence: `tmp/cav-verify-20260718/evidence/stock-fixed2-foreground.log` and `quick-fix-picker-fixed2.png`. |
 | References and implementations | `verified` | The official Java JDT server advertises `referencesProvider` and `implementationProvider`; the coordinator does not interpose on either. Driven run 2026-07-18: on `GreetingService`, "Go to Implementation" issued `textDocument/implementation` and returned `DefaultGreetingService`; "Find All References" issued `textDocument/references` and returned 4 cross-file locations (the declaration, the `implements` clause, and two javadoc `{@link}` references). Both are gesture-triggered standard LSP served directly by the official Java extension. Evidence: `tmp/refs-impl-capture-20260718/evidence/`. |
 | Source authorship and change history | `zed-native-equivalent` | This is not a Spring Boot Tools capability. Zed provides current-line inline blame, Git gutter/change indicators, a Git panel, clickable commit references and hosted permalinks. No Spring/JDT duplication is planned. |
-| Spring-specific references and document highlights | `planned` | Spring separately implements references for property values, profiles, qualifiers, named beans and application events, plus WebFlux-route and embedded-query document highlights. Preferred route is Zed's standard References and Document Highlights UI; test multi-server composition and source attribution. |
+| Spring-specific references | `verified` | Verified 2026-07-22 on macOS arm64/JDK 25.0.3, Zed 1.11.3, official Java 6.8.21, and Spring Tools 5.2.0. S018 established that Zed fans out `textDocument/references` to both the Spring coordinator and jdtls and unions their results. U4 drove three distinct Spring providers: `@Qualifier("greetingPrefix")`→`@Bean`, `@Value("${fixture.greeting.salutation}")`→`application.properties`, and a disposable `@Named("namedGreeting")` injection→`@Named` bean declaration. Each Spring-only target appeared in Zed's composed References result alongside jdtls output. No coordinator merge code is needed. Profile- and application-event-specific result content remains undriven and is recorded as residual uncertainty rather than evidence for this route. Evidence: `tmp/u4-refs-20260722/evidence/` and [S018](spikes/018-references-highlights-multiserver-composition.md). |
+| Spring-specific document highlights | `blocked-zed-api` | Spring's WebFlux-route and embedded-query document highlights cannot reach stock Zed's Java buffer: S018 observed steady-state `textDocument/documentHighlight` requests going only to the primary jdtls server, never to the Spring coordinator. Do not add coordinator merge code. Reopen if Zed aggregates document highlights across language servers in a future release; ordinary jdtls highlights remain available. |
 | Spring-aware Java completion | `verified` | Verified 2026-07-21 on macOS 26.5.x arm64, Zed 1.11.3, official Java 6.8.23, Temurin JDK 25.0.3, Spring Tools 5.2.0. Spring dynamically registers Java completion with every letter plus `.`/`(`/`@` as trigger characters (`documentSelector: [{language: java}]`), so ordinary typing reaches it; the driven run used explicit `editor::ShowCompletions` so no gesture mutated the buffer. Six representative families were observed returning real, index- or classpath-backed results, each alongside an independent jdtls response for the same position — the two servers compose in Zed's menu rather than one replacing the other: `@Value` → 1836 property keys including the fixture's own `fixture.greeting.salutation` from generated metadata; `@Qualifier` → 10 indexed bean names; `@Scope` → the 7 scope names; `@Profile` → `dev`, the only profile the index knows; repository body → `findBy`/`countBy`/… prefixes plus entity-derived `findById(Long id)` and `findByMessage(String message)`; and bean injection → 7 injectable beans, correctly excluding the two `String` beans whose type is already a field and the declaring bean itself. **`boot-java.java.completions.inject-bean` was a live parity gap**: `BootJavaConfig.isBeanInjectionCompletionEnabled()` is `Boolean.TRUE.equals(b)`, so an absent key reads false while VS Code's schema defaults it true, and `BeanCompletionProvider` returned nothing. The extension now sends it (`spring_default_configuration`), and an A/B on the identical caret position closed the gate: default → 7 Spring items, user override `inject-bean: false` → 0 Spring items with jdtls's 17 unchanged. An audit of every VS Code boolean defaulting true against its `BootJavaConfig` getter found no other gap in this path. Bean injection also requires the caret to resolve to a `SimpleName`/`Block`/`FieldAccess`/`ThisExpression` inside a method body of a `@Component` type; a caret on the `return` keyword yields a `ReturnStatement` and the provider bails, which is upstream behaviour and not a Zed limitation. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/`. |
 | Spring Java request-mapping templates | `verified` | Verified 2026-07-21 on the same tuple. All four templates `JavaSnippetManager` contributes — `@RequestMapping(..) {..}`, `@GetMapping(..) {..}`, `@PostMapping(..) {..}`, `@PutMapping(..) {..}` — were returned at class-body root level in the `@RestController` fixture as `insertTextFormat: 2` items, composed with jdtls's 30 ordinary Java proposals. The row's three open questions are all answered. *Placeholders*: the resolved `newText` carries Spring's tab stops intact, e.g. `@GetMapping("${1:path}")\npublic ${2:String} ${3:getMethodName}(@RequestParam ${4:String} ${5:param})`. *Imports*: they arrive through `completionItem/resolve`, which Zed does issue, as `additionalTextEdits` inserting after the last existing import — and they are deduplicated against the file, so `@GetMapping` added only `RequestParam` while `@PutMapping` added all three of its imports. *Controller context*: the negative control passed — the identical class-body-root gesture in `@Configuration` `GreetingConfiguration` returned zero Spring items, so `AnnotatedTypeDeclarationContext(Annotations.CONTROLLER)` is enforced through Zed and `@RestController` satisfies it by annotation hierarchy. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/trace-snippets.log` and `slice-snippet-control.log`. |
 | SpEL language intelligence | `planned` | Spring supplies embedded semantic tokens and diagnostics, plus contextual hover/navigation paths; AI explanation is a separate client-only lens. The semantic-token half of this row is settled and negative: Zed issues no semantic-token request even after Spring registers the provider dynamically (see Embedded language syntax highlighting), so the preferred route narrows to diagnostics, hover and navigation, which are ordinary LSP and remain untested here rather than blocked. Do not conflate working language intelligence with the VS Code Copilot command. |
