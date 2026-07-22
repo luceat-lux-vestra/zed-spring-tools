@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 29 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 19 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 30 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 19 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -62,12 +62,12 @@ The following outcomes have been observed on the tested environment:
 Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
 surface is still planned or unverified. Live application data has its first
-slice — connect/disconnect to a running Boot process — built and contract-tested
-(a Code Action lists processes, prompts a bounded choice, and reports connect
-success only when the server announces the process is connected, never on the
-command's always-null result), but it is not yet driven against a live
-JMX/Actuator process, and the rest of live data (metrics, loggers, automatic
-connection) remains planned.
+verified slice — connect/disconnect to a running Boot process. A Code Action
+lists processes, prompts a bounded choice, and reports connect success only when
+the server announces the process is connected, never on the command's
+always-null result. The 2026-07-23 macOS arm64 gate connected and disconnected a
+Boot 3.5.5 process with JMX and Actuator live-data endpoints exposed. The rest of
+live data (metrics, loggers, automatic connection) remains planned.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
