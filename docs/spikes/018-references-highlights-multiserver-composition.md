@@ -1,8 +1,9 @@
 # S018: References and document highlights under two-server composition
 
-- Status: Mixed — `textDocument/references` Supported (Zed composes both
-  servers); `textDocument/documentHighlight` Refuted (Zed queries one server)
-- Date: 2026-07-21
+- Status: Mixed — `textDocument/references` Supported (U3 + U4; Zed composes
+  both servers); `textDocument/documentHighlight` Refuted (Zed queries one
+  server)
+- Date: 2026-07-22 (U4 follow-up; U3 ran 2026-07-21)
 - Related: [capability-delivery-plan](../capability-delivery-plan.md) row
   *Bean and endpoint navigation* / references; [S017](017-static-semantic-token-declaration.md)
   (the neighbouring composition question for semantic tokens);
@@ -31,8 +32,9 @@ product code changes — drive the existing fixture and read the trace.
 
 ## Environment
 
-- macOS 26.5.x arm64, Zed 1.11.3 (unmodified); official Java extension 6.8.23,
-  Temurin JDK 25.x; Spring Tools 5.2.0 / `vscode-spring-boot` 2.2.0
+- macOS 26.5.x arm64, Zed 1.11.3 (unmodified); U3 used official Java
+  extension 6.8.23 and U4 used 6.8.21, both with Temurin JDK 25.x and Spring
+  Tools 5.2.0 / `vscode-spring-boot` 2.2.0
 - Reused the live warm run dir from S017, `/private/tmp/zst-s017/` (short path;
   jdtls full stack present), fixture `dev/zed/spring/fixture` — `GreetingService`
   interface + `DefaultGreetingService` impl, `GreetingConfiguration.greetingPrefix()`
@@ -106,7 +108,8 @@ highlighting is single-server.)
   Spring's semantic references appear with no coordinator merge code. This is the
   favourable branch: the references/implementation capability can be delivered by
   **adding Spring-attributable targets to the fixture and verifying**, not by
-  building multi-server composition in the coordinator. → this is the U4 task.
+  building multi-server composition in the coordinator. U4 then confirmed the
+  qualifier, property, and distinct Jakarta `@Named` targets.
 - **Document highlights: Refuted for Spring-specific highlights.** Zed routes
   `documentHighlight` to the buffer's single primary server (jdtls) despite the
   coordinator advertising the provider. Spring's highlights cannot surface — the
@@ -119,6 +122,36 @@ No product code was written or changed. Evidence:
 `tmp/u3-refs-highlights-20260721/evidence/` (per-gesture marks, `trace-u3-run.log`,
 `refs-qualifier.png` / `-crop.png`).
 
+## U4 follow-up — Spring-attributable references
+
+The existing fixture contained the qualifier and property targets, but those do
+not exercise Spring Tools' distinct `NamedReferencesProvider`. For U4 only, the
+disposable worktree added the managed `jakarta.inject-api` 2.0.1 dependency,
+an `@Named("namedGreeting")` bean, and a constructor injection point carrying
+the same `@Named` value. The repository fixture and product dependencies were
+not changed. `mvn test -f /private/tmp/zst-s017/worktree/pom.xml` passed before
+the driven run.
+
+A driven run on macOS arm64/JDK 25 with Zed 1.11.3, official Java 6.8.21, and
+Spring Tools 5.2.0 exercised three source positions.
+
+Each gesture sent two `textDocument/references` requests. The Spring response
+for the qualifier contained `GreetingConfiguration.greetingPrefix()` and the
+qualifier use; the Spring response for the property value contained
+`application.properties` and the annotation use. The jdtls responses contained
+only Java-local occurrences. At the `@Named` injection value, the two outgoing
+requests returned different attributable sets: Spring returned the
+`NamedGreeting` declaration value and `NamedGreetingInjection` injection value,
+while jdtls returned only the Java type occurrence. Zed then opened
+`NamedGreeting.java` from the composed result. The three distinct Spring
+providers therefore reached Zed's References UI without coordinator merge code.
+
+Evidence: `tmp/u4-refs-20260722/evidence/U4-RESULT.md` and
+`trace-named-reference.log` in the same local evidence directory.
+
+U4 closes the references half of the spike. The inventory can promote Spring-
+specific references independently of document highlights.
+
 ## Remaining uncertainty
 
 - Whether Zed **dedupes** overlapping ranges when the two servers return the same
@@ -128,10 +161,11 @@ No product code was written or changed. Evidence:
   refs-impl run, but it was not re-driven here.
 - Whether a future Zed extends the aggregate path to `documentHighlight`. If it
   does, the Spring slice reopens with no new coordinator work.
+- Spring's profile and application-event reference providers use the same
+  verified aggregate route, but their provider-specific result content was not
+  driven in U4.
 
-## Next experiment (U4)
-
-Add Spring-attributable reference targets to the fixture — a `@Qualifier`→`@Bean`
-pair (already present), a `@Value` property key defined in `application.properties`,
-a named-bean qualifier — and drive find-all-references to confirm each Spring
-contribution lands in the composed multibuffer. Small; no composition code.
+No further U4 experiment is required. A future run may re-drive
+`textDocument/implementation` on the same tuple to strengthen the existing
+implementation-composition observation, but it is not needed for the
+references result above.

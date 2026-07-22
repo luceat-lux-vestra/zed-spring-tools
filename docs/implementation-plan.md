@@ -286,24 +286,19 @@ be proposed later only through a new direction decision, after stock-Zed routes
 are tested, and only for a capability such as embedded syntax highlighting that
 has no safe equivalent.
 
-Immediate M4 slice order after D006 is:
+Immediate M4 slice order after D006 is now:
 
-1. completed on the current CodeLens/compatibility branch: retained the verified
-   live path, promoted all five static families after corrected AI-boundary
-   wording and authentic `CL-4d` asynchronous target pre-resolution/one-click
-   navigation passed with ignored `target/`, removed the self-declared exact-
-   release gate while preserving functional probes, and verified the bounded
-   compatibility-report notification through the populated browser composer;
-2. delivered in code and contract-tested on `feat/boot-project-run-config`:
-   a synthetic Code Action discovers executable Boot projects, prompts a bounded
-   selection, and generates merge-safe `.zed/tasks.json` run tasks and
-   `.zed/debug.json` (`"adapter": "Java"`) launches under official Java DAP
-   ownership; a driven Zed run remains required to promote it, and debug is still
-   unobserved;
-3. properties/YAML conversion and metadata reload Code Actions;
-4. one opt-in Spring Structure document slice; and
-5. separately gated live-data, metrics, logger, upgrade, Modulith, and special
-   language slices.
+1. CodeLens/compatibility, properties/YAML conversion and metadata reload, and
+   Spring-specific file-language routing are verified on the first macOS tuple;
+2. Spring-aware Java completion, request-mapping snippets, and cron completion /
+   validation are verified on that tuple;
+3. the references half of S018 is verified by U4, while Spring-specific document
+   highlights are recorded as `blocked-zed-api` because Zed queries only the
+   primary Java server;
+4. close the remaining Run/Debug runtime gates (multi-project selection and the
+   real-Zed forced-timeout recovery run); and
+5. prototype the opt-in Structure document, then take the separately gated
+   live-data, build/task, upgrade, Modulith, XML, and remaining language slices.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's
@@ -338,7 +333,9 @@ classpath listening, and no automatic retry followed. The coordinator now
 re-drives that handshake within a bounded grace window and defers only the
 classpath-specific missing-extension diagnostic during that interval.
 Coordinator regression tests cover transient recovery, grace-window exhaustion,
-and immediate reporting for unrelated Java data-route failures. A real-Zed
+and immediate reporting for unrelated Java data-route failures. S018/U4 then
+verified Spring qualifier, property, and distinct `@Named` references through
+Zed's composed References result without coordinator merge code. A real-Zed
 forced-timeout recovery run remains pending.
 
 ### M5: Installability and platform validation

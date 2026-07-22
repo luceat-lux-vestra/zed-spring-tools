@@ -106,7 +106,7 @@ user outcome take precedence.
 | Modulith — inspect application modules and refresh their metadata | Capability remains `planned`; source navigation remains available through Java. | Use Workspace Symbols for search and an opt-in Structure document for module/dependency grouping. | If metadata generation or links are incomplete, keep the view `planned` and retain ordinary Java navigation. | 3/5 |
 | Spring XML and Java reconcilers — analyze XML configuration and additional Java sources | Capability remains `planned`. | Pass reviewed settings to Spring LS and surface standard completion, diagnostics, navigation, and Code Actions. | Disable only the failing reconciler and preserve the rest of Spring LS. | 4/5 |
 | `spring.factories` and JPA query files — classify special Spring files for completion and validation | Delivered: both are `verified`. Ordinary Properties behaviour is untouched for every other `.properties` file. | Route taken: distinct Zed languages on a pinned `tree-sitter-properties` grammar, mapped to the Spring language IDs `spring-factories` and `jpa-query-properties`. The open question — filename or language ID — resolved to **language ID**, so the grammar cost was unavoidable. | The 2026-07-20 gates passed: both IDs reached the server and Spring returned `JPQL_SYNTAX` on the broken named query. Java ownership is unchanged. | 5/5; gates closed |
-| Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | Half the gate closed negative on 2026-07-21: Zed never requests tokens after Spring's *dynamic* registration. The *static* path is untested and is the live candidate — the coordinator already rewrites the `initialize` result, so it can declare `semanticTokensProvider` with Spring's captured legend and consume the dynamic registration, the same adaptation that fixed Code Actions. A future opt-in Java query pack is the independent tree-sitter alternative and still needs a new direction decision. | The fallback is already the supported state: official Java tree-sitter highlighting renders these strings correctly; only token-level colouring inside them is lost. Never risk the whole Java language registration for this enhancement. | 2/5; half the gate closed, static path open |
+| Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | S017 closed the stock-Zed route negatively on 2026-07-21: Zed issues no semantic-token request after either dynamic or static registration, including jdtls's own static provider. A future opt-in Java query pack is an independent tree-sitter alternative and requires a new direction decision. | The fallback is the supported state: official Java tree-sitter highlighting renders these strings correctly; only token-level colouring inside them is lost. Never risk the whole Java language registration for this enhancement. | 2/5; blocked on Zed's Java semantic-token request/render path |
 | Spring Initializr — create a new Spring project | It is outside the pinned VSIX capability surface and current runtime boundary. | Make a separate scope, network, artifact, and UX decision before adding it. | Remain out of scope; document external Initializr use. | 2/5 |
 | AI explanations — explain SpEL, queries, and AOP behavior | The pinned command is VS Code Copilot-specific. The provider is enabled by this product regardless of Zed AI state, while the command is intercepted locally. | Keep the requested lens visible with wording that says the extension cannot detect or invoke Zed Agent and sends no source/prompt to AI. Revisit direct open/prefill only if Zed exports a user-consented Agent action/state API. | Manual analysis or a separate user-initiated Agent request. Do not imply conditional integration, auto-submit a prompt, or include the result in the current extension parity claim. | 2/5 |
 | Offline, compatibility, and diagnostics — reuse artifacts, explain Java/Spring incompatibility, and report contract breaks | Preserve the current coordinator, adapter contract, checked artifact cache, and verified failure diagnostics. | Attempt known capabilities independent of the installed official-Java release string. On a required-capability failure, show a bounded prefilled public GitHub issue for user review and submission; keep security reports private. | Never start a misleading reduced mode, submit telemetry or an issue automatically, handle a GitHub token, or include paths, classpaths, source, environment, credentials, or raw logs in the report. | 4/5 |
@@ -149,20 +149,21 @@ question below. What remains:
    prompt and other platform/build-tool tuples have no driven evidence.
 2. Prototype the opt-in Structure document before using the same pattern for
    live metrics or loggers.
-3. Take WS2's two remaining language-intelligence rows. Spring XML config is
+3. Take WS2's remaining language-intelligence rows. Spring XML config is
    settings-plus-verification, and its master switch
    `boot-java.support-spring-xml-config.on` defaults false in VS Code too, so it
    is genuinely opt-in and needs only passthrough plus a driven check.
    Spring-specific references and document highlights **split** on the
    composition question, settled by [S018](spikes/018-references-highlights-multiserver-composition.md)
-   (driven 2026-07-21): `textDocument/references` fans to both servers and Zed
-   **unions** the results — Spring's `@Qualifier`→`@Bean` link appeared in the
-   same multibuffer as jdtls's Java references — so the references/implementation
-   row needs no coordinator merge code, only Spring-attributable fixture targets
-   plus a driven verification. `textDocument/documentHighlight`, by contrast,
-   goes to the single primary server (jdtls); Spring is never queried, so the
-   Spring-specific highlight slice is `blocked-zed-api`, the same class as the
-   S017 semantic-token result. Do not build coordinator highlight code.
+   and its U4 follow-up (driven 2026-07-21/22): `textDocument/references`
+   fans to both servers and Zed **unions** the results. The qualifier→bean,
+   property→properties-file, and distinct `@Named` injection→bean targets are
+   now verified, so the references route needs no coordinator merge code.
+   Profile- and application-event-specific result content remains undriven.
+   `textDocument/documentHighlight`, by
+   contrast, goes to the single primary server (jdtls); Spring is never queried,
+   so the Spring-specific highlight slice is `blocked-zed-api`, the same class
+   as the S017 semantic-token result. Do not build coordinator highlight code.
 4. The semantic-token spike is **closed, refuted** ([S017](spikes/017-static-semantic-token-declaration.md),
    driven 2026-07-21). Both halves failed: Zed requests nothing after Spring's
    *dynamic* registration, and — the decisive part — nothing after a *static*
