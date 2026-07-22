@@ -1,7 +1,7 @@
 # Product implementation and public-development plan
 
 - Status: In progress; M1-M3 complete, M4 in progress
-- Last updated: 2026-07-19
+- Last updated: 2026-07-23
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
@@ -162,7 +162,7 @@ Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 30 `verified`, 2 `implemented`, 5 `zed-native-equivalent`, 18
+capabilities: 31 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 18
 `planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
@@ -302,8 +302,9 @@ Immediate M4 slice order after D006 is now:
    generation, rendered default grouping, source-file opening, stale guidance,
    byte-stable refresh, deletion/recreation, and `.gitignore` non-mutation passed.
    Zed 1.11.3 drops Markdown `#L…` fragments, so Project Symbols remains the
-   exact-location fallback. The next live-data slice now implements a bounded,
-   timestamped metrics document and awaits its connected-Boot runtime gate;
+   exact-location fallback. The next live-data slices are also verified: bounded
+   local-process connection plus the timestamped metrics document passed their
+   connected-Boot/JMX gates, including metrics refresh and deletion/recreation;
    build/task, upgrade, Modulith, loggers, and remaining commands stay separate.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
