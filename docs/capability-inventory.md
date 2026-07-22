@@ -1,8 +1,8 @@
 # Capability inventory
 
-- Inventory version: 19
+- Inventory version: 20
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-22
+- Last updated: 2026-07-23
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -54,8 +54,8 @@ selected route or planning-confidence score does not change a state here.
 | State | Count |
 | --- | --- |
 | `verified` | 29 |
-| `implemented` | 1 |
-| `planned` | 20 |
+| `implemented` | 2 |
+| `planned` | 19 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 5 |
@@ -100,6 +100,19 @@ preview, source-file opening, byte-identical refresh, deletion/recreation, and
 fragment after opening the file; Project Symbols retains exact-location
 navigation. `structure/groups` visibility selection is not part of this first
 all-default-groups prototype.
+
+Inventory version 20 records the first live-application-data slice as
+`implemented`: connect/disconnect to a local Boot process. It is built and
+contract-tested but not yet driven against a live JMX/Actuator process, which is
+the gate to `verified`. A static read of `SpringProcessCommandHandler` first
+showed connect/disconnect/refresh all resolve to `null` regardless of outcome —
+the same false-success trap the shared-metadata reload had — so the coordinator
+keys connect success off the server's `sts/liveprocess/connected` notification
+(`SpringProcessLiveDataProvider.add`) instead of the command result, waits for
+it per `processKey`, and otherwise reports a bounded "requested" message rather
+than claiming a connection. Live hover data stays `zed-native-equivalent`; the
+remaining WS3 rows (show/hide/refresh, metrics, loggers, automatic connection)
+stay `planned`.
 
 ## Known surface constraints
 
@@ -193,9 +206,9 @@ verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Connect / disconnect to a local Boot process | `planned` | Preferred route: a Code Action calls `listProcesses`, uses a bounded Zed message choice, then executes `sts/livedata/connect`/`disconnect` with coordinator-owned identity and cleanup. If the list is not usable in that prompt, an opt-in Live document is the fallback presentation; no reduced connection mode is claimed. |
+| Connect / disconnect to a local Boot process | `implemented` | Built and contract-tested; a driven run against a live JMX/Actuator process is the remaining gate to `verified`. A synthetic `source` Code Action on Java files (**Spring Boot: Connect or disconnect live process data…**) runs `sts/livedata/listProcesses` and renders the returned descriptors — Spring already labels each and tags it with the exact `action` (`connect` for an available process, `disconnect`/`refresh` for a connected one) — as a bounded `window/showMessageRequest` choice (capped at 12 with an overflow notice; nothing happens until the user chooses). The chosen action executes with `[{processKey}]`. **A static read closed the same silent-gap trap as the shared-metadata reload**: `SpringProcessCommandHandler.connect/disconnect/refresh` each `return CompletableFuture.completedFuture(null)` regardless of outcome, so a null result is not evidence of success. The authoritative connect signal is instead the server→client `sts/liveprocess/connected` notification, which `SpringProcessLiveDataProvider.add` fires exactly once after the process is reached and its first live data is stored; the coordinator registers a per-`processKey` waiter before issuing connect and only reports "Connected …" when that notification arrives, otherwise a bounded "Requested … make sure the process exposes Actuator/JMX" (never a false success). Coordinator-owned identity/cleanup: it tracks connected keys from the connected/disconnected notifications (still forwarding both to Zed) and clears the map plus any pending waiter on shutdown. Contract-tested in `coordinator/test/coordinator.test.mjs` (confirmed connect, unconfirmed-connect bounded report, disconnect, empty list, dismissed prompt). The opt-in Live document remains the fallback presentation only if the bounded prompt cannot hold the list; no reduced connection mode is claimed. |
 | Remote connect | `planned` | Preferred route: an explicit Code Action reads endpoint and non-secret options from Zed settings before `sts/livedata/remoteConnect`. Credential input/storage needs a separate security decision; credentials may not enter project files, generated documents, action arguments, or logs. |
-| Live hover data | `zed-native-equivalent` | Source-local live bean and injection facts are verified through live CodeLens followed by Zed's native Hover gesture. The connected run rendered Spring bean name, type, resource, bean id and process together with JDT hover. One-click dispatch remains blocked by Zed's client-command bridge; aggregate live data and explicit connection UX remain separate planned capabilities. |
+| Live hover data | `zed-native-equivalent` | Source-local live bean and injection facts are verified through live CodeLens followed by Zed's native Hover gesture. The connected run rendered Spring bean name, type, resource, bean id and process together with JDT hover. One-click dispatch remains blocked by Zed's client-command bridge. Explicit connect/disconnect is now a separate `implemented` capability (see the row above); aggregate live data, show/hide/refresh, metrics and loggers remain separate planned capabilities. |
 | Show / hide / refresh live data | `planned` | Preferred route: contextual Code Actions drive `live.show.active`, `live.hide.active`, and `live.refresh.active`, with explicit refresh state shared by inline surfaces and an optional Live document. |
 | Metrics | `planned` | Preferred route: `sts/livedata/get/metrics` and `refresh/metrics` feed an opt-in, timestamped Spring Live document. A link to the application's own endpoint is fallback if editor refresh/redaction cannot be bounded. |
 | Loggers and log levels | `planned` | Preferred route: an opt-in Live document lists `getLoggers` results and exposes confirmed item-level `configure/logLevel` Code Actions. Read-only data or the external Actuator endpoint is fallback if selection/confirmation is unsafe. |
