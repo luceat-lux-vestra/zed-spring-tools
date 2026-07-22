@@ -309,8 +309,12 @@ Immediate M4 slice order after D006 is now:
    861 authentic logger records with an exact 512-entry bound, while the separate
    paged and confirmed action changed `ROOT` only after Spring's matching update,
    refreshed to prove effective/configured `DEBUG`, and restored `INFO` through
-   the same path. Build/task, upgrade, Modulith, and remaining commands stay
-   separate.
+   the same path. A pinned-source audit then closed show/hide/refresh as a
+   Zed-native equivalent: VS Code's three active-app commands only wrap the same
+   connect/disconnect/refresh operations already exposed through the verified
+   explicit process/action choice, whose contract tests now cover all three.
+   Automatic/remote connection, build/task, upgrade, Modulith, and remaining
+   commands stay separate.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's

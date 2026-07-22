@@ -2925,6 +2925,56 @@ test("disconnecting a connected process issues disconnect and reports it", async
   assert.match(notice.params.message, /Disconnected live data from demo/);
 });
 
+test("refreshing a connected process issues refresh and reports it", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      { processKey: "app:1234", label: "demo", action: "sts/livedata/refresh" },
+      { processKey: "app:1234", label: "demo", action: "sts/livedata/disconnect" },
+    ],
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "prompt",
+  );
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: prompt.id,
+    result: { title: "Refresh — demo" },
+  });
+
+  const refreshRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/refresh",
+    "refresh request",
+  );
+  assert.deepEqual(refreshRequest.params.arguments, [{ processKey: "app:1234" }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: refreshRequest.id, result: null });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "refresh notice",
+  );
+  assert.match(notice.params.message, /Refreshed live data from demo/);
+});
+
 test("no running processes reports a notice and issues no connect command", async () => {
   const springWrites = [];
   const zedWrites = [];
