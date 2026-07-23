@@ -519,6 +519,54 @@ mod tests {
         );
     }
 
+    // Remote live data has no dedicated command in the pinned VS Code extension:
+    // its only route is this settings array, which the server reads in
+    // `remoteAppsFromSettingsConnector` and hands to
+    // `SpringProcessConnectorRemote.updateApps`. The array is user-authored and
+    // absent by default, so the whole capability rides on this passthrough
+    // surviving the deep merge with its element objects intact.
+    #[test]
+    fn remote_apps_reach_spring_untouched() {
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": {
+                    "remote-apps": [{
+                        "jmxurl": "service:jmx:rmi://staging:9111/jndi/rmi://staging:9111/jmxrmi",
+                        "host": "staging",
+                        "urlScheme": "https",
+                        "port": 8443
+                    }]
+                }
+            })),
+            "/work",
+        );
+        let apps = config["boot-java"]["remote-apps"]
+            .as_array()
+            .expect("remote-apps stays an array");
+        assert_eq!(apps.len(), 1);
+        assert_eq!(
+            apps[0]["jmxurl"],
+            zed::serde_json::json!("service:jmx:rmi://staging:9111/jndi/rmi://staging:9111/jmxrmi")
+        );
+        assert_eq!(apps[0]["host"], zed::serde_json::json!("staging"));
+        assert_eq!(apps[0]["urlScheme"], zed::serde_json::json!("https"));
+        assert_eq!(apps[0]["port"], zed::serde_json::json!(8443));
+        // Declaring a remote target must not disturb the local-discovery default.
+        assert_eq!(
+            config["boot-java"]["live-information"]["all-local-java-processes"],
+            zed::serde_json::json!(true)
+        );
+    }
+
+    // Absent is the default: the server replaces its whole remote-app set from
+    // this key, so shipping an empty array of our own would be indistinguishable
+    // from a user clearing theirs.
+    #[test]
+    fn remote_apps_are_absent_without_user_settings() {
+        let config = spring_workspace_configuration(None, "/work");
+        assert!(config["boot-java"].get("remote-apps").is_none());
+    }
+
     #[test]
     fn user_settings_override_an_enabled_default() {
         let config = spring_workspace_configuration(

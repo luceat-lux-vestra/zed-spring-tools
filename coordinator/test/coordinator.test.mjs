@@ -3070,6 +3070,155 @@ test("a connect that never confirms reports a bounded request, not a false succe
   );
 });
 
+// A target declared in `boot-java.remote-apps` arrives through the same
+// `listProcesses` route as a local JVM, but Spring derives its key and its label
+// from the user's `jmxurl` (`SpringProcessConnectorRemote.getProcessKey` /
+// `getProcessName`). If that URL carries credentials they must not reach a
+// prompt or a notice, while the key Spring identifies the target by has to go
+// back unchanged.
+const REMOTE_JMX_URL =
+  "service:jmx:rmi://admin:s3cr3t@staging:9111/jndi/rmi://staging:9111/jmxrmi";
+const REDACTED_JMX_URL =
+  "service:jmx:rmi://<credentials redacted>@staging:9111/jndi/rmi://staging:9111/jmxrmi";
+
+test("a remote target's credentials are redacted in prompts while Spring still gets the raw key", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+
+  coordinator.observeZedMessage({ ...MANAGE_LIVE_PROCESS_COMMAND_MESSAGE });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "listProcesses request",
+  );
+  // The label Spring builds when the entry has neither `processName` nor `host`.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      {
+        processKey: REMOTE_JMX_URL,
+        label: `remote process - ${REMOTE_JMX_URL}`,
+        action: "sts/livedata/connect",
+      },
+    ],
+  });
+
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "process selection prompt",
+  );
+  const [title] = prompt.params.actions.map((action) => action.title);
+  assert.equal(title, `Connect — remote process - ${REDACTED_JMX_URL}`);
+  assert.ok(!title.includes("s3cr3t"), "no password in the prompt");
+  assert.ok(!title.includes("admin"), "no username in the prompt");
+  // Host and port survive so the user can still tell which target they picked.
+  assert.ok(title.includes("staging:9111"), "the endpoint stays identifiable");
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: { title } });
+
+  const connectRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/connect",
+    "connect request",
+  );
+  // Redaction is presentation-only: the server's own identifier round-trips intact.
+  assert.deepEqual(connectRequest.params.arguments, [{ processKey: REMOTE_JMX_URL }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: connectRequest.id, result: null });
+  coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/liveprocess/connected",
+    params: { type: "remote", processKey: REMOTE_JMX_URL, processName: `remote process - ${REMOTE_JMX_URL}` },
+  });
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "connect confirmation",
+  );
+  assert.ok(!notice.params.message.includes("s3cr3t"), "no password in the notice");
+  assert.match(notice.params.message, /Connected live data from remote process/);
+});
+
+test("the Live data document never persists a remote target's credentials", async () => {
+  const worktree = makeWorktree();
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    now: () => new Date("2026-07-23T12:34:56.000Z"),
+  });
+
+  coordinator.observeZedMessage({ ...GENERATE_LIVE_METRICS_COMMAND });
+  const connected = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listConnected",
+    "connected-process request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: connected.id,
+    result: [{
+      type: "remote",
+      processKey: REMOTE_JMX_URL,
+      processName: `remote process - ${REMOTE_JMX_URL}`,
+    }],
+  });
+
+  for (const metricName of ["memory", "gcPauses"]) {
+    const refresh = await waitFor(
+      springWrites,
+      (message) => message.params?.command === "sts/livedata/refresh/metrics"
+        && message.params.arguments?.[0]?.metricName === metricName,
+      `${metricName} refresh`,
+    );
+    await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: refresh.id, result: null });
+  }
+  for (const metricName of ["heapMemory", "nonHeapMemory", "gcPauses"]) {
+    const read = await waitFor(
+      springWrites,
+      (message) => message.params?.command === "sts/livedata/get/metrics"
+        && message.params.arguments?.[0]?.metricName === metricName,
+      `${metricName} read`,
+    );
+    await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: read.id, result: [] });
+  }
+
+  const loggers = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/getLoggers",
+    "live loggers request",
+  );
+  // The name Spring indexes the process by travels back verbatim; only rendered
+  // text is redacted, so an altered name can never break the server lookup.
+  assert.equal(loggers.params.arguments[0].processName, `remote process - ${REMOTE_JMX_URL}`);
+  assert.equal(loggers.params.arguments[0].processKey, REMOTE_JMX_URL);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: loggers.id, result: {} });
+
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage"
+      && /\.zed\/spring-live\.md/.test(message.params.message),
+    "Live document confirmation",
+  );
+  const contents = fs.readFileSync(path.join(worktree, ".zed", "spring-live.md"), "utf8");
+  assert.ok(!contents.includes("s3cr3t"), "no password in the generated document");
+  assert.ok(!contents.includes("admin:"), "no username in the generated document");
+  // The angle brackets are Markdown-escaped in the file and render as literals,
+  // so assert on the wording rather than the escaped punctuation.
+  assert.ok(contents.includes("credentials redacted"), "the redaction is visible, not silent");
+  assert.ok(contents.includes("staging:9111"), "the endpoint stays identifiable");
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
 test("disconnecting a connected process issues disconnect and reports it", async () => {
   const springWrites = [];
   const zedWrites = [];

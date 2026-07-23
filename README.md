@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 33 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 34 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 14 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -87,7 +87,13 @@ connects only when Spring reports exactly one local process matching an
 executable Boot project in the worktree. A 2026-07-23 Zed debug lifecycle gate
 automatically connected the matching Boot 3.5.5 process, delivered live data,
 honored manual disconnect without reconnecting, and cleaned up the debuggee and
-owned processes on stop and exit.
+owned processes on stop and exit. Applications running elsewhere connect through
+the `boot-java.remote-apps` setting — the same settings-only route VS Code uses,
+since neither client has a remote-connect command — and appear in the same
+process action. A 2026-07-24 gate connected a Boot 3.5.5 HTTP-Actuator target
+from one settings change, read 860 authentic loggers, and disconnected when the
+array was cleared; a real-Zed run then showed the same route end to end, with
+Spring hover naming the connected remote process in the editor.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
@@ -248,6 +254,44 @@ otherwise use the explicit **Connect or disconnect live process data…** action
 This route passed its real-Zed start/connect/manual-disconnect/stop lifecycle
 gate on the macOS arm64 tuple recorded above. Other desktop/JDK combinations
 remain untested.
+
+`boot-java.remote-apps` connects live data to an application running elsewhere.
+This is the same settings-only route the VS Code extension uses; there is no
+separate remote-connect action in either client. Each entry needs a `jmxurl`,
+and Spring starts tracking a target as soon as you declare it:
+
+```json
+{
+  "lsp": {
+    "spring-tools": {
+      "settings": {
+        "boot-java": {
+          "remote-apps": [
+            {
+              "jmxurl": "http://staging.internal:8080/actuator",
+              "host": "staging.internal",
+              "urlScheme": "https",
+              "port": 8443
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+A `jmxurl` starting with `http` connects over Actuator HTTP; anything else is
+treated as a JMX service URL. Declared targets appear in the **Connect or
+disconnect live process data…** action and can feed the Live data document like
+any local process. Spring identifies a remote target by its URL, so if yours
+embeds credentials (`scheme://user:password@host`) this extension strips the
+`user:password` part from every label it shows you or writes into
+`.zed/spring-live.md`, keeping the host and port visible. Prefer a URL without
+embedded credentials: Zed settings are ordinary files, and a project-level
+`.zed/settings.json` is easy to commit by accident. The driven gate used a
+localhost target over `http`, so a physically remote host and a
+`service:jmx:rmi://` URL remain untested.
 
 ## How it fits together
 

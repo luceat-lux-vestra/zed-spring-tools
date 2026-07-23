@@ -2081,6 +2081,23 @@ function syntheticCodeActions(request) {
   return actions;
 }
 
+// A remote target declared in `boot-java.remote-apps` reaches us as a URL, and
+// Spring derives both its process key and its human label from that URL:
+// `SpringProcessConnectorRemote.getProcessKey` returns the raw `jmxurl`, and
+// `getProcessName` falls back to `"remote process - " + jmxurl` when the entry
+// carries neither `processName` nor `host`. A user may embed credentials in that
+// URL as `scheme://user:password@host`, so any live text we render into a prompt,
+// write into `.zed/spring-live.md`, or log must have the userinfo removed first.
+// Only the userinfo is dropped: host and port identify which target the user is
+// acting on, and blanking them would make the choice unreadable. The unredacted
+// key is still sent back to Spring verbatim as a command argument — that is the
+// server's own identifier round-tripping to the process that issued it, and it is
+// never rendered, persisted, or logged.
+function redactLiveTargetText(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(/\/\/[^/@\s]*@/g, "//<credentials redacted>@");
+}
+
 // Keep only well-formed live-process descriptors whose action is one of the
 // commands this route is prepared to execute. Spring returns connect entries for
 // available processes and disconnect/refresh entries for connected ones; an
@@ -2095,7 +2112,9 @@ function normalizeLiveProcesses(discovered) {
     if (processKey === undefined || action === undefined || !LIVE_PROCESS_ACTIONS.has(action)) {
       continue;
     }
-    const label = typeof item.label === "string" && item.label.length > 0 ? item.label : processKey;
+    const label = redactLiveTargetText(
+      typeof item.label === "string" && item.label.length > 0 ? item.label : processKey,
+    );
     const projectName =
       typeof item.projectName === "string" &&
       item.projectName.length > 0 &&
@@ -2111,6 +2130,9 @@ function normalizeLiveProcesses(discovered) {
 // The server's listConnected command returns only process summaries. Retain the
 // opaque key for subsequent commands, but never render it into the generated
 // document: remote keys may contain endpoints and local keys are usually PIDs.
+// `processName` is kept verbatim because it travels back to Spring inside the
+// metrics and logger command arguments; only the derived `label`, which is what
+// prompts and the generated document render, has remote credentials redacted.
 function normalizeConnectedLiveProcesses(discovered) {
   if (!Array.isArray(discovered)) return [];
   const entries = [];
@@ -2127,7 +2149,9 @@ function normalizeConnectedLiveProcesses(discovered) {
     const pid = type === "local" && typeof item.pid === "string" && /^\d{1,20}$/.test(item.pid)
       ? item.pid
       : undefined;
-    const label = pid === undefined ? processName : `${processName} (pid: ${pid})`;
+    const label = redactLiveTargetText(
+      pid === undefined ? processName : `${processName} (pid: ${pid})`,
+    );
     entries.push({ processKey, processName, type, pid, label });
   }
   return entries;
