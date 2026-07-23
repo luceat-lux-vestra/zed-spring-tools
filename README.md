@@ -4,19 +4,19 @@ Experimental Spring Boot language intelligence for Zed, built as a companion to
 the required official Java extension.
 
 > This is an early public-development project, not a stable release. The
-> platform-neutral WASM adapter and OS-aware coordinator are written for Linux,
-> macOS, and Windows; runtime evidence to date is on macOS arm64/JDK 25, and an
-> extension-registry submission is in preparation.
+> WASM adapter and OS-aware coordinator are designed for Zed's Linux, macOS,
+> and Windows desktop boundary. Runtime evidence to date is limited to macOS
+> arm64/JDK 25, and the extension-registry submission is under review.
 
 ## Project status
 
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 32 `verified`, 2 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 33 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
-| Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
+| Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -56,8 +56,10 @@ The following outcomes have been observed on the tested environment:
 - cron inlay hints, cron expression completion, and cron syntax validation;
 - Spring quick-fix code actions applied end to end;
 - Java references and implementations through the official Java language
-  server; and
-- the `sts/javaType` Spring-to-Java data route.
+  server;
+- Spring-specific references composed with official Java results; and
+- Spring-to-Java type and classpath integration through the required official
+  Java companion.
 
 Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
@@ -69,22 +71,23 @@ Code's show/hide/refresh commands, which only wrap the same Spring operations fo
 its active debug app. The 2026-07-23 macOS arm64 gate connected a Boot 3.5.5
 process, exposed refresh/disconnect choices, refreshed live CodeLens, and then
 disconnected with JMX cleanup. The fixture had JMX and Actuator live-data
-endpoints exposed. A separate
-Code Action generates a bounded, timestamped `.zed/spring-live.md` snapshot for
-heap, non-heap, and GC-pause measurements. The 2026-07-23 driven gate verified
-authentic values, rendered preview, explicit refresh, and deletion/recreation
-against that connected process. The document now also includes a bounded
-read-only logger snapshot, and another source action pages logger choices,
-requires a final level-change confirmation, and reports success only after
-Spring sends the matching update notification. A driven Boot/JMX gate rendered
-861 authentic loggers with an explicit 512-entry bound, changed `ROOT` from
-`INFO` to `DEBUG`, verified the refreshed effective/configured state, and
-restored it to `INFO`. Automatic local connection is now implemented as a
-default-off opt-in: generated Java debug entries add reviewable local-management
-and project-identity properties, and the coordinator connects only when Spring
-reports exactly one local process matching an executable Boot project in the
-worktree. The real Zed debug lifecycle gate remains, so this route is not yet
-runtime-verified.
+endpoints exposed. A separate Code Action generates a bounded, timestamped
+`.zed/spring-live.md` snapshot for heap, non-heap, and GC-pause measurements.
+The 2026-07-23 driven gate verified authentic values, rendered preview, explicit
+refresh, and deletion/recreation against that connected process. The document
+now also includes a bounded read-only logger snapshot, and another source action
+pages logger choices, requires a final level-change confirmation, and reports
+success only after Spring sends the matching update notification. A driven
+Boot/JMX gate rendered 861 authentic loggers with an explicit 512-entry bound,
+changed `ROOT` from `INFO` to `DEBUG`, verified the refreshed
+effective/configured state, and restored it to `INFO`. Automatic local
+connection is a verified default-off opt-in: generated Java debug entries add
+reviewable local-management and project-identity properties, and the coordinator
+connects only when Spring reports exactly one local process matching an
+executable Boot project in the worktree. A 2026-07-23 Zed debug lifecycle gate
+automatically connected the matching Boot 3.5.5 process, delivered live data,
+honored manual disconnect without reconnecting, and cleaned up the debuggee and
+owned processes on stop and exit.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
@@ -117,19 +120,20 @@ source or prompt to an AI service.
 A Boot run/debug configuration Code Action discovers executable Spring Boot
 projects on a Java file, prompts a bounded selection, and generates merge-safe
 `.zed/tasks.json` run tasks (wrapper-aware `spring-boot:run`/`bootRun`) and
-`.zed/debug.json` (`"adapter": "Java"`) launches — portable across machines,
-secret-free, and never overwriting a config it cannot parse without loss (a
-commented or non-array file receives a reviewable sidecar instead). It emits one
-base entry plus one per discovered Spring profile (from `application-<profile>.*`
+`.zed/debug.json` (`"adapter": "Java"`) launches. Generated entries use
+`$ZED_WORKTREE_ROOT`-relative working directories, contain no credentials, and
+never overwrite a config that cannot be parsed without loss (a commented or
+non-array file receives a reviewable sidecar instead). It emits one base entry
+plus one per discovered Spring profile (from `application-<profile>.*`
 filenames and multi-document `application.yml` activation, capped at eight) so
 Zed's task/debug picker becomes the profile selector, alongside editable
-`vmArgs`/`args`/`env` slots. Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3,
-official Java 6.8.21, JDK 25) verified discovery, generation, profile entries,
-the generated run task serving `GET /greeting`, and a Java debug launch from the
-generated `dev` entry after editing all three debug slots. A 2026-07-22
-multi-project run then displayed `service-a`, `service-b`, and `All projects`;
-selecting all generated one task/debug pair per module with the correct portable
-working directory and launched nothing automatically.
+`vmArgs`/`args`/`env` slots. Driven checks on 2026-07-19 (macOS arm64, Zed
+1.11.3, official Java 6.8.21, JDK 25) verified discovery, generation, profile
+entries, the generated run task serving `GET /greeting`, and a Java debug
+launch from the generated `dev` entry after editing all three debug slots. A
+2026-07-22 multi-project run then displayed `service-a`, `service-b`, and `All
+projects`; selecting all generated one task/debug pair per module with the
+correct worktree-relative directory and launched nothing automatically.
 
 Now verified on the named macOS tuple: a Java-file `source` Code Action executes
 Spring's authentic `sts/spring-boot/structure` command and writes
@@ -189,8 +193,9 @@ edit it.
    `zed: install dev extension` — and select this repository directory. See
    [Zed's development-extension instructions](https://zed.dev/docs/extensions/developing-extensions).
 4. Open a Spring Boot project and wait for Java project import and Spring
-   indexing to finish. The integrated product path is verified only with the
-   repository's Maven fixture.
+   indexing to finish. The broadest end-to-end coverage uses this repository's
+   Maven fixture; narrower multi-project and Gradle observations are identified
+   separately in the compatibility and capability evidence.
 
 Keep at least one `.java` file open. Zed starts the official Java language
 server only for Java buffers, and no extension can start it for you, so a
@@ -240,7 +245,9 @@ the generated Java debug entries include the reviewable local JMX/Actuator and
 project-identity JVM properties. After a matching debug launch, automatic
 connection occurs only when exactly one worktree project/process match exists;
 otherwise use the explicit **Connect or disconnect live process data…** action.
-This route is contract-tested but still awaits its real-Zed runtime gate.
+This route passed its real-Zed start/connect/manual-disconnect/stop lifecycle
+gate on the macOS arm64 tuple recorded above. Other desktop/JDK combinations
+remain untested.
 
 ## How it fits together
 
@@ -269,8 +276,9 @@ bridge registration after that same jdtls process resumed.
 ## Important limitations
 
 - This is not a stable release. The adapter and coordinator are written for
-  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence; other
-  platforms are supported in code and not yet driven.
+  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence. Other
+  desktop platforms remain untested, and the platform-aware implementation is
+  not itself a support claim.
 - The official Java extension is required. Compatibility is capability-based,
   so an upstream release can still break the private route and produce a visible
   failure until this project adapts.

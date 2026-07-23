@@ -81,7 +81,7 @@ fs.writeFileSync(
 const manifest = {
   status: "prepared",
   target: "macOS-arm64",
-  zed: "1.10.3",
+  zed: "1.11.3",
   javaExtension: "6.8.21",
   runtimeJdk: javaVersion(javaHome),
   repository,
@@ -104,12 +104,12 @@ function settings(jdk, data) {
     disable_ai: true,
     session: { restore_unsaved_buffers: false, trust_all_worktrees: true },
     auto_install_extensions: { html: false },
-    auto_update_extensions: { java: false, "zed-spring-tools": false },
+    auto_update_extensions: { java: false, "spring-tools": false },
     log: { lsp: "trace", project: "warn" },
     languages: {
-      Java: { language_servers: ["jdtls", "zed-spring-tools"] },
-      Properties: { language_servers: ["zed-spring-tools"] },
-      YAML: { language_servers: ["zed-spring-tools"] },
+      Java: { language_servers: ["jdtls", "spring-tools"] },
+      Properties: { language_servers: ["spring-tools"] },
+      YAML: { language_servers: ["spring-tools"] },
     },
     lsp: {
       jdtls: {

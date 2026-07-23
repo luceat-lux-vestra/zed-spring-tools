@@ -38,9 +38,11 @@ the commandless `@Value` range became a visible Hover lens and native Hover
 returned the environment value `37` plus its `systemEnvironment` source. The
 explicit local-process, metrics, logger, and show/hide/refresh-equivalent slices
 are verified on that Boot/JMX tuple. Default-off automatic local connection is
-now implemented and contract-tested with single-project identity admission and
-fail-closed ambiguity; its real Zed debug lifecycle gate remains. The
-release-pin cleanup remains ancillary to this branch.
+also verified there: a real Zed Java-debug run connected the one matching
+project, delivered live data, honored manual disconnect without reconnecting,
+and cleaned up on debug stop and Zed exit. Contract coverage retains
+single-project identity admission and fail-closed ambiguity. The release-pin
+cleanup remains ancillary to this branch.
 
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
 and uninstall cycle reproduced real Spring Boot property completions, executed
