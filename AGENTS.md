@@ -31,9 +31,13 @@ boundary: AI Agent state/dispatch and file-finder sort-last are unavailable to
 the product. The AI notices now state that boundary and send no prompt or source
 to AI. Data AOT `CL-4d` now pre-resolves Spring's authentic target, rewrites it
 to a Zed location command, and passed its one-click ignored-`target/` runtime
-gate. The compatibility-failure notification now keeps a bounded Markdown link
-visible and a driven click opened a title/body-prefilled GitHub composer without
-submitting it. `CL-7c` also passed against a connected Boot 3.5.5/JMX process:
+gate. The `CL-4a`/`CL-4e` AOT build route is also verified: real Zed created the
+reviewable task, `task: spawn` exposed Maven's successful terminal output and
+generated the authentic repository JSON, and refresh rewrote the task without
+starting a build. The compatibility-failure notification now keeps a bounded
+Markdown link visible and a driven click opened a title/body-prefilled GitHub
+composer without submitting it. `CL-7c` also passed against a connected Boot
+3.5.5/JMX process:
 the commandless `@Value` range became a visible Hover lens and native Hover
 returned the environment value `37` plus its `systemEnvironment` source. The
 explicit local-process, metrics, logger, and show/hide/refresh-equivalent slices

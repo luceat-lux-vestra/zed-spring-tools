@@ -107,14 +107,18 @@ takes the command instead and writes this task, which you run from Zed's
 `task: spawn` picker and watch in a terminal you own:
 
 ```
-Spring Boot (zed-spring-tools) build: <module> (compile org.springframework.boot:spring-boot-maven-plugin:process-aot)
+Spring Boot (zed-spring-tools) build: <module> (org.springframework.boot:spring-boot-maven-plugin:process-aot)
 ```
+
+The coordinator preserves Spring's supplied goal list if a command variant
+prepends `compile`; the driven `CL-4a`/`CL-4e` route supplied only the plugin
+goal shown above.
 
 Run it and wait for it to finish. The deterministic terminal equivalent is:
 
 ```sh
 mvn -f "$CODELENS_FIXTURE/pom.xml" \
-  compile org.springframework.boot:spring-boot-maven-plugin:process-aot
+  org.springframework.boot:spring-boot-maven-plugin:process-aot
 test -f "$CODELENS_FIXTURE/target/spring-aot/main/resources/dev/zed/spring/codelens/CodeLensShowcaseRepository.json"
 ```
 
@@ -127,6 +131,14 @@ Above `findByMessageContainingIgnoreCase`, verify all of these:
 | `CL-4c` | `Turn into @Query` applies a workspace edit and adds an explicit `@Query` annotation to the disposable source |
 | `CL-4d` | `Go To Implementation` first resolves Spring's authentic generated target; after the automatic refresh, one click opens the exact generated method through `editor.action.goToLocations`, including when `/target/` is ignored |
 | `CL-4e` | `Refresh AOT Metadata` rewrites the same reviewable task and names it again; no build is started by the click |
+
+This pass closed on 2026-07-24 with macOS 26.5.2 arm64, Zed 1.12.0,
+official Java 6.8.21, Spring Tools 5.2.0, and Temurin JDK 25.0.3. The task
+picker ran the generated entry, its terminal ended in `BUILD SUCCESS`, and the
+13,450-byte repository JSON appeared under `target/spring-aot`. The later
+`CL-4e` click changed only the task timestamp, not the JSON timestamp, and left
+no Maven process. Evidence is under
+`tmp/maven-goal-ownership-20260724/evidence/`.
 
 After testing `Turn into @Query`, save and confirm that the edited disposable
 fixture still compiles:
@@ -180,7 +192,7 @@ The evidence is under the ignored local directory
 | `CL-1` | Official Java/JDT | Native CodeLens and navigation; this project does not intercept it | Runtime verified |
 | `CL-2` | `WebfluxHandlerCodeLensProvider` | Visible informational lens plus explicit click explanation | Product implementation and contract test complete |
 | `CL-3` | `WebConfigCodeLensProvider` | `vscode.open` translated to `editor.action.goToLocations` | Product implementation and contract test complete |
-| `CL-4a`–`CL-4e` | `DataRepositoryAotMetadataCodeLensProvider` | Query text and the refactoring command retained; `CL-4d` authentic target pre-resolved and rewritten to Zed navigation; the `CL-4a`/`CL-4e` build command answered with a reviewable Zed task instead of Spring's invisible in-process `Runtime.exec` | All subfeatures observed; `CL-4d` one-click generated-method navigation runtime verified with ignored `/target/`; the generated build task is contract-tested and its driven click is still open |
+| `CL-4a`–`CL-4e` | `DataRepositoryAotMetadataCodeLensProvider` | Query text and the refactoring command retained; `CL-4d` authentic target pre-resolved and rewritten to Zed navigation; the `CL-4a`/`CL-4e` build command answered with a reviewable Zed task instead of Spring's invisible in-process `Runtime.exec` | Runtime verified: `CL-4a` created the task, `task: spawn` showed Maven output and generated the authentic repository JSON, `CL-4d` navigated with ignored `/target/`, and `CL-4e` rewrote the task without auto-running it |
 | `CL-5a`–`CL-5c` | `CopilotCodeLensProvider` | Provider enabled regardless of Zed AI state; command intercepted with an explicit API-boundary/manual explanation | Lenses and corrected notices observed; direct Agent action remains blocked by Zed API |
 | `CL-6` | `RouterFunctionCodeLensProvider` | Provider enabled automatically; absence of a deterministic upstream edit is explained without changing source | Product implementation and contract test complete; maintainer confirmed fallback display |
 | `CL-7a`–`CL-7b` | versioned `sts/highlight` | Merged into standard CodeLens with refresh, stale rejection, native Hover and URL fallbacks | Runtime verified |

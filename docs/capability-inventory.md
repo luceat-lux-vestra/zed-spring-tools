@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 33
+- Inventory version: 34
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-24
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -16,8 +16,9 @@
   compatibility/reporting policy from
   [D006](decisions/006-capability-first-java-compatibility-and-reporting.md)
 - Reproducible CodeLens targets: [CodeLens showcase and coverage](code-lens-showcase.md)
-- Runtime-tested tuples in this inventory: macOS 26.5.1/26.5.2 arm64, Zed 1.10.3
-  and 1.11.3, official Java extension 6.8.21 and 6.8.23, Temurin JDK 25.0.3
+- Runtime-tested tuples in this inventory: macOS 26.5.1/26.5.2 arm64, Zed
+  1.10.3, 1.11.3, and 1.12.0, official Java extension 6.8.21 and 6.8.23,
+  Temurin JDK 25.0.3
 
 This is the auditable list behind the goal of capability parity with VS Code
 Spring Tools. Every user-visible capability carries exactly one state. A
@@ -53,8 +54,8 @@ selected route or planning-confidence score does not change a state here.
 
 | State | Count |
 | --- | --- |
-| `verified` | 36 |
-| `implemented` | 2 |
+| `verified` | 37 |
+| `implemented` | 1 |
 | `planned` | 11 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
@@ -334,6 +335,19 @@ old label prefix would have silently deleted the run/debug entries. The two
 writers now own disjoint label prefixes and pass their own scope predicate.
 Evidence: `tmp/maven-goal-ownership-20260724/evidence/`.
 
+Inventory version 34 promotes that route to `verified`. A 2026-07-24 isolated
+run on macOS 26.5.2 arm64, Zed 1.12.0, official Java 6.8.21, Spring Tools 5.2.0,
+and Temurin JDK 25.0.3 clicked `CL-4a` in the real editor and observed the
+reviewable task appear in `.zed/tasks.json`. Zed's `task: spawn` picker exposed
+that exact entry; running it produced visible Maven `BUILD SUCCESS` output and
+created the authentic 13,450-byte
+`target/spring-aot/main/resources/dev/zed/spring/codelens/CodeLensShowcaseRepository.json`.
+After the generated-data lenses loaded, clicking `CL-4e` rewrote the same task
+while the JSON timestamp stayed unchanged and no Maven process started. This
+closes both halves of the ownership contract: the lens creates or refreshes a
+task, and only the user's task-picker action runs the build. Evidence:
+`tmp/maven-goal-ownership-20260724/evidence/`.
+
 ## Known surface constraints
 
 Two constraints of the Zed extension API shape several rows below. Both are read
@@ -441,7 +455,7 @@ verified structure-navigation fallback.
 | Browse / navigate the Spring logical structure | `zed-native-equivalent` | Zed's Project Symbols returns and navigates beans, the request-mapping endpoint, and component/configuration/application stereotypes, so it remains the supported equivalent. S015 Refuted the preferred per-file LSP Outline because restart can omit Java symbols. The explicitly requested, regenerable Spring Structure document is now a verified grouping companion. Its Markdown links open the right source files, while Project Symbols remains the exact-location path because Zed 1.11.3 discards their `#L…` fragments. Evidence: `tmp/ws2-symbols-run2-20260718/`, `tmp/s015-document-symbols-20260718/evidence/`, and `tmp/structure-document-20260722-runtime/evidence/`. |
 | Structure refresh / grouping | `verified` | A Java-file `source` Code Action runs `sts/spring-boot/structure` with `{updateMetadata:true}` and renders Spring's default project/group hierarchy to the opt-in `.zed/spring-structure.md`. It includes a visible snapshot/stale warning, only links `location`/`reference` file URIs inside the worktree, caps output at 2,000 nodes/16 levels, deterministically replaces only a file with its versioned ownership marker, recreates after deletion, and never edits `.gitignore`; an unknown target is preserved with a notice before Spring is called. Contract tests cover those rules. **Driven on 2026-07-22** (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25.0.3): Spring returned the authentic project and default groups, Markdown preview rendered them, a request-mapping link opened `GreetingController.java`, explicit refresh retained SHA-256 `006ad20227f9e4a09a6c230382bc9411d2e15b81ab02b721cea666c1cf8d97d1`, and moving the file away then rerunning recreated the same bytes while `.gitignore` remained absent. Zed discarded the `#L16` fragment when opening that link, matching its Markdown Preview implementation, so Project Symbols remains the exact-location fallback. Custom visibility selection via `structure/groups` remains a later enhancement. Evidence: `tmp/structure-document-20260722-runtime/evidence/`. |
 | Run / debug a Boot application | `verified` | The configure Code Action generates merge-safe `.zed/tasks.json` (wrapper-aware `spring-boot:run`/`bootRun`, portable `$ZED_WORKTREE_ROOT`-relative `cwd`, editable `env`) and `.zed/debug.json` (`"adapter": "Java"` launch with `mainClass`, `cwd`, and editable `vmArgs`/`args`/`env`). One base entry plus one per discovered Spring profile (from `application-<profile>.*` filenames and multi-document `application.{yml,yaml}` activation), capped at eight with the overflow named. Merge safety: create when absent, replace only its own labelled entries in plain JSON, and sidecar (never clobber) a commented or non-array file. **Driven checks verified on 2026-07-19** (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25): the generated run task's exact `mvn spring-boot:run` launched the Boot app and served `GET /greeting` (HTTP 200); a second check generated `dev`/`prod`/`staging` entries and launched the `dev` Java debug configuration after editing `vmArgs`, `args`, and `env`. The 2026-07-22 macOS 26.5.2 Maven multi-project gate then displayed `service-a`, `service-b`, and `All projects`; selecting all generated two task and two debug entries with the correct module `cwd` values and ran nothing automatically. Official Java's loopback main-class resolver requires system HTTP proxies to bypass `localhost`/`127.0.0.1`; its isolated-profile DAP helper path remains an S016 caveat. Gradle interaction and every non-macOS-arm64 desktop tuple remain untested. No route overwrites unknown configuration or starts a debug session programmatically. Evidence: `tmp/run-debug-gates-20260722/evidence/`. |
-| Maven goal / Gradle build | `implemented` | A source read of the pinned release narrowed this row sharply. Spring advertises `sts.maven.goal` and `sts.gradle.build`, but `sts.gradle.build` has **no caller anywhere in the server**: its only would-be caller, `DataRepositoryAotMetadataService.regenerateMetadataCommand`, returns `Optional.empty()` for any project whose build is not `maven`. There is also no arbitrary-goal entry point. `sts.maven.goal` is reachable from exactly one place — the `CL-4a`/`CL-4e` Data AOT lenses — carrying one composed goal, `[compile ]org.springframework.boot:spring-boot-maven-plugin:process-aot`. Gradle builds and arbitrary goals are therefore not a Spring Tools capability at all; they stay Zed task and official-Java ownership under D003/D006, where S016 verified Maven main execution and Gradle project coordination. Which handler runs the command depends on `LspClient.currentClient()`, read from the `sts.lsp.client` system property: VS Code gets `VSCodeBuildCommandProvider`, which hands `maven.goal.custom`/`gradle.runBuild` to the separate VS Code Maven and Gradle extensions. This product sets no such property, so an unmodified pass-through would select `DefaultBuildCommandProvider`, which runs the build inside the language-server process with `Runtime.exec`. A 2026-07-24 direct drive of the pinned server measured what that costs: the AOT goal did complete in 5,532 ms and wrote authentic metadata, but sent **no** log, message, or progress notification of any kind; a failing goal returned only a Java stack trace with Maven's own diagnostic discarded; and because `executeMaven` waits on `Process.onExit()` without ever reading the child's streams, the same goal at 120 KB of output **never returned in 300 s**, against 5 s for the identical build with its output drained. The coordinator therefore takes both commands instead of forwarding them, validates the supplied build file (inside the worktree, existing, matching the requested tool) and every goal token against a conservative argument pattern, and writes one reviewable wrapper-aware `.zed/tasks.json` entry under its own `Spring Boot (zed-spring-tools) build:` label prefix, with a worktree-relative `cwd`. Run/debug generation and build generation now own disjoint label scopes, so neither deletes the other's entries, and the existing merge-safety contract (preserve foreign entries, sidecar an unparseable file) is unchanged. Nothing is executed by the extension. Contract tests cover interception, wrapper selection, same-label replacement, scope isolation in both directions, the declined out-of-worktree/missing-file/unsafe-goal/tool-mismatch paths, and the unreachable Gradle command. A driven Zed run of the lens click and of the generated task has not happened yet, which is why this is `implemented` and not `verified`. Evidence: `tmp/maven-goal-ownership-20260724/evidence/`. |
+| Maven goal / Gradle build | `verified` | Pinned source narrows this row to one reachable operation: `sts.maven.goal` is called only by the `CL-4a`/`CL-4e` Data AOT lenses with `[compile ]org.springframework.boot:spring-boot-maven-plugin:process-aot`; `sts.gradle.build` has no caller, and Spring exposes no arbitrary-goal route. An unmodified non-VS-Code client selects Spring's `DefaultBuildCommandProvider`, whose direct drive completed the AOT goal in 5,532 ms but emitted no log/message/progress, discarded Maven's own diagnostic on failure, and hung past 300 s on 120 KB of output because it waits without draining the child streams; the same terminal build finished in 5 s. The coordinator therefore intercepts both advertised commands, validates the build file/tool/goal tokens, and writes one wrapper-aware, worktree-relative `.zed/tasks.json` entry under a build-only label scope. It never starts the build, preserves foreign/run-debug entries, and retains the sidecar fallback for unparseable configuration. Contract tests cover interception, wrapper selection, replacement, scope isolation, declined unsafe inputs, and unreachable Gradle. **Driven 2026-07-24** on macOS 26.5.2 arm64, Zed 1.12.0, official Java 6.8.21, Spring Tools 5.2.0, and Temurin JDK 25.0.3: clicking `CL-4a` created the exact reviewable task; selecting it from `task: spawn` exposed Maven output and `BUILD SUCCESS`, then created the authentic 13,450-byte `target/spring-aot/main/resources/dev/zed/spring/codelens/CodeLensShowcaseRepository.json`. After reload, `CL-4e` rewrote the same task while the JSON timestamp stayed unchanged and no Maven process started. Evidence: `tmp/maven-goal-ownership-20260724/evidence/`. |
 | Open Boot app page URL | `planned` | Preferred route: expose a standard Document Link or clickable Markdown URL in hover or the opt-in Live document. A Code Action that discovers a URL may present it through Zed's general `window/showMessageRequest` Markdown prompt, whose source routes link clicks through `open_url_or_file`; this companion still needs a driven desktop test. Zed's general LSP client does not advertise or handle `window/showDocument`, so copyable text is the required fallback. OS-specific opener tasks remain an excluded contingency unless public links fail and a separate cross-platform security/quoting gate supports them. |
 
 ## Workstream 5 — commands, upgrade, Modulith
