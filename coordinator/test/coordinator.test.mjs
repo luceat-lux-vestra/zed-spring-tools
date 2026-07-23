@@ -37,9 +37,11 @@ test("product arguments are positional, absolute, and shell independent", () => 
     "--compatibility", "/tmp/runtime/providers.json",
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
+    "--automatic-live-connection", "true",
   ]);
   assert.equal(options.worktree, "/tmp/work tree");
   assert.equal(options.hostOs, "macos");
+  assert.equal(options.automaticLiveConnection, true);
   assert.throws(() => parseOptions(["--worktree", "/tmp"]));
 });
 
@@ -1295,6 +1297,7 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
     "--compatibility", compatibilityFile,
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
+    "--automatic-live-connection", "false",
   ], {
     input,
     output: new PassThrough(),
@@ -2735,6 +2738,199 @@ const MANAGE_LIVE_PROCESS_COMMAND_MESSAGE = {
   params: { command: "zed-spring-tools.manage-live-process", arguments: [] },
 };
 
+function waitingJavaTransport() {
+  return {
+    supportsSpringClientMethod: () => false,
+    waitUntilReady: ({ signal }) =>
+      new Promise((resolve, reject) => {
+        if (signal.aborted) {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+          return;
+        }
+        signal.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, { once: true });
+      }),
+  };
+}
+
+test("opt-in automatic live connection attaches only the single matching Boot project", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: waitingJavaTransport(),
+    worktree: "/tmp/project",
+    automaticLiveInitialDelayMs: 0,
+    automaticLivePollMs: 60_000,
+  });
+
+  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    method: "workspace/didChangeConfiguration",
+    params: {
+      settings: {
+        "boot-java": {
+          "live-information": {
+            "automatic-connection": { on: true },
+          },
+        },
+      },
+    },
+  });
+  const projectsRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "automatic executable-project discovery",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: projectsRequest.id,
+    result: [{
+      name: "demo",
+      mainClass: "dev.example.DemoApplication",
+      uri: "file:///tmp/project",
+    }],
+  });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "automatic process discovery",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      {
+        processKey: "unrelated:1000",
+        label: "other",
+        action: "sts/livedata/connect",
+        projectName: "other",
+      },
+      {
+        processKey: "unnamed:1001",
+        label: "unnamed",
+        action: "sts/livedata/connect",
+      },
+      {
+        processKey: "demo:1234",
+        label: "demo (pid: 1234)",
+        action: "sts/livedata/connect",
+        projectName: "demo",
+      },
+    ],
+  });
+  const connectRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/connect",
+    "automatic connect request",
+  );
+  assert.deepEqual(connectRequest.params.arguments, [{ processKey: "demo:1234" }]);
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: connectRequest.id, result: null });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    method: "sts/liveprocess/connected",
+    params: { type: "local", processKey: "demo:1234", processName: "demo", pid: "1234" },
+  });
+  const notice = await waitFor(
+    zedWrites,
+    (message) =>
+      message.method === "window/showMessage" &&
+      /Automatically connected live data from demo/.test(message.params?.message),
+    "automatic connect confirmation",
+  );
+  assert.match(notice.params.message, /connect\/disconnect action to disconnect/);
+  assert.equal(
+    springWrites.some(
+      (message) =>
+        message.params?.command === "sts/livedata/connect" &&
+        message.params.arguments?.[0]?.processKey !== "demo:1234",
+    ),
+    false,
+  );
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("automatic live connection fails closed when matching process identity is ambiguous", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const logs = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: waitingJavaTransport(),
+    worktree: "/tmp/project",
+    automaticLiveConnection: true,
+    automaticLiveInitialDelayMs: 0,
+    automaticLivePollMs: 60_000,
+    logger: (message) => logs.push(message),
+  });
+
+  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
+  const projectsRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "automatic executable-project discovery",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: projectsRequest.id,
+    result: [{
+      name: "demo",
+      mainClass: "dev.example.DemoApplication",
+      uri: "file:///tmp/project",
+    }],
+  });
+  const listRequest = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/livedata/listProcesses",
+    "automatic process discovery",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listRequest.id,
+    result: [
+      {
+        processKey: "demo:1234",
+        label: "demo one",
+        action: "sts/livedata/connect",
+        projectName: "demo",
+      },
+      {
+        processKey: "demo:5678",
+        label: "demo two",
+        action: "sts/livedata/connect",
+        projectName: "demo",
+      },
+    ],
+  });
+  await waitFor(
+    logs,
+    (message) => /2 matching processes are ambiguous/.test(message),
+    "ambiguity log",
+  );
+  assert.equal(
+    springWrites.some((message) => message.params?.command === "sts/livedata/connect"),
+    false,
+  );
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    false,
+    "automatic ambiguity must not become an implicit selection prompt",
+  );
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
 test("connecting a live process reports success only after the server confirms the connection", async () => {
   const springWrites = [];
   const zedWrites = [];
@@ -3258,7 +3454,7 @@ test("a commented existing config is preserved and a sidecar is written instead"
   fs.rmSync(worktree, { recursive: true, force: true });
 });
 
-async function driveConfigureSingleProject(worktree, project) {
+async function driveConfigureSingleProject(worktree, project, options = {}) {
   const springWrites = [];
   const zedWrites = [];
   const coordinator = new Coordinator({
@@ -3266,6 +3462,7 @@ async function driveConfigureSingleProject(worktree, project) {
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: { supportsSpringClientMethod: () => false },
     worktree,
+    automaticLiveConnection: options.automaticLiveConnection,
     reportContext: { hostOs: "macos" },
   });
   coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
@@ -3324,6 +3521,46 @@ test("profiles from filenames and multi-doc application.yml become picker entrie
   assert.equal(debug[1].vmArgs, "-Dspring.profiles.active=dev");
   assert.deepEqual(debug[0].args, []);
   assert.deepEqual(debug[0].env, {});
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("opt-in automatic live connection adds local management identity to generated debug entries", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  const resources = path.join(worktree, "src", "main", "resources");
+  fs.mkdirSync(resources, { recursive: true });
+  fs.writeFileSync(path.join(resources, "application-dev.yml"), "server.port: 8081\n");
+
+  const { debug } = await driveConfigureSingleProject(
+    worktree,
+    { name: "root-app", mainClass: "com.example.App" },
+    { automaticLiveConnection: true },
+  );
+  const automaticArgs = [
+    "-Dspring.jmx.enabled=true",
+    "-Dmanagement.endpoints.jmx.exposure.include=*",
+    "-Dspring.application.admin.enabled=true",
+    "-Dspring.boot.project.name=root-app",
+  ].join(" ");
+  assert.equal(debug[0].vmArgs, automaticArgs);
+  assert.equal(debug[1].vmArgs, `-Dspring.profiles.active=dev ${automaticArgs}`);
+  assert.equal(debug[0].request, "launch");
+  assert.equal(debug[0].adapter, "Java");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("automatic live debug properties fail closed for an unsafe project name", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  const { debug } = await driveConfigureSingleProject(
+    worktree,
+    { name: "project with spaces", mainClass: "com.example.App" },
+    { automaticLiveConnection: true },
+  );
+  assert.equal(debug[0].vmArgs, "");
+  assert.doesNotMatch(JSON.stringify(debug), /spring\.boot\.project\.name/);
 
   fs.rmSync(worktree, { recursive: true, force: true });
 });

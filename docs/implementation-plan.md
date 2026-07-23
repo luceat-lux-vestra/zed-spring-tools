@@ -155,14 +155,14 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 25 exists at
+Status: in progress. Inventory version 27 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 32 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 17
+capabilities: 32 `verified`, 2 `implemented`, 6 `zed-native-equivalent`, 15
 `planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
@@ -313,8 +313,13 @@ Immediate M4 slice order after D006 is now:
    Zed-native equivalent: VS Code's three active-app commands only wrap the same
    connect/disconnect/refresh operations already exposed through the verified
    explicit process/action choice, whose contract tests now cover all three.
-   Automatic/remote connection, build/task, upgrade, Modulith, and remaining
-   commands stay separate.
+   Automatic local connection is now implemented and contract-tested as a
+   default-off opt-in. Generated Java debug entries carry reviewable
+   local-management/project identity properties, and the coordinator admits
+   exactly one executable-project-matching local Attach descriptor into the
+   verified confirmation path; ambiguous or unnamed candidates fail closed.
+   Its real Zed debug lifecycle gate remains. Remote connection, build/task,
+   upgrade, Modulith, and remaining commands stay separate.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's

@@ -32,6 +32,12 @@ impl zed::Extension for SpringToolsExtension {
             .map_err(|error| format!("resolve extension work directory: {error}"))?;
         let java_work = platform::official_java_work_dir(&extension_work)?;
         let root = worktree.root_path();
+        let automatic_live_connection =
+            zed::settings::LspSettings::for_worktree(SERVER_ID, worktree)
+                .ok()
+                .and_then(|settings| settings.settings)
+                .as_ref()
+                .is_some_and(automatic_live_connection_enabled);
 
         Ok(zed::Command {
             command: node,
@@ -42,6 +48,7 @@ impl zed::Extension for SpringToolsExtension {
                 &java,
                 &java_work,
                 zed::current_platform().0,
+                automatic_live_connection,
             )?,
             env: worktree.shell_env(),
         })
@@ -194,6 +201,22 @@ fn spring_workspace_configuration(
     configuration
 }
 
+// VS Code implements this preference in its client rather than in Spring LS:
+// its Java debug provider adds the management/project JVM properties and its
+// debug-event listener initiates the live-data connection. Zed exposes neither
+// hook to an extension, so pass the explicit opt-in to the coordinator, which
+// generates equivalent reviewable debug properties and uses Spring's local
+// Attach process list. Absent, non-boolean, and false values all remain off.
+fn automatic_live_connection_enabled(configuration: &zed::serde_json::Value) -> bool {
+    configuration
+        .get("boot-java")
+        .and_then(|boot| boot.get("live-information"))
+        .and_then(|live| live.get("automatic-connection"))
+        .and_then(|automatic| automatic.get("on"))
+        .and_then(|enabled| enabled.as_bool())
+        == Some(true)
+}
+
 // Deep-merge objects key by key; any non-object user value replaces ours
 // outright, so a user can turn an enabled default back off.
 fn merge_configuration(target: &mut zed::serde_json::Value, source: zed::serde_json::Value) {
@@ -245,6 +268,7 @@ fn coordinator_arguments(
     java: &str,
     java_work: &Path,
     os: zed::Os,
+    automatic_live_connection: bool,
 ) -> Result<Vec<String>, String> {
     Ok(vec![
         platform::path_string(&runtime.coordinator)?,
@@ -269,6 +293,8 @@ fn coordinator_arguments(
         .to_owned(),
         "--extension-version".to_owned(),
         EXTENSION_VERSION.to_owned(),
+        "--automatic-live-connection".to_owned(),
+        automatic_live_connection.to_string(),
     ])
 }
 
@@ -297,6 +323,7 @@ mod tests {
             "/jdks/temurin 25/bin/java",
             Path::new("/extensions/work/java"),
             zed::Os::Mac,
+            false,
         )
         .unwrap();
         assert_eq!(arguments[0], "/extension work/runtime/main.mjs");
@@ -304,6 +331,7 @@ mod tests {
         assert_eq!(arguments[4], "/jdks/temurin 25/bin/java");
         assert_eq!(arguments[10], "/extensions/work/java");
         assert_eq!(arguments[16], EXTENSION_VERSION);
+        assert_eq!(arguments[18], "false");
         assert!(!arguments.iter().any(|argument| argument == "sh"));
         assert!(
             include_str!("../extension.toml")
@@ -444,6 +472,29 @@ mod tests {
                 .is_none(),
             "explicit discovery must not opt into automatic connection"
         );
+    }
+
+    #[test]
+    fn automatic_live_connection_requires_an_explicit_true_setting() {
+        assert!(!automatic_live_connection_enabled(&zed::serde_json::json!(
+            {}
+        )));
+        assert!(!automatic_live_connection_enabled(
+            &zed::serde_json::json!({
+                "boot-java": {
+                    "live-information": {
+                        "automatic-connection": { "on": false }
+                    }
+                }
+            })
+        ));
+        assert!(automatic_live_connection_enabled(&zed::serde_json::json!({
+            "boot-java": {
+                "live-information": {
+                    "automatic-connection": { "on": true }
+                }
+            }
+        })));
     }
 
     #[test]

@@ -118,6 +118,12 @@ const MAX_LIVE_LOGGER_SELECTION_PAGE = 10;
 // handshake plus the first actuator poll can take a few seconds.
 const LIVE_CONNECT_CONFIRM_MS = 12_000;
 const LIVE_LOG_LEVEL_CONFIRM_MS = 12_000;
+// Automatic live connection is opt-in. Poll only after the prior discovery
+// round finishes because Spring's local Attach scan may spend several seconds
+// classifying JVMs; overlapping scans would add load and could race identity.
+const AUTOMATIC_LIVE_INITIAL_DELAY_MS = 2_000;
+const AUTOMATIC_LIVE_POLL_MS = 5_000;
+const AUTOMATIC_LIVE_PROJECT_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
 const ALL_BOOT_PROJECTS_TITLE = "All projects";
 const MAX_BOOT_PROJECT_SELECTION = 8;
 // Cap generated per-profile entries so a project with many profiles cannot flood
@@ -182,6 +188,9 @@ export class Coordinator {
     inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
     liveConnectConfirmMs = LIVE_CONNECT_CONFIRM_MS,
     liveLogLevelConfirmMs = LIVE_LOG_LEVEL_CONFIRM_MS,
+    automaticLiveConnection = false,
+    automaticLiveInitialDelayMs = AUTOMATIC_LIVE_INITIAL_DELAY_MS,
+    automaticLivePollMs = AUTOMATIC_LIVE_POLL_MS,
     now = () => new Date(),
     reportContext = {},
     targetExists = fileUriExists,
@@ -197,6 +206,9 @@ export class Coordinator {
     this.inlayRefreshDelayMs = inlayRefreshDelayMs;
     this.liveConnectConfirmMs = liveConnectConfirmMs;
     this.liveLogLevelConfirmMs = liveLogLevelConfirmMs;
+    this.automaticLiveConnection = automaticLiveConnection === true;
+    this.automaticLiveInitialDelayMs = automaticLiveInitialDelayMs;
+    this.automaticLivePollMs = automaticLivePollMs;
     this.now = now;
     this.targetExists = targetExists;
     this.logger = logger;
@@ -228,6 +240,13 @@ export class Coordinator {
     this.connectedProcesses = new Map();
     this.pendingConnectWaiters = new Map();
     this.pendingLogLevelWaiters = new Map();
+    this.automaticLiveAttemptedKeys = new Set();
+    this.automaticLiveProjectNames = new Set();
+    this.automaticLiveAmbiguity = undefined;
+    this.automaticLivePollTimer = undefined;
+    this.automaticLiveTask = undefined;
+    this.automaticLivePollFailureLogged = false;
+    this.initialized = false;
     this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -256,6 +275,7 @@ export class Coordinator {
   }
 
   observeZedMessage(message) {
+    this.#observeAutomaticLiveConfiguration(message);
     this.#observeJavaDocument(message);
     if (message?.method === "textDocument/inlayHint" && message.id !== undefined) {
       const uri = message.params?.textDocument?.uri;
@@ -324,8 +344,10 @@ export class Coordinator {
     if (this.#handleGenerateLiveMetricsDocumentCommand(message)) return false;
     if (this.#handleConfigureLiveLogLevelCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
+      this.initialized = true;
       this.#startSpringCodeLensProviders();
       this.#startClasspathCoordination();
+      this.#startAutomaticLiveConnection();
     }
     return true;
   }
@@ -402,6 +424,7 @@ export class Coordinator {
         Array.isArray(message.params?.affectedProjects) &&
         message.params.affectedProjects.length > 0
       ) {
+        this.automaticLiveProjectNames.clear();
         this.inlayRefreshPending = true;
         this.#invalidateGeneratedTargets();
         this.#scheduleZedInlayHintsRefresh(this.inlayRefreshDelayMs);
@@ -515,6 +538,8 @@ export class Coordinator {
     }
     this.pendingLogLevelWaiters.clear();
     this.connectedProcesses.clear();
+    this.automaticLiveAttemptedKeys.clear();
+    this.automaticLiveProjectNames.clear();
     this.pending.clear();
     this.zedRequests.clear();
     this.pendingZedRequests.clear();
@@ -533,6 +558,10 @@ export class Coordinator {
       clearTimeout(this.inlayRefreshTimer);
       this.inlayRefreshTimer = undefined;
     }
+    if (this.automaticLivePollTimer !== undefined) {
+      clearTimeout(this.automaticLivePollTimer);
+      this.automaticLivePollTimer = undefined;
+    }
   }
 
   async close() {
@@ -542,6 +571,7 @@ export class Coordinator {
     if (session !== undefined) await session.close();
     await this.enableTask;
     await this.codeLensEnableTask;
+    await this.automaticLiveTask;
     await this.generatedResolutionTail;
     this.shutdownIds.clear();
   }
@@ -1176,6 +1206,131 @@ export class Coordinator {
     );
   }
 
+  #startAutomaticLiveConnection() {
+    if (
+      !this.initialized ||
+      !this.automaticLiveConnection ||
+      this.closed ||
+      this.automaticLivePollTimer !== undefined ||
+      this.automaticLiveTask !== undefined
+    ) {
+      return;
+    }
+    this.#scheduleAutomaticLivePoll(this.automaticLiveInitialDelayMs);
+  }
+
+  #observeAutomaticLiveConfiguration(message) {
+    if (message?.method !== "workspace/didChangeConfiguration" || message.id !== undefined) return;
+    const enabled =
+      message.params?.settings?.["boot-java"]?.["live-information"]
+        ?.["automatic-connection"]?.on === true;
+    if (enabled === this.automaticLiveConnection) return;
+    this.automaticLiveConnection = enabled;
+    this.automaticLiveProjectNames.clear();
+    this.automaticLiveAttemptedKeys.clear();
+    this.automaticLiveAmbiguity = undefined;
+    if (enabled) {
+      this.#startAutomaticLiveConnection();
+    } else if (this.automaticLivePollTimer !== undefined) {
+      clearTimeout(this.automaticLivePollTimer);
+      this.automaticLivePollTimer = undefined;
+    }
+  }
+
+  #scheduleAutomaticLivePoll(delayMs) {
+    if (!this.automaticLiveConnection || this.closed || this.automaticLivePollTimer !== undefined) {
+      return;
+    }
+    this.automaticLivePollTimer = setTimeout(() => {
+      this.automaticLivePollTimer = undefined;
+      if (this.closed) return;
+      this.automaticLiveTask = this.#pollAutomaticLiveConnection()
+        .catch((error) => {
+          if (this.closed) return;
+          if (!this.automaticLivePollFailureLogged) {
+            this.automaticLivePollFailureLogged = true;
+            this.logger(`automatic Spring live-process discovery is not ready: ${errorText(error)}`);
+          }
+        })
+        .finally(() => {
+          this.automaticLiveTask = undefined;
+          if (!this.closed) this.#scheduleAutomaticLivePoll(this.automaticLivePollMs);
+        });
+    }, delayMs);
+    this.automaticLivePollTimer.unref?.();
+  }
+
+  async #pollAutomaticLiveConnection() {
+    if (!this.automaticLiveConnection || this.closed) return;
+    if (this.automaticLiveProjectNames.size === 0) {
+      const discoveredProjects = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: EXECUTABLE_BOOT_PROJECTS_COMMAND,
+        arguments: [],
+      });
+      for (const project of normalizeBootProjects(discoveredProjects)) {
+        this.automaticLiveProjectNames.add(project.name);
+      }
+    }
+    if (
+      this.automaticLiveProjectNames.size === 0 ||
+      !this.automaticLiveConnection ||
+      this.closed
+    ) {
+      return;
+    }
+
+    const discovered = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: LIST_LIVE_PROCESSES_COMMAND,
+      arguments: [],
+    });
+    const entries = normalizeLiveProcesses(discovered);
+    const presentKeys = new Set(entries.map((entry) => entry.processKey));
+    for (const processKey of this.automaticLiveAttemptedKeys) {
+      if (!presentKeys.has(processKey)) this.automaticLiveAttemptedKeys.delete(processKey);
+    }
+
+    // Spring marks a process with `spring.boot.project.name`, but its public
+    // descriptor does not expose the internal AUTO_CONNECT status. Reconcile
+    // that name against this worktree's authentic executable-project list, then
+    // require exactly one distinct connect candidate. This avoids attaching to
+    // an unrelated JVM and fails closed when two matching runs are alive.
+    const eligibleByKey = new Map();
+    for (const entry of entries) {
+      if (
+        entry.action === LIVE_CONNECT_COMMAND &&
+        entry.projectName !== undefined &&
+        this.automaticLiveProjectNames.has(entry.projectName)
+      ) {
+        eligibleByKey.set(entry.processKey, entry);
+      }
+    }
+    const eligible = [...eligibleByKey.values()];
+    if (eligible.length > 1) {
+      const ambiguity = [...eligibleByKey.keys()].sort().join("\u0000");
+      if (ambiguity !== this.automaticLiveAmbiguity) {
+        this.automaticLiveAmbiguity = ambiguity;
+        this.logger(
+          `automatic Spring live connection skipped: ${eligible.length} matching processes are ambiguous`,
+        );
+      }
+      return;
+    }
+    this.automaticLiveAmbiguity = undefined;
+    const candidate = eligible[0];
+    if (
+      candidate === undefined ||
+      !this.automaticLiveConnection ||
+      this.automaticLiveAttemptedKeys.has(candidate.processKey) ||
+      this.connectedProcesses.has(candidate.processKey)
+    ) {
+      this.automaticLivePollFailureLogged = false;
+      return;
+    }
+    this.automaticLiveAttemptedKeys.add(candidate.processKey);
+    await this.#connectLiveProcess(candidate, { automatic: true });
+    this.automaticLivePollFailureLogged = false;
+  }
+
   #handleManageLiveProcessCommand(message) {
     if (
       !isRequest(message) ||
@@ -1430,7 +1585,7 @@ export class Coordinator {
     );
   }
 
-  async #connectLiveProcess(entry) {
+  async #connectLiveProcess(entry, { automatic = false } = {}) {
     // Register the confirmation waiter before issuing connect so the server's
     // `sts/liveprocess/connected` notification cannot race ahead of it.
     const confirmed = this.#awaitLiveConnection(entry.processKey);
@@ -1442,9 +1597,10 @@ export class Coordinator {
     if (this.closed) return;
     this.#showInfo(
       connected
-        ? `Spring Boot: Connected live data from ${entry.label}. Live CodeLens and native Hover now show runtime beans, endpoints and injection data; run this action again to disconnect.`
-        : `Spring Boot: Requested a live-data connection to ${entry.label}, but no runtime data has arrived yet. Make sure the process exposes Spring Boot Actuator (or JMX). If it connects, live CodeLens and Hover will update on their own.`,
+        ? `Spring Boot: ${automatic ? "Automatically connected" : "Connected"} live data from ${entry.label}. Live CodeLens and native Hover now show runtime beans, endpoints and injection data; run the connect/disconnect action to disconnect.`
+        : `Spring Boot: ${automatic ? "Automatic connection requested" : "Requested a live-data connection"} to ${entry.label}, but no runtime data has arrived yet. Make sure the process exposes Spring Boot Actuator (or JMX). If it connects, live CodeLens and Hover will update on their own.`,
     );
+    return connected;
   }
 
   // Resolve true when the server announces the process is connected, false when
@@ -1679,7 +1835,10 @@ export class Coordinator {
       const runTasks = bootRunTasks(project, directory, cwd, hostOs, profiles);
       if (runTasks.length === 0) skippedRun.push(project.name);
       else tasks.push(...runTasks);
-      debugConfigs.push(...bootDebugConfigs(project, cwd, profiles));
+      debugConfigs.push(
+        ...bootDebugConfigs(project, cwd, profiles, this.automaticLiveConnection),
+      );
+      if (this.automaticLiveConnection) this.automaticLiveProjectNames.add(project.name);
     }
     const zedDirectory = path.join(worktree, ".zed");
     return {
@@ -1937,7 +2096,14 @@ function normalizeLiveProcesses(discovered) {
       continue;
     }
     const label = typeof item.label === "string" && item.label.length > 0 ? item.label : processKey;
-    entries.push({ processKey, action, label });
+    const projectName =
+      typeof item.projectName === "string" &&
+      item.projectName.length > 0 &&
+      item.projectName.length <= MAX_LIVE_METRIC_TEXT_LENGTH &&
+      !/[\u0000-\u001f\u007f]/.test(item.projectName)
+        ? item.projectName
+        : undefined;
+    entries.push({ processKey, action, label, projectName });
   }
   return entries;
 }
@@ -2492,15 +2658,31 @@ function bootRunTasks(project, directory, cwd, hostOs, profiles) {
 }
 
 // `vmArgs`, `args`, and `env` are editable slots the official Java debug adapter
-// honors; the per-profile entries pre-fill `vmArgs` with the active profile.
-function bootDebugConfigs(project, cwd, profiles) {
+// honors. When automatic live connection is explicitly enabled, mirror the
+// pinned VS Code provider's local management/project properties in the
+// reviewable generated config. The coordinator uses local Attach rather than a
+// public RMI port, so it does not add VS Code's separately allocated remote port
+// or unauthenticated remote-management flags.
+function bootDebugConfigs(project, cwd, profiles, automaticLiveConnection) {
+  const automaticArgs =
+    automaticLiveConnection && AUTOMATIC_LIVE_PROJECT_NAME.test(project.name)
+      ? [
+          "-Dspring.jmx.enabled=true",
+          "-Dmanagement.endpoints.jmx.exposure.include=*",
+          "-Dspring.application.admin.enabled=true",
+          `-Dspring.boot.project.name=${project.name}`,
+        ]
+      : [];
   const entry = (profile) => ({
     adapter: "Java",
     request: "launch",
     label: `${BOOT_CONFIG_LABEL_PREFIX}${project.name} (debug${profile === undefined ? "" : `: ${profile}`})`,
     mainClass: project.mainClass,
     cwd,
-    vmArgs: profile === undefined ? "" : `-Dspring.profiles.active=${profile}`,
+    vmArgs: [
+      ...(profile === undefined ? [] : [`-Dspring.profiles.active=${profile}`]),
+      ...automaticArgs,
+    ].join(" "),
     args: [],
     env: {},
     stopOnEntry: false,
@@ -2966,6 +3148,7 @@ export function parseOptions(arguments_) {
     ["--compatibility", "compatibility"],
     ["--host-os", "hostOs"],
     ["--extension-version", "extensionVersion"],
+    ["--automatic-live-connection", "automaticLiveConnection"],
   ];
   if (arguments_.length !== fields.length * 2) {
     throw new Error("coordinator arguments do not match the product contract");
@@ -2977,7 +3160,10 @@ export function parseOptions(arguments_) {
     if (arguments_[index * 2] !== flag || typeof value !== "string" || value.length === 0) {
       throw new Error(`missing required coordinator argument ${flag}`);
     }
-    values[name] = name === "hostOs" || name === "extensionVersion" ? value : path.resolve(value);
+    values[name] =
+      name === "hostOs" || name === "extensionVersion" || name === "automaticLiveConnection"
+        ? value
+        : path.resolve(value);
   }
   if (!new Set(["macos", "linux", "windows"]).has(values.hostOs)) {
     throw new Error("coordinator host OS is invalid");
@@ -2985,6 +3171,10 @@ export function parseOptions(arguments_) {
   if (!/^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/.test(values.extensionVersion)) {
     throw new Error("extension version is invalid");
   }
+  if (values.automaticLiveConnection !== "true" && values.automaticLiveConnection !== "false") {
+    throw new Error("automatic live connection option is invalid");
+  }
+  values.automaticLiveConnection = values.automaticLiveConnection === "true";
   return values;
 }
 
@@ -3160,6 +3350,7 @@ export async function run(arguments_, dependencies = {}) {
       timeoutMs: JAVA_ROUTE_TIMEOUT_MS,
     }),
     worktree: options.worktree,
+    automaticLiveConnection: options.automaticLiveConnection,
     reportContext: {
       hostOs: options.hostOs,
       hostArch: normalizedArchitecture(process.arch),

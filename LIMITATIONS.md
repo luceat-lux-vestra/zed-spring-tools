@@ -4,15 +4,16 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- 22 of 57 tracked capabilities are proven on the tested tuple, and most of the
+- 32 of 58 tracked capabilities are proven on the tested tuple, and much of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
   `spring-factories` / `jpa-query-properties` languages), Spring workspace
   symbols with bean and request-mapping navigation, static and live CodeLens,
-  inlay hints, quick fixes, and Boot run/debug configuration generation. Live
-  application data, the Structure document, Boot upgrade, Modulith, and most of
-  WS2's remaining Java language intelligence are untouched. See the
+  inlay hints, quick fixes, Boot run/debug configuration generation, the
+  Structure document, and explicit live-process/metrics/logger workflows. Boot
+  upgrade, Modulith, remote connection, and the automatic-connection runtime
+  gate remain. See the
   [capability inventory](docs/capability-inventory.md) for the per-row evidence.
   Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
@@ -22,7 +23,7 @@ extension.
   on restart: Spring answered before JDT's later dynamic registration, and Zed
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
-  fallback; the opt-in Structure document remains planned.
+  fallback; the opt-in Structure document is the verified grouping companion.
 - The official Java language server starts only when a Java file is open, and
   this extension cannot start it. Zed's extension API exposes no call for
   starting another extension's language server, and `languages.<Language>.
@@ -40,7 +41,7 @@ extension.
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested
   Structure/Live documents only where grouping or a table is essential. Those
-  generated documents and Run/Debug generation remain plans. CodeLens
+  generated documents and Run/Debug generation are implemented. CodeLens
   adaptation is implemented; its connected-process endpoint, bean, injection,
   click and native-Hover path is verified on the first macOS tuple. All five
   static Spring providers now have product activation, contract tests, and a
@@ -77,9 +78,19 @@ extension.
   `vmArgs`, `args`, and `env` slots. The official Java 6.8.21 debug helper uses an
   HTTP `localhost` callback, so a system HTTP proxy must bypass `localhost` and
   `127.0.0.1`; otherwise main-class resolution times out before launch. The
-  isolated-profile DAP helper path remains an S016 caveat. Still unobserved:
-  multi-project selection. Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) are
-  untested. The synthetic action offers on any Java file, not only Boot mains.
+  isolated-profile DAP helper path remains an S016 caveat. Maven multi-project
+  selection is verified; Gradle interaction and Windows wrapper forms
+  (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action offers on any
+  Java file, not only Boot mains.
+- Automatic local live-data connection is implemented but not yet runtime-
+  verified. It is off unless
+  `boot-java.live-information.automatic-connection.on` is explicitly true.
+  Generated Java debug entries then include reviewable local JMX/Actuator and
+  project-identity properties. The coordinator connects only one process whose
+  identity matches an executable Boot project in the worktree; missing identity
+  or multiple matches do nothing and leave the explicit process action as the
+  fallback. A real Zed debug start/connect/manual-disconnect/stop run is still
+  required before relying on this route.
 - Profile discovery and the editable slots are best-effort, not exhaustive.
   Profiles come from `application-<profile>.{properties,yml,yaml}` filenames and
   multi-document `application.{yml,yaml}` activation (`spring.config.activate.on-profile`
