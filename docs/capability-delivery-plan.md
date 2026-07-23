@@ -184,6 +184,21 @@ question below. What remains:
    contrast, goes to the single primary server (jdtls); Spring is never queried,
    so the Spring-specific highlight slice is `blocked-zed-api`, the same class
    as the S017 semantic-token result. Do not build coordinator highlight code.
+   **SpEL is now `verified` too, and closed with no product code.** A source
+   read narrowed the row to diagnostics and `@Value` navigation — semantic
+   tokens stay refuted below, and the pinned release has no SpEL hover provider
+   — and the settings audit found nothing to send, because
+   `boot-java.validation.spel.on` falls back to its own `ON` default when the
+   key is absent, matching VS Code's schema. The 2026-07-24 driven run published
+   SpEL syntax, property-placeholder syntax, and one
+   `@EventListener(condition = …)` diagnostic, the last proving the reconciler
+   covers the whole `SPEL_EXTRACTORS` set rather than `@Value` alone; Go to
+   Definition then returned both navigation shapes, bean reference and method
+   reference on a bean. That gesture extends the composition answer to a third
+   request type: `textDocument/definition` fans out to both servers and unions,
+   like `references` and unlike `documentHighlight`, so no coordinator merge
+   code is needed there either. Spring Data query intelligence is the remaining
+   WS2 row.
 4. The semantic-token spike is **closed, refuted** ([S017](spikes/017-static-semantic-token-declaration.md),
    driven 2026-07-21). Both halves failed: Zed requests nothing after Spring's
    *dynamic* registration, and — the decisive part — nothing after a *static*
