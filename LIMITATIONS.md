@@ -4,16 +4,16 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- 32 of 58 tracked capabilities are proven on the tested tuple, and much of the
+- 33 of 58 tracked capabilities are proven on the tested tuple, and much of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
   `spring-factories` / `jpa-query-properties` languages), Spring workspace
   symbols with bean and request-mapping navigation, static and live CodeLens,
   inlay hints, quick fixes, Boot run/debug configuration generation, the
-  Structure document, and explicit live-process/metrics/logger workflows. Boot
-  upgrade, Modulith, remote connection, and the automatic-connection runtime
-  gate remain. See the
+  Structure document, and explicit plus automatic
+  live-process/metrics/logger workflows. Boot upgrade, Modulith, and remote
+  connection remain. See the
   [capability inventory](docs/capability-inventory.md) for the per-row evidence.
   Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
@@ -82,15 +82,16 @@ extension.
   selection is verified; Gradle interaction and Windows wrapper forms
   (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action offers on any
   Java file, not only Boot mains.
-- Automatic local live-data connection is implemented but not yet runtime-
-  verified. It is off unless
+- Automatic local live-data connection is verified on the 2026-07-23 macOS
+  arm64 tuple. It remains off unless
   `boot-java.live-information.automatic-connection.on` is explicitly true.
   Generated Java debug entries then include reviewable local JMX/Actuator and
   project-identity properties. The coordinator connects only one process whose
   identity matches an executable Boot project in the worktree; missing identity
   or multiple matches do nothing and leave the explicit process action as the
-  fallback. A real Zed debug start/connect/manual-disconnect/stop run is still
-  required before relying on this route.
+  fallback. The driven Zed run proved automatic discovery and confirmed live
+  data, manual disconnect without reconnection across subsequent polls, debug
+  stop, and owned-process cleanup. Other desktop/JDK tuples remain untested.
 - Profile discovery and the editable slots are best-effort, not exhaustive.
   Profiles come from `application-<profile>.{properties,yml,yaml}` filenames and
   multi-document `application.{yml,yaml}` activation (`spring.config.activate.on-profile`

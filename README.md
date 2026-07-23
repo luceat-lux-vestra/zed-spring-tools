@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 32 `verified`, 2 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 33 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -79,12 +79,14 @@ requires a final level-change confirmation, and reports success only after
 Spring sends the matching update notification. A driven Boot/JMX gate rendered
 861 authentic loggers with an explicit 512-entry bound, changed `ROOT` from
 `INFO` to `DEBUG`, verified the refreshed effective/configured state, and
-restored it to `INFO`. Automatic local connection is now implemented as a
-default-off opt-in: generated Java debug entries add reviewable local-management
-and project-identity properties, and the coordinator connects only when Spring
+restored it to `INFO`. Automatic local connection is a verified default-off
+opt-in: generated Java debug entries add reviewable local-management and
+project-identity properties, and the coordinator connects only when Spring
 reports exactly one local process matching an executable Boot project in the
-worktree. The real Zed debug lifecycle gate remains, so this route is not yet
-runtime-verified.
+worktree. A 2026-07-23 Zed debug lifecycle gate automatically connected the
+matching Boot 3.5.5 process, delivered live data, honored manual disconnect
+without reconnecting, and cleaned up the debuggee and owned processes on stop
+and exit.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after

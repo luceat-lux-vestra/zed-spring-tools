@@ -63,12 +63,37 @@ with official Java 6.8.21 while connecting a real Boot process.
 The supported observation is also bounded. Maven and Gradle coordination,
 visible Spring completion, product uninstall, warm cached startup with outbound
 network denied, and the ordinary-profile Maven main runnable passed. Gradle and
-vanilla task execution, test runnables, debugging, first-install offline
-behavior, and all other desktop/JDK tuples remain untested. Zed's generated
+vanilla task execution, test runnables, first-install offline behavior, and all
+other desktop/JDK tuples were outside S016. Zed's generated
 runnable resolves its helper in the default data directory and therefore failed
 under `--user-data-dir`. Twice, after worktree closure, the official Java proxy
 exited while its JDT child and port file remained; product-owned processes and
 routes were already gone. See S016 for attribution and bounded evidence.
+
+## M4 automatic-connection evidence
+
+The default-off automatic local live-data route passed its Zed debug lifecycle
+gate on this exact later tuple:
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2 (build 25F84), arm64 |
+| Zed | 1.11.3 |
+| Official Zed Java extension | 6.8.21 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | `5.2.0.RELEASE` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixture | Maven, Spring Boot 3.5.5 |
+
+On 2026-07-23, the generated Java debug entry exposed reviewable local JMX,
+Actuator, application-admin, and project-identity properties. Spring discovered
+the one matching fixture, emitted `sts/liveprocess/connected`, and delivered
+authentic live data. Manual disconnect emitted `sts/liveprocess/disconnected`
+and did not reconnect across more than two later polling periods while the JVM
+remained alive. Zed debug stop terminated the fixture, and isolated-Zed exit
+left no coordinator, Spring server, official-Java process, or debuggee from the
+run. This does not extend the observation to another desktop, JDK, build tool,
+or official-Java release.
 
 ## Desktop matrix
 
