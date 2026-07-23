@@ -82,6 +82,19 @@ extension.
   selection is verified; Gradle interaction and Windows wrapper forms
   (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action offers on any
   Java file, not only Boot mains.
+- The Data AOT CodeLenses (`CL-4a`, `CL-4e`) no longer start a build when
+  clicked. Spring's own handler for those commands runs Maven inside the
+  language-server process and never reads its output: it reports nothing on
+  success, replaces Maven's diagnostic with a Java stack trace on failure, and
+  hangs indefinitely once the output fills the pipe — a 2026-07-24 direct drive
+  measured no response in 300 s for a build that takes 5 s with its output
+  drained. The extension answers the command by writing one reviewable
+  `.zed/tasks.json` entry instead, and the user starts it from the `task: spawn`
+  picker. That is one extra step, and it is deliberate. The generated task is
+  contract-tested; clicking the lens and running the task in real Zed is not yet
+  driven-verified. Spring's `sts.gradle.build` command has no caller in the
+  pinned release, so no Gradle build reaches this route at all; Gradle and
+  arbitrary Maven goals stay official-Java and manual Zed task ownership.
 - Automatic local live-data connection is verified on the 2026-07-23 macOS
   arm64 tuple. It remains off unless
   `boot-java.live-information.automatic-connection.on` is explicitly true.

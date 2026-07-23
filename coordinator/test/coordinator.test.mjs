@@ -3825,3 +3825,212 @@ test("no executable Boot project reports a notice and writes no files", async ()
 
   fs.rmSync(worktree, { recursive: true, force: true });
 });
+
+const AOT_GOAL = "compile org.springframework.boot:spring-boot-maven-plugin:process-aot";
+
+function buildCommandMessage(buildFile, goal = AOT_GOAL, command = "sts.maven.goal") {
+  return { jsonrpc: "2.0", id: "build-1", method: "workspace/executeCommand", params: { command, arguments: [buildFile, goal] } };
+}
+
+function buildCoordinator(worktree, springWrites, zedWrites) {
+  return new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: "macos" },
+  });
+}
+
+test("a Spring build command becomes a reviewable task instead of a hidden process", () => {
+  const worktree = makeWorktree();
+  const module = path.join(worktree, "service-a");
+  fs.mkdirSync(module);
+  fs.writeFileSync(path.join(module, "pom.xml"), "<project/>\n");
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = buildCoordinator(worktree, springWrites, zedWrites);
+
+  assert.equal(
+    coordinator.observeZedMessage(buildCommandMessage(path.join(module, "pom.xml"))),
+    false,
+  );
+  assert.deepEqual(springWrites, [], "the build command must never reach Spring");
+
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.deepEqual(tasks, [
+    {
+      label:
+        "Spring Boot (zed-spring-tools) build: service-a (compile org.springframework.boot:spring-boot-maven-plugin:process-aot)",
+      command: "mvn",
+      args: ["compile", "org.springframework.boot:spring-boot-maven-plugin:process-aot"],
+      cwd: "$ZED_WORKTREE_ROOT/service-a",
+      env: {},
+    },
+  ]);
+
+  const notice = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.match(notice.params.message, /task: spawn/);
+  assert.match(notice.params.message, /mvn compile org\.springframework\.boot/);
+  assert.equal(zedWrites.at(-1).id, "build-1");
+  assert.equal(zedWrites.at(-1).result, null);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("a generated build task uses the wrapper beside its own build file", () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  fs.writeFileSync(path.join(worktree, "mvnw"), "#!/bin/sh\n");
+
+  const zedWrites = [];
+  buildCoordinator(worktree, [], zedWrites).observeZedMessage(
+    buildCommandMessage(path.join(worktree, "pom.xml")),
+  );
+
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.equal(tasks[0].command, "./mvnw");
+  assert.equal(tasks[0].cwd, "$ZED_WORKTREE_ROOT");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("regenerating a build task replaces only its own entry", () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  fs.mkdirSync(path.join(worktree, ".zed"));
+  fs.writeFileSync(
+    path.join(worktree, ".zed", "tasks.json"),
+    `${JSON.stringify(
+      [
+        { label: "My task", command: "echo" },
+        { label: "Spring Boot (zed-spring-tools): root-app (run)", command: "./mvnw" },
+        {
+          label: `Spring Boot (zed-spring-tools) build: ${path.basename(worktree)} (${AOT_GOAL})`,
+          command: "stale",
+        },
+        { label: "Spring Boot (zed-spring-tools) build: other (verify)", command: "./mvnw" },
+      ],
+      null,
+      2,
+    )}\n`,
+  );
+
+  buildCoordinator(worktree, [], []).observeZedMessage(
+    buildCommandMessage(path.join(worktree, "pom.xml")),
+  );
+
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.deepEqual(tasks.map((task) => task.label), [
+    "My task",
+    "Spring Boot (zed-spring-tools): root-app (run)",
+    "Spring Boot (zed-spring-tools) build: other (verify)",
+    `Spring Boot (zed-spring-tools) build: ${path.basename(worktree)} (${AOT_GOAL})`,
+  ]);
+  assert.equal(tasks[1].command, "./mvnw", "run/debug entries survive a build write");
+  assert.equal(tasks[2].command, "./mvnw", "another module's build task survives");
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("generating run configuration does not delete a generated build task", async () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = buildCoordinator(worktree, springWrites, zedWrites);
+  coordinator.observeZedMessage(buildCommandMessage(path.join(worktree, "pom.xml")));
+
+  coordinator.observeZedMessage({ ...CONFIGURE_COMMAND });
+  const discovery = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/executableBootProjects",
+    "executable projects request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: discovery.id,
+    result: [{ name: "root-app", mainClass: "com.example.App", uri: pathToFileURL(worktree).href }],
+  });
+  await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage" && /Run tasks/.test(message.params.message),
+    "run configuration confirmation",
+  );
+
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.deepEqual(tasks.map((task) => task.label), [
+    `Spring Boot (zed-spring-tools) build: ${path.basename(worktree)} (${AOT_GOAL})`,
+    "Spring Boot (zed-spring-tools): root-app (run)",
+  ]);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("a build command outside the worktree or with an unsafe goal writes nothing", () => {
+  const worktree = makeWorktree();
+  const outside = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "pom.xml"), "<project/>\n");
+  fs.writeFileSync(path.join(outside, "pom.xml"), "<project/>\n");
+
+  const declined = [
+    [path.join(outside, "pom.xml"), AOT_GOAL, /outside this worktree/],
+    [path.join(worktree, "absent.xml"), AOT_GOAL, /does not exist/],
+    [path.join(worktree, "pom.xml"), "compile; rm -rf ~", /will not write to a task file/],
+    [path.join(worktree, "pom.xml"), "compile $(id)", /will not write to a task file/],
+    [path.join(worktree, "pom.xml"), "   ", /empty or has too many arguments/],
+  ];
+
+  for (const [buildFile, goal, expected] of declined) {
+    const springWrites = [];
+    const zedWrites = [];
+    buildCoordinator(worktree, springWrites, zedWrites).observeZedMessage(
+      buildCommandMessage(buildFile, goal),
+    );
+    const notice = zedWrites.find((message) => message.method === "window/showMessage");
+    assert.match(notice.params.message, expected);
+    assert.match(notice.params.message, /nothing was started or written/);
+    assert.deepEqual(springWrites, [], "a declined build must not reach Spring either");
+    assert.equal(fs.existsSync(path.join(worktree, ".zed", "tasks.json")), false);
+    assert.equal(zedWrites.at(-1).result, null);
+  }
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+  fs.rmSync(outside, { recursive: true, force: true });
+});
+
+test("an unreachable Gradle build command is taken over rather than forwarded", () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "build.gradle"), "plugins {}\n");
+
+  const springWrites = [];
+  const zedWrites = [];
+  buildCoordinator(worktree, springWrites, zedWrites).observeZedMessage(
+    buildCommandMessage(path.join(worktree, "build.gradle"), "bootJar", "sts.gradle.build"),
+  );
+
+  assert.deepEqual(springWrites, []);
+  const tasks = JSON.parse(fs.readFileSync(path.join(worktree, ".zed", "tasks.json"), "utf8"));
+  assert.equal(tasks[0].command, "gradle");
+  assert.deepEqual(tasks[0].args, ["bootJar"]);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});
+
+test("a build command whose file does not match its tool is declined", () => {
+  const worktree = makeWorktree();
+  fs.writeFileSync(path.join(worktree, "build.gradle"), "plugins {}\n");
+
+  const zedWrites = [];
+  buildCoordinator(worktree, [], zedWrites).observeZedMessage(
+    buildCommandMessage(path.join(worktree, "build.gradle"), AOT_GOAL),
+  );
+
+  const notice = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.match(notice.params.message, /No Maven build was detected/);
+  assert.equal(fs.existsSync(path.join(worktree, ".zed", "tasks.json")), false);
+
+  fs.rmSync(worktree, { recursive: true, force: true });
+});

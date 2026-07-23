@@ -29,6 +29,17 @@ const VSCODE_OPEN_COMMAND = "vscode.open";
 const ZED_SHOW_LOCATIONS_COMMAND = "editor.action.goToLocations";
 const GENERATED_IMPLEMENTATION_COMMAND = "sts/boot/open-data-query-method-aot-definition";
 const MAVEN_GOAL_COMMAND = "sts.maven.goal";
+const GRADLE_BUILD_COMMAND = "sts.gradle.build";
+// Spring advertises both build commands, and its own handler for them runs the
+// build inside the language-server process with `Runtime.exec`: no terminal, no
+// drained output, and no way to stop it from Zed. D003/D005 keep build execution
+// under Zed/official-Java ownership, so the coordinator answers these commands by
+// writing a reviewable task instead of forwarding them. Only `sts.maven.goal` is
+// reachable in the pinned release — `sts.gradle.build` is registered but has no
+// caller, because Spring's single build-command caller returns nothing for a
+// non-Maven project. It is handled here so a future Spring release cannot silently
+// reopen the invisible-process route.
+const SPRING_BUILD_COMMANDS = new Set([MAVEN_GOAL_COMMAND, GRADLE_BUILD_COMMAND]);
 const CODE_ACTION_REQUEST = "textDocument/codeAction";
 const EXECUTABLE_BOOT_PROJECTS_COMMAND = "sts/spring-boot/executableBootProjects";
 const CONFIGURE_BOOT_RUN_COMMAND = "zed-spring-tools.configure-boot-run";
@@ -43,6 +54,16 @@ const MAX_STRUCTURE_DEPTH = 16;
 const MAX_STRUCTURE_LABEL_LENGTH = 300;
 const BOOT_CONFIG_ACTION_KIND = "source";
 const BOOT_CONFIG_LABEL_PREFIX = "Spring Boot (zed-spring-tools): ";
+// Generated build tasks carry their own label prefix so the two writers own
+// disjoint scopes: regenerating run/debug configuration must not delete a build
+// task, and rewriting a build task must not delete run/debug entries.
+const BUILD_TASK_LABEL_PREFIX = "Spring Boot (zed-spring-tools) build: ";
+// A generated task's argv is written to a file the user runs through a shell, so
+// every token has to stay a plain build argument. Spring composes the goal itself
+// today, but the coordinator must not widen that to whatever a future release or
+// a crafted workspace sends.
+const BUILD_ARGUMENT = /^[A-Za-z0-9_.:@=+/-]{1,200}$/;
+const MAX_BUILD_ARGUMENTS = 16;
 // Properties/YAML conversion and shared-metadata reload. The Spring server owns
 // the conversion: given [sourceUri, targetUri, replaceOriginal] it computes the
 // converted document and drives a `workspace/applyEdit` that creates the target
@@ -336,6 +357,7 @@ export class Coordinator {
     this.#observeDocumentVersion(message);
     this.#observeGeneratedTargetInvalidation(message);
     if (this.#handleCoordinatorCodeLensCommand(message)) return false;
+    if (this.#handleSpringBuildCommand(message)) return false;
     if (this.#handleConfigureBootRunCommand(message)) return false;
     if (this.#handleGenerateStructureDocumentCommand(message)) return false;
     if (this.#handleConvertPropertiesYamlCommand(message)) return false;
@@ -1040,6 +1062,43 @@ export class Coordinator {
     if (synthetic.length === 0) return normalized;
     const existing = Array.isArray(normalized.result) ? normalized.result : [];
     return { ...normalized, result: [...existing, ...synthetic] };
+  }
+
+  // Spring's own handler for these commands spawns Maven or Gradle inside the
+  // language-server process and never reads the child's output, so nothing
+  // reaches the user and a build that fills the pipe buffer can stall. Take the
+  // command instead of forwarding it, and hand the same build to Zed as a
+  // reviewable task the user starts and watches.
+  #handleSpringBuildCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      !SPRING_BUILD_COMMANDS.has(message.params?.command)
+    ) {
+      return false;
+    }
+    const request = buildTaskRequest(
+      message.params.command,
+      message.params.arguments,
+      this.worktree,
+      this.reportContext.hostOs,
+    );
+    if (request.error !== undefined) {
+      this.logger(`declined ${message.params.command}: ${request.error}`);
+      this.#showInfo(
+        `Spring Boot: this build action was not run. ${request.error} Zed Spring Tools never runs a build inside the language server, so nothing was started or written.`,
+      );
+      this.sendZed(encodeLsp(responseFor(message, null)));
+      return true;
+    }
+    const outcome = writeMergedConfig(
+      path.join(this.worktree, ".zed", "tasks.json"),
+      [request.task],
+      (entry) => isGeneratedBuildTask(entry) && entry.label === request.task.label,
+    );
+    this.#showInfo(describeGeneratedBuildTask(request, outcome));
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    return true;
   }
 
   #handleConfigureBootRunCommand(message) {
@@ -2657,6 +2716,66 @@ function detectBuildTool(directory, hostOs) {
   return undefined;
 }
 
+// Spring sends [buildFilePath, goal]: an absolute path to the module's build file
+// and a single space-separated goal string. Everything here is checked rather
+// than trusted, because the result is written to a file the user runs.
+function buildTaskRequest(command, argumentList, worktree, hostOs) {
+  const expected = command === MAVEN_GOAL_COMMAND ? "maven" : "gradle";
+  const args = Array.isArray(argumentList) ? argumentList : [];
+  const buildFile = args[0];
+  const goal = args[1];
+  if (typeof buildFile !== "string" || typeof goal !== "string") {
+    return { error: "Spring Tools did not supply a build file and goal." };
+  }
+  const root = path.resolve(worktree);
+  const resolved = path.resolve(buildFile);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    return { error: "Its build file is outside this worktree." };
+  }
+  if (!fileExists(resolved)) {
+    return { error: `Its build file ${inlineCode(path.basename(resolved))} does not exist.` };
+  }
+  const goalArguments = goal.trim().split(/\s+/).filter((token) => token.length > 0);
+  if (goalArguments.length === 0 || goalArguments.length > MAX_BUILD_ARGUMENTS) {
+    return { error: "Its goal is empty or has too many arguments." };
+  }
+  const unsafe = goalArguments.find((token) => !BUILD_ARGUMENT.test(token));
+  if (unsafe !== undefined) {
+    return { error: `Its goal contains an argument this extension will not write to a task file: ${inlineCode(unsafe)}.` };
+  }
+  const directory = path.dirname(resolved);
+  // Match Spring's own wrapper lookup: the wrapper beside the build file, then
+  // the bare tool from PATH. A wrapper further up the tree is intentionally not
+  // substituted, because that would change which build the user asked for.
+  const build = detectBuildTool(directory, hostOs);
+  if (build === undefined || build.tool !== expected) {
+    return { error: `No ${expected === "maven" ? "Maven" : "Gradle"} build was detected next to ${inlineCode(path.basename(resolved))}.` };
+  }
+  const relative = path.relative(root, directory);
+  const moduleLabel =
+    relative === "" || relative === "." ? path.basename(root) : relative.split(path.sep).join("/");
+  return {
+    tool: build.tool,
+    moduleLabel,
+    commandLine: [build.command, ...goalArguments].join(" "),
+    task: {
+      label: `${BUILD_TASK_LABEL_PREFIX}${moduleLabel} (${goalArguments.join(" ")})`,
+      command: build.command,
+      args: goalArguments,
+      cwd: worktreeRelativeCwd(directory, root),
+      env: {},
+    },
+  };
+}
+
+function describeGeneratedBuildTask(request, outcome) {
+  const written =
+    outcome.status === "sidecar"
+      ? `${path.join(".zed", "tasks.json")} already exists and ${outcome.reason}, so the task was written to ${path.join(".zed", path.basename(outcome.path))} to merge manually`
+      : `the task ${inlineCode(request.task.label)} was ${outcome.status === "created" ? "written to" : "merged into"} ${path.join(".zed", "tasks.json")}`;
+  return `Spring Boot: instead of running this build invisibly inside the language server, ${written}. Run it from Zed's ${inlineCode("task: spawn")} picker to watch ${inlineCode(request.commandLine)} in a terminal you own.`;
+}
+
 // Maven's Boot plugin takes profiles as a plugin property; Gradle's bootRun takes
 // them as forwarded program arguments. Both stay reviewable in the task entry.
 function runArgumentsFor(tool, profile) {
@@ -2820,10 +2939,21 @@ function isOwnedConfigEntry(entry) {
   );
 }
 
+function isGeneratedBuildTask(entry) {
+  return (
+    entry !== null &&
+    typeof entry === "object" &&
+    typeof entry.label === "string" &&
+    entry.label.startsWith(BUILD_TASK_LABEL_PREFIX)
+  );
+}
+
 // Merge safety: create when absent, replace only our own previously generated
 // entries when the file is plain JSON, and never rewrite a file we cannot parse
 // without loss (comments or non-array) — write a sidecar for manual merge then.
-function writeMergedConfig(absolutePath, ours) {
+// `ownedHere` names the scope this write replaces. Entries outside it — a user's
+// own tasks, and the other generated scope — are always preserved.
+function writeMergedConfig(absolutePath, ours, ownedHere = isOwnedConfigEntry) {
   if (ours.length === 0) return { status: "empty", path: absolutePath, added: 0 };
   let existingText;
   try {
@@ -2846,7 +2976,7 @@ function writeMergedConfig(absolutePath, ours) {
   if (!Array.isArray(parsed)) {
     return writeBootConfigSidecar(absolutePath, ours, "the existing file is not a plain JSON array");
   }
-  const preserved = parsed.filter((entry) => !isOwnedConfigEntry(entry));
+  const preserved = parsed.filter((entry) => !ownedHere(entry));
   return finalizeConfig(absolutePath, [...preserved, ...ours], "merged", preserved.length, ours.length);
 }
 
