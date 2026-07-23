@@ -155,14 +155,14 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 28 exists at
+Status: in progress. Inventory version 34 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 33 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 15
+capabilities: 37 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 11
 `planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
