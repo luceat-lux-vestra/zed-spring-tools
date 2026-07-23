@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 26
+- Inventory version: 27
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-23
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -54,8 +54,8 @@ selected route or planning-confidence score does not change a state here.
 | State | Count |
 | --- | --- |
 | `verified` | 32 |
-| `implemented` | 1 |
-| `planned` | 16 |
+| `implemented` | 2 |
+| `planned` | 15 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 6 |
@@ -198,6 +198,27 @@ disconnected with JMX cleanup. This classification does not promote automatic
 or remote connection, which retain their independent ambiguity and security
 gates.
 
+Inventory version 27 records opt-in automatic local connection as
+`implemented`. The pinned VS Code feature is client-owned: its Java debug
+provider adds local-management and `spring.boot.project.name` JVM properties,
+then a debug-session event supplies the process identity before it calls
+Spring's ordinary connect command. Zed exposes neither debug hook to an
+extension. The Zed-native route therefore adds equivalent, reviewable
+local-management/project properties only to generated Java debug entries when
+`boot-java.live-information.automatic-connection.on` is explicitly true, then
+polls Spring's local Attach descriptors without overlapping scans. It reconciles
+each descriptor's project name against the authentic
+`sts/spring-boot/executableBootProjects` result and invokes the already verified
+confirmation-based connect path only when exactly one distinct matching process
+exists. Missing identity, unrelated JVMs, two matching processes, unsafe
+generated project names, setting disablement, and a repeated attempted key all
+fail closed. Contract tests cover settings/argument propagation, generated
+debug JVM properties, dynamic enablement, single-candidate connection,
+unrelated/unnamed exclusion, ambiguity, authoritative connected notification,
+and cleanup. A real Zed Java-debug launch must still prove automatic discovery,
+connection, live data, manual disconnect without reconnection, and debug-stop
+cleanup before this row can become `verified`.
+
 ## Known surface constraints
 
 Two constraints of the Zed extension API shape several rows below. Both are read
@@ -293,10 +314,10 @@ verified structure-navigation fallback.
 | Connect / disconnect to a local Boot process | `verified` | A synthetic `source` Code Action on Java files (**Spring Boot: Connect or disconnect live process data…**) runs `sts/livedata/listProcesses` and renders the returned descriptors — Spring already labels each and tags it with the exact `action` (`connect` for an available process, `disconnect`/`refresh` for a connected one) — as a bounded `window/showMessageRequest` choice (capped at 12 with an overflow notice; nothing happens until the user chooses). The chosen action executes with `[{processKey}]`. **A static read closed the same silent-gap trap as the shared-metadata reload**: `SpringProcessCommandHandler.connect/disconnect/refresh` each `return CompletableFuture.completedFuture(null)` regardless of outcome, so a null result is not evidence of success. The authoritative connect signal is instead the server→client `sts/liveprocess/connected` notification, which `SpringProcessLiveDataProvider.add` fires exactly once after the process is reached and its first live data is stored; the coordinator registers a per-`processKey` waiter before issuing connect and only reports "Connected …" when that notification arrives, otherwise a bounded "Requested … make sure the process exposes Actuator/JMX" (never a false success). Coordinator-owned identity/cleanup: it tracks connected keys from the connected/disconnected notifications (still forwarding both to Zed) and clears the map plus any pending waiter on shutdown. Contract-tested in `coordinator/test/coordinator.test.mjs` (confirmed connect, unconfirmed-connect bounded report, disconnect, empty list, dismissed prompt). **Driven 2026-07-23** on macOS 26.5.2 arm64, Zed 1.11.3, official Java 6.8.21, Spring Tools 5.2.0, JDK 25.0.3 and Boot 3.5.5: the bounded choice listed the fixture after the extension supplied Spring's false-when-absent `boot-java.live-information.all-local-java-processes: true`; selecting it opened JMX, stored the first Actuator live-data result, emitted `sts/liveprocess/connected`, showed the confirmed success notice and refreshed CodeLens. Running the action again exposed `Refresh` and `Disconnect`; selecting `Disconnect` emitted `sts/liveprocess/disconnected`, closed JMX, refreshed CodeLens and showed the disconnect notice. The fixture enabled JMX and exposed its Actuator JMX endpoints; without that exposure the coordinator correctly avoided false success. The opt-in Live document remains the fallback presentation only if the bounded prompt cannot hold the list; no reduced connection mode is claimed. Evidence: `tmp/live-process-connect-runtime-20260723/evidence/`. |
 | Remote connect | `planned` | Preferred route: an explicit Code Action reads endpoint and non-secret options from Zed settings before `sts/livedata/remoteConnect`. Credential input/storage needs a separate security decision; credentials may not enter project files, generated documents, action arguments, or logs. |
 | Live hover data | `zed-native-equivalent` | Source-local live bean and injection facts are verified through live CodeLens followed by Zed's native Hover gesture. The connected run rendered Spring bean name, type, resource, bean id and process together with JDT hover. One-click dispatch remains blocked by Zed's client-command bridge. Explicit process show/hide/refresh is a separate `zed-native-equivalent`; aggregate metrics and logger aggregation/level changes are separate `verified` capabilities. |
-| Show / hide / refresh live data | `zed-native-equivalent` | The pinned VS Code commands are thin active-debug-app wrappers around Spring's `sts/livedata/connect`, `disconnect`, and `refresh`; they add no separate server capability. Zed's **Spring Boot: Connect or disconnect live process data…** Code Action delivers the outcome through an explicit bounded process/action choice using Spring's own `listProcesses` descriptors. Contract tests cover connect, refresh, and disconnect; the 2026-07-23 Boot 3.5.5/JMX gate connected, exposed refresh/disconnect, refreshed live CodeLens, and disconnected with JMX cleanup. Zed does not infer an “active” debug app, and automatic/remote connection remain separate planned rows. |
+| Show / hide / refresh live data | `zed-native-equivalent` | The pinned VS Code commands are thin active-debug-app wrappers around Spring's `sts/livedata/connect`, `disconnect`, and `refresh`; they add no separate server capability. Zed's **Spring Boot: Connect or disconnect live process data…** Code Action delivers the outcome through an explicit bounded process/action choice using Spring's own `listProcesses` descriptors. Contract tests cover connect, refresh, and disconnect; the 2026-07-23 Boot 3.5.5/JMX gate connected, exposed refresh/disconnect, refreshed live CodeLens, and disconnected with JMX cleanup. Zed does not infer an “active” debug app; automatic local connection is a separately implemented opt-in awaiting its runtime gate, and remote connection remains planned. |
 | Metrics | `verified` | A synthetic Java-file source Code Action (**Spring Boot: Generate or refresh Live data document…**) first runs `sts/livedata/listConnected`; one connected process skips the prompt, while multiple processes use a bounded 12-item `window/showMessageRequest` and dismissal writes nothing. For the chosen opaque `processKey`, the coordinator explicitly refreshes `memory` and `gcPauses` with `tags: ""` (the pinned JMX extractor otherwise concatenates a literal `null,id:…` filter), then reads the server's `heapMemory`, `nonHeapMemory`, and `gcPauses` models into the owned, timestamped `.zed/spring-live.md`. The file shows finite measurements only, caps output at 64 models and 16 measurements per model, omits `availableTags` and the opaque key, preserves foreign/in-flight targets, and is regenerable/deletable without `.gitignore` mutation. The contract is sourced from `SpringProcessCommandHandler`, `SpringProcessConnectorService`, `SpringProcessLiveDataExtractorOverJMX`, `LiveMemoryMetricsModel`, and `Measurements` at pinned Spring Tools commit `18d1a975dbea4f9314fd736d0237bd9e23f243f9`; coordinator tests cover command order, redaction, bounds, empty/dismissed selection, and ownership. **Driven 2026-07-23** on macOS 26.5.2 arm64, Zed 1.11.3, official Java 6.8.21, Spring Tools 5.2.0, Temurin JDK 25.0.3 and a connected Boot 3.5.5/JMX fixture: the first snapshot contained 12 authentic heap/non-heap measurements and an explicit empty GC family; Zed rendered its Markdown preview; explicit refresh changed the timestamp, file hash and values and added a real GC pause for 15 measurements; moving the owned file away and rerunning the action recreated it with a third timestamp/hash. The snapshots persisted no metric tags or opaque process-key field. Evidence: `tmp/live-metrics-runtime-20260723/evidence/`. |
 | Loggers and log levels | `verified` | The opt-in `.zed/spring-live.md` appends a bounded, sorted read-only logger snapshot from `sts/livedata/getLoggers` without persisting the opaque process key; missing logger exposure does not discard verified metrics. A separate Java-file source action changes a level through bounded prompts: connected process, ten-at-a-time logger pages (up to 512), a level from Spring's advertised list, then a final confirmation. It calls the pinned `sts/livedata/configure/logLevel` argument contract and treats its immediate `null` only as acceptance; success requires a matching `sts/liveprocess/loglevel/updated` process/logger/level tuple. Mismatched notification, timeout, disconnect, or dismissal produces no false success. Logger names and levels used for mutation are never trimmed/truncated; invalid identifiers are omitted. The external Actuator endpoint remains the fallback for omitted entries. **Driven 2026-07-23** on macOS 26.5.2 arm64, Zed 1.11.3, official Java 6.8.21, Spring Tools 5.2.0, Temurin JDK 25.0.3 and Boot 3.5.5/JMX: 861 authentic loggers produced an exact 512-entry bounded document and rendered in Zed; the confirmed `ROOT` `INFO -> DEBUG` action received the matching update before success, a refresh showed effective/configured `DEBUG`, and the same verified path restored `INFO`. Evidence: `tmp/live-loggers-runtime-20260723/evidence/`. |
-| Automatic connection | `planned` | Settings `boot-java.live-information.automatic-connection.on` and `all-local-java-processes`. Automatic behavior must reuse the verified explicit connection lifecycle and fail closed on ambiguous process identity. |
+| Automatic connection | `implemented` | Opt-in only through `boot-java.live-information.automatic-connection.on: true`; absent/false stays off. Generated Java debug entries receive reviewable local JMX/Actuator exposure and `spring.boot.project.name` properties for safe project identity. The coordinator serially polls Spring's local Attach descriptors, reconciles `projectName` against authentic executable Boot projects, and reuses the verified `sts/liveprocess/connected` confirmation path only for exactly one matching process. Unnamed/unrelated JVMs, unsafe generated names, duplicate matching runs, and repeated attempts do not connect. Contract-tested; a driven Zed Java-debug start/connect/disconnect/stop gate on a named tuple remains required for `verified`. |
 
 ## Workstream 4 — structure view, run/debug, tasks
 

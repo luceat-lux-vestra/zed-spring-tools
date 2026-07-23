@@ -36,6 +36,10 @@ visible and a driven click opened a title/body-prefilled GitHub composer without
 submitting it. `CL-7c` also passed against a connected Boot 3.5.5/JMX process:
 the commandless `@Value` range became a visible Hover lens and native Hover
 returned the environment value `37` plus its `systemEnvironment` source. The
+explicit local-process, metrics, logger, and show/hide/refresh-equivalent slices
+are verified on that Boot/JMX tuple. Default-off automatic local connection is
+now implemented and contract-tested with single-project identity admission and
+fail-closed ambiguity; its real Zed debug lifecycle gate remains. The
 release-pin cleanup remains ancillary to this branch.
 
 The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,

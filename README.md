@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 32 `verified`, 1 `implemented`, 5 `zed-native-equivalent`, 17 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 32 `verified`, 2 `implemented`, 6 `zed-native-equivalent`, 15 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Supported by the platform-neutral adapter and OS-aware coordinator; not yet driven |
@@ -79,7 +79,12 @@ requires a final level-change confirmation, and reports success only after
 Spring sends the matching update notification. A driven Boot/JMX gate rendered
 861 authentic loggers with an explicit 512-entry bound, changed `ROOT` from
 `INFO` to `DEBUG`, verified the refreshed effective/configured state, and
-restored it to `INFO`. Automatic connection remains planned.
+restored it to `INFO`. Automatic local connection is now implemented as a
+default-off opt-in: generated Java debug entries add reviewable local-management
+and project-identity properties, and the coordinator connects only when Spring
+reports exactly one local process matching an executable Boot project in the
+worktree. The real Zed debug lifecycle gate remains, so this route is not yet
+runtime-verified.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
@@ -210,7 +215,10 @@ Code extension documents can be set here — including turning a default back of
     "spring-tools": {
       "settings": {
         "boot-java": {
-          "common": { "properties-metadata": "config/shared-metadata.json" }
+          "common": { "properties-metadata": "config/shared-metadata.json" },
+          "live-information": {
+            "automatic-connection": { "on": true }
+          }
         }
       }
     }
@@ -225,6 +233,14 @@ editing that file, run the **Spring Boot: Reload shared properties metadata**
 code action from any properties or YAML file to pick up the change without
 restarting the server; with no such file configured the action says so instead
 of claiming a reload.
+
+`boot-java.live-information.automatic-connection.on` is optional and defaults
+off. When enabled, rerun **Spring Boot: Configure run/debug for a project…** so
+the generated Java debug entries include the reviewable local JMX/Actuator and
+project-identity JVM properties. After a matching debug launch, automatic
+connection occurs only when exactly one worktree project/process match exists;
+otherwise use the explicit **Connect or disconnect live process data…** action.
+This route is contract-tested but still awaits its real-Zed runtime gate.
 
 ## How it fits together
 
