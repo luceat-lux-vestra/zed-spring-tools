@@ -92,7 +92,8 @@ the `boot-java.remote-apps` setting — the same settings-only route VS Code use
 since neither client has a remote-connect command — and appear in the same
 process action. A 2026-07-24 gate connected a Boot 3.5.5 HTTP-Actuator target
 from one settings change, read 860 authentic loggers, and disconnected when the
-array was cleared.
+array was cleared; a real-Zed run then showed the same route end to end, with
+Spring hover naming the connected remote process in the editor.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
@@ -289,9 +290,8 @@ embeds credentials (`scheme://user:password@host`) this extension strips the
 `.zed/spring-live.md`, keeping the host and port visible. Prefer a URL without
 embedded credentials: Zed settings are ordinary files, and a project-level
 `.zed/settings.json` is easy to commit by accident. The driven gate used a
-localhost target over `http` and drove the language server directly rather than
-through Zed's UI, so a physically remote host and a `service:jmx:rmi://` URL
-remain untested.
+localhost target over `http`, so a physically remote host and a
+`service:jmx:rmi://` URL remain untested.
 
 ## How it fits together
 
