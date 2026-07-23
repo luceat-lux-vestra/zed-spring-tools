@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 33 `verified`, 2 `implemented`, 6 `zed-native-equivalent`, 14 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 34 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 14 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -90,8 +90,9 @@ honored manual disconnect without reconnecting, and cleaned up the debuggee and
 owned processes on stop and exit. Applications running elsewhere connect through
 the `boot-java.remote-apps` setting — the same settings-only route VS Code uses,
 since neither client has a remote-connect command — and appear in the same
-process action; that path is contract-tested but not yet driven against a real
-remote target.
+process action. A 2026-07-24 gate connected a Boot 3.5.5 HTTP-Actuator target
+from one settings change, read 860 authentic loggers, and disconnected when the
+array was cleared.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
@@ -287,8 +288,10 @@ embeds credentials (`scheme://user:password@host`) this extension strips the
 `user:password` part from every label it shows you or writes into
 `.zed/spring-live.md`, keeping the host and port visible. Prefer a URL without
 embedded credentials: Zed settings are ordinary files, and a project-level
-`.zed/settings.json` is easy to commit by accident. This route is contract-tested
-but has not yet been driven against a real remote target.
+`.zed/settings.json` is easy to commit by accident. The driven gate used a
+localhost target over `http` and drove the language server directly rather than
+through Zed's UI, so a physically remote host and a `service:jmx:rmi://` URL
+remain untested.
 
 ## How it fits together
 
