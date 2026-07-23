@@ -259,6 +259,12 @@ Driven-verified on the committed positional-`?1` text-block fixture — the coor
 returned `{"position":{…},"label":"message","kind":2}` on the `?1`
 (`tmp/ih2-driven-20260719/evidence/JPQL-FIX-FINDING.txt`).
 
+The rest of what that one flag unlocks is now verified too, on 2026-07-24: query
+diagnostics for `@Query`, native queries and `EntityManager.createQuery`, and Go to
+Definition from a query parameter — including the named `:message` shape, which has
+navigation even though it never gets an inlay hint. See the *Spring Data query
+intelligence* row in the [capability inventory](capability-inventory.md).
+
 ### IH-3 — pom.xml (implemented; verify in a real Zed)
 
 `PomInlayHintHandler` parses `pom.xml` with the bundled lemminx DOM and emits "Add

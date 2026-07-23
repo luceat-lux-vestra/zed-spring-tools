@@ -197,8 +197,25 @@ question below. What remains:
    reference on a bean. That gesture extends the composition answer to a third
    request type: `textDocument/definition` fans out to both servers and unions,
    like `references` and unlike `documentHighlight`, so no coordinator merge
-   code is needed there either. Spring Data query intelligence is the remaining
-   WS2 row.
+   code is needed there either. **Spring Data query intelligence, the last WS2
+   row, is now `verified` — and it too closed with no product code.** `jpql` was
+   already sent and the audit found nothing else to supply:
+   `boot-java.validation.data-query` falls back to its own `ON` default and
+   `codelens-over-query-methods` is already in the default configuration. The
+   2026-07-24 driven run published `HQL_SYNTAX` on a broken `@Query`,
+   `SQL_SYNTAX` on the `nativeQuery = true` form — the grammar is chosen from
+   project dependencies, Hibernate for HQL and H2 for the PostgreSQL parser, not
+   from the annotation — and a third diagnostic on a bare
+   `entityManager.createQuery(…)`, which shows the reconciler visiting
+   `MethodInvocation` as well as annotations. Go to Definition then resolved both
+   query-parameter shapes, `?1` and `:message`, to the method's own parameter,
+   and a caret inside a derived query method name returned Spring's property and
+   predicate-keyword proposals alongside jdtls's. Three residual limits are
+   recorded in the inventory rather than smoothed over: a transient upstream NPE
+   truncated the *first* cold-start reconcile to two of the three diagnostics
+   (any edit re-publishes all three), the `Add @Query` code action needs Spring
+   Data JPA ≥ 4 so it cannot appear on the Boot 3.5.5 fixture and is covered as
+   the `CL-4` refactoring, and the MySQL/MariaDB SQL branch is untested.
 4. The semantic-token spike is **closed, refuted** ([S017](spikes/017-static-semantic-token-declaration.md),
    driven 2026-07-21). Both halves failed: Zed requests nothing after Spring's
    *dynamic* registration, and — the decisive part — nothing after a *static*
