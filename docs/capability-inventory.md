@@ -1,8 +1,8 @@
 # Capability inventory
 
-- Inventory version: 30
+- Inventory version: 31
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-23
+- Last updated: 2026-07-24
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -53,9 +53,9 @@ selected route or planning-confidence score does not change a state here.
 
 | State | Count |
 | --- | --- |
-| `verified` | 34 |
+| `verified` | 35 |
 | `implemented` | 1 |
-| `planned` | 14 |
+| `planned` | 13 |
 | `blocked-zed-api` | 2 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 6 |
@@ -277,6 +277,32 @@ Two limits are recorded rather than smoothed over: the target was localhost
 rather than a physically remote host, and only the `http` branch of
 `connectProcess` ran, leaving the `service:jmx:rmi://` branch untested.
 
+Inventory version 31 promotes SpEL language intelligence to `verified` and
+needed no product code to do it. A source read first narrowed the row to what
+Zed can carry: semantic tokens stay settled negative from S017, the pinned
+release has no SpEL-specific hover provider, and what remains — reconciler
+diagnostics and `@Value` navigation — is ordinary LSP. The settings audit that
+caught `jpql`, `inject-bean` and the XML sub-keys found nothing to send here:
+`boot-java.validation.spel.on` is a `ProblemCategory.Toggle`, and
+`isProblemCategoryEnabled` falls back to the toggle's own `ON` default when the
+key is absent, which is what VS Code's schema also declares. The 2026-07-24
+driven run on macOS arm64, Zed 1.11.3, official Java 6.8.21 and Temurin JDK
+25.0.3 then observed both surfaces against a new fixture class. Spring published
+three authentic diagnostics — SpEL syntax, property-placeholder syntax through a
+second grammar, and one on `@EventListener(condition = …)`, which is the
+evidence that the reconciler's reach is the whole `SPEL_EXTRACTORS` set and not
+just `@Value`. Two Go to Definition gestures then returned Spring's two
+navigation shapes, bean reference and method reference on a bean. Those gestures
+also answered the composition question S018 left open for a third request type:
+Zed fans `textDocument/definition` out to both servers and unions the results,
+so Spring's index-derived targets compose with the official Java server's
+instead of being replaced by them, and no coordinator merge code is needed —
+the same favourable branch as `references`, not the single-primary
+`documentHighlight` branch. Like the cron fixture, the unparseable expressions
+live on a class with no stereotype annotation, because the reconciler walks the
+AST rather than the registered bean set and the fixture has to keep booting.
+Evidence: `tmp/spel-runtime-20260724/evidence/`.
+
 ## Known surface constraints
 
 Two constraints of the Zed extension API shape several rows below. Both are read
@@ -358,7 +384,7 @@ verified structure-navigation fallback.
 | Spring-specific document highlights | `blocked-zed-api` | Spring's WebFlux-route and embedded-query document highlights cannot reach stock Zed's Java buffer: S018 observed steady-state `textDocument/documentHighlight` requests going only to the primary jdtls server, never to the Spring coordinator. Do not add coordinator merge code. Reopen if Zed aggregates document highlights across language servers in a future release; ordinary jdtls highlights remain available. |
 | Spring-aware Java completion | `verified` | Verified 2026-07-21 on macOS 26.5.x arm64, Zed 1.11.3, official Java 6.8.23, Temurin JDK 25.0.3, Spring Tools 5.2.0. Spring dynamically registers Java completion with every letter plus `.`/`(`/`@` as trigger characters (`documentSelector: [{language: java}]`), so ordinary typing reaches it; the driven run used explicit `editor::ShowCompletions` so no gesture mutated the buffer. Six representative families were observed returning real, index- or classpath-backed results, each alongside an independent jdtls response for the same position — the two servers compose in Zed's menu rather than one replacing the other: `@Value` → 1836 property keys including the fixture's own `fixture.greeting.salutation` from generated metadata; `@Qualifier` → 10 indexed bean names; `@Scope` → the 7 scope names; `@Profile` → `dev`, the only profile the index knows; repository body → `findBy`/`countBy`/… prefixes plus entity-derived `findById(Long id)` and `findByMessage(String message)`; and bean injection → 7 injectable beans, correctly excluding the two `String` beans whose type is already a field and the declaring bean itself. **`boot-java.java.completions.inject-bean` was a live parity gap**: `BootJavaConfig.isBeanInjectionCompletionEnabled()` is `Boolean.TRUE.equals(b)`, so an absent key reads false while VS Code's schema defaults it true, and `BeanCompletionProvider` returned nothing. The extension now sends it (`spring_default_configuration`), and an A/B on the identical caret position closed the gate: default → 7 Spring items, user override `inject-bean: false` → 0 Spring items with jdtls's 17 unchanged. An audit of every VS Code boolean defaulting true against its `BootJavaConfig` getter found no other gap in this path. Bean injection also requires the caret to resolve to a `SimpleName`/`Block`/`FieldAccess`/`ThisExpression` inside a method body of a `@Component` type; a caret on the `return` keyword yields a `ReturnStatement` and the provider bails, which is upstream behaviour and not a Zed limitation. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/`. |
 | Spring Java request-mapping templates | `verified` | Verified 2026-07-21 on the same tuple. All four templates `JavaSnippetManager` contributes — `@RequestMapping(..) {..}`, `@GetMapping(..) {..}`, `@PostMapping(..) {..}`, `@PutMapping(..) {..}` — were returned at class-body root level in the `@RestController` fixture as `insertTextFormat: 2` items, composed with jdtls's 30 ordinary Java proposals. The row's three open questions are all answered. *Placeholders*: the resolved `newText` carries Spring's tab stops intact, e.g. `@GetMapping("${1:path}")\npublic ${2:String} ${3:getMethodName}(@RequestParam ${4:String} ${5:param})`. *Imports*: they arrive through `completionItem/resolve`, which Zed does issue, as `additionalTextEdits` inserting after the last existing import — and they are deduplicated against the file, so `@GetMapping` added only `RequestParam` while `@PutMapping` added all three of its imports. *Controller context*: the negative control passed — the identical class-body-root gesture in `@Configuration` `GreetingConfiguration` returned zero Spring items, so `AnnotatedTypeDeclarationContext(Annotations.CONTROLLER)` is enforced through Zed and `@RestController` satisfies it by annotation hierarchy. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/trace-snippets.log` and `slice-snippet-control.log`. |
-| SpEL language intelligence | `planned` | Spring supplies embedded semantic tokens and diagnostics, plus contextual hover/navigation paths; AI explanation is a separate client-only lens. The semantic-token half of this row is settled and negative: Zed issues no semantic-token request even after Spring registers the provider dynamically (see Embedded language syntax highlighting), so the preferred route narrows to diagnostics, hover and navigation, which are ordinary LSP and remain untested here rather than blocked. Do not conflate working language intelligence with the VS Code Copilot command. |
+| SpEL language intelligence | `verified` | Verified 2026-07-24 on macOS 26.5.x arm64, Zed 1.11.3, official Java 6.8.21, Spring Tools 5.2.0, Temurin JDK 25.0.3. The semantic-token half of this row stays settled and negative (see Embedded language syntax highlighting), so the delivered surfaces are diagnostics and navigation, both ordinary LSP needing no product code. *Diagnostics*: opening the fixture published all three, `severity: 1`, source `vscode-spring-boot` — `JAVA_SPEL_EXPRESSION_SYNTAX` / `"SPEL: mismatched input '<EOF>'…"` on `@Value("#{@greetingPrefix + }")`, `PROPERTY_PLACE_HOLDER_SYNTAX` / `"Place-Holder: extraneous input 'greeting'…"` on the nested `${…}` (a second grammar reached only through a **bare** placeholder, since a quoted one lexes as a SpEL string literal), and a third on `@EventListener(condition = "#event.")`, which proves the reconciler's reach beyond `@Value` — `AnnotationParamSpelExtractor.SPEL_EXTRACTORS` also covers `@Cacheable`/`@CacheEvict`, the four Security `@Pre*`/`@Post*` annotations, `@ConditionalOnExpression` and `@Scheduled` cron. No settings gap: `boot-java.validation.spel.on` is a `ProblemCategory.Toggle` whose absent-key path returns its own `ON` default, matching VS Code's schema, so the extension sends nothing. *Navigation*: `SpelDefinitionProvider` resolves only `@Value`, and Go to Definition returned both of its shapes — a bean reference `#{@greetingPrefix}` to the `@Bean` declaration and a method reference `#{@defaultGreetingService.greeting()}` to the method declaration in that bean's own source. **This also settles `textDocument/definition` on the S018 composition question, favourably**: each gesture produced two outgoing requests for one position, the other server answered `[]`, and Zed opened Spring's target — matching `LspStore::definitions`, which fans out through `request_multiple_lsp_locally` and flattens, as `references` does and unlike single-primary `documentHighlight`. Contextual SpEL hover is not a separate provider in the pinned release. Evidence: `tmp/spel-runtime-20260724/evidence/`. Do not conflate working language intelligence with the VS Code Copilot command. |
 | Spring Data query intelligence | `planned` | Includes repository-method completion and embedded JPQL/HQL/SQL semantic tokens, diagnostics (`JPQL_SYNTAX`/`HQL_SYNTAX`), highlights, multiline conversion, AOT query display, implementation navigation and refactoring, plus an inlay hint on **positional** query parameters (`?1` → mapped method-parameter name, via `JdtDataQueriesInlayHintsProvider`). All gated by `boot-java.jpql`, which the server defaults **off**; the Zed extension now sends `jpql: true` (`spring_workspace_configuration`), and a 2026-07-19 driven run verified the positional-parameter inlay renders (`?1` → `message`). See [codelens-inlay-parity](codelens-inlay-parity.md) §5. The other surfaces are standard LSP or advertised Spring commands; verify Java text blocks and the distinct `jpa-named-queries.properties` language identity. |
 | Cron completion and validation | `verified` | Verified 2026-07-21 on the same tuple; cron inlay hints were already verified separately. *Completion*: a caret inside the existing `@Scheduled(cron = "0 0 * * * *")` returned 24 proposals from `CronExpressionCompletionProvider` (`0 0 * * * *`, `0 */5 * * * *`, `0 0 0 * * SAT,SUN`, `0 0 0 ? * MON#1`, …) while jdtls returned zero for the same position, so the result is Spring-attributed. *Validation*: `JdtCronReconciler` published `severity: 1`, `code: SYNTAX`, `source: vscode-spring-boot`, message `CRON: mismatched input '<EOF>' expecting WS` on the fixture's deliberate five-field expression, with the valid six-field expression in `GreetingSchedule` publishing an empty diagnostic list as the control. The reconciler visits any `NormalAnnotation` carrying a cron attribute rather than the registered bean set, which is why the broken expression can live on an unregistered class and leave the fixture bootable. Embedded cron semantic highlighting is **not** part of this row — see the **Embedded language syntax highlighting** row, which records why no semantic-token route exists on this tuple. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/trace-cron-completion.log`. |
 | Boot project info | `implemented` | The synthetic `zed-spring-tools.configure-boot-run` Code Action consumes `sts/spring-boot/executableBootProjects` project records (`name`/`projectName`, `mainClass`, `uri`) to generate reviewable run/debug configuration; the 2026-07-19 driven run confirmed the real `mainClass` reached the generated `.zed/debug.json`. `sts/spring-boot/bootProjectInfo` remains advertised and forwarded unchanged for additional detail, which is not separately exercised. |

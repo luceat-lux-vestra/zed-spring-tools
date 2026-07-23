@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 34 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 14 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 35 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 13 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -54,6 +54,10 @@ The following outcomes have been observed on the tested environment:
 - `@RequestMapping`/`@GetMapping`/`@PostMapping`/`@PutMapping` method templates
   inside controllers, with their imports added on insertion;
 - cron inlay hints, cron expression completion, and cron syntax validation;
+- SpEL validation wherever Spring reads an expression — `@Value`, `@Cacheable`,
+  `@EventListener`, `@ConditionalOnExpression` and the rest — including nested
+  `${…}` placeholders, plus Go to Definition from a SpEL bean reference to its
+  `@Bean` declaration and from a bean's method call to that method;
 - Spring quick-fix code actions applied end to end;
 - Java references and implementations through the official Java language
   server;
@@ -96,13 +100,14 @@ array was cleared; a real-Zed run then showed the same route end to end, with
 Spring hover naming the connected remote process in the editor.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
-delivered yet. It needs LSP semantic tokens, and Zed 1.11.3 requests none after
-Spring registers the provider dynamically — though it advertises full support,
-so a route through static declaration is still open and untested. Java code
-itself highlights correctly through Zed's own grammar meanwhile; only
-token-level colouring within those strings is affected, and the diagnostics,
-hover, and navigation for the same embedded languages ride ordinary LSP and
-work today.
+delivered, and that is now settled rather than pending. It needs LSP semantic
+tokens, and Zed 1.11.3 requests none for a Java buffer — not after Spring
+registers the provider dynamically, and not after a static declaration either,
+including the official Java server's own. Java code itself highlights correctly
+through Zed's own grammar meanwhile, so only token-level colouring within those
+strings is affected. Everything else for those embedded languages rides ordinary
+LSP and works today: SpEL validation and navigation are verified above, and so
+is the JPQL validation inside named queries.
 
 The coordinator also implements Spring CodeLens compatibility: standard Spring
 lenses retain server actions, source-opening lenses use Zed's native location
