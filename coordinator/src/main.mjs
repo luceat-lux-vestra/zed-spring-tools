@@ -1032,9 +1032,14 @@ export class Coordinator {
         "Spring Tools is resolving the authentic AOT-generated implementation in the background. This CodeLens refreshes to one-click navigation when the target is ready. If it remains unavailable, regenerate AOT metadata and wait for Spring indexing to finish.";
     } else if (kind === "url") {
       const url = message.params?.arguments?.[0]?.url;
-      const target = typeof url === "string" ? ` Open ${url} in your browser.` : "";
+      const address = typeof url === "string" ? url : "the application URL";
+      // Stock Zed cannot execute the VS Code open-URL command from a CodeLens,
+      // and a language server cannot open a browser itself — Zed only opens a URL
+      // from a clicked Markdown link. Spring already renders that link in the
+      // request mapping's Hover for this client, so point the user there instead
+      // of leaving them with a dead lens.
       explanation =
-        `This Spring lens uses a VS Code-only command to open its URL, which stock Zed cannot execute from CodeLens.${target} Please follow or report the Zed client-command bridge limitation at https://github.com/zed-industries/zed/issues/20042.`;
+        `Stock Zed cannot open a URL from a CodeLens command. To open ${address} in your browser, hover over the request mapping and click the link in the Hover popover.`;
     } else {
       explanation =
         "This Spring CodeLens is informational. Its title is the available value; use native Hover, Project Symbols, or navigation for related details.";

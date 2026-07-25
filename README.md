@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 37 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 11 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 38 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 10 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -103,6 +103,15 @@ process action. A 2026-07-24 gate connected a Boot 3.5.5 HTTP-Actuator target
 from one settings change, read 860 authentic loggers, and disconnected when the
 array was cleared; a real-Zed run then showed the same route end to end, with
 Spring hover naming the connected remote process in the editor.
+
+Once a process is connected, the running application's page URL is reachable from
+the editor: Spring renders the request mapping's live Hover with a plain
+clickable Markdown link for this client, and Zed opens it in the browser. A
+2026-07-25 macOS arm64 gate hovered `@GetMapping` and opened
+`http://127.0.0.1:8080/greeting`, reaching the running app. The URL CodeLens
+shows the same address; because stock Zed cannot run its VS Code open-URL command
+and a language server cannot open a browser itself, that notice points to the
+Hover link rather than dead-ending.
 
 Highlighting embedded SpEL and query fragments *inside* Java strings is not
 delivered, and that is now settled rather than pending. It needs LSP semantic
