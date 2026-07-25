@@ -28,6 +28,16 @@ const SHOW_DOCUMENT = "window/showDocument";
 const VSCODE_OPEN_COMMAND = "vscode.open";
 const ZED_SHOW_LOCATIONS_COMMAND = "editor.action.goToLocations";
 const GENERATED_IMPLEMENTATION_COMMAND = "sts/boot/open-data-query-method-aot-definition";
+// Spring's Boot upgrade. Its own version-validation quick fix and pom inlay hint
+// both execute it, and the server answers by computing a `workspace/applyEdit`
+// for the build file — a route Zed already supports, so the command is forwarded
+// unchanged. Only its failures need the coordinator: an LSP error response is
+// invisible in Zed, and the pinned release throws before it edits anything when
+// OpenRewrite finds no Maven settings file, which would leave the user clicking
+// an upgrade that silently does nothing.
+const UPGRADE_SPRING_BOOT_COMMAND = "sts/upgrade/spring-boot";
+const MISSING_MAVEN_SETTINGS_MARKER = "MavenSettings";
+const MAX_UPGRADE_FAILURE_DETAIL = 200;
 const MAVEN_GOAL_COMMAND = "sts.maven.goal";
 const GRADLE_BUILD_COMMAND = "sts.gradle.build";
 // Spring advertises both build commands, and its own handler for them runs the
@@ -238,6 +248,7 @@ export class Coordinator {
     this.initializeRequests = new Set();
     this.codeLensRequests = new Map();
     this.codeActionRequests = new Map();
+    this.upgradeRequests = new Map();
     this.inlayHintRequests = new Map();
     this.inlayHintParams = new Map();
     this.inlayHints = new Map();
@@ -345,6 +356,16 @@ export class Coordinator {
         });
       }
     }
+    if (
+      isRequest(message) &&
+      message.method === EXECUTE_SPRING_COMMAND &&
+      message.params?.command === UPGRADE_SPRING_BOOT_COMMAND
+    ) {
+      const target = message.params?.arguments?.[1];
+      this.upgradeRequests.set(idKey(message.id), {
+        version: typeof target === "string" ? target : undefined,
+      });
+    }
     if (isRequest(message) && message.method === CODE_ACTION_REQUEST) {
       const uri = message.params?.textDocument?.uri;
       if (typeof uri === "string") {
@@ -419,6 +440,14 @@ export class Coordinator {
       this.codeActionRequests.delete(pendingKey);
       this.sendZed(encodeLsp(this.#mergeCodeActions(message, request)));
       return;
+    }
+
+    if (pendingKey !== null && this.upgradeRequests.has(pendingKey)) {
+      const upgrade = this.upgradeRequests.get(pendingKey);
+      this.upgradeRequests.delete(pendingKey);
+      // The response itself still reaches Zed unchanged; this only makes a
+      // failure visible, because Zed reports nothing for a failed command.
+      this.#reportUpgradeFailure(message, upgrade);
     }
 
     if (!isRequest(message)) {
@@ -568,6 +597,7 @@ export class Coordinator {
     this.initializeRequests.clear();
     this.codeLensRequests.clear();
     this.codeActionRequests.clear();
+    this.upgradeRequests.clear();
     this.inlayHintRequests.clear();
     this.inlayHintParams.clear();
     this.inlayHints.clear();
@@ -1914,6 +1944,25 @@ export class Coordinator {
     };
   }
 
+  #reportUpgradeFailure(message, upgrade) {
+    if (message?.error === undefined || this.closed) return;
+    const target = upgrade?.version;
+    const heading =
+      target === undefined
+        ? "Spring Boot: the Spring Boot upgrade failed"
+        : `Spring Boot: the upgrade to Spring Boot ${target} failed`;
+    this.sendZed(
+      encodeLsp({
+        jsonrpc: "2.0",
+        method: "window/showMessage",
+        params: {
+          type: 1,
+          message: `${heading}. ${upgradeFailureAdvice(message.error)}`,
+        },
+      }),
+    );
+  }
+
   #showInfo(message) {
     if (this.closed) return;
     this.sendZed(
@@ -3099,6 +3148,31 @@ function fileExists(candidate) {
   } catch {
     return false;
   }
+}
+
+// Spring answers a failed upgrade with a plain LSP error whose `data` is a Java
+// stack trace. Only its first line is ever shown, and only to say what the user
+// can do next: the trace itself carries local paths and belongs in the log.
+function upgradeFailureAdvice(error) {
+  const detail = upgradeFailureDetail(error);
+  if (detail.includes(MISSING_MAVEN_SETTINGS_MARKER)) {
+    return (
+      "The pinned Spring Tools release could not read a Maven settings file and stopped before changing anything. " +
+      "Create a Maven user settings file at ~/.m2/settings.xml — an empty <settings/> document is enough — then run the upgrade again, " +
+      "or change the Spring Boot version in the build file yourself."
+    );
+  }
+  const reported = detail === "" ? "" : ` Spring reported: ${detail}`;
+  return `Nothing was upgraded.${reported} Review the build file before retrying, or change the Spring Boot version yourself.`;
+}
+
+function upgradeFailureDetail(error) {
+  const source = typeof error?.data === "string" && error.data.trim() !== "" ? error.data : error?.message;
+  if (typeof source !== "string") return "";
+  const firstLine = source.split("\n", 1)[0].trim();
+  return firstLine.length > MAX_UPGRADE_FAILURE_DETAIL
+    ? `${firstLine.slice(0, MAX_UPGRADE_FAILURE_DETAIL)}…`
+    : firstLine;
 }
 
 function normalizeCodeLens(lens) {

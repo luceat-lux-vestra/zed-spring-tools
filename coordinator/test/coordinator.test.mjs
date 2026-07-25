@@ -4035,3 +4035,95 @@ test("a build command whose file does not match its tool is declined", () => {
 
   fs.rmSync(worktree, { recursive: true, force: true });
 });
+
+function upgradeCoordinator(zedWrites) {
+  return new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+}
+
+function upgradeRequest(id, version) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: "workspace/executeCommand",
+    params: {
+      command: "sts/upgrade/spring-boot",
+      arguments: ["file:/tmp/project", version, false],
+    },
+  };
+}
+
+test("a successful Spring Boot upgrade adds no notice of its own", async () => {
+  const zedWrites = [];
+  const coordinator = upgradeCoordinator(zedWrites);
+  coordinator.observeZedMessage(upgradeRequest(11, "3.5.16"));
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: 11, result: "success" });
+
+  assert.deepEqual(zedWrites, [{ jsonrpc: "2.0", id: 11, result: "success" }]);
+});
+
+test("an upgrade that fails on a missing Maven settings file explains the prerequisite", async () => {
+  const zedWrites = [];
+  const coordinator = upgradeCoordinator(zedWrites);
+  coordinator.observeZedMessage(upgradeRequest(12, "3.5.16"));
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 12,
+    error: {
+      code: -32603,
+      message: "Internal error.",
+      data:
+        'java.lang.NullPointerException: Cannot invoke "org.openrewrite.maven.MavenSettings.getActiveProfiles()" because "settings" is null\n' +
+        "\tat org.springframework.ide.vscode.boot.java.rewrite.RewriteRecipeRepository.createContext(RewriteRecipeRepository.java:119)\n",
+    },
+  });
+
+  const notice = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.equal(notice.params.type, 1);
+  assert.match(notice.params.message, /upgrade to Spring Boot 3\.5\.16 failed/);
+  assert.match(notice.params.message, /~\/\.m2\/settings\.xml/);
+  assert.match(notice.params.message, /stopped before changing anything/);
+  // The raw Java stack trace stays in the log, never in the user-facing notice.
+  assert.doesNotMatch(notice.params.message, /RewriteRecipeRepository\.java/);
+  // Zed still receives the server's own response unchanged.
+  assert.ok(zedWrites.some((message) => message.id === 12 && message.error !== undefined));
+});
+
+test("an unrecognised upgrade failure is reported with one bounded detail line", async () => {
+  const zedWrites = [];
+  const coordinator = upgradeCoordinator(zedWrites);
+  coordinator.observeZedMessage(upgradeRequest(13, "3.5.16"));
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 13,
+    error: { code: -32603, message: "Internal error.", data: `${"y".repeat(400)}\nsecond line` },
+  });
+
+  const notice = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.match(notice.params.message, /Nothing was upgraded/);
+  assert.doesNotMatch(notice.params.message, /second line/);
+  assert.ok(notice.params.message.length < 400);
+});
+
+test("an upgrade failure without a recorded target version still reports honestly", async () => {
+  const zedWrites = [];
+  const coordinator = upgradeCoordinator(zedWrites);
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: 14,
+    method: "workspace/executeCommand",
+    params: { command: "sts/upgrade/spring-boot", arguments: ["file:/tmp/project"] },
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: 14,
+    error: { code: -32603, message: "Internal error." },
+  });
+
+  const notice = zedWrites.find((message) => message.method === "window/showMessage");
+  assert.match(notice.params.message, /the Spring Boot upgrade failed/);
+});

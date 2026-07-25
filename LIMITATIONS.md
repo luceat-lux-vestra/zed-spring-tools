@@ -4,7 +4,22 @@ This repository is ready to be reviewed as experimental source with one working
 vertical slice. It is not ready to be relied on as a Spring development
 extension.
 
-- 33 of 58 tracked capabilities are proven on the tested tuple, and much of the
+- The Spring Boot upgrade is delivered only in the shape the pinned Spring Tools
+  release actually implements, and that shape is narrow. It upgrades the **patch
+  version of a Maven project** and nothing else: the server asserts the same
+  major and minor version and rejects anything else, its major/minor "full
+  OpenRewrite conversion" quick fixes are never offered because the release
+  returns no target version for them, and Gradle projects are rejected outright.
+  The upgrade is reached from the version-validation quick fix, whose diagnostic
+  anchors at the **first character of the build file**; the pom inlay hint that
+  carries the same command in VS Code renders in Zed but does nothing when
+  clicked, because stock Zed does not execute an inlay hint's label command.
+  The pinned release also throws before changing anything when Maven has no user
+  settings file, so on a machine without `~/.m2/settings.xml` the upgrade cannot
+  run at all; the extension reports that as a visible error naming the remedy
+  rather than failing silently, but it does not create or modify Maven
+  configuration on the user's behalf.
+- 39 of 59 tracked capabilities are proven on the tested tuple, and much of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
@@ -12,8 +27,8 @@ extension.
   symbols with bean and request-mapping navigation, static and live CodeLens,
   inlay hints, quick fixes, Boot run/debug configuration generation, the
   Structure document, and explicit plus automatic
-  live-process/metrics/logger workflows. Boot upgrade, Modulith, and remote
-  connection remain. See the
+  live-process/metrics/logger workflows, remote live-data targets, and the
+  patch-level Boot upgrade described above. Modulith remains. See the
   [capability inventory](docs/capability-inventory.md) for the per-row evidence.
   Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
