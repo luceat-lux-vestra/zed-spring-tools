@@ -326,10 +326,17 @@ Immediate M4 slice order after D006 is now:
    diagnostics that reach it, and — 2026-07-26 — both Modulith rows. The Modulith
    slice needed only a settings default and one Code Action, because Spring's own
    Structure command already switches to `ModulithStructureView` for a
-   spring-modulith project. What remains `planned` after it is the group that each
-   need a decision rather than a slice: Spring Initializr, the embedded MCP
-   server, the AI explanation commands, the Java reconciler families, Spring AI
-   annotation diagnostics, and offline behaviour.
+   spring-modulith project. The Java reconciler families and the Spring AI
+   annotation row then closed together on the same day, and they too needed no
+   product code: the pinned server's `problem-types.json` already matches the
+   VS Code schema on all 11 categories and all 71 problem types, and
+   `boot-java.java.reconcilers` defaults to true when the key is absent. The
+   driven run drew 28 problem types across every Java family, applied a fix from
+   both Spring quick-fix engines through Zed's code-action menu, and proved
+   selective disabling at category and problem-type granularity. What remains
+   `planned` after that is the group that each need a decision rather than a
+   slice: Spring Initializr, the embedded MCP server, the AI explanation
+   commands, and offline behaviour.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's
