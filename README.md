@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 39 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 9 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 40 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 8 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -67,6 +67,11 @@ The following outcomes have been observed on the tested environment:
   patch upgrade — the version-validation quick fix at the top of a Maven build
   file bumps the Boot version through a reviewable edit you can inspect before
   saving, and a failed upgrade says so instead of doing nothing quietly;
+- Boot version and support-range diagnostics on the build file — an available
+  patch or minor release, and whether the project's Boot generation is still
+  inside OSS or commercial support, with the dates Spring itself publishes; the
+  release notes and commercial-support quick fixes hand you the page address as a
+  clickable link, because stock Zed cannot open a page on a server's request;
 - Java references and implementations through the official Java language
   server;
 - Spring-specific references composed with official Java results; and

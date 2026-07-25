@@ -2656,6 +2656,95 @@ test("a conversion's post-create showDocument is acknowledged silently, not as a
   );
 });
 
+// Spring's version-validation quick fixes ("Open Release Notes for Spring Boot
+// x.y.z", the Tanzu commercial-support action) ask the client to open a web page.
+async function showDocumentPage(uri, options = {}) {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: "show-page",
+    method: "window/showDocument",
+    params: { uri, external: true, takeFocus: true, selection: options.selection },
+  });
+  return { coordinator, springWrites, zedWrites };
+}
+
+test("a release-notes quick fix renders one clickable link and is reported handled", async () => {
+  const page = "https://github.com/spring-projects/spring-boot/releases/tag/v3.5.16";
+  const { coordinator, springWrites, zedWrites } = await showDocumentPage(page);
+
+  assert.equal(zedWrites.length, 1);
+  // A plain showMessage toast auto-dismisses before a link can be clicked, so the
+  // address is carried by a request whose dismissal action keeps it on screen.
+  assert.equal(zedWrites[0].method, "window/showMessageRequest");
+  assert.equal(zedWrites[0].params.type, 3);
+  assert.deepEqual(zedWrites[0].params.actions, [{ title: "Not now" }]);
+  assert.match(zedWrites[0].params.message, new RegExp(`\\[${page}\\]\\(${page}\\)`));
+  // The file-oriented CodeLens advice must not reach a web page.
+  assert.doesNotMatch(zedWrites[0].params.message, /Go to Definition/);
+  // Reported handled, so Spring adds no "Failed to open" error of its own.
+  assert.deepEqual(springWrites[0], {
+    jsonrpc: "2.0",
+    id: "show-page",
+    result: { success: true },
+  });
+
+  // Dismissing the notice is the coordinator's own request settling; Spring never
+  // sees a second answer for the same show-document request.
+  const forwarded = coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: zedWrites[0].id,
+    result: { title: "Not now" },
+  });
+  assert.equal(forwarded, false);
+  assert.equal(springWrites.length, 1);
+});
+
+test("the commercial-support quick fix renders its Tanzu page the same way", async () => {
+  const { springWrites, zedWrites } = await showDocumentPage("https://spring.io/support", {
+    selection: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+  });
+
+  assert.match(zedWrites[0].params.message, /\[https:\/\/spring\.io\/support\]\(https:\/\/spring\.io\/support\)/);
+  // A web page carries no source position, so no line is claimed for it.
+  assert.doesNotMatch(zedWrites[0].params.message, /line \d/);
+  assert.deepEqual(springWrites[0].result, { success: true });
+});
+
+test("a page address carrying credentials is rendered redacted and never as a link", async () => {
+  const { springWrites, zedWrites } = await showDocumentPage("https://user:secret@spring.io/support");
+
+  assert.match(zedWrites[0].params.message, /<credentials redacted>@spring\.io\/support/);
+  assert.doesNotMatch(zedWrites[0].params.message, /secret/);
+  assert.doesNotMatch(zedWrites[0].params.message, /\]\(/);
+  assert.deepEqual(springWrites[0].result, { success: true });
+});
+
+test("a page address that could break out of the link is rendered as plain text", async () => {
+  const injected = "https://spring.io/support?q=x)+[click](https://attacker.example/)";
+  const { zedWrites } = await showDocumentPage(injected);
+
+  assert.ok(zedWrites[0].params.message.includes(injected));
+  assert.doesNotMatch(zedWrites[0].params.message, /\[https:\/\/spring\.io/);
+});
+
+test("a non-web showDocument scheme keeps the file-oriented CodeLens notice", async () => {
+  const { springWrites, zedWrites } = await showDocumentPage("file:///tmp/project/target/Generated.java", {
+    selection: { start: { line: 4, character: 0 }, end: { line: 4, character: 8 } },
+  });
+
+  assert.match(zedWrites[0].params.message, /Go to Definition/);
+  assert.match(zedWrites[0].params.message, /line 5/);
+  assert.deepEqual(springWrites[0].result, { success: false });
+});
+
 test("reload shared properties metadata executes the Spring command", async () => {
   const springWrites = [];
   const zedWrites = [];

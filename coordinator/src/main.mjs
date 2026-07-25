@@ -200,6 +200,11 @@ const SPRING_TOOLS_VERSION = "5.2.0.RELEASE";
 const COMPATIBILITY_REPORT_URL =
   "https://github.com/luceat-lux-vestra/zed-spring-tools/issues/new";
 const MAX_COMPATIBILITY_REPORT_URL_LENGTH = 2_000;
+// A web page Spring asks the client to open is rendered as a bounded link, so its
+// address is length-capped and restricted to characters that cannot terminate the
+// Markdown link early or add text after it.
+const MAX_EXTERNAL_PAGE_URL_LENGTH = 2_000;
+const MARKDOWN_SAFE_URL = /^[A-Za-z0-9\-._~:/?#@!$&'*+,;=%]+$/;
 const JAVA_FAILURE_REPORTS = Object.freeze({
   "java-data-route-failed-v1": "Official Java data route failed",
   "classpath-registration-failed-v1": "Official Java classpath registration failed",
@@ -1974,7 +1979,37 @@ export class Coordinator {
     );
   }
 
+  // A link is only useful if it stays on screen long enough to be clicked, and a
+  // `window/showMessage` toast auto-dismisses in Zed with no lever to hold it. A
+  // `showMessageRequest` carrying one dismissal action keeps the address visible
+  // until the user acts, which is the same surface the compatibility report uses.
+  // The action performs nothing: the extension never opens the page itself.
+  #showExternalPage(page) {
+    if (this.closed) return;
+    const id = `zed-spring-tools:${this.sessionId}:zed:${++this.sequence}`;
+    this.pendingZedRequests.add(idKey(id));
+    this.sendZed(
+      encodeLsp({
+        jsonrpc: "2.0",
+        id,
+        method: "window/showMessageRequest",
+        params: {
+          type: 3,
+          message: `Spring Tools offers a page outside the editor: ${page}. Stock Zed does not support the LSP window/showDocument request, so open it from here in your browser.`,
+          actions: [{ title: "Not now" }],
+        },
+      }),
+    );
+  }
+
   #handleShowDocument(params) {
+    // A web page is never a generated source target, so it is answered before the
+    // in-flight lens resolution rather than being dropped by it.
+    const externalPage = externalShowDocumentPage(params);
+    if (externalPage !== undefined) {
+      this.#showExternalPage(externalPage);
+      return { success: true };
+    }
     if (this.activeGeneratedTargetResolution !== undefined) {
       const target = showDocumentTarget(params);
       if (target === undefined) return { success: false };
@@ -3292,6 +3327,38 @@ function coordinatorCodeLens(lens, kind) {
       arguments: [{ kind, originalCommand: lens.command?.command ?? null }],
     },
   };
+}
+
+// Spring's `sts/show/document` command is how its version-validation quick fixes
+// act: "Open Release Notes for Spring Boot x.y.z" and the Tanzu commercial-support
+// action both ask the client to open an external web page. Stock Zed answers no
+// `window/showDocument` request, so the coordinator answers it, and for a web page
+// the honest answer is the address itself as a bounded clickable notice — the same
+// Markdown-link route the compatibility report already uses. The request is then
+// reported as handled, because the user did receive the page; leaving it a failure
+// makes Spring add its own `Failed to open:` error on top of the notice for an
+// action that did all it could.
+//
+// The address is server data, so it is rendered under three rules: only `http`
+// and `https` reach the notice, the visible label is the address itself so no
+// label can claim a destination the link does not have, and an address carrying
+// userinfo is rendered as redacted plain text instead of a link, so credentials
+// never end up in something clickable. An address holding characters that would
+// break out of the Markdown link is rendered as plain text for the same reason.
+function externalShowDocumentPage(params) {
+  const uri = params?.uri;
+  if (typeof uri !== "string" || uri.length === 0 || uri.length > MAX_EXTERNAL_PAGE_URL_LENGTH) {
+    return undefined;
+  }
+  let url;
+  try {
+    url = new URL(uri);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  if (url.username !== "" || url.password !== "") return redactLiveTargetText(uri);
+  return MARKDOWN_SAFE_URL.test(uri) ? `[${uri}](${uri})` : uri;
 }
 
 function showDocumentTarget(params) {
