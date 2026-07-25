@@ -72,6 +72,13 @@ extension.
   `window/showDocument` is not supported by Zed's project LSP client, and
   Project Symbols does not render `containerName` as a hierarchy. URLs therefore
   require a verified Document Link/Markdown link plus copyable text fallback.
+- Following from the same gap: a Spring action that asks the client to *open a web
+  page* — the release-notes and Tanzu commercial-support quick fixes on a
+  build-file version diagnostic — cannot open your browser by itself. The
+  coordinator answers that request with a dismissible notice carrying the page
+  address as a Markdown link, so reaching the page is one click of yours rather
+  than none. The address is always shown as its own link label, and an address
+  with embedded credentials is shown redacted and unlinked.
 - Spring's AI-only CodeLens provider is enabled by this product independent of
   Zed's AI setting. Stock Zed exposes no public extension/CodeLens API to read
   authoritative Agent state or open/prefill Agent, so this project can only keep

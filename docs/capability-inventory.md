@@ -1,8 +1,8 @@
 # Capability inventory
 
-- Inventory version: 34
+- Inventory version: 35
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-24
+- Last updated: 2026-07-25
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -54,9 +54,9 @@ selected route or planning-confidence score does not change a state here.
 
 | State | Count |
 | --- | --- |
-| `verified` | 39 |
+| `verified` | 40 |
 | `implemented` | 1 |
-| `planned` | 9 |
+| `planned` | 8 |
 | `blocked-zed-api` | 3 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 6 |
@@ -348,6 +348,31 @@ closes both halves of the ownership contract: the lens creates or refreshes a
 task, and only the user's task-picker action runs the build. Evidence:
 `tmp/maven-goal-ownership-20260724/evidence/`.
 
+Inventory version 35 promotes Spring Boot version/support validation to
+`verified`. The diagnostics half needed no product code and no settings: a
+four-module Maven fixture pinned to Boot 4.0.6, 3.5.5, 3.3.5 and 2.7.18 drew every
+problem type whose default severity is not `IGNORE`, both branches of the OSS
+message, and — deliberately — nothing at all for the three types that default to
+`IGNORE`. This is the first row where the settings audit came back empty on both
+sides: every version-validation default in `BootDiagnosticSeverityProvider`'s
+absent-key path already equals the VS Code schema default, so the silent gap that
+`jpql`, `inject-bean` and the XML sub-settings had does not exist here. What the
+row actually contained was a **dead end for the user**. Both of its link quick
+fixes, release notes and Tanzu commercial support, execute `sts/show/document` for
+an external page, and stock Zed answers no `window/showDocument`; the coordinator
+was replying with a notice written for generated *files* — it advised Go to
+Definition on a repository method — and reporting failure, which made Spring add
+its own `Failed to open:` error. The coordinator now renders an `http`/`https`
+target as the address itself in a bounded Markdown link and reports the request
+handled. Two details are the interesting part. The surface had to be a
+`showMessageRequest` with a dismissal action rather than a `showMessage` toast,
+because a toast auto-dismisses before a link can be clicked and Zed drops an
+actionless request — the same reason the compatibility report uses that surface.
+And because the address is server data rendered into something clickable, the
+label is the address itself, so no label can claim a destination the link does not
+have, while userinfo or Markdown-breaking characters downgrade it to redacted
+plain text. Evidence: `tmp/version-validation-20260725/evidence/`.
+
 ## Known surface constraints
 
 Two constraints of the Zed extension API shape several rows below. Both are read
@@ -480,7 +505,7 @@ verified structure-navigation fallback.
 | Missing / incompatible Java diagnostic | `verified` | Observed on 2026-07-18 by driving the real coordinator process on incompatible inputs. A real Temurin 17.0.18 was refused with `JDK 21 or newer is required by Spring Tools`; a structurally invalid self-declared provider contract was refused with `official Java compatibility contract is invalid` before the JDK check. Both exited nonzero with no reduced mode; a compatible Temurin 21.0.11 control passed both guards and launched the real Spring server. Absent-Java path observed earlier in M2. D006 now makes the installed extension release non-gating; contract coverage and the 2026-07-19 CodeLens run both exercised the release-unpinned structural route successfully. Actual required-capability failures now produce a persistent clickable Markdown notification with an allowlisted title/body-prefilled GitHub report. The diagnostic Zed-to-browser gate opened a populated composer without submission; contract tests tie that UX to real failure paths. Evidence: `tmp/m2-step7-incompatible-java-20260718/`, `tmp/codelens-runtime-20260719.udLvyE/evidence/`, and R016. |
 | Embedded language syntax highlighting | `blocked-zed-api` | Setting `boot-java.embedded-syntax-highlighting`; the VSIX contributes four grammars. D005 preserves official Java highlighting and excludes Java query replacement from the baseline. **Settled negative on both paths ([S017](spikes/017-static-semantic-token-declaration.md), driven 2026-07-21).** Dynamic first: after Spring registers `textDocument/semanticTokens` through `client/registerCapability` — even after `workspace/semanticTokens/refresh` — Zed 1.11.3 issues no semantic-token request. That is not a client-capability gap; Zed's `initialize` advertises `semanticTokens` with `requests.full.delta`, the full legend, `dynamicRegistration: true`, and `augmentsSyntaxTokens: true`. Static next: the coordinator declared `semanticTokensProvider` with Spring's captured legend in the `initialize` result and consumed Spring's dynamic registration (the adaptation that fixed Code Actions), the declaration reached Zed, `GreetingRepository.java` was the focused Java buffer, and Zed still issued **zero** `textDocument/semanticTokens/*` requests. Decisive control: **jdtls, the primary Java server, declares its own `semanticTokensProvider` statically and Zed ignored that too** — so the missing surface is Zed's semantic-token request/render path for Java, not registration timing. Tree-sitter Java highlighting stays intact as the supported fallback (the `@Query` JPQL block renders as a plain string). The opt-in Java query pack remains an independent tree-sitter route needing its own direction decision. Evidence: `tmp/s017-static-semantic-tokens-20260721/evidence/` (baseline in `tmp/ws2-language-intelligence-20260721/evidence/trace-baseline.log`). |
 | Java Spring diagnostics and quick fixes | `planned` | Preferred route: pass reviewed `boot-java.java.reconcilers`, Boot 2/3/4, AOT, and `boot-java.scan-java-test-sources.on` settings and surface standard diagnostics/Code Actions. The pinned release registers more than two dozen Java reconcilers; representative families must be tested independently and a failing reconciler disabled without weakening unrelated diagnostics. |
-| Spring Boot version/support validation | `planned` | The server validates Boot/Cloud compatibility, OSS/commercial support ranges and available major/minor/patch updates, with build-file diagnostics and upgrade actions. Preferred route is native diagnostics and reviewable Code Actions. Network/source freshness and workspace-edit behaviour require explicit runtime tests. |
+| Spring Boot version/support validation | `verified` | Verified 2026-07-25 on macOS 26.5 arm64, Zed 1.12.0, official Java 6.8.23, Spring Tools 5.2.0, Temurin JDK 25.0.3, against a four-module Maven fixture pinned to Boot 4.0.6, 3.5.5, 3.3.5 and 2.7.18. The diagnostics need no product code: they arrive as ordinary `textDocument/publishDiagnostics` on each module's own build file, all anchored at the **first character of the file** (line 0, characters 0–1), and every problem type whose default severity is not `IGNORE` fired — `UPDATE_LATEST_PATCH` (`severity: 2`, e.g. "Newer patch version of Spring Boot available: 4.0.7"), `UPDATE_LATEST_MINOR` (`severity: 3`, 4.1.0 on the 4.0.x module and 3.5.16 on the 3.3.x one), `UNSUPPORTED_OSS_VERSION` and `UNSUPPORTED_COMMERCIAL_VERSION` (both `severity: 2`). Both OSS branches were observed: with commercial support still valid the message names the commercial end date and carries the Tanzu action (3.5.x "ended on 2026-06-30, get commercial support until 2032-06-30", 2.7.x likewise), and with commercial support also expired (3.3.x) it does neither and the separate commercial diagnostic appears instead. `SUPPORTED_OSS_VERSION`, `SUPPORTED_COMMERCIAL_VERSION` and `UPDATE_LATEST_MAJOR_VERSION` were correctly absent, because all three default to `IGNORE` in the pinned release *and* in the VS Code schema — the in-support 4.0.x module reports no support diagnostic at all, and no module is nagged about Boot 4 across a major boundary. **The settings audit found nothing to send**: `BootDiagnosticSeverityProvider` falls back to each problem type's own default when `spring-boot.ls.problem.version-validation.<CODE>` is absent, and every one of those defaults matches the schema, as do `boot-java.validation.java.version-validation` (`ON`) and `spring-boot.ls.problem-parameters.version-validation.use-project-build-file` (`true`) — so this row escapes the silent-gap trap that `jpql`, `inject-bean` and the XML sub-settings hit, and all severities stay user-settable through the settings passthrough. Both version sources ran and both reported themselves through `$/progress`: "Spring Tools: Fetching Maven release metadata" served the release list from the project's own repositories (the default route), and one "Fetching Generations from Spring IO" call served the support dates, which only the spring.io API carries. Update diagnostics carry Spring's upgrade quick fix (the separately `verified` *Spring Boot upgrade* row) plus release notes; a minor-update diagnostic carries **only** release notes, confirming from the diagnostic side that the "full project conversion recipe" action is never built in 5.2.0. **The one product change is that external pages now reach the user.** Both link quick fixes — "Open Release Notes for Spring Boot x.y.z" and "Get commercial Spring Boot support via Tanzu Spring Runtime" — execute `sts/show/document`, which the server turns into a `window/showDocument` request for an external URL, and stock Zed answers no such request. That previously landed in the coordinator's file-oriented CodeLens notice, which advised running Go to Definition on a Spring Data repository method, and returned `success: false`, so Spring added its own `Failed to open:` error on top. The coordinator now answers an `http`/`https` target with the address itself as a bounded Markdown link and reports the request handled, so the `executeCommand` result is a clean `null` and no failure notice appears. The notice is a `showMessageRequest` with one dismissal action, because a plain toast auto-dismisses before a link can be clicked and Zed drops an actionless request; the action performs nothing, and the extension never opens a page itself. Three rendering rules keep server data safe in a clickable surface: only `http`/`https` reach it, the visible label is the address itself so no label can claim a destination the link lacks, and an address carrying userinfo or characters that would break out of the Markdown link is rendered as redacted plain text instead. Both actions were driven; Zed rendered the address as a real link, and the maintainer's click opened the page. *Residual limits.* (1) `SPRING_CLOUD_INCOMPATIBLE_BOOT_VERSION` is unobserved: it needs a Spring Cloud dependency whose linked generation omits the project's Boot generation, and no fixture here carries Spring Cloud; it is built by the same call as the observed diagnostics and carries no action of its own. (2) No automated click could activate the rendered link — macOS System Events `click at` is window-relative and produces no hover, which GPUI's link hit-testing appears to need — so the click itself rests on the maintainer's observation, while the request, the notice and the clean result are in the trace. (3) The support dates are as fresh as Spring's own 30-second-cached spring.io fetch; offline behaviour for this row is covered by the separate *Offline behaviour* row. Evidence: `tmp/version-validation-20260725/evidence/`. |
 | Spring AI annotation diagnostics and indexing | `planned` | The server indexes `@Tool` and Spring AI MCP annotations and diagnoses missing/short descriptions. Preferred route is standard diagnostics, Code Actions where offered, and Project Symbols; this does not require enabling the embedded MCP server. |
 | Offline behaviour | `planned` | Preserve the checked artifact cache, compatibility diagnostics, and fail-closed provider behavior. S016 verified one warm cached startup with outbound network denied for official Java 6.8.23 on macOS arm64/JDK 25. D006 removes exact release admission, while rollback, first-install offline behavior, and other platform evidence remain planned; see `LIMITATIONS.md`. |
 
