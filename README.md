@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 40 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 8 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 42 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 6 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -72,6 +72,12 @@ The following outcomes have been observed on the tested environment:
   inside OSS or commercial support, with the dates Spring itself publishes; the
   release notes and commercial-support quick fixes hand you the page address as a
   clickable link, because stock Zed cannot open a page on a server's request;
+- Spring Modulith support for a Maven project — the application-module violation
+  diagnostic fires on its own, flagging every reference that reaches into another
+  module's internals while leaving references to its exposed types alone, the
+  Structure document groups the project by application module and marks each type
+  `(API)` or `(internal)`, and a **Refresh Modulith metadata…** action regenerates
+  the metadata for a project you pick after a rebuild;
 - Java references and implementations through the official Java language
   server;
 - Spring-specific references composed with official Java results; and
@@ -178,6 +184,18 @@ its ownership marker. A driven Zed run proved authentic generation, rendered
 hierarchy, source-file opening, byte-stable refresh, and deletion/recreation
 without creating `.gitignore`. Zed 1.11.3 opens the linked file but discards the
 Markdown `#L…` fragment, so Project Symbols remains the exact-location fallback.
+
+For a Spring Modulith project that same document is Spring's Modulith view: the
+grouping becomes the project's application modules, and each type is marked
+`(API)` or `(internal)` according to the module's named interfaces. A project
+without a spring-modulith dependency in the same worktree keeps the ordinary
+package grouping. Spring generates the underlying metadata by running Spring
+Modulith's own exporter against the compiled classes, so build the project first;
+it refreshes automatically as class files change, and the **Spring Boot: Refresh
+Modulith metadata…** Code Action regenerates it for a project you choose when you
+want to force the point. The grouping comes from that metadata but the listed
+types come from the Spring index, so a project whose files you have not opened yet
+can appear with empty modules until you open one of its files and regenerate.
 
 The [CodeLens showcase and coverage matrix](docs/code-lens-showcase.md) maps
 every standard provider, its user-visible subfeatures, the separate live-data

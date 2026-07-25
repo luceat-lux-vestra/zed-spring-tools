@@ -251,6 +251,7 @@ test("Spring initialize advertises the coordinator-owned commands", async () => 
       "zed-spring-tools.manage-live-process",
       "zed-spring-tools.generate-live-metrics-document",
       "zed-spring-tools.configure-live-log-level",
+      "zed-spring-tools.refresh-modulith-metadata",
     ],
   );
 });
@@ -1559,6 +1560,11 @@ test("project Code Actions are injected for Java files and respect the only filt
         "source",
         "zed-spring-tools.configure-live-log-level",
       ],
+      [
+        "Spring Boot: Refresh Modulith metadata…",
+        "source",
+        "zed-spring-tools.refresh-modulith-metadata",
+      ],
     ],
   );
   assert.deepEqual(injected[0].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
@@ -1587,6 +1593,7 @@ test("project Code Actions are injected for Java files and respect the only filt
       "Spring Boot: Connect or disconnect live process data…",
       "Spring Boot: Generate or refresh Live data document…",
       "Spring Boot: Set a live logger level…",
+      "Spring Boot: Refresh Modulith metadata…",
     ],
   );
 
@@ -2818,6 +2825,206 @@ test("an unconfigured shared metadata file is reported instead of a false refres
   assert.ok(
     !/Reloaded shared properties metadata/.test(notice.params.message),
     "no success claim when nothing was reloaded",
+  );
+});
+
+function modulithCoordinator() {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+  });
+  coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "modulith-1",
+    method: "workspace/executeCommand",
+    params: { command: "zed-spring-tools.refresh-modulith-metadata", arguments: [] },
+  });
+  return { coordinator, springWrites, zedWrites };
+}
+
+test("a single Modulith project refreshes without asking which project", async () => {
+  // VS Code's own command skips its quick pick when the server returns exactly
+  // one project, and the refresh argument is that project's location URI.
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  assert.equal(zedWrites[0].result, null);
+
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  assert.deepEqual(listed.params.arguments, []);
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listed.id,
+    result: { inventory: "file:///tmp/project/inventory" },
+  });
+
+  const refresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/metadata/refresh",
+    "modulith refresh request",
+  );
+  assert.deepEqual(refresh.params.arguments, ["file:///tmp/project/inventory"]);
+  assert.ok(
+    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    "one project must not prompt for a selection",
+  );
+});
+
+test("several Modulith projects are refreshed only after a bounded selection", async () => {
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listed.id,
+    result: {
+      orders: "file:///tmp/project/orders",
+      inventory: "file:///tmp/project/inventory",
+    },
+  });
+
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "modulith project selection",
+  );
+  assert.deepEqual(
+    prompt.params.actions.map((action) => action.title),
+    ["inventory", "orders"],
+  );
+  assert.match(prompt.params.message, /Nothing is regenerated until you choose/);
+  assert.ok(
+    !springWrites.some((message) => message.params?.command === "sts/modulith/metadata/refresh"),
+    "no refresh may run before the user chooses",
+  );
+
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: { title: "orders" } });
+  const refresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/metadata/refresh",
+    "modulith refresh request",
+  );
+  assert.deepEqual(refresh.params.arguments, ["file:///tmp/project/orders"]);
+});
+
+test("dismissing the Modulith selection refreshes nothing", async () => {
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listed.id,
+    result: {
+      orders: "file:///tmp/project/orders",
+      inventory: "file:///tmp/project/inventory",
+    },
+  });
+  const prompt = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "modulith project selection",
+  );
+  coordinator.observeZedMessage({ jsonrpc: "2.0", id: prompt.id, result: null });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    !springWrites.some((message) => message.params?.command === "sts/modulith/metadata/refresh"),
+    "a dismissed prompt must leave the metadata untouched",
+  );
+});
+
+test("no Modulith project is reported as a classpath fact, not a failure", async () => {
+  // `sts/modulith/projects` filters by `isModulithDependentProject`, so an empty
+  // object means no imported project carries spring-modulith-core.
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: listed.id, result: {} });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "empty project notice",
+  );
+  assert.match(notice.params.message, /No Spring Modulith projects were found/);
+  assert.match(notice.params.message, /spring-modulith-core/);
+  assert.ok(
+    !/could not be refreshed/.test(notice.params.message),
+    "an empty worktree is not a refresh failure",
+  );
+});
+
+test("Modulith project entries that cannot be acted on are dropped", async () => {
+  // Both halves are server data: the name becomes a selection label and the URI
+  // becomes a command argument, so a non-`file:` target or a control-character
+  // name never reaches either.
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listed.id,
+    result: {
+      orders: "file:///tmp/project/orders",
+      remote: "https://example.invalid/orders",
+      "line\nbreak": "file:///tmp/project/break",
+      missing: null,
+    },
+  });
+
+  const refresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/metadata/refresh",
+    "modulith refresh request",
+  );
+  assert.deepEqual(refresh.params.arguments, ["file:///tmp/project/orders"]);
+  assert.ok(
+    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    "only one entry survived, so there is nothing to choose between",
+  );
+});
+
+test("Spring's own Modulith outcome message is not duplicated by the coordinator", async () => {
+  // `ModulithService` reports success, no-change and failure itself through
+  // `window/showMessage`. A second coordinator notice would double-report.
+  const { coordinator, springWrites, zedWrites } = modulithCoordinator();
+  const listed = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/projects",
+    "modulith project list request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: listed.id,
+    result: { inventory: "file:///tmp/project/inventory" },
+  });
+  const refresh = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/modulith/metadata/refresh",
+    "modulith refresh request",
+  );
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: refresh.id, result: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    !zedWrites.some((message) => message.method === "window/showMessage"),
+    "the server already told the user what happened",
   );
 });
 
