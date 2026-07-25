@@ -245,6 +245,7 @@ test("Spring initialize advertises the coordinator-owned commands", async () => 
       "sts/server-command",
       "zed-spring-tools.explain-code-lens",
       "zed-spring-tools.configure-boot-run",
+      "zed-spring-tools.show-boot-project-info",
       "zed-spring-tools.generate-structure-document",
       "zed-spring-tools.convert-properties-yaml",
       "zed-spring-tools.reload-properties-metadata",
@@ -1541,6 +1542,11 @@ test("project Code Actions are injected for Java files and respect the only filt
         "zed-spring-tools.configure-boot-run",
       ],
       [
+        "Spring Boot: Show this file's Boot project info",
+        "source",
+        "zed-spring-tools.show-boot-project-info",
+      ],
+      [
         "Spring Boot: Generate or refresh Structure document",
         "source",
         "zed-spring-tools.generate-structure-document",
@@ -1567,11 +1573,14 @@ test("project Code Actions are injected for Java files and respect the only filt
       ],
     ],
   );
+  // The two per-file actions carry the requesting document; the workspace-wide
+  // ones take no argument.
   assert.deepEqual(injected[0].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
-  assert.deepEqual(injected[1].command.arguments, []);
+  assert.deepEqual(injected[1].command.arguments, [{ uri: "file:///tmp/project/App.java" }]);
   assert.deepEqual(injected[2].command.arguments, []);
   assert.deepEqual(injected[3].command.arguments, []);
   assert.deepEqual(injected[4].command.arguments, []);
+  assert.deepEqual(injected[5].command.arguments, []);
 
   coordinator.observeZedMessage({
     jsonrpc: "2.0",
@@ -1589,6 +1598,7 @@ test("project Code Actions are injected for Java files and respect the only filt
     [
       "Valid existing action",
       "Spring Boot: Configure run/debug for a project…",
+      "Spring Boot: Show this file's Boot project info",
       "Spring Boot: Generate or refresh Structure document",
       "Spring Boot: Connect or disconnect live process data…",
       "Spring Boot: Generate or refresh Live data document…",
@@ -4422,4 +4432,196 @@ test("an upgrade failure without a recorded target version still reports honestl
 
   const notice = zedWrites.find((message) => message.method === "window/showMessage");
   assert.match(notice.params.message, /the Spring Boot upgrade failed/);
+});
+
+// Boot project info. Spring's `sts/spring-boot/bootProjectInfo` is the per-file
+// companion to the workspace-wide executable-projects list, and it is the only
+// result carrying the project's build tool, Boot version, and JRE version. The
+// pinned VS Code client never calls it, so these tests pin the contract read off
+// the server's own `WorkspaceBootExecutableProjects` handler rather than an
+// upstream client's usage.
+const SHOW_BOOT_PROJECT_INFO_COMMAND = {
+  jsonrpc: "2.0",
+  id: "boot-info-1",
+  method: "workspace/executeCommand",
+  params: {
+    command: "zed-spring-tools.show-boot-project-info",
+    arguments: [{ uri: "file:///tmp/project/service-a/src/main/java/dev/example/App.java" }],
+  },
+};
+
+function bootProjectInfoCoordinator(springWrites, zedWrites) {
+  return new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: waitingJavaTransport(),
+    worktree: "/tmp/project",
+  });
+}
+
+test("Boot project info forwards the bare document URI and answers the editor at once", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+
+  // The command response must not wait on Spring or on the user's dismissal.
+  const response = zedWrites.find((message) => message.id === "boot-info-1");
+  assert.deepEqual(response.result, null);
+
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  // Spring reads `arguments[0]` with `getAsString()` and wraps it in a
+  // TextDocumentIdentifier, so an object wrapper would fail on the server side.
+  assert.deepEqual(request.params.arguments, [
+    "file:///tmp/project/service-a/src/main/java/dev/example/App.java",
+  ]);
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("Boot project info reports every field Spring resolved, with a worktree-relative location", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: {
+      name: "service-a",
+      uri: "file:///tmp/project/service-a",
+      mainClass: "dev.example.ServiceAApplication",
+      buildTool: "maven",
+      springBootVersion: "3.5.5",
+      javaVersion: "25",
+    },
+  });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "boot project info notice",
+  );
+  assert.equal(
+    notice.params.message,
+    "Spring Boot: This file belongs to project service-a — main class dev.example.ServiceAApplication · maven build · Spring Boot 3.5.5 · Java 25 · at service-a.",
+  );
+  // A toast auto-dismisses in Zed; several fields need a notice that holds.
+  assert.deepEqual(notice.params.actions, [{ title: "Close" }]);
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("Boot project info omits fields Spring could not resolve instead of inventing them", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  // The server explicitly null-guards `mainClass` and `javaVersion`, and a
+  // project outside this worktree keeps its absolute path.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: {
+      name: "service-b",
+      uri: "file:///elsewhere/service-b",
+      mainClass: null,
+      buildTool: "gradle",
+      springBootVersion: "3.5.5",
+      javaVersion: null,
+    },
+  });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessageRequest",
+    "boot project info notice",
+  );
+  assert.equal(
+    notice.params.message,
+    "Spring Boot: This file belongs to project service-b — gradle build · Spring Boot 3.5.5 · at /elsewhere/service-b.",
+  );
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("a null Boot project info result names all three causes rather than guessing one", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  // `getBootProjectInfo` ends in `Optional.orElse(null)`, so an unresolved
+  // project, a project with no @SpringBootApplication bean, and a caught record
+  // failure are indistinguishable on the wire.
+  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "boot project info absence notice",
+  );
+  assert.match(notice.params.message, /reported no Boot project for this file/);
+  assert.match(notice.params.message, /@SpringBootApplication class/);
+  assert.match(notice.params.message, /finished importing the project/);
+  assert.equal(
+    zedWrites.some((message) => message.method === "window/showMessageRequest"),
+    false,
+  );
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("a Boot project info record without a usable name is treated as no answer", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: { name: "   ", uri: "file:///tmp/project/service-a", buildTool: "maven" },
+  });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "boot project info absence notice",
+  );
+  assert.match(notice.params.message, /reported no Boot project for this file/);
+
+  coordinator.beginClose();
+  await coordinator.close();
 });
