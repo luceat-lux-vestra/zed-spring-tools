@@ -298,3 +298,27 @@ question below. What remains:
    matched, so `spring.factories` reached no server and a JPA named-queries file
    was validated as ordinary Boot properties. Those two rows keep their
    2026-07-20 evidence for Zed 1.11.3 and now carry that regression signal.
+8. That signal is now **withdrawn, and nothing in the product or in Zed had to
+   change.** The two languages were never registered in that run because the
+   profile carried a stale extension index: Zed rebuilds
+   `extensions/index.json` at startup only when it is not newer than
+   `extensions/installed/`, and copying a warm profile always leaves the index
+   newer, so a copied profile keeps the source profile's language set. The
+   profile descended from a 2026-07-19 ancestor that predates both language
+   directories. Two controls close it — the ordinary profile on the same Zed
+   1.12.0 has both languages indexed, and deleting `index.json` alone in a fresh
+   copy brought both back, with `spring.factories` opening as
+   `spring-factories` and the named-queries file as `jpa-query-properties` with
+   its `JPQL_SYNTAX` diagnostic. Both rows are now verified on 1.11.3 and
+   1.12.0. What this leaves behind is a verification rule rather than a backlog
+   item: a copied profile can silently invalidate any driven negative result, so
+   confirm the rebuilt index lists every contributed language before trusting
+   one. The one genuinely open thread is narrower than before.
+   `FACTORIES_KEY_NOT_SUPPORTED` still does not appear even though the file now
+   reaches Spring with the right language id, and the reconciler's own code
+   explains why it would be silent: it begins collecting only inside
+   `projectFinder.find(uri).ifPresent(…)`, so an unresolved project publishes no
+   array at all — which is exactly what was observed, including at the
+   `**/META-INF/spring/*.factories` path the indexer scans. Project resolution
+   for a non-Java `.factories` URI is the next experiment, and it is recorded as
+   an unobserved diagnostic rather than a claim.

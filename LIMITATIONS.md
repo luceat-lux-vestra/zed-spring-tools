@@ -19,7 +19,7 @@ extension.
   run at all; the extension reports that as a visible error naming the remedy
   rather than failing silently, but it does not create or modify Maven
   configuration on the user's behalf.
-- 42 of 59 tracked capabilities are proven on the tested tuple, and much of the
+- 44 of 59 tracked capabilities are proven on the tested tuple, and much of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
