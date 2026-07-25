@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 42 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 6 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 44 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 4 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -46,7 +46,9 @@ The following outcomes have been observed on the tested environment:
 - `.properties`↔`.yaml` conversion, and shared properties metadata reload once
   `boot-java.common.properties-metadata` names a metadata file;
 - Spring's own languages for `*.factories` and `META-INF/jpa-named-queries.properties`,
-  including JPQL validation inside named queries;
+  including JPQL validation inside named queries — verified on Zed 1.11.3; a
+  2026-07-26 run on Zed 1.12.0 saw neither language match, which is recorded in
+  the inventory and not yet explained;
 - Spring workspace symbols, request-mapping navigation, and bean navigation;
 - Spring-aware Java completion — property keys in `@Value`, bean names in
   `@Qualifier`, scopes, profiles, Spring Data query methods derived from the
@@ -63,10 +65,23 @@ The following outcomes have been observed on the tested environment:
   `@EventListener`, `@ConditionalOnExpression` and the rest — including nested
   `${…}` placeholders, plus Go to Definition from a SpEL bean reference to its
   `@Bean` declaration and from a bean's method call to that method;
-- Spring quick-fix code actions applied end to end, including the Spring Boot
-  patch upgrade — the version-validation quick fix at the top of a Maven build
-  file bumps the Boot version through a reviewable edit you can inspect before
-  saving, and a failed upgrade says so instead of doing nothing quietly;
+- Spring's Java analysis on your own sources — the Boot 2.x best-practice checks
+  (an unnecessary `@Autowired`, a `@Bean` method that can drop `public`, field
+  injection worth turning into a constructor parameter, a class defining beans
+  without `@Configuration`, a redundant `@Repository`, a mismatched repository id
+  type, and more), the removed-in-Boot-3 type warnings, the Boot 4 API-versioning
+  and bean-registrar checks, and the Spring AI `@Tool` description checks. Every
+  one of them can be tuned or switched off individually from Zed settings —
+  a whole category through `boot-java.validation.java.*` or a single problem
+  through `spring-boot.ls.problem.<category>.<CODE>` — so one noisy check never
+  costs you the rest;
+- Spring quick-fix code actions applied end to end, from both of Spring's fix
+  engines: the JDT refactorings and the OpenRewrite recipes, so
+  **Convert @Autowired field into Constructor Parameter** really rewrites the
+  field and writes the constructor. The Spring Boot patch upgrade rides the same
+  path — the version-validation quick fix at the top of a Maven build file bumps
+  the Boot version through a reviewable edit you can inspect before saving, and a
+  failed upgrade says so instead of doing nothing quietly;
 - Boot version and support-range diagnostics on the build file — an available
   patch or minor release, and whether the project's Boot generation is still
   inside OSS or commercial support, with the dates Spring itself publishes; the
