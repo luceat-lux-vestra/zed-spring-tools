@@ -586,7 +586,8 @@ test("unavailable CodeLens commands explain the native Zed workflow instead of f
       arguments: [{ kind: "url", url: "http://127.0.0.1:8080/demo" }],
     },
   });
-  assert.match(zedWrites[2].params.message, /VS Code-only command/);
+  assert.match(zedWrites[2].params.message, /cannot open a URL from a CodeLens/);
+  assert.match(zedWrites[2].params.message, /hover over the request mapping and click the link/i);
   assert.match(zedWrites[2].params.message, /http:\/\/127\.0\.0\.1:8080\/demo/);
   assert.deepEqual(zedWrites[3], { jsonrpc: "2.0", id: 45, result: null });
 
