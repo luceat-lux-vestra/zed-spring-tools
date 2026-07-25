@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 38 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 10 `planned`, 2 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 39 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 9 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -63,7 +63,10 @@ The following outcomes have been observed on the tested environment:
   `@EventListener`, `@ConditionalOnExpression` and the rest — including nested
   `${…}` placeholders, plus Go to Definition from a SpEL bean reference to its
   `@Bean` declaration and from a bean's method call to that method;
-- Spring quick-fix code actions applied end to end;
+- Spring quick-fix code actions applied end to end, including the Spring Boot
+  patch upgrade — the version-validation quick fix at the top of a Maven build
+  file bumps the Boot version through a reviewable edit you can inspect before
+  saving, and a failed upgrade says so instead of doing nothing quietly;
 - Java references and implementations through the official Java language
   server;
 - Spring-specific references composed with official Java results; and

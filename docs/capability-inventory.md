@@ -50,14 +50,14 @@ selected route or planning-confidence score does not change a state here.
 
 ## Summary
 
-58 capabilities tracked.
+59 capabilities tracked.
 
 | State | Count |
 | --- | --- |
-| `verified` | 38 |
+| `verified` | 39 |
 | `implemented` | 1 |
-| `planned` | 10 |
-| `blocked-zed-api` | 2 |
+| `planned` | 9 |
+| `blocked-zed-api` | 3 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 6 |
 | `not-pursued` | 1 |
@@ -462,7 +462,8 @@ verified structure-navigation fallback.
 
 | Capability | State | Notes |
 | --- | --- | --- |
-| Spring Boot upgrade | `planned` | Preferred route: a Code Action executes `sts/upgrade/spring-boot` and applies only reviewable workspace edits. If authentic upgrade needs unsupported multi-step UI or external content, stop before mutation and retain the manual upgrade workflow. |
+| Spring Boot upgrade | `verified` | Route taken with no product code for the upgrade itself: Spring's own version-validation quick fix executes `sts/upgrade/spring-boot`, and the server answers with a `workspace/applyEdit` for the build file. Driven 2026-07-25 on the macOS arm64 tuple: on a Maven project pinned to Boot 3.5.0 the quick fix `Upgrade to Spring Boot 3.5.16 (Maven dependency version changes only)` produced `applied:true`, a minimal `3.5.0`→`3.5.16` parent-version edit in the buffer, and `"success"`. Three constraints are upstream, not Zed: the command is **patch-only** (it asserts the same major/minor and rejects anything else), the major/minor "full OpenRewrite conversion" quick fixes are **never offered** because `getNearestAvailableMinorVersion` returns empty in the pinned release, and Gradle is rejected outright. The pom **inlay hint** carrying the same command renders but is inert — see the `blocked-zed-api` row below. The version-validation diagnostic anchors at the **first character of the build file**, so the quick fix is reached with the caret there. **The one product change is failure visibility.** Spring throws before editing anything when OpenRewrite finds no Maven settings file (`MavenSettings.readMavenSettingsFromDisk` returns null and the server dereferences it) — the default state for a machine without `~/.m2/settings.xml` — and Zed reports nothing for a failed `workspace/executeCommand`, so the upgrade silently did nothing. The coordinator now watches its own forwarded upgrade requests and turns a failure into a bounded `window/showMessage` error naming the target version, the fact that nothing was changed, and the settings-file remedy, never the Java stack trace, which stays in the log. Both halves were driven on 2026-07-25: with `~/.m2/settings.xml` absent the notice appeared and the build file was untouched; with a minimal `<settings/>` file present the same quick fix completed the edit above. Evidence: `tmp/upgrade-runtime-20260725/evidence/`. |
+| Inlay-hint label commands (pom "Upgrade to the Latest Patch") | `blocked-zed-api` | Spring's `PomInlayHintHandler` attaches a `Command` to the inlay hint's label part, so in VS Code the hint text itself is the upgrade button. Driven 2026-07-25: the hint renders with the correct command and arguments (`sts/upgrade/spring-boot`, `["file:…", "3.5.16", false]`), but clicking it produces **no `workspace/executeCommand` at all** — stock Zed renders `InlayHintLabelPart.label` without executing its `command`. The hint therefore stays an accurate indicator that a newer patch exists, and the verified route to act on it is the version-validation quick fix at the top of the build file. No product workaround exists: label-part activation is client behaviour the extension cannot supply. |
 | Modulith metadata refresh | `planned` | Preferred route: a Code Action selects a project, executes `sts/modulith/metadata/refresh`, and refreshes standard symbols or the opt-in Structure document. |
 | Modulith projects | `planned` | Preferred route: Workspace Symbols provides search and an opt-in Structure document provides module/dependency grouping. Ordinary Java navigation remains fallback if metadata or links are incomplete. |
 | Spring Initializr | `planned` | Not in this pinned VSIX; a separate VS Code extension provides it. It remains outside the selected runtime boundary until a distinct network, artifact, scope, and UX decision is accepted. External Initializr use is the fallback. |
