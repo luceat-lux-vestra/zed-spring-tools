@@ -152,6 +152,15 @@ For every completed spike:
   later decision explicitly adds them.
 - Keep commands shell-independent and use Zed platform, worktree, environment,
   and executable-discovery APIs for host differences.
+- A driven run's evidence is only as trustworthy as its profile. Zed rebuilds
+  `<profile>/extensions/index.json` at startup only when that file is not newer
+  than `<profile>/extensions/installed/`, and copying a warm profile always
+  leaves the index newer — so a copied profile silently keeps the source
+  profile's registered language set and never re-indexes. Delete
+  `extensions/index.json` after copying a profile, and confirm the rebuilt index
+  lists every language the extension contributes before trusting a negative
+  result. A missing language looks exactly like a missing capability in the LSP
+  trace: the buffer gets no language and no `didOpen` is sent at all.
 
 ## Branching and pull requests
 

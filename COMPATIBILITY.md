@@ -95,6 +95,32 @@ left no coordinator, Spring server, official-Java process, or debuggee from the
 run. This does not extend the observation to another desktop, JDK, build tool,
 or official-Java release.
 
+## Zed 1.12.0 evidence
+
+The Java-reconciler and language-matching runs observed this later exact tuple:
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2 (build 25F84), arm64 |
+| Zed | 1.12.0, `1.12.0+stable.328.f96212f2c50f54d93712fa130d6226b1ce7d76b5` |
+| Official Zed Java extension | 6.8.23 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | `5.2.0.RELEASE` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixtures | Maven, Spring Boot 3.5.5 / 2.7.18 / 4.0.6, Spring AI 1.0.0 |
+
+On 2026-07-26 this tuple drew 28 distinct Java problem types and applied a fix
+from both Spring quick-fix engines. A follow-up run on the same tuple then
+extended the two extension-contributed language rows to 1.12.0 and withdrew a
+regression signal that had been raised against this Zed release: the languages
+failed to register in the earlier run because the copied run profile carried a
+stale `extensions/index.json`, which Zed does not rebuild while that file is
+newer than `extensions/installed/`. Deleting the index alone restored both
+languages on the same Zed build, and the developer's ordinary profile on this
+build had never lost them. No behaviour of Zed 1.12.0 is implicated, and nothing
+here extends the observation to another desktop, JDK, build tool, or
+official-Java release.
+
 ## Desktop matrix
 
 | Desktop tuple | Current state |
