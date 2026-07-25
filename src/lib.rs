@@ -146,6 +146,21 @@ fn spring_initialization_options() -> zed::serde_json::Value {
 // `SpringSymbolIndex`), so supplying these defaults unconditionally never turns
 // the feature on by itself; it only makes the opt-in match VS Code's behavior.
 //
+// `modulith-project-tracking` is the same trap once more, and it is the one that
+// decides whether Modulith metadata exists at all.
+// `BootJavaConfig.isModulithAutoProjectTrackingEnabled()` returns false for an
+// absent key while VS Code's schema defaults it `true`. `ModulithService` only
+// registers its `ProjectObserver` listener while that flag is on, so with the key
+// missing no project is ever tracked: metadata is never generated on import, the
+// class-file watcher that regenerates it after a build is never started, and the
+// `MODULITH_TYPE_REF_VIOLATION` re-validation that follows a metadata change
+// never runs. The Structure document is affected too, because
+// `SpringIndexCommands` picks `ModulithStructureView` over the jMolecules view
+// only for a Modulith project, and that view reads the same cache. The two
+// `sts/modulith/*` commands stay registered regardless of this flag, so the
+// explicit refresh Code Action works either way; this setting is what makes the
+// automatic behavior match VS Code.
+//
 // Local live-data discovery has another server-side gate that is easy to miss:
 // `SpringProcessConnectorLocal.isAvailable()` returns false unless
 // `live-information.all-local-java-processes` is true. VS Code defaults that
@@ -163,6 +178,7 @@ fn spring_default_configuration() -> zed::serde_json::Value {
                 "on": true
             },
             "jpql": true,
+            "modulith-project-tracking": true,
             "live-information": {
                 "all-local-java-processes": true
             },
@@ -379,6 +395,7 @@ mod tests {
                     "highlight-codelens": { "on": true },
                     "highlight-copilot-codelens": { "on": true },
                     "jpql": true,
+                    "modulith-project-tracking": true,
                     "live-information": {
                         "all-local-java-processes": true
                     },
@@ -454,6 +471,36 @@ mod tests {
         // the positional-parameter inlay hint) never runs.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
+    }
+
+    #[test]
+    fn spring_workspace_configuration_enables_modulith_project_tracking() {
+        // `BootJavaConfig.isModulithAutoProjectTrackingEnabled()` reads false for
+        // an absent key while VS Code's schema defaults it true. Without it
+        // `ModulithService` registers no project listener, so Modulith metadata
+        // is never generated, never regenerated after a build, and the module
+        // grouping the Structure document renders stays empty.
+        let config = spring_workspace_configuration(None, "/work");
+        assert_eq!(
+            config["boot-java"]["modulith-project-tracking"],
+            zed::serde_json::json!(true)
+        );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_lets_user_disable_modulith_tracking() {
+        // Automatic tracking spawns an exporter process per project, so a user
+        // who does not want that must be able to turn it back off.
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": { "modulith-project-tracking": false }
+            })),
+            "/work",
+        );
+        assert_eq!(
+            config["boot-java"]["modulith-project-tracking"],
+            zed::serde_json::json!(false)
+        );
     }
 
     #[test]

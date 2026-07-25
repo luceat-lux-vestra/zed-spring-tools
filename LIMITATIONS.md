@@ -19,7 +19,7 @@ extension.
   run at all; the extension reports that as a visible error naming the remedy
   rather than failing silently, but it does not create or modify Maven
   configuration on the user's behalf.
-- 39 of 59 tracked capabilities are proven on the tested tuple, and much of the
+- 42 of 59 tracked capabilities are proven on the tested tuple, and much of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
@@ -27,8 +27,12 @@ extension.
   symbols with bean and request-mapping navigation, static and live CodeLens,
   inlay hints, quick fixes, Boot run/debug configuration generation, the
   Structure document, and explicit plus automatic
-  live-process/metrics/logger workflows, remote live-data targets, and the
-  patch-level Boot upgrade described above. Modulith remains. See the
+  live-process/metrics/logger workflows, remote live-data targets, the
+  patch-level Boot upgrade described above, Boot version/support validation, and
+  Spring Modulith metadata refresh with application-module structure. Modulith
+  coverage is Maven-only: metadata generation runs Spring Modulith's own exporter
+  against the compiled classes, so an uncompiled project is refused, and Gradle
+  Modulith projects are untested. See the
   [capability inventory](docs/capability-inventory.md) for the per-row evidence.
   Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java

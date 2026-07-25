@@ -81,6 +81,12 @@ const MAX_BUILD_ARGUMENTS = 16;
 // exposes the Code Action, computes a non-colliding target path the way the VS
 // Code client does, and keeps the original by default so the result stays
 // reviewable. See docs/research/011 for the client-command contract.
+const MODULITH_PROJECTS_SPRING_COMMAND = "sts/modulith/projects";
+const REFRESH_MODULITH_METADATA_SPRING_COMMAND = "sts/modulith/metadata/refresh";
+const REFRESH_MODULITH_METADATA_COMMAND = "zed-spring-tools.refresh-modulith-metadata";
+const REFRESH_MODULITH_METADATA_TITLE = "Spring Boot: Refresh Modulith metadata…";
+const MAX_MODULITH_PROJECT_SELECTION = 12;
+const MODULITH_PROJECT_NAME = /^[^\p{Cc}]{1,128}$/u;
 const PROPS_TO_YAML_SPRING_COMMAND = "sts/boot/props-to-yaml";
 const YAML_TO_PROPS_SPRING_COMMAND = "sts/boot/yaml-to-props";
 const RELOAD_PROPERTIES_METADATA_SPRING_COMMAND = "sts/common-properties/reload";
@@ -169,6 +175,7 @@ const COORDINATOR_COMMANDS = [
   MANAGE_LIVE_PROCESS_COMMAND,
   GENERATE_LIVE_METRICS_DOCUMENT_COMMAND,
   CONFIGURE_LIVE_LOG_LEVEL_COORDINATOR_COMMAND,
+  REFRESH_MODULITH_METADATA_COMMAND,
 ];
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
@@ -391,6 +398,7 @@ export class Coordinator {
     if (this.#handleManageLiveProcessCommand(message)) return false;
     if (this.#handleGenerateLiveMetricsDocumentCommand(message)) return false;
     if (this.#handleConfigureLiveLogLevelCommand(message)) return false;
+    if (this.#handleRefreshModulithMetadataCommand(message)) return false;
     if (message?.method === "initialized" && message.id === undefined) {
       this.initialized = true;
       this.#startSpringCodeLensProviders();
@@ -1305,6 +1313,82 @@ export class Coordinator {
     );
   }
 
+  // VS Code's `Refresh Modulith Metadata` command is a three-step client flow:
+  // list the Modulith projects, pick one when there is more than one, then pass
+  // that project's location URI to the refresh command. Both server commands are
+  // registered unconditionally by `ModulithService`, so this action works even
+  // when a user has turned automatic tracking back off — which is exactly when
+  // an explicit refresh is the only way to update the metadata.
+  #handleRefreshModulithMetadataCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== REFRESH_MODULITH_METADATA_COMMAND
+    ) {
+      return false;
+    }
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#refreshModulithMetadata().catch((error) => {
+      if (this.closed) return;
+      this.#showInfo(
+        `Spring Boot: Modulith metadata could not be refreshed. ${errorText(error)}`,
+      );
+    });
+    return true;
+  }
+
+  async #refreshModulithMetadata() {
+    const listed = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: MODULITH_PROJECTS_SPRING_COMMAND,
+      arguments: [],
+    });
+    if (this.closed) return;
+    const projects = normalizeModulithProjects(listed);
+    if (projects.length === 0) {
+      // Spring filters this list by `isModulithDependentProject`, so an empty
+      // result means no imported project has `spring-modulith-core` on its
+      // classpath — not that the refresh failed.
+      this.#showInfo(
+        "Spring Boot: No Spring Modulith projects were found in this worktree. A project qualifies once spring-modulith-core is on its classpath and the official Java extension has imported it.",
+      );
+      return;
+    }
+    const chosen = await this.#selectModulithProject(projects);
+    if (chosen === undefined || this.closed) return;
+    // Spring reports the outcome itself through `window/showMessage`: an error
+    // when the project has no spring-modulith dependency or no compiled classes,
+    // and an info message stating whether the regenerated metadata changed. Do
+    // not add a second notice for the same operation; only a transport-level
+    // failure reaches the catch above.
+    await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+      command: REFRESH_MODULITH_METADATA_SPRING_COMMAND,
+      arguments: [chosen.uri],
+    });
+  }
+
+  async #selectModulithProject(projects) {
+    if (projects.length === 1) return projects[0];
+    const shown = projects.slice(0, MAX_MODULITH_PROJECT_SELECTION);
+    const byTitle = new Map();
+    const actions = [];
+    for (const project of shown) {
+      let title = project.name;
+      for (let index = 2; byTitle.has(title); index += 1) title = `${project.name} (${index})`;
+      byTitle.set(title, project);
+      actions.push({ title });
+    }
+    const overflow = projects.length - shown.length;
+    const response = await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message: overflow > 0
+        ? `Select a Spring Modulith project to regenerate application-module metadata for. ${overflow} more ${overflow === 1 ? "project is" : "projects are"} not shown. Nothing is regenerated until you choose.`
+        : "Select a Spring Modulith project to regenerate application-module metadata for. Nothing is regenerated until you choose.",
+      actions,
+    });
+    const title = response?.title;
+    return typeof title === "string" ? byTitle.get(title) : undefined;
+  }
+
   #startAutomaticLiveConnection() {
     if (
       !this.initialized ||
@@ -2204,6 +2288,15 @@ function syntheticCodeActions(request) {
         arguments: [],
       },
     });
+    actions.push({
+      title: REFRESH_MODULITH_METADATA_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: REFRESH_MODULITH_METADATA_TITLE,
+        command: REFRESH_MODULITH_METADATA_COMMAND,
+        arguments: [],
+      },
+    });
   }
   const conversion = propertiesConversionFor(request);
   if (conversion !== undefined) {
@@ -2738,6 +2831,22 @@ function comparePositions(left, right) {
 // The executableBootProjects command returns Spring's own project records. Keep
 // only the fields the run/debug generation needs, and require the ones without
 // which no safe configuration can be written.
+// `sts/modulith/projects` answers a plain object keyed by the project's element
+// name, whose value is the project location URI — not the array shape the boot
+// project commands use. Both halves are server data that ends up in a selection
+// label and a command argument, so drop anything that is not a usable
+// `file:` URI and keep the names bounded and free of control characters.
+function normalizeModulithProjects(listed) {
+  if (listed === null || typeof listed !== "object" || Array.isArray(listed)) return [];
+  const projects = [];
+  for (const [name, uri] of Object.entries(listed)) {
+    if (!MODULITH_PROJECT_NAME.test(name)) continue;
+    if (typeof uri !== "string" || !uri.startsWith("file:")) continue;
+    projects.push({ name, uri });
+  }
+  return projects.sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function normalizeBootProjects(discovered) {
   if (!Array.isArray(discovered)) return [];
   const seen = new Set();

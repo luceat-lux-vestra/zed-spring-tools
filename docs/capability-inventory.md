@@ -1,8 +1,8 @@
 # Capability inventory
 
-- Inventory version: 35
+- Inventory version: 36
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-25
+- Last updated: 2026-07-26
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -54,9 +54,9 @@ selected route or planning-confidence score does not change a state here.
 
 | State | Count |
 | --- | --- |
-| `verified` | 40 |
+| `verified` | 42 |
 | `implemented` | 1 |
-| `planned` | 8 |
+| `planned` | 6 |
 | `blocked-zed-api` | 3 |
 | `blocked-upstream` | 0 |
 | `zed-native-equivalent` | 6 |
@@ -373,6 +373,42 @@ label is the address itself, so no label can claim a destination the link does n
 have, while userinfo or Markdown-breaking characters downgrade it to redacted
 plain text. Evidence: `tmp/version-validation-20260725/evidence/`.
 
+Inventory version 36 promotes both Spring Modulith rows to `verified`. Reading the
+pinned server first shrank them the same way as the previous two rows, and split
+them cleanly: the **refresh** row is a client flow the coordinator reproduces, and
+the **projects** row is delivered by a document this project already verified.
+`ModulithService` registers `sts/modulith/projects` and
+`sts/modulith/metadata/refresh` unconditionally, and VS Code's `Refresh Modulith
+Metadata` command is nothing but a three-step chain over them — list, quick-pick
+when there is more than one, refresh by location URI. The new Code Action is that
+chain with a bounded `showMessageRequest` in the middle, and it reports nothing of
+its own on success or on a rejected project, because `ModulithService` already emits
+its own `window/showMessage` for every outcome; adding a second notice would
+double-report. For the **projects** row no new surface was needed at all:
+`SpringIndexCommands` swaps `JMoleculesStructureView` for `ModulithStructureView`
+whenever the project depends on `spring-modulith-core`, so the opt-in Structure
+document renders application modules with their named-interface exposure the moment
+the metadata exists.
+
+The one product change is a settings default, and it is the **third** instance of
+the absent-key trap after `jpql` and `java.completions.inject-bean`:
+`BootJavaConfig.isModulithAutoProjectTrackingEnabled()` reads false for a missing
+key while VS Code's schema defaults it `true`. A clean control proved what that
+costs — with the key absent, `ModulithService` never registers its `ProjectObserver`
+listener, produced **zero** log lines at import, and the
+`MODULITH_TYPE_REF_VIOLATION` diagnostics never appeared; with the default sent,
+metadata loaded for both Modulith projects on import and all three violations
+published with no user action. Reaching a *valid* control took two attempts and
+that is worth recording: Spring persists per-project symbol **and diagnostic**
+caches under `~/.sts4/.symbolCache`, which `--user-data-dir` does not isolate, so
+the first control replayed the previous run's diagnostics from disk while
+`ModulithService` was provably idle. The same control corrected the causal claim in
+a useful direction: generating the Structure document with tracking still off loads
+the metadata anyway, because `ModulithStructureView` requests it itself, after which
+the diagnostics do appear. So the setting is not what makes the diagnostics
+possible; it is what makes them automatic, which is the VS Code behavior.
+Evidence: `tmp/modulith-20260726/evidence/`.
+
 ## Known surface constraints
 
 Two constraints of the Zed extension API shape several rows below. Both are read
@@ -489,8 +525,8 @@ verified structure-navigation fallback.
 | --- | --- | --- |
 | Spring Boot upgrade | `verified` | Route taken with no product code for the upgrade itself: Spring's own version-validation quick fix executes `sts/upgrade/spring-boot`, and the server answers with a `workspace/applyEdit` for the build file. Driven 2026-07-25 on the macOS arm64 tuple: on a Maven project pinned to Boot 3.5.0 the quick fix `Upgrade to Spring Boot 3.5.16 (Maven dependency version changes only)` produced `applied:true`, a minimal `3.5.0`→`3.5.16` parent-version edit in the buffer, and `"success"`. Three constraints are upstream, not Zed: the command is **patch-only** (it asserts the same major/minor and rejects anything else), the major/minor "full OpenRewrite conversion" quick fixes are **never offered** because `getNearestAvailableMinorVersion` returns empty in the pinned release, and Gradle is rejected outright. The pom **inlay hint** carrying the same command renders but is inert — see the `blocked-zed-api` row below. The version-validation diagnostic anchors at the **first character of the build file**, so the quick fix is reached with the caret there. **The one product change is failure visibility.** Spring throws before editing anything when OpenRewrite finds no Maven settings file (`MavenSettings.readMavenSettingsFromDisk` returns null and the server dereferences it) — the default state for a machine without `~/.m2/settings.xml` — and Zed reports nothing for a failed `workspace/executeCommand`, so the upgrade silently did nothing. The coordinator now watches its own forwarded upgrade requests and turns a failure into a bounded `window/showMessage` error naming the target version, the fact that nothing was changed, and the settings-file remedy, never the Java stack trace, which stays in the log. Both halves were driven on 2026-07-25: with `~/.m2/settings.xml` absent the notice appeared and the build file was untouched; with a minimal `<settings/>` file present the same quick fix completed the edit above. Evidence: `tmp/upgrade-runtime-20260725/evidence/`. |
 | Inlay-hint label commands (pom "Upgrade to the Latest Patch") | `blocked-zed-api` | Spring's `PomInlayHintHandler` attaches a `Command` to the inlay hint's label part, so in VS Code the hint text itself is the upgrade button. Driven 2026-07-25: the hint renders with the correct command and arguments (`sts/upgrade/spring-boot`, `["file:…", "3.5.16", false]`), but clicking it produces **no `workspace/executeCommand` at all** — stock Zed renders `InlayHintLabelPart.label` without executing its `command`. The hint therefore stays an accurate indicator that a newer patch exists, and the verified route to act on it is the version-validation quick fix at the top of the build file. No product workaround exists: label-part activation is client behaviour the extension cannot supply. |
-| Modulith metadata refresh | `planned` | Preferred route: a Code Action selects a project, executes `sts/modulith/metadata/refresh`, and refreshes standard symbols or the opt-in Structure document. |
-| Modulith projects | `planned` | Preferred route: Workspace Symbols provides search and an opt-in Structure document provides module/dependency grouping. Ordinary Java navigation remains fallback if metadata or links are incomplete. |
+| Modulith metadata refresh | `verified` | Verified 2026-07-26 on macOS 26.5 arm64, Zed 1.12.0, official Java 6.8.23 (jdtls), Spring Tools 5.2.0, Temurin JDK 25.0.3, Maven 3.9.15, against a three-module Maven fixture (two Spring Modulith 1.4.12 / Boot 3.5.5 apps plus one Boot app with no modulith dependency). `ModulithService` registers `sts/modulith/projects` and `sts/modulith/metadata/refresh` unconditionally, so the route does not depend on the tracking setting below. The **Spring Boot: Refresh Modulith metadata…** Code Action reproduces VS Code's `Refresh Modulith Metadata` command exactly: `sts/modulith/projects` (no arguments, answering `{projectName: locationUri}` already filtered by `isModulithDependentProject`), a bounded `window/showMessageRequest` when more than one project qualifies — skipped for a single project, as in VS Code — then `sts/modulith/metadata/refresh` with the chosen project's location URI. Driven: the action offered `inventory-app` and `orders-app` and correctly omitted the non-Modulith `plain-boot`; choosing `inventory-app` produced Spring's own `Project 'inventory-app' Modulith metadata has been changed.` The coordinator adds **no** notice of its own on success, because `ModulithService` reports every outcome through `window/showMessage` itself — an `Error` for a project without spring-modulith or without compiled classes, an `Info` stating whether the regenerated metadata differed — and only a transport-level failure produces a coordinator message. Metadata generation spawns `org.springframework.modulith.core.util.ApplicationModulesExporter` against the project's own classpath, so an uncompiled project is refused by the server with that first `Error`; `mvn compile` is a real prerequisite, not an artifact of the fixture. Gradle Modulith projects and the `orders-app` branch of the selection are untested. Evidence: `tmp/modulith-20260726/evidence/`. |
+| Modulith projects | `verified` | Verified 2026-07-26 on the same tuple. No new surface was needed: `SpringIndexCommands` chooses `ModulithStructureView` over `JMoleculesStructureView` for any project that depends on `spring-modulith-core` (gated only by the JVM property `disable-modulith-structure-view`, which this product does not set), so the already-verified opt-in Structure document *is* the module/dependency grouping. Driven, it rendered each Modulith project's application modules with their named-interface exposure — `Catalog (c.e.i.catalog)` carrying `c.e.i.c.CatalogService (API)` and `c.e.i.c.internal.CatalogRepository (internal)` — while the non-Modulith `plain-boot` in the same worktree kept the ordinary package grouping, which is the control proving the switch is Modulith-specific. That `(API)`/`(internal)` split is the same exposure fact the `MODULITH_TYPE_REF_VIOLATION` reconciler enforces: with `boot-java.modulith-project-tracking` supplied, three Error-severity `Invalid reference to non-exposed type of module 'catalog'!` diagnostics published with no user action, on the import, the field and the constructor parameter that reach into `catalog.internal`, while the legal import of the exposed `CatalogService` was correctly not flagged. As with the Spring Data row, the first reconcile after a cold start published only one of the three and the settled reconcile published all three. **Residual limit:** the grouping comes from the Modulith metadata but the members come from the Spring index, so a project whose files have not been opened in the session renders as `<name> ()` with its modules listed and empty; opening one of its files and regenerating fills it in. Workspace Symbols were not separately re-exercised here — Spring symbol search has its own verified row. Evidence: `tmp/modulith-20260726/evidence/`. |
 | Spring Initializr | `planned` | Not in this pinned VSIX; a separate VS Code extension provides it. It remains outside the selected runtime boundary until a distinct network, artifact, scope, and UX decision is accepted. External Initializr use is the fallback. |
 | Explain SpEL / queries / AOP (AI assistant) | `planned` | `query.explain` and `sts/enable/copilot/features` are VS Code Copilot-bound. The current product enables and displays those titles regardless of Zed AI state, but Zed's public CodeLens/extension API exposes neither authoritative Agent-state detection nor direct Agent dispatch/prefill. The extension can provide only accurate blocked-action wording and must not send the prompt or source to AI. A future direct Agent workflow requires a new Zed API and an explicit privacy/consent update; it is not included in the current parity claim. |
 | Embedded Spring Tools MCP server | `planned` | Spring Tools 5.2.0 contains an experimental streamable-HTTP MCP server with project, Spring index, component, endpoint, diagnostics, Spring-version and Spring.io tools; Zed supports remote MCP tools and prompts. Enabling a listening port and external Spring.io calls is a new runtime/network/security surface and requires an explicit decision before implementation or support claims. |

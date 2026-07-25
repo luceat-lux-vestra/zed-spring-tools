@@ -1,7 +1,7 @@
 # Product implementation and public-development plan
 
 - Status: In progress; M1-M3 complete, M4 in progress
-- Last updated: 2026-07-23
+- Last updated: 2026-07-26
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
@@ -321,7 +321,15 @@ Immediate M4 slice order after D006 is now:
    debug lifecycle gate proved automatic live-data connection, manual
    disconnect without reconnection, debug stop, and owned-process cleanup.
    Remote connection, build/task, upgrade, Modulith, and remaining commands stay
-   separate.
+   separate. Those four are now closed in that order: remote connection, the
+   build/task route, the patch-level Boot upgrade with the version/support
+   diagnostics that reach it, and — 2026-07-26 — both Modulith rows. The Modulith
+   slice needed only a settings default and one Code Action, because Spring's own
+   Structure command already switches to `ModulithStructureView` for a
+   spring-modulith project. What remains `planned` after it is the group that each
+   need a decision rather than a slice: Spring Initializr, the embedded MCP
+   server, the AI explanation commands, the Java reconciler families, Spring AI
+   annotation diagnostics, and offline behaviour.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's
