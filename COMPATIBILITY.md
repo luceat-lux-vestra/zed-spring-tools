@@ -64,7 +64,14 @@ The supported observation is also bounded. Maven and Gradle coordination,
 visible Spring completion, product uninstall, warm cached startup with outbound
 network denied, and the ordinary-profile Maven main runnable passed. Gradle and
 vanilla task execution, test runnables, first-install offline behavior, and all
-other desktop/JDK tuples were outside S016. Zed's generated
+other desktop/JDK tuples were outside S016. First-install offline behaviour has
+since been observed separately, on 2026-07-26 under Zed 1.12.0 and official Java
+6.8.23: with outbound network denied to Zed, the coordinator, and the JVMs, a
+cold profile fails closed naming the pinned release and its artifact URL, a warm
+one runs the product with only Boot version/support validation degraded, and a
+corrupted installed jar is repaired from the cached checksum-verified archive
+without a download. See the `Offline behaviour` row in the capability inventory.
+Zed's generated
 runnable resolves its helper in the default data directory and therefore failed
 under `--user-data-dir`. Twice, after worktree closure, the official Java proxy
 exited while its JDT child and port file remained; product-owned processes and

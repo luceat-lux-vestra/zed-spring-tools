@@ -111,7 +111,7 @@ user outcome take precedence.
 | Embedded syntax highlighting — highlight SpEL, JPQL, and query fragments inside Java strings | Preserve official Java highlighting without Spring-specific embedded grammar. | S017 closed the stock-Zed route negatively on 2026-07-21: Zed issues no semantic-token request after either dynamic or static registration, including jdtls's own static provider. A future opt-in Java query pack is an independent tree-sitter alternative and requires a new direction decision. | The fallback is the supported state: official Java tree-sitter highlighting renders these strings correctly; only token-level colouring inside them is lost. Never risk the whole Java language registration for this enhancement. | 2/5; blocked on Zed's Java semantic-token request/render path |
 | Spring Initializr — create a new Spring project | It is outside the pinned VSIX capability surface and current runtime boundary. | Make a separate scope, network, artifact, and UX decision before adding it. | Remain out of scope; document external Initializr use. | 2/5 |
 | AI explanations — explain SpEL, queries, and AOP behavior | The pinned command is VS Code Copilot-specific. The provider is enabled by this product regardless of Zed AI state, while the command is intercepted locally. | Keep the requested lens visible with wording that says the extension cannot detect or invoke Zed Agent and sends no source/prompt to AI. Revisit direct open/prefill only if Zed exports a user-consented Agent action/state API. | Manual analysis or a separate user-initiated Agent request. Do not imply conditional integration, auto-submit a prompt, or include the result in the current extension parity claim. | 2/5 |
-| Offline, compatibility, and diagnostics — reuse artifacts, explain Java/Spring incompatibility, and report contract breaks | Preserve the current coordinator, adapter contract, checked artifact cache, and verified failure diagnostics. | Attempt known capabilities independent of the installed official-Java release string. On a required-capability failure, show a bounded prefilled public GitHub issue for user review and submission; keep security reports private. | Never start a misleading reduced mode, submit telemetry or an issue automatically, handle a GitHub token, or include paths, classpaths, source, environment, credentials, or raw logs in the report. | 4/5 |
+| Offline, compatibility, and diagnostics — reuse artifacts, explain Java/Spring incompatibility, and report contract breaks | Preserve the current coordinator, adapter contract, checked artifact cache, and verified failure diagnostics. The offline half is now `verified` 2026-07-26 and needed no product code: the existing checksum-first install path already delivers it. | Attempt known capabilities independent of the installed official-Java release string. On a required-capability failure, show a bounded prefilled public GitHub issue for user review and submission; keep security reports private. | Never start a misleading reduced mode, submit telemetry or an issue automatically, handle a GitHub token, or include paths, classpaths, source, environment, credentials, or raw logs in the report. With outbound network denied, a first install fails closed with the pinned release and artifact URL named and leaves no partial state, a warm install runs the whole product, a corrupt installed jar is repaired from the checked archive without a download, and only version/support validation degrades — to an empty diagnostic publish, never to stale advice. | 5/5 offline on the tested tuple; the reporting half keeps its own gates |
 
 ## Cross-cutting gates
 
@@ -358,3 +358,28 @@ question below. What remains:
    and one fewer diagnostic. The standing lesson is the fixture-side companion to
    item 9's: when a reconciler is silent, check its `isApplicable` gate and the
    index it consults before theorising about the syntax in front of it.
+11. Offline behaviour is now `verified`, which empties the last row that was
+   `planned` for want of evidence rather than for want of a decision — what
+   remains `planned` is Spring Initializr, the embedded MCP server, and the AI
+   explanation commands, each needing a scope/network/privacy decision before any
+   slice. This one needed no product code either, and for a fifth time the reason
+   was that the existing path already answered the question: the install is
+   checksum-first, so being offline only changes *when* it says no. The runs
+   denied outbound network to the whole process tree with `sandbox-exec`, which
+   is what makes the result cover the Spring and JDT JVMs rather than only Zed's
+   HTTP client. A first install fails closed with the pinned release and the
+   exact artifact URL in Zed's own error buffer, and leaves no install directory,
+   no partial archive, no staging directory and no coordinator process behind —
+   there is no reduced mode to mistake for a working one, and jdtls in the same
+   session was unaffected. A warm install then runs the entire product with no
+   network: classpath bridge, Java reconciler diagnostics, the classpath-backed
+   unknown-property diagnostic, and `server.*` completion with documentation.
+   Exactly one capability degrades, version and support validation, and it
+   degrades to an **empty** diagnostic publish with both fetch failures confined
+   to the server log — no stale advice, no error notice, no hang. The two
+   artifact gates are the part worth remembering: a flipped byte in an installed
+   jar is repaired *offline* from the checked VSIX, and corrupting the archive as
+   well deletes it rather than using it while leaving the existing installation
+   untouched, because activation is a validated staging directory renamed into
+   place. That is the rollback claim this project can actually make, and one
+   online start afterwards restored the pinned checksums.
