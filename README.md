@@ -46,8 +46,8 @@ The following outcomes have been observed on the tested environment:
 - `.properties`↔`.yaml` conversion, and shared properties metadata reload once
   `boot-java.common.properties-metadata` names a metadata file;
 - Spring's own languages for `*.factories` and `META-INF/jpa-named-queries.properties`,
-  including JPQL validation inside named queries — verified on Zed 1.11.3 and
-  1.12.0;
+  including JPQL validation inside named queries and the Boot 3 unsupported-key
+  error in `spring.factories` — verified on Zed 1.11.3 and 1.12.0;
 - Spring workspace symbols, request-mapping navigation, and bean navigation;
 - Spring-aware Java completion — property keys in `@Value`, bean names in
   `@Qualifier`, scopes, profiles, Spring Data query methods derived from the

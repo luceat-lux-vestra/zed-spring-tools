@@ -56,6 +56,14 @@ extension.
   coordinator now says so once, naming the action that works (open a Java file),
   instead of reporting a compatibility failure; a genuine handshake failure
   after a Java file is open still raises the bounded compatibility report.
+  **The reach is wider than properties**, and a 2026-07-26 run measured one case
+  precisely: Spring resolves a document to a project by containment against the
+  projects the classpath listener has delivered, so with none delivered
+  *everything* project-scoped is silent for every file in the worktree.
+  `spring.factories` validation is the sharpest example — its reconciler collects
+  problems only inside `projectFinder.find(uri).ifPresent(…)`, so before a Java
+  file is open it publishes no diagnostic array at all, which is
+  indistinguishable from a clean file. Opening one Java file first restores it.
 - Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested

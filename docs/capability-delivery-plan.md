@@ -292,7 +292,7 @@ question below. What remains:
    in `workspace/applyEdit` with `applied: true`. The row's real requirement,
    disabling a failing reconciler without weakening unrelated diagnostics, holds
    at both granularities through the existing settings passthrough: a category
-   `OFF` and a single problem type `IGNORE`. Three problem types are recorded
+   `OFF` and a single problem type `IGNORE`. Three problem types were recorded
    unobserved rather than claimed, and one of them exposed a separate finding
    worth its own work: on Zed 1.12.0 neither extension-contributed language
    matched, so `spring.factories` reached no server and a JPA named-queries file
@@ -313,12 +313,22 @@ question below. What remains:
    1.12.0. What this leaves behind is a verification rule rather than a backlog
    item: a copied profile can silently invalidate any driven negative result, so
    confirm the rebuilt index lists every contributed language before trusting
-   one. The one genuinely open thread is narrower than before.
-   `FACTORIES_KEY_NOT_SUPPORTED` still does not appear even though the file now
-   reaches Spring with the right language id, and the reconciler's own code
-   explains why it would be silent: it begins collecting only inside
-   `projectFinder.find(uri).ifPresent(…)`, so an unresolved project publishes no
-   array at all — which is exactly what was observed, including at the
-   `**/META-INF/spring/*.factories` path the indexer scans. Project resolution
-   for a non-Java `.factories` URI is the next experiment, and it is recorded as
-   an unobserved diagnostic rather than a claim.
+   one.
+9. That last open thread is now closed, and it needed no product change either.
+   `FACTORIES_KEY_NOT_SUPPORTED` was blamed first on language matching and then,
+   after item 8 corrected that, on project resolution for a non-Java
+   `.factories` URI. The file type was never the issue. `JdtLsProjectCache.find`
+   resolves any `file:` URI contained in a registered project URI, and those runs
+   had **no registered project at all**: no Java buffer was open, so Zed never
+   started the official Java extension, no classpath reached Spring, and the
+   reconciler's `projectFinder.find` was empty for every URI in the worktree.
+   The extension's own notice saying so is in the same log. Opening one Java file
+   first published the diagnostic on both scanned paths as `ERROR` over the whole
+   continued key/value pair, with a still-supported key in the same file drawing
+   nothing, and — from four stray characters typed into the key and reverted — an
+   empty publish followed by the diagnostic again, which is the direct evidence
+   that the `ifPresent(…)` is now entered. Two of the three unobserved problem
+   types remain, and the standing lesson is a verification one: this project's own
+   constraint that Zed starts jdtls only for Java buffers is a confound for any
+   negative result about a non-Java file, and it is cheaper to rule out first
+   than to reason around.
