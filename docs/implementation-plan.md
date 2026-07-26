@@ -334,10 +334,16 @@ Immediate M4 slice order after D006 is now:
    `boot-java.java.reconcilers` defaults to true when the key is absent. The
    driven run drew 28 problem types across every Java family, applied a fix from
    both Spring quick-fix engines through Zed's code-action menu, and proved
-   selective disabling at category and problem-type granularity. What remains
-   `planned` after that is the group that each need a decision rather than a
-   slice: Spring Initializr, the embedded MCP server, the AI explanation
-   commands, and offline behaviour.
+   selective disabling at category and problem-type granularity. Offline
+   behaviour then closed on 2026-07-26 as well, again with no product code: with
+   outbound network denied to the whole process tree, a first install fails
+   closed naming the pinned release and its artifact URL and leaves nothing
+   partial behind, a warm installation runs the entire product, a corrupted
+   installed jar is repaired offline from the checksum-verified archive, and only
+   Spring's version/support validation degrades — to an empty diagnostic publish
+   rather than to stale advice. What remains `planned` after that is the group
+   that each need a decision rather than a slice: Spring Initializr, the embedded
+   MCP server, and the AI explanation commands.
 
 The earlier Boot-project-discovery slice completed one missing dependency in
 the accepted Java-companion boundary. Spring's

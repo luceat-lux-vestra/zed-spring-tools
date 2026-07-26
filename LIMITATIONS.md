@@ -246,9 +246,21 @@ extension.
 - The extension downloads the pinned, checksum-verified Spring Tools
   `5.2.0.RELEASE` VSIX from its official GitHub release on first use. It requires
   network access for that download and does not mirror or repackage the artifact.
-- S016 verified one warm cached start with outbound network denied on macOS
-  arm64/JDK 25. Offline installation, rollback, and project-operated
-  redistribution remain undecided. Repackaging or mirroring stays blocked on a
+- Offline behaviour is verified on macOS arm64/Zed 1.12.0/JDK 25 (2026-07-26),
+  with outbound network denied to Zed, the coordinator, and the JVMs alike. A
+  first install without network **fails closed**: the error names the pinned
+  release and the exact artifact URL, no partial archive or installation is left
+  behind, and no reduced mode starts. A warm installation needs no network for
+  anything except Spring's version and support validation, which degrades to an
+  empty diagnostic set — you lose the update/support advice, you are never shown
+  stale advice. A corrupted installed jar is repaired offline from the cached,
+  checksum-verified VSIX; if that archive is also damaged it is deleted rather
+  than used and the existing installation is left untouched, because a new
+  installation is only ever activated by renaming a validated staging directory
+  into place. Offline *installation* therefore remains impossible by design (the
+  VSIX must be fetched once), and rollback between two different pinned Spring
+  Tools releases is untested because only one release is pinned. Project-operated
+  redistribution remains undecided; repackaging or mirroring stays blocked on a
   complete third-party license inventory and an appropriate review.
 - SSH remote development and WSL-hosted remote projects are not in the initial
   product scope.

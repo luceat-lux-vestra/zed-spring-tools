@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 45 `verified`, 6 `zed-native-equivalent`, 4 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -96,9 +96,18 @@ The following outcomes have been observed on the tested environment:
   the metadata for a project you pick after a rebuild;
 - Java references and implementations through the official Java language
   server;
-- Spring-specific references composed with official Java results; and
+- Spring-specific references composed with official Java results;
 - Spring-to-Java type and classpath integration through the required official
-  Java companion.
+  Java companion; and
+- working on a plane. Once the pinned Spring Tools release has been downloaded
+  once, nothing above needs the network again — a run with every outbound
+  connection blocked still gave completion, diagnostics, quick fixes and the
+  classpath bridge. Only the Boot version and support-range diagnostics go quiet,
+  because Spring asks Maven Central and `api.spring.io` for those; you lose the
+  update advice rather than being shown stale advice. Before that first download
+  the extension says so plainly and does nothing else: it names the release it
+  needs and the address it could not reach, and it never starts a half-working
+  mode.
 
 Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
@@ -260,7 +269,9 @@ edit it.
 - JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
 - Rust installed through `rustup`, which Zed requires when building a local
   development extension; and
-- network access for the first pinned Spring Tools artifact download.
+- network access for the first pinned Spring Tools artifact download, and for
+  that download only — later sessions run offline (see
+  [known limitations](LIMITATIONS.md)).
 
 ### Install
 
@@ -282,8 +293,10 @@ is opened. The extension says so once rather than reporting a failure.
 
 If Java was already running when this extension was installed, restart Zed so
 JDT LS receives the contributed bridge bundles. If the first Spring artifact
-download remains stuck, restart Zed and retry. Both conditions are documented in
-[known limitations](LIMITATIONS.md).
+download fails or remains stuck, the status bar reports it and names the release
+and address it needed; restart Zed to retry, since a failed language server is
+not restarted within the same session. Nothing partial is kept, so a retry starts
+clean. Both conditions are documented in [known limitations](LIMITATIONS.md).
 
 ### Settings
 
@@ -407,8 +420,9 @@ bridge registration after that same jdtls process resumed.
   can omit ordinary Java symbols until a document edit forces recollection.
 - First-use artifact acquisition can hang until Zed is restarted.
 - Continuous integration runs format, lint, tests, and the WASM release build;
-  there is no packaged release, offline install, rollback flow, or published
-  registry entry yet.
+  there is no packaged release, no way to install without that one artifact
+  download, and no rollback flow between two pinned Spring Tools releases. Once
+  installed, running offline is verified — see [known limitations](LIMITATIONS.md).
 - SSH remote development and WSL-hosted projects are outside the current scope.
 
 Read [known limitations](LIMITATIONS.md) before relying on the extension.
