@@ -1,6 +1,8 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1-M4 complete, M5 in progress on its first tuple gate
+- Status: In progress; M1-M4 complete, M5 in progress — slice 1 (the JDK 21
+  floor on macOS arm64) is driven, slice 2 is blocked on its hardware
+  prerequisite
 - Last updated: 2026-07-26
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
