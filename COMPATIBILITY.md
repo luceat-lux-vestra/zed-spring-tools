@@ -107,7 +107,7 @@ The Java-reconciler and language-matching runs observed this later exact tuple:
 | JDT LS | `1.60.0-202606262232` |
 | Spring Tools | `5.2.0.RELEASE` |
 | Server runtime | Eclipse Temurin JDK 25.0.3 |
-| Fixtures | Maven, Spring Boot 3.5.5 / 2.7.18 / 4.0.6, Spring AI 1.0.0 |
+| Fixtures | Maven, Spring Boot 3.5.5 / 2.7.18 / 4.0.6 / 4.1.0, Spring AI 1.0.0, Spring Cloud Commons 4.1.6 / 4.3.3 |
 
 On 2026-07-26 this tuple drew 28 distinct Java problem types and applied a fix
 from both Spring quick-fix engines. A follow-up run on the same tuple then
@@ -120,6 +120,17 @@ languages on the same Zed build, and the developer's ordinary profile on this
 build had never lost them. No behaviour of Zed 1.12.0 is implicated, and nothing
 here extends the observation to another desktop, JDK, build tool, or
 official-Java release.
+
+A third run on this tuple, on the same date, added Spring Boot 4.1.0 and Spring
+Cloud Commons to the fixture set and drew the last three problem types those runs
+had left unobserved: `JAVA_BEAN_NOT_REGISTERED_IN_AOT`,
+`SPRING_DATA_STRING_PROPERTY_REFERENCE` and
+`SPRING_CLOUD_INCOMPATIBLE_BOOT_VERSION`. Two of the three turned on a dependency
+version rather than on anything about Zed or this extension — the Spring Data
+check needs spring-data-commons 4.1.0 or newer, and the Spring Cloud check needs
+a spring-cloud-commons release whose spring.io generation does not link the
+project's Boot generation — so both are recorded here as fixture pins, not as
+platform evidence.
 
 ## Desktop matrix
 
