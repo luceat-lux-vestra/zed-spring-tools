@@ -6,17 +6,18 @@ the required official Java extension.
 > This is an early public-development project, not a stable release. The
 > WASM adapter and OS-aware coordinator are designed for Zed's Linux, macOS,
 > and Windows desktop boundary. Runtime evidence to date is limited to macOS
-> arm64/JDK 25, and the extension-registry submission is under review.
+> arm64 on Temurin JDK 25.0.3 and 21.0.11, and the extension-registry submission
+> is under review.
 
 ## Project status
 
 | Item | Current state |
 | --- | --- |
-| Development phase | M5 platform validation; the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Development phase | M5 platform validation; the JDK 21 floor gate is driven, the M4 capability-parity program closed on 2026-07-26 |
+| Capability inventory | 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` (inventory version 43) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
-| Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
-| Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
+| Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
+| Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -273,7 +274,8 @@ edit it.
   XML-config intelligence (set `boot-java.support-spring-xml-config.on`) — Zed
   has no built-in XML language, the same way Java support requires the official
   Java extension;
-- JDK 21 or newer available to Zed; only Temurin JDK 25.0.3 is runtime-verified;
+- JDK 21 or newer available to Zed; Temurin 25.0.3 and the declared floor
+  21.0.11 are the runtime-verified versions, and 22 through 24 are untested;
 - Rust installed through `rustup`, which Zed requires when building a local
   development extension; and
 - network access for the first pinned Spring Tools artifact download, and for
@@ -411,9 +413,12 @@ bridge registration after that same jdtls process resumed.
 ## Important limitations
 
 - This is not a stable release. The adapter and coordinator are written for
-  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence. Other
-  desktop platforms remain untested, and the platform-aware implementation is
-  not itself a support claim.
+  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence, on two
+  JDKs. Other desktop platforms remain untested, and the platform-aware
+  implementation is not itself a support claim.
+- On a project's very first import, the compatibility notification can fire on a
+  transient official-Java route timeout even though nothing is incompatible. See
+  [known limitations](LIMITATIONS.md).
 - The official Java extension is required. Compatibility is capability-based,
   so an upstream release can still break the private route and produce a visible
   failure until this project adapts.

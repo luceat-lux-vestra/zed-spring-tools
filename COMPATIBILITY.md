@@ -139,11 +139,58 @@ a spring-cloud-commons release whose spring.io generation does not link the
 project's Boot generation — so both are recorded here as fixture pins, not as
 platform evidence.
 
+## M5 JDK 21 floor evidence
+
+The first M5 tuple gate ran the plan's bounded portability core on 2026-07-26
+with the JVM that hosts both the Spring server and JDT LS pinned to the declared
+floor:
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2, arm64 |
+| Zed | 1.12.0, `1.12.0+stable.328.f96212f2c50f54d93712fa130d6226b1ce7d76b5` |
+| Official Zed Java extension | 6.8.23 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | `5.2.0.RELEASE` |
+| Server runtime | Eclipse Temurin JDK **21.0.11+10 LTS** |
+| Control runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixture | Maven, Spring Boot 3.5.5, single module |
+
+All five core steps passed on 21.0.11. A cold profile installed the pinned VSIX
+and started `BootLanguageServerBootApp … using Java 21.0.11`; the classpath
+bridge registered against official Java; one capability from each dependency
+class worked (1842 `server.*` completions with resolved metadata documentation,
+a classpath-backed `PROP_UNKNOWN_PROPERTY` on `server.porrt`, and the
+`JAVA_AUTOWIRED_CONSTRUCTOR` quick fix applied from a menu composed with JDT's
+own actions); the generated `tasks.json`, `debug.json` and `spring-structure.md`
+carried `$ZED_WORKTREE_ROOT` and worktree-relative links with no absolute host
+path; and a warm restart followed by an uninstall produced
+`official Java classpath bridge removed`, zero owned processes, and an empty
+install directory.
+
+Two things this gate settled beyond the pass. The JDK a user gets is decided by
+two independent resolvers — `lsp.jdtls.settings.java_home` for JDT LS, and this
+extension's PATH-first `resolve_java` for the Spring server — and on a stock
+macOS host the PATH answer is Apple's `/usr/bin/java` stub, which defers to
+`JAVA_HOME` and is not a JDK at all when that is unset. Separately, the official
+Java extension adds two `-Djdk.xml.*` flags only at Java 24 or newer, so a 21
+launch of JDT LS is not the same command line as a 25 launch.
+
+The run also exposed one product defect, recorded in the capability inventory
+and in [known limitations](LIMITATIONS.md): on the very first import of a
+never-before-opened project, Spring's first `sts.java.type` lookup exceeded
+official Java's five-second command timeout, and the coordinator reported that
+transient failure as an incompatibility. The route answered
+normally three seconds later. Four further runs alternating JDK 21.0.11 and
+25.0.3 against warm and rebuilt fixtures never reproduced it, so it is a
+reporting-policy defect and not evidence about either JDK. Evidence:
+`tmp/m5-jdk21-floor-20260726/evidence/`.
+
 ## Desktop matrix
 
 | Desktop tuple | Current state |
 | --- | --- |
-| macOS arm64 | Verified on the exact M2 tuple above; S016 adds separately bounded 6.8.23 candidate evidence on macOS 26.5.2 |
+| macOS arm64 | Verified on the exact M2 tuple above; S016 adds separately bounded 6.8.23 candidate evidence on macOS 26.5.2, and the M5 portability core has now been driven here on JDK 21.0.11, with 25.0.3 as its start-and-route control |
 | macOS x86_64 | Untested |
 | Linux x86_64 | Untested |
 | Linux arm64 | Untested |
@@ -158,16 +205,19 @@ matrix has been run.
 
 ## Java matrix
 
-Spring Tools and the inspected JDT LS require Java 21 or newer to launch. The
-local integrated PoC and the M2 product slice were verified with JDK 25 only.
-JDK 21 and all other runtime JDK versions remain untested for the integrated
-product path. The Java bridge targets Java 21 bytecode through `--release 21`,
-which is a compatibility property of the artifact, not a tested claim. Running
-the declared floor is M5's first gate — see the plan's
-[M5 slice order](docs/implementation-plan.md#slice-order-cheapest-evidence-first)
-— and until that gate is driven, "Java 21 or newer" describes the guard the
-coordinator enforces at startup, not a runtime version this product has been
-observed working on.
+Spring Tools and the inspected JDT LS require Java 21 or newer to launch.
+
+| Runtime JDK | Current state |
+| --- | --- |
+| Temurin 21.0.11 (the declared floor) | Portability core driven on macOS arm64, 2026-07-26 — see the M5 section above |
+| Temurin 25.0.3 | Verified across the integrated PoC, the M2 product slice, and every M4 capability run |
+| 22, 23, 24 | Untested. 24 and newer are not merely "between" the two tested versions: official Java adds two `-Djdk.xml.*` flags to the JDT LS launch at 24 or newer |
+| 17.0.18 and older | Refused at startup with `JDK 21 or newer is required by Spring Tools`, observed 2026-07-18 |
+
+The Java bridge targets Java 21 bytecode through `--release 21` regardless of
+the JDK that runs it, so that remains a compatibility property of the artifact
+rather than a tested claim; the floor gate covers the runtime half only. Both
+tested JDKs were exercised on one host, one fixture, and one build tool.
 
 The extension requires the official Zed Java extension. It optimistically probes
 the known versioned capability boundary rather than admitting exact point

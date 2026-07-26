@@ -1,6 +1,6 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1-M4 complete, M5 starting
+- Status: In progress; M1-M4 complete, M5 in progress on its first tuple gate
 - Last updated: 2026-07-26
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -427,7 +427,8 @@ composed References result without coordinator merge code.
 
 ### M5: Installability and platform validation
 
-Status: starting, 2026-07-26.
+Status: in progress, 2026-07-26. Slice 1 (the JDK 21 floor on macOS arm64) is
+driven; slice 2 (Linux x86_64) is blocked on its hardware prerequisite.
 
 Platform-neutral paths, executable discovery, worktree identity, and no
 unnecessary manifest restriction are required from M2. Runtime support claims
@@ -483,6 +484,22 @@ port handling).
    already-observed negative. It also separates two things the current evidence
    conflates — the JVM that runs Spring and JDT, and the `--release 21` bytecode
    target of the Java bridge.
+
+   **Driven on 2026-07-26; all five core steps passed on Temurin 21.0.11.**
+   Pinning the floor took two levers, not one, because JDT LS reads
+   `lsp.jdtls.settings.java_home` while the Spring server follows this
+   extension's PATH-first `resolve_java`; and the official Java extension only
+   adds its `-Djdk.xml.*` flags at Java 24 or newer, so 21 and 25 are different
+   JDT LS launches rather than the same one twice. The gate also produced its
+   first defect: on the very first import of a never-before-opened project, one
+   `sts.java.type` lookup exceeded official Java's five-second command timeout
+   and the coordinator reported that transient failure as an incompatibility,
+   three seconds before the same route answered normally. Four
+   further runs alternating 21.0.11 and 25.0.3 never reproduced it, so it is a
+   reporting-policy defect rather than platform evidence — the classpath path
+   already treats the same timeout as transient, and the data route at
+   `coordinator/src/main.mjs:545` does not. Fixing that asymmetry is the next
+   product slice. Evidence: `tmp/m5-jdk21-floor-20260726/evidence/`.
 2. **A second OS.** Linux x86_64 is the next most valuable tuple: it is the
    platform whose path, process, and executable-discovery behaviour differs from
    macOS while remaining Unix-shaped, so it separates "POSIX assumptions" from
@@ -586,6 +603,14 @@ closed with none — and treat a silent feature as a fixture or settings questio
 first. M5 now converts that single-tuple parity evidence into platform evidence
 through a bounded portability core rather than a full re-verification, starting
 with the one gate the tested host can already run: the declared Java 21 floor.
+
+Amended on 2026-07-26 after that first gate. The core is now confirmed workable
+as a unit of platform evidence: five steps, one sitting, and it found something
+on its first outing that no capability run had — a transient official-Java route
+timeout reported to the user as an incompatibility. The gate also fixes the
+method for the tuples that follow: pin the JDK at both resolvers, capture the
+JDT LS command line rather than assuming it, and treat a single unreproducible
+anomaly as a defect to characterise rather than as a platform finding.
 
 The highest known risks are the official proxy's private compatibility surface
 and observed JDT/port-file lifecycle caveat, third-party artifact distribution,
