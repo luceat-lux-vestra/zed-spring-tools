@@ -68,8 +68,9 @@ The following outcomes have been observed on the tested environment:
   (an unnecessary `@Autowired`, a `@Bean` method that can drop `public`, field
   injection worth turning into a constructor parameter, a class defining beans
   without `@Configuration`, a redundant `@Repository`, a mismatched repository id
-  type, and more), the removed-in-Boot-3 type warnings, the Boot 4 API-versioning
-  and bean-registrar checks, and the Spring AI `@Tool` description checks. Every
+  type, and more), the removed-in-Boot-3 type warnings, the Boot 4 API-versioning,
+  bean-registrar and non-type-safe property-reference checks, the AOT-processor
+  registration warning, and the Spring AI `@Tool` description checks. Every
   one of them can be tuned or switched off individually from Zed settings —
   a whole category through `boot-java.validation.java.*` or a single problem
   through `spring-boot.ls.problem.<category>.<CODE>` — so one noisy check never
@@ -82,9 +83,10 @@ The following outcomes have been observed on the tested environment:
   the Boot version through a reviewable edit you can inspect before saving, and a
   failed upgrade says so instead of doing nothing quietly;
 - Boot version and support-range diagnostics on the build file — an available
-  patch or minor release, and whether the project's Boot generation is still
-  inside OSS or commercial support, with the dates Spring itself publishes; the
-  release notes and commercial-support quick fixes hand you the page address as a
+  patch or minor release, whether the project's Boot generation is still inside
+  OSS or commercial support, with the dates Spring itself publishes, and whether
+  a Spring Cloud release on the classpath actually supports that Boot generation;
+  the release notes and commercial-support quick fixes hand you the page address as a
   clickable link, because stock Zed cannot open a page on a server's request;
 - Spring Modulith support for a Maven project — the application-module violation
   diagnostic fires on its own, flagging every reference that reaches into another
