@@ -1,7 +1,10 @@
 # M4 capability delivery plan
 
-- Status: Selected direction; implementation and runtime verification remain
-  incremental
+- Status: Route selection complete; every route below has been taken or settled,
+  and M4 closed on 2026-07-26. The remaining rows are the three awaiting a
+  direction decision and the three naming a missing Zed client surface. This
+  document stays the route record — read it to learn why a capability is
+  delivered the way it is, and update it if a new Zed release reopens one
 - Last updated: 2026-07-26
 - Decision: [D005](decisions/005-lsp-first-capability-delivery.md)
 - Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md),

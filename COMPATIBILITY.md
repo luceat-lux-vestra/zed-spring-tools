@@ -162,7 +162,12 @@ Spring Tools and the inspected JDT LS require Java 21 or newer to launch. The
 local integrated PoC and the M2 product slice were verified with JDK 25 only.
 JDK 21 and all other runtime JDK versions remain untested for the integrated
 product path. The Java bridge targets Java 21 bytecode through `--release 21`,
-which is a compatibility property of the artifact, not a tested claim.
+which is a compatibility property of the artifact, not a tested claim. Running
+the declared floor is M5's first gate — see the plan's
+[M5 slice order](docs/implementation-plan.md#slice-order-cheapest-evidence-first)
+— and until that gate is driven, "Java 21 or newer" describes the guard the
+coordinator enforces at startup, not a runtime version this product has been
+observed working on.
 
 The extension requires the official Zed Java extension. It optimistically probes
 the known versioned capability boundary rather than admitting exact point
