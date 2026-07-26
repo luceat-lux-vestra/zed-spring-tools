@@ -4565,7 +4565,7 @@ test("Boot project info omits fields Spring could not resolve instead of inventi
   await coordinator.close();
 });
 
-test("a null Boot project info result names all three causes rather than guessing one", async () => {
+test("a null Boot project info result states the conditions instead of guessing which failed", async () => {
   const springWrites = [];
   const zedWrites = [];
   const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
@@ -4576,9 +4576,10 @@ test("a null Boot project info result names all three causes rather than guessin
     (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
     "boot project info request",
   );
-  // `getBootProjectInfo` ends in `Optional.orElse(null)`, so an unresolved
-  // project, a project with no @SpringBootApplication bean, and a caught record
-  // failure are indistinguishable on the wire.
+  // `getBootProjectInfo` ends in `Optional.orElse(null)`, so a project with no
+  // @SpringBootApplication bean and a caught record failure are
+  // indistinguishable on the wire. (An *unresolved* project is a separate path:
+  // Spring throws there. See the error-response test below.)
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: request.id, result: null });
 
   const notice = await waitFor(
@@ -4586,9 +4587,11 @@ test("a null Boot project info result names all three causes rather than guessin
     (message) => message.method === "window/showMessage",
     "boot project info absence notice",
   );
-  assert.match(notice.params.message, /reported no Boot project for this file/);
+  assert.match(notice.params.message, /has no Boot project info for this file/);
   assert.match(notice.params.message, /@SpringBootApplication class/);
-  assert.match(notice.params.message, /finished importing the project/);
+  assert.match(notice.params.message, /already imported/);
+  // Nothing was resolved, so there is no server detail to append.
+  assert.equal(/Spring Tools reported:/.test(notice.params.message), false);
   assert.equal(
     zedWrites.some((message) => message.method === "window/showMessageRequest"),
     false,
@@ -4620,7 +4623,75 @@ test("a Boot project info record without a usable name is treated as no answer",
     (message) => message.method === "window/showMessage",
     "boot project info absence notice",
   );
-  assert.match(notice.params.message, /reported no Boot project for this file/);
+  assert.match(notice.params.message, /has no Boot project info for this file/);
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("a Spring error for an unresolved project reads as absence, not as a broken action", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = bootProjectInfoCoordinator(springWrites, zedWrites);
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  const request = await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  // Verified 2026-07-26 against a Java file outside every imported project:
+  // `getBootProjectInfo` hands the unresolved project to `mapToBootProjectInfo`,
+  // which dereferences it, so Spring answers with an error rather than null.
+  await coordinator.handleSpringMessage({
+    jsonrpc: "2.0",
+    id: request.id,
+    error: { code: -32603, message: "java.lang.NullPointerException" },
+  });
+
+  const notice = await waitFor(
+    zedWrites,
+    (message) => message.method === "window/showMessage",
+    "boot project info absence notice",
+  );
+  assert.match(notice.params.message, /has no Boot project info for this file/);
+  // The server's own words are kept rather than replaced by the coordinator's
+  // generic internal-callback wording, which would misdescribe this failure.
+  assert.match(notice.params.message, /Spring Tools reported: java\.lang\.NullPointerException/);
+  assert.equal(/rejected an internal callback/.test(notice.params.message), false);
+
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("a lost Boot project info request is still reported as a failure", async () => {
+  const springWrites = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: waitingJavaTransport(),
+    worktree: "/tmp/project",
+    requestTimeoutMs: 5,
+  });
+
+  coordinator.observeZedMessage(SHOW_BOOT_PROJECT_INFO_COMMAND);
+  await waitFor(
+    springWrites,
+    (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
+    "boot project info request",
+  );
+  // No response at all is a real failure, not an absent project, so it must not
+  // borrow the "no Boot project" wording.
+  const notice = await waitFor(
+    zedWrites,
+    (message) =>
+      message.method === "window/showMessage" &&
+      /could not be read/.test(message.params?.message ?? ""),
+    "boot project info failure notice",
+  );
+  assert.match(notice.params.message, /timed out/);
+  assert.equal(/has no Boot project info/.test(notice.params.message), false);
 
   coordinator.beginClose();
   await coordinator.close();

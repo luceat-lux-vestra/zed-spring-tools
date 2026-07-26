@@ -13,7 +13,7 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M4 capability-parity program |
-| Capability inventory | 44 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 4 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
+| Capability inventory | 45 `verified`, 6 `zed-native-equivalent`, 4 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop/JDK combinations | Untested; the implementation is platform-aware, but that is not a support claim |
@@ -188,6 +188,15 @@ launch from the generated `dev` entry after editing all three debug slots. A
 2026-07-22 multi-project run then displayed `service-a`, `service-b`, and `All
 projects`; selecting all generated one task/debug pair per module with the
 correct worktree-relative directory and launched nothing automatically.
+
+A companion `source` Code Action, **Show this file's Boot project info**, answers
+the per-file question instead of the workspace-wide one: which Boot project owns
+the file in front of you, its main class, build tool, Spring Boot version, and
+the JRE on its classpath. The 2026-07-26 driven run resolved each file to its own
+module across a worktree pinning Boot 4.0.6, 3.5.5, 3.3.5, and 2.7.18 side by
+side. Fields Spring cannot resolve are left out rather than shown as "unknown",
+and a file outside every imported project gets an explanation of what the command
+requires plus Spring's own message, not a generic failure.
 
 Now verified on the named macOS tuple: a Java-file `source` Code Action executes
 Spring's authentic `sts/spring-boot/structure` command and writes

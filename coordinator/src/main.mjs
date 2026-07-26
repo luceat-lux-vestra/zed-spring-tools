@@ -1217,21 +1217,44 @@ export class Coordinator {
     if (typeof uri !== "string" || uri.length === 0) {
       throw new Error("The action did not carry a document URI.");
     }
-    // Spring reads `arguments[0]` as a bare string URI here, not the object
-    // wrapper `executableBootProjects` callers use.
-    const result = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
-      command: BOOT_PROJECT_INFO_SPRING_COMMAND,
-      arguments: [uri],
-    });
+    let result;
+    try {
+      // Spring reads `arguments[0]` as a bare string URI here, not the object
+      // wrapper `executableBootProjects` callers use.
+      result = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: BOOT_PROJECT_INFO_SPRING_COMMAND,
+        arguments: [uri],
+      });
+    } catch (error) {
+      // A timeout or a lost connection is a real failure and belongs to the
+      // caller's error notice. A Spring *error response* is not: verified
+      // 2026-07-26, that is exactly what a Java file outside every imported
+      // project produces, because `getBootProjectInfo` passes the unresolved
+      // project straight into `mapToBootProjectInfo`, which dereferences it.
+      // From the user's side that is the same situation as the null result.
+      if (error?.springError === undefined) throw error;
+      this.#showNoBootProjectInfo(error.springError);
+      return;
+    }
     if (this.closed) return;
     const info = normalizeBootProjectInfo(result);
     if (info === undefined) {
-      this.#showInfo(
-        "Spring Boot: Spring Tools reported no Boot project for this file. It answers this only for a file inside an imported project that also has a @SpringBootApplication class, so confirm the official Java extension has finished importing the project and that the project is a Spring Boot application.",
-      );
+      // The null result is the remaining path: the project resolved but has no
+      // `@SpringBootApplication` bean, or the record could not be built and the
+      // server swallowed the failure into `Optional.empty()`.
+      this.#showNoBootProjectInfo(undefined);
       return;
     }
     await this.#showPersistentNotice(describeBootProjectInfo(info, this.worktree));
+  }
+
+  // One notice for every way Spring declines to describe this file's project.
+  // The wording states the two conditions it actually requires instead of
+  // guessing which one failed, because the server does not distinguish them.
+  #showNoBootProjectInfo(detail) {
+    const base =
+      "Spring Boot: Spring Tools has no Boot project info for this file. It answers only for a file inside a project the official Java extension has already imported, and that project must contain a @SpringBootApplication class.";
+    this.#showInfo(detail === undefined ? base : `${base} Spring Tools reported: ${detail}`);
   }
 
   #handleGenerateStructureDocumentCommand(message) {
@@ -2215,7 +2238,14 @@ export class Coordinator {
     if (Object.hasOwn(message, "result")) {
       pending.resolve(message.result);
     } else {
-      pending.reject(new Error("Spring Tools rejected an internal callback"));
+      const failure = new Error("Spring Tools rejected an internal callback");
+      // The server did answer — it answered with an error. A caller that can
+      // interpret one command's failure needs to tell that apart from a timeout
+      // or a lost connection, which leave no response at all, so carry the
+      // server's own words alongside the generic message rather than replacing
+      // it and disturbing every existing caller.
+      failure.springError = boundedMetricText(message.error?.message);
+      pending.reject(failure);
     }
   }
 

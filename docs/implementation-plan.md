@@ -161,9 +161,10 @@ Status: in progress. Inventory version 34 exists at
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
-[R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 58
-capabilities: 37 `verified`, 1 `implemented`, 6 `zed-native-equivalent`, 11
-`planned`, 2 `blocked-zed-api`, and 1 `not-pursued`.
+[R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 59
+capabilities: 45 `verified`, 6 `zed-native-equivalent`, 4 `planned`,
+3 `blocked-zed-api`, and 1 `not-pursued`. The inventory itself is the authority
+for these counts; this summary had drifted several slices behind it.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
@@ -358,9 +359,15 @@ Driven checks on 2026-07-19 (macOS arm64, Zed 1.11.3, official Java 6.8.21,
 JDK 25) verified discovery, generation, the generated run task serving
 `GET /greeting`, generated `dev`/`prod`/`staging` picker entries, and a Java debug
 launch from the `dev` entry after editing `vmArgs`, `args`, and `env`. Executable
-Boot project discovery is therefore `verified`. Boot project info stays
-`implemented` because `sts/spring-boot/bootProjectInfo` detail is not separately
-exercised. Boot run/debug is now `verified` on the named macOS arm64/Maven tuple:
+Boot project discovery is therefore `verified`. Boot project info is now
+`verified` too, on 2026-07-26: `sts/spring-boot/bootProjectInfo` has its own
+`source` Code Action, and driving it against a four-module Maven fixture pinning
+Boot 4.0.6 / 3.5.5 / 3.3.5 / 2.7.18 resolved each file to its own module's
+record. That closes the last `implemented` row. See the inventory's version 39
+note for what the run corrected — the command's absent-project path throws rather
+than returning `null`, and the coordinator now preserves Spring's own error text
+instead of replacing every server error with one fixed string.
+Boot run/debug is now `verified` on the named macOS arm64/Maven tuple:
 the 2026-07-22 follow-up presented `service-a`, `service-b`, and `All projects`,
 and selecting all generated one task/debug pair per module with the correct
 worktree-relative `cwd` and no automatic launch. Gradle interaction and the
