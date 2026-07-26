@@ -14,14 +14,30 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M5 platform validation; the JDK 21 floor gate is driven, the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` (inventory version 43) |
+| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 3 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 1 `not-pursued` (inventory version 43) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
-components.
+components. The row above carries all seven inventory states, including the two
+that are empty, so it can be checked line by line against the inventory summary:
+
+- `verified` — observed working on a named runtime tuple.
+- `implemented` — built, but not yet observed working on any named tuple. Empty
+  by design: nothing ships here on the strength of "the code exists".
+- `planned` — not built yet, and no claim is made. Each open row needs a scope
+  decision first: Spring Initializr, the AI explanation commands, and the
+  embedded Spring Tools MCP server.
+- `blocked-zed-api` — Zed lacks the required UI or protocol surface, and the
+  missing surface is named exactly.
+- `blocked-upstream` — held up by Spring Tools or the official Java extension.
+  Currently empty: no capability is waiting on an upstream fix.
+- `zed-native-equivalent` — a different Zed workflow delivers the same outcome.
+- `not-pursued` — intentionally not built because the outcome is already at
+  parity; a documented exception, not backlog.
+
 The [M4 capability delivery plan](docs/capability-delivery-plan.md) keeps each
 preferred stock-Zed route beside its existing fallback and runtime gate.
 The [final upstream audit](docs/research/014-final-upstream-capability-surface-audit.md)
@@ -423,7 +439,7 @@ bridge registration after that same jdtls process resumed.
   so an upstream release can still break the private route and produce a visible
   failure until this project adapts.
 - Automatic GitHub issue creation through Zed sign-in is unavailable. On a
-  recognized compatibility failure, the implemented notification opens a
+  recognized compatibility failure, the notification opens a
   bounded title/body-prefilled public issue in the user's browser for review
   and manual submission. A driven Zed-to-browser check passed; the test did not
   submit an issue. Security reports must use private vulnerability reporting.
