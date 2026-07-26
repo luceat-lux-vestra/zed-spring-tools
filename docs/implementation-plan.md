@@ -1,6 +1,6 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1-M3 complete, M4 in progress
+- Status: In progress; M1-M4 complete, M5 starting
 - Last updated: 2026-07-26
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -155,20 +155,49 @@ Publication record:
 
 ### M4: VS Code Spring Tools capability-parity program
 
-Status: in progress. Inventory version 34 exists at
+Status: complete, 2026-07-26. Inventory version 42 exists at
 [capability-inventory.md](capability-inventory.md), derived by
 [R011](research/011-vscode-spring-tools-capability-surface.md) from the pinned
 Spring Tools `5.2.0.RELEASE` and amended by
 [R013](research/013-zed-native-capability-delivery-surfaces.md) for stock-Zed
 delivery routes and re-audited by
 [R018](research/018-spring-tools-zed-outcome-parity-audit.md). It records 59
-capabilities: 45 `verified`, 6 `zed-native-equivalent`, 4 `planned`,
+capabilities: 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`,
 3 `blocked-zed-api`, and 1 `not-pursued`. The inventory itself is the authority
-for these counts; this summary had drifted several slices behind it.
+for these counts; this summary had drifted several slices behind it before the
+closing pass below.
 A capability is promoted to a blocked state
 only when its exact missing surface is named and no Zed-native workflow can
 deliver the outcome; a capability is named for its user outcome, not for the VS
 Code widget that delivers it there.
+
+Exit gate, met on 2026-07-26: **no capability is left in a state that only more
+evidence would change.** The `implemented` column — built but never observed
+working — is empty, and it is empty because every row that once sat there was
+driven on a named tuple, not because rows were reclassified. Nothing is
+`planned` for want of a runtime gate either. The three rows that remain
+`planned` are each waiting on a direction decision rather than on a slice:
+Spring Initializr (a separate VS Code extension, and a new network/artifact/UX
+boundary), the embedded Spring Tools MCP server (a new listening port and
+outbound Spring.io calls), and the AI explanation commands (which need a Zed
+Agent API that does not exist, plus a privacy decision if it ever does). The
+three `blocked-zed-api` rows each name the exact missing client surface —
+cross-server document highlights, the semantic-token request path for Java, and
+`InlayHintLabelPart.command` activation — and each was established by a driven
+control, so reopening them is a Zed-release question, not an open work item
+here.
+
+What closing M4 does **not** claim: every state above rests on the macOS arm64
+tuples named in the inventory header. Parity evidence and platform evidence are
+different things, and the second is exactly what M5 is for. The last six slices
+(build/task, upgrade, Modulith, Java reconcilers, the residual diagnostics, and
+offline behaviour) also make a pattern worth carrying into M5 — three of them
+needed no product code at all, and the other three needed only failure
+visibility or one Code Action, while each thing that first looked like a
+missing feature
+turned out to be a settings default, a fixture precondition, or a client
+limitation. The cheap first move on a new tuple is therefore an audit of what
+the pinned server already does, not a patch.
 
 Every user-visible capability has one state: `planned`, `implemented`,
 `zed-native-equivalent`, `blocked-zed-api`, `blocked-upstream`, `not-pursued`,
@@ -398,6 +427,8 @@ composed References result without coordinator merge code.
 
 ### M5: Installability and platform validation
 
+Status: starting, 2026-07-26.
+
 Platform-neutral paths, executable discovery, worktree identity, and no
 unnecessary manifest restriction are required from M2. Runtime support claims
 follow later.
@@ -406,6 +437,79 @@ Validate the six desktop tuples separately: macOS/Linux/Windows on x86_64 and
 arm64/Arm64, followed by the declared JDK matrix. Untested tuples remain
 `untested`. SSH remote development and WSL-hosted remote projects remain out of
 scope until the local desktop matrix is stable and a later decision adds them.
+
+#### What a tuple gate covers
+
+Re-running all 46 `verified` rows on six tuples is not the goal and would not
+buy proportional information. Nearly every one of those rows exercises the same
+pinned Spring server over LSP; what varies by platform is the layer this project
+actually owns — path construction, artifact acquisition and checksum
+verification, executable discovery, process spawn and cleanup, and the bridge
+handshake with the official Java extension. A tuple gate is therefore a bounded
+**portability core**, run in one sitting on a clean profile:
+
+1. **Acquire and install.** A first-run install on a cold cache fetches the
+   pinned VSIX, verifies the checksums, and activates by renaming a validated
+   staging directory into place. A deliberate failure (network denied, per the
+   offline recipe) fails closed and names the release and its artifact URL.
+2. **Start and coordinate.** Zed starts one Spring LS and one worktree-scoped
+   coordinator, which discovers the official Java provider and registers the
+   classpath bridge on that platform's process and path shapes.
+3. **One capability from each dependency class.** A properties completion with
+   metadata documentation (server metadata only), a classpath-backed
+   `PROP_UNKNOWN_PROPERTY` (needs the bridge), and one Java reconciler
+   diagnostic with a quick fix (needs jdtls plus code actions). If these three
+   pass, the LSP surface above them is not platform-sensitive; if the bridge
+   fails, they fail together and the cause is visible in one place.
+4. **Generated files and worktree identity.** A generated `.zed/tasks.json` and
+   Structure document carry worktree-relative paths with that platform's
+   separator, and no absolute host path leaks into either.
+5. **Restart, uninstall, and cleanup.** Owned processes reach zero, the bridge
+   removal contract executes, and nothing is left in the install directory.
+
+Anything beyond that core is re-run on a new tuple only when it has a
+platform-specific mechanism of its own — the run/debug tasks (a shell-free
+argument vector per OS), and the JMX/Actuator live-data connection (loopback and
+port handling).
+
+#### Slice order, cheapest evidence first
+
+1. **JDK matrix floor on the already-verified tuple.** The declared floor is
+   Java 21 and only Temurin 25.0.3 has ever been run end to end, so
+   `JDK 21 or newer` is currently half a claim. Temurin 21.0.11 is installed on
+   the tested host beside 17.0.18 and 25.0.3, which makes this the one M5 gate
+   needing no new hardware: run the portability core on macOS arm64 with the
+   JDK pinned to 21.0.11, keeping 25.0.3 as the control and 17.0.18 as the
+   already-observed negative. It also separates two things the current evidence
+   conflates — the JVM that runs Spring and JDT, and the `--release 21` bytecode
+   target of the Java bridge.
+2. **A second OS.** Linux x86_64 is the next most valuable tuple: it is the
+   platform whose path, process, and executable-discovery behaviour differs from
+   macOS while remaining Unix-shaped, so it separates "POSIX assumptions" from
+   "macOS assumptions" before Windows tests both at once. This needs hardware or
+   a VM that can run Zed's own Linux build with GPU support; that prerequisite
+   is unresolved and is the gate's first task, not an afterthought.
+3. **Windows x86_64.** The tuple most likely to find real defects, because it is
+   the only one where path separators, executable extensions, and process
+   termination all differ. Expect the bridge handshake and generated
+   task/debug files to be where problems surface.
+4. **The remaining tuples** (macOS x86_64, Linux arm64, Windows Arm64) as
+   hardware allows; each stays `untested` until its own run.
+
+#### Standing rules
+
+- A tuple is `untested` until its portability core has been driven on it. Code
+  being platform-neutral by construction is a code-shape property and is never
+  written up as coverage — `COMPATIBILITY.md` already says so, and M5 must not
+  quietly soften it.
+- Each gate keeps its evidence under an ignored `tmp/<gate>-<date>/evidence/`
+  path and updates `COMPATIBILITY.md`'s desktop and Java matrices in the same
+  change. The capability inventory records capability state, not platform state,
+  so a passing tuple gate does not edit inventory rows; a *failing* one does,
+  because a capability that breaks on a supported platform is a capability
+  problem.
+- A defect found on a new tuple is fixed in the platform-neutral layer, never by
+  branching product behaviour per OS unless the platform genuinely differs.
 
 ### M6: Preview and incremental public releases
 
@@ -470,6 +574,18 @@ Zed's native location command. The driven click opened the exact generated
 method with `/target/` ignored. The AI notice correction is live. The bounded
 compatibility notification also passed a diagnostic Zed-to-browser gate using a
 title/body-prefilled GitHub composer; no issue was submitted.
+
+Amended on 2026-07-26 to close M4 and open M5. The parity program ends with an
+empty `implemented` column and no row left `planned` for want of evidence; the
+three remaining `planned` rows need a direction decision, and the three
+`blocked-zed-api` rows each name a client surface established by a driven
+control. The closing slices also settled the working method this project uses:
+audit the pinned server's own defaults and preconditions before writing product
+code — build/task, Modulith, the Java reconcilers, and offline behaviour each
+closed with none — and treat a silent feature as a fixture or settings question
+first. M5 now converts that single-tuple parity evidence into platform evidence
+through a bounded portability core rather than a full re-verification, starting
+with the one gate the tested host can already run: the declared Java 21 floor.
 
 The highest known risks are the official proxy's private compatibility surface
 and observed JDT/port-file lifecycle caveat, third-party artifact distribution,

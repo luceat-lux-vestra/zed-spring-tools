@@ -12,7 +12,7 @@ the required official Java extension.
 
 | Item | Current state |
 | --- | --- |
-| Development phase | M4 capability-parity program |
+| Development phase | M5 platform validation; the M4 capability-parity program closed on 2026-07-26 |
 | Capability inventory | 46 `verified`, 6 `zed-native-equivalent`, 3 `planned`, 3 `blocked-zed-api`, 1 `not-pursued` |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3; exact point releases and slices are recorded in compatibility evidence |
@@ -110,8 +110,15 @@ The following outcomes have been observed on the tested environment:
   mode.
 
 Zed-native language-server startup replaces the VS Code-specific
-`vscode-spring-boot.ls.start` command. Much of the broader VS Code Spring Tools
-surface is still planned or unverified. For live application data, a Code Action
+`vscode-spring-boot.ls.start` command. The parity walk through the pinned VS Code
+Spring Tools surface is finished: what is left is three capabilities that need a
+direction decision rather than more work — Spring Initializr, the experimental
+embedded MCP server, and the AI explanation commands — plus three that name an
+exact missing Zed client surface. Everything else is either observed working on
+the tested tuple or delivered through a different Zed workflow, and the
+[capability inventory](docs/capability-inventory.md) says which, row by row. That
+is parity evidence on one platform; every other desktop tuple is still
+`untested`. For live application data, a Code Action
 lists processes, prompts a bounded connect/refresh/disconnect choice, and reports
 connect success only when the server announces the process is connected, never
 on the command's always-null result. This is the Zed-native equivalent of VS

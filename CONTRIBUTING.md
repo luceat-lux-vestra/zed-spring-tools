@@ -1,8 +1,9 @@
 # Contributing
 
 Thanks for helping build Spring tooling for Zed. This repository has an
-installable extension with one working vertical slice, verified on a single
-tuple, and is expanding capability coverage in public.
+installable extension whose capability parity with VS Code Spring Tools is
+tracked row by row and observed on a single host tuple; the current work is
+validating it on the other desktop platforms and JDKs, in public.
 
 ## Before proposing a change
 
