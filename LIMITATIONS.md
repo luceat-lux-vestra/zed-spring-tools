@@ -165,7 +165,20 @@ extension.
   product implementation and will not be promoted directly into one.
 - Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. The
   adapter and coordinator are written for Linux, macOS, and Windows, but every
-  other desktop and runtime tuple is untested at runtime.
+  other desktop and runtime tuple is untested at runtime. The declared Java
+  floor is the one exception: Temurin 21.0.11 ran the M5 portability core on
+  macOS arm64 on 2026-07-26. JDK 22, 23 and 24 remain untested, and 24 is not
+  interpolation — official Java changes the JDT LS command line at 24 or newer.
+- On the very first import of a never-before-opened project, the compatibility
+  notification can fire when nothing is incompatible. Spring's first
+  `sts.java.type` lookup can exceed official Java's five-second command timeout
+  while JDT LS is still importing, and the coordinator reports that transient
+  rejection as *requires a working official Java extension and JDK 21 or newer*
+  even though the route recovers seconds later and every capability then works.
+  The neighbouring classpath route already absorbs the same timeout without a
+  notice. If the notice appears once during a first import and the project then
+  behaves normally, it can be dismissed; nothing is submitted anywhere unless
+  you open and submit the linked form yourself.
 - The product requires the official Zed Java extension. It does not replace Java
   debugging, tests, tasks, project import, or other Java ownership, and it will
   not offer a reduced standalone JDT fallback.
