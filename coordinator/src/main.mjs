@@ -54,6 +54,22 @@ const CODE_ACTION_REQUEST = "textDocument/codeAction";
 const EXECUTABLE_BOOT_PROJECTS_COMMAND = "sts/spring-boot/executableBootProjects";
 const CONFIGURE_BOOT_RUN_COMMAND = "zed-spring-tools.configure-boot-run";
 const CONFIGURE_BOOT_RUN_TITLE = "Spring Boot: Configure run/debug for a project…";
+// `bootProjectInfo` is the per-file companion to the workspace-wide
+// `executableBootProjects` list: given one document URI it answers Spring's
+// `BootProjectInfo` record — {name, uri, mainClass, buildTool, springBootVersion,
+// javaVersion} — for the project that owns that file. Three of those fields
+// (buildTool, springBootVersion, javaVersion) appear in no other Spring result
+// this extension consumes, which is why the command earns its own action rather
+// than folding into the run/debug flow. The pinned VS Code client never calls it,
+// so there is no upstream UI to mirror; the outcome is the fact, not the widget.
+// Spring answers `null` — not an error — when the URI resolves to no imported
+// project, when that project has no `@SpringBootApplication` bean, or when the
+// record cannot be built (a non-Boot project makes `getSpringBootVersion` null
+// and the server catches the resulting failure). All three collapse to the same
+// wire value, so the notice names all three rather than guessing one.
+const BOOT_PROJECT_INFO_SPRING_COMMAND = "sts/spring-boot/bootProjectInfo";
+const SHOW_BOOT_PROJECT_INFO_COMMAND = "zed-spring-tools.show-boot-project-info";
+const SHOW_BOOT_PROJECT_INFO_TITLE = "Spring Boot: Show this file's Boot project info";
 const SPRING_STRUCTURE_COMMAND = "sts/spring-boot/structure";
 const GENERATE_STRUCTURE_DOCUMENT_COMMAND = "zed-spring-tools.generate-structure-document";
 const GENERATE_STRUCTURE_DOCUMENT_TITLE = "Spring Boot: Generate or refresh Structure document";
@@ -169,6 +185,7 @@ const MAX_BOOT_PROFILE_ENTRIES = 8;
 const COORDINATOR_COMMANDS = [
   COORDINATOR_CODE_LENS_COMMAND,
   CONFIGURE_BOOT_RUN_COMMAND,
+  SHOW_BOOT_PROJECT_INFO_COMMAND,
   GENERATE_STRUCTURE_DOCUMENT_COMMAND,
   CONVERT_PROPERTIES_YAML_COMMAND,
   RELOAD_PROPERTIES_METADATA_COMMAND,
@@ -392,6 +409,7 @@ export class Coordinator {
     if (this.#handleCoordinatorCodeLensCommand(message)) return false;
     if (this.#handleSpringBuildCommand(message)) return false;
     if (this.#handleConfigureBootRunCommand(message)) return false;
+    if (this.#handleShowBootProjectInfoCommand(message)) return false;
     if (this.#handleGenerateStructureDocumentCommand(message)) return false;
     if (this.#handleConvertPropertiesYamlCommand(message)) return false;
     if (this.#handleReloadPropertiesMetadataCommand(message)) return false;
@@ -1171,6 +1189,72 @@ export class Coordinator {
       );
     });
     return true;
+  }
+
+  #handleShowBootProjectInfoCommand(message) {
+    if (
+      !isRequest(message) ||
+      message.method !== EXECUTE_SPRING_COMMAND ||
+      message.params?.command !== SHOW_BOOT_PROJECT_INFO_COMMAND
+    ) {
+      return false;
+    }
+    const uri = message.params?.arguments?.[0]?.uri;
+    // Answer Zed's command immediately. Spring resolves the project and its bean
+    // index before answering, and the notice holds until the user dismisses it,
+    // so neither wait belongs on the editor's command response.
+    this.sendZed(encodeLsp(responseFor(message, null)));
+    void this.#showBootProjectInfo(uri).catch((error) => {
+      if (this.closed) return;
+      this.#showInfo(
+        `Spring Boot: This file's Boot project info could not be read. ${errorText(error)}`,
+      );
+    });
+    return true;
+  }
+
+  async #showBootProjectInfo(uri) {
+    if (typeof uri !== "string" || uri.length === 0) {
+      throw new Error("The action did not carry a document URI.");
+    }
+    let result;
+    try {
+      // Spring reads `arguments[0]` as a bare string URI here, not the object
+      // wrapper `executableBootProjects` callers use.
+      result = await this.requestSpring(EXECUTE_SPRING_COMMAND, {
+        command: BOOT_PROJECT_INFO_SPRING_COMMAND,
+        arguments: [uri],
+      });
+    } catch (error) {
+      // A timeout or a lost connection is a real failure and belongs to the
+      // caller's error notice. A Spring *error response* is not: verified
+      // 2026-07-26, that is exactly what a Java file outside every imported
+      // project produces, because `getBootProjectInfo` passes the unresolved
+      // project straight into `mapToBootProjectInfo`, which dereferences it.
+      // From the user's side that is the same situation as the null result.
+      if (error?.springError === undefined) throw error;
+      this.#showNoBootProjectInfo(error.springError);
+      return;
+    }
+    if (this.closed) return;
+    const info = normalizeBootProjectInfo(result);
+    if (info === undefined) {
+      // The null result is the remaining path: the project resolved but has no
+      // `@SpringBootApplication` bean, or the record could not be built and the
+      // server swallowed the failure into `Optional.empty()`.
+      this.#showNoBootProjectInfo(undefined);
+      return;
+    }
+    await this.#showPersistentNotice(describeBootProjectInfo(info, this.worktree));
+  }
+
+  // One notice for every way Spring declines to describe this file's project.
+  // The wording states the two conditions it actually requires instead of
+  // guessing which one failed, because the server does not distinguish them.
+  #showNoBootProjectInfo(detail) {
+    const base =
+      "Spring Boot: Spring Tools has no Boot project info for this file. It answers only for a file inside a project the official Java extension has already imported, and that project must contain a @SpringBootApplication class.";
+    this.#showInfo(detail === undefined ? base : `${base} Spring Tools reported: ${detail}`);
   }
 
   #handleGenerateStructureDocumentCommand(message) {
@@ -2063,6 +2147,19 @@ export class Coordinator {
     );
   }
 
+  // Read-me-now facts need the same treatment a link does: a `window/showMessage`
+  // toast auto-dismisses in Zed, which is fine for "the file was written" but not
+  // for several fields the user is meant to actually read off the screen. One
+  // dismissal action holds the notice open and performs nothing.
+  async #showPersistentNotice(message) {
+    if (this.closed) return;
+    await this.requestZed("window/showMessageRequest", {
+      type: 3,
+      message,
+      actions: [{ title: "Close" }],
+    });
+  }
+
   // A link is only useful if it stays on screen long enough to be clicked, and a
   // `window/showMessage` toast auto-dismisses in Zed with no lever to hold it. A
   // `showMessageRequest` carrying one dismissal action keeps the address visible
@@ -2141,7 +2238,14 @@ export class Coordinator {
     if (Object.hasOwn(message, "result")) {
       pending.resolve(message.result);
     } else {
-      pending.reject(new Error("Spring Tools rejected an internal callback"));
+      const failure = new Error("Spring Tools rejected an internal callback");
+      // The server did answer — it answered with an error. A caller that can
+      // interpret one command's failure needs to tell that apart from a timeout
+      // or a lost connection, which leave no response at all, so carry the
+      // server's own words alongside the generic message rather than replacing
+      // it and disturbing every existing caller.
+      failure.springError = boundedMetricText(message.error?.message);
+      pending.reject(failure);
     }
   }
 
@@ -2249,6 +2353,15 @@ function syntheticCodeActions(request) {
       command: {
         title: CONFIGURE_BOOT_RUN_TITLE,
         command: CONFIGURE_BOOT_RUN_COMMAND,
+        arguments: [{ uri: request.uri }],
+      },
+    });
+    actions.push({
+      title: SHOW_BOOT_PROJECT_INFO_TITLE,
+      kind: BOOT_CONFIG_ACTION_KIND,
+      command: {
+        title: SHOW_BOOT_PROJECT_INFO_TITLE,
+        command: SHOW_BOOT_PROJECT_INFO_COMMAND,
         arguments: [{ uri: request.uri }],
       },
     });
@@ -2733,6 +2846,59 @@ function boundedMetricText(value) {
   const normalized = value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
   if (normalized.length === 0) return undefined;
   return normalized.slice(0, MAX_LIVE_METRIC_TEXT_LENGTH);
+}
+
+// Spring's `BootProjectInfo` record is entirely optional past `name`: `mainClass`
+// and `javaVersion` are explicitly null-guarded by the server, and the remaining
+// fields are whatever the project build reported. Keep a record whose name
+// survives and let each other field be absent, rather than discarding a partly
+// populated answer — an imported project with no resolved JRE is still worth
+// naming. Every field is rendered straight into a notification, so it goes
+// through the same control-character and length bound the live tables use.
+function normalizeBootProjectInfo(result) {
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return undefined;
+  const name = boundedMetricText(result.name);
+  if (name === undefined) return undefined;
+  return {
+    name,
+    uri: boundedMetricText(result.uri),
+    mainClass: boundedMetricText(result.mainClass),
+    buildTool: boundedMetricText(result.buildTool),
+    springBootVersion: boundedMetricText(result.springBootVersion),
+    javaVersion: boundedMetricText(result.javaVersion),
+  };
+}
+
+// One line, because Zed renders a message request's text as a single block and a
+// multi-line body reads worse there than separated clauses. Absent fields are
+// omitted rather than shown as "unknown": a field Spring could not resolve is
+// not a fact about the project.
+function describeBootProjectInfo(info, worktree) {
+  const parts = [];
+  if (info.mainClass !== undefined) parts.push(`main class ${info.mainClass}`);
+  if (info.buildTool !== undefined) parts.push(`${info.buildTool} build`);
+  if (info.springBootVersion !== undefined) parts.push(`Spring Boot ${info.springBootVersion}`);
+  if (info.javaVersion !== undefined) parts.push(`Java ${info.javaVersion}`);
+  const location = bootProjectLocation(info.uri, worktree);
+  if (location !== undefined) parts.push(`at ${location}`);
+  const detail = parts.length === 0
+    ? "Spring Tools reported no further detail for it."
+    : `${parts.join(" · ")}.`;
+  return `Spring Boot: This file belongs to project ${info.name} — ${detail}`;
+}
+
+// Prefer the worktree-relative path for the same reason generated tasks do: an
+// absolute path is noise for a project the user already has open, and it can
+// carry a home directory into a screenshot. Fall back to whatever Spring sent
+// when the project sits outside this worktree.
+function bootProjectLocation(uri, worktree) {
+  if (uri === undefined) return undefined;
+  const projectPath = fileUriToPath(uri);
+  if (projectPath === undefined) return uri;
+  const relative = path.relative(worktree, projectPath);
+  if (relative === "") return ".";
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return projectPath;
+  return relative;
 }
 
 function renderStructureNode(node, depth, lines, state, target, worktree) {
