@@ -176,15 +176,20 @@ macOS host the PATH answer is Apple's `/usr/bin/java` stub, which defers to
 Java extension adds two `-Djdk.xml.*` flags only at Java 24 or newer, so a 21
 launch of JDT LS is not the same command line as a 25 launch.
 
-The run also exposed one product defect, recorded in the capability inventory
-and in [known limitations](LIMITATIONS.md): on the very first import of a
-never-before-opened project, Spring's first `sts.java.type` lookup exceeded
-official Java's five-second command timeout, and the coordinator reported that
-transient failure as an incompatibility. The route answered
-normally three seconds later. Four further runs alternating JDK 21.0.11 and
-25.0.3 against warm and rebuilt fixtures never reproduced it, so it is a
-reporting-policy defect and not evidence about either JDK. Evidence:
-`tmp/m5-jdk21-floor-20260726/evidence/`.
+The run also exposed one product defect, **since fixed and driven on
+2026-07-29**: on the very first import of a never-before-opened project,
+Spring's first `sts.java.type` lookup exceeded official Java's five-second
+command timeout, and the coordinator reported that transient failure as an
+incompatibility. The route answered normally three seconds later. Four further
+runs alternating JDK 21.0.11 and 25.0.3 against warm and rebuilt fixtures never
+reproduced it, so it was a reporting-policy defect and not evidence about either
+JDK. A separate gate then reproduced it deterministically by freezing the
+isolated JDT LS child with `SIGSTOP`, confirmed the pre-fix build raises the
+notice fifteen seconds into the import, and confirmed the fixed build suppresses
+six such failures inside the handshake window while still raising the same
+notice two seconds after the window closes. Evidence:
+`tmp/m5-jdk21-floor-20260726/evidence/` and
+`tmp/data-route-transient-20260729/evidence/`.
 
 ## Desktop matrix
 

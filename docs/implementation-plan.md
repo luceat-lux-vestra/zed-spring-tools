@@ -3,8 +3,9 @@
 - Status: In progress; M1-M4 complete, M5 in progress — slice 1 (the JDK 21
   floor on macOS arm64) is driven, slice 2 is blocked on its hardware
   prerequisite. M6 now records the three non-platform gaps that sit between a
-  finished M5 and a stable release
-- Last updated: 2026-07-28
+  finished M5 and a stable release; the one product defect M5 slice 1 found is
+  fixed and driven
+- Last updated: 2026-07-29
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
@@ -498,11 +499,13 @@ port handling).
    `sts.java.type` lookup exceeded official Java's five-second command timeout
    and the coordinator reported that transient failure as an incompatibility,
    three seconds before the same route answered normally. Four
-   further runs alternating 21.0.11 and 25.0.3 never reproduced it, so it is a
+   further runs alternating 21.0.11 and 25.0.3 never reproduced it, so it was a
    reporting-policy defect rather than platform evidence — the classpath path
-   already treats the same timeout as transient, and the data route at
-   `coordinator/src/main.mjs:545` does not. Fixing that asymmetry is the next
-   product slice. Evidence: `tmp/m5-jdk21-floor-20260726/evidence/`.
+   already treated the same timeout as transient and the data route did not.
+   **That asymmetry was closed on 2026-07-29**, with the defect reproduced
+   deterministically by freezing the isolated JDT LS child and an A/B against the
+   pre-fix build. Evidence: `tmp/m5-jdk21-floor-20260726/evidence/` and
+   `tmp/data-route-transient-20260729/evidence/`.
 2. **A second OS.** Linux x86_64 is the next most valuable tuple: it is the
    platform whose path, process, and executable-discovery behaviour differs from
    macOS while remaining Unix-shaped, so it separates "POSIX assumptions" from
@@ -578,8 +581,8 @@ matrix is left" became an easy and wrong reading of the plan.
    moved to `not-pursued` with its reason — rather than left pending.
 
 The transient official-Java route timeout misreported as an incompatibility
-(`coordinator/src/main.mjs`, the data route) remains the next product slice and
-is separate from all three.
+(`coordinator/src/main.mjs`, the data route) was the next product slice and was
+closed on 2026-07-29; it was separate from all three, and all three remain open.
 
 #### Candidate stable-release criteria — proposed, not accepted
 

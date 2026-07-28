@@ -542,7 +542,7 @@ export class Coordinator {
           this.#noteJavaRoute(message.method);
           return result;
         } catch (error) {
-          if (!this.closed) this.#showJavaFailure("java-data-route-failed-v1");
+          this.#reportJavaDataRouteFailure(error);
           throw error;
         }
       });
@@ -2253,6 +2253,40 @@ export class Coordinator {
     if (this.routedJavaMethods.has(method)) return;
     this.routedJavaMethods.add(method);
     this.logger(`official Java data request ${method} answered`);
+  }
+
+  // One failed data request is not evidence that the official Java extension or
+  // the JDK is unusable, which is the only thing the requirement notice claims.
+  // Official Java answers these by dispatching into JDT LS under its own
+  // five-second command timeout, so the first request against a project that is
+  // still importing can exceed it: the M5 JDK 21 gate saw exactly one
+  // `sts.java.type` time out and raise this notice three seconds before the same
+  // route answered normally, and four further runs never reproduced it. The
+  // classpath path already encodes the rule — a failure inside the handshake
+  // grace window is startup noise, and only one that outlives the window is
+  // real. This is that rule for the route that cannot retry, because its caller
+  // is Spring and the error has to be answered rather than deferred. A route
+  // that is genuinely broken keeps failing past the window, and the classpath
+  // bridge rides the same transport, so nothing is silenced permanently.
+  #reportJavaDataRouteFailure(error) {
+    if (this.closed || error?.name === "AbortError") return;
+    if (this.routedJavaMethods.size > 0) {
+      // The route has already answered in this session, so the requirement the
+      // notice states is demonstrably met and the claim would be false.
+      this.logger("an official Java data request failed after the route had answered");
+      return;
+    }
+    if (this.javaDocumentSeenAt === undefined) {
+      // The same split `#showJavaNotStarted` makes: with no Java file open the
+      // official Java server is not expected to be running at all.
+      this.logger("an official Java data request failed before any Java document opened");
+      return;
+    }
+    if (!this.#javaHandshakeGraceElapsed()) {
+      this.logger("an official Java data request failed inside the handshake grace window");
+      return;
+    }
+    this.#showJavaFailure("java-data-route-failed-v1");
   }
 
   #ownsClasspathCapabilityRequest(message) {
