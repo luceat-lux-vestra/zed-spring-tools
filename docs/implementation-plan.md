@@ -598,6 +598,18 @@ matrix is left" became an easy and wrong reading of the plan.
    the random port is announced; the listening-port, `api.spring.io` and
    offline consequences are then decided on evidence.
 
+   [S019](spikes/019-embedded-mcp-server.md) ran that spike on 2026-07-29 and
+   answered all three. Lifting the one flag is sufficient: the unmodified pinned
+   jar bound `127.0.0.1:<random>`, served all 18 tools over `POST /mcp`, and
+   left the stdio LSP stream byte-clean with diagnostics identical to the
+   control — so R018 hypothesis 6 is closed. The port reaches stderr as well as
+   `window/showMessage`, and the spring.io tools were observed making live
+   outbound calls. **The row is still `planned`**: the spike was scoped to
+   evidence, and the decision it feeds — whether a host-local unauthenticated
+   endpoint, a network dependency that reopens the offline row, and an
+   index-backed payload never observed against a resolved project are worth the
+   agent-callable surface — is the next slice, not this one.
+
 The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
 closed on 2026-07-29; it was separate from all three.
