@@ -233,6 +233,39 @@ user review and manual submission, without handling a GitHub token. Its first
 stock-Zed notification-to-browser gate passed on the macOS tuple; no issue was
 submitted.
 
+## Embedded MCP server evidence
+
+The opt-in embedded MCP server was driven on 2026-07-29 on the tuple below, with
+`boot-java.ai.mcp-server-enabled` and `boot-java.ai.mcp-server-port` written into
+the profile as a user would write them.
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2, arm64 |
+| Zed | 1.12.1 |
+| Official Zed Java extension | 6.8.21 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | `5.2.0.RELEASE` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixture project JRE, as the server reported it | 21.0.11 |
+| Fixture | Maven, Spring Boot 3.5.5, single module |
+
+All 18 tools were called against the resolved project and 17 returned real
+payloads; an unknown-project negative control was refused. Enabling the server
+did not delay teardown — Spring exited 3.70 s after quit with the setting off
+and 3.66 s with it on, leaving no process and no held port.
+
+Two upstream defects were observed and do not affect the other sixteen tools:
+`getResolvedProjectClasspath` fails on a classpath entry whose version is null,
+and `getLatestReleaseInformation` returns `null` where
+`getLatestBootVersionsFromMavenRepo` answers correctly for the same project.
+Neither is confirmed against VS Code, so both are recorded as very likely
+upstream rather than proven so.
+
+This covers one tuple, one Maven fixture, and one project per worktree. Gradle,
+multi-project worktrees, and any actual MCP client connection are untested; the
+endpoint was driven over HTTP directly.
+
 ## Out of scope
 
 Zed SSH remote development and WSL-hosted remote projects are outside the

@@ -648,9 +648,20 @@ matrix is left" became an easy and wrong reading of the plan.
    `boot-java.live-information.automatic-connection.on` was already read at
    launch and passed as `--automatic-live-connection`, so the MCP settings
    reused an established route and the slice came in smaller than described.
-   Promotion to `verified` still needs index-backed tool payloads against a
-   resolved project, which S019 could not observe without the official-Java
-   bridge.
+   **Driven-verified the same day** (inventory version 48), which closes the
+   row. All 18 tools were exercised against a resolved `practices-app` through
+   the shipped opt-in setting, and 17 returned real payloads — beans with source
+   ranges and injection points, request mappings, project diagnostics, and live
+   `api.spring.io` data — with an unknown-project negative control refused. A
+   suspected cleanup regression was measured rather than argued and did not
+   exist: Spring exits in 3.70 s with the setting off and 3.66 s with it on. The
+   run also found two upstream defects, `getResolvedProjectClasspath` throwing
+   on a null classpath-entry version and `getLatestReleaseInformation`
+   returning `null`; both are named in the row and neither blocks it. Evidence:
+   `tmp/mcp-verify-20260729/evidence/`.
+
+   With that, **the `planned` and `implemented` columns are both empty**, which
+   is the state M4 closed on and M6 has now restored after adding a capability.
 
 The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
@@ -674,10 +685,11 @@ of it.
   choosing to rehearse it backwards against an earlier release.
 - The `planned` rows are decided, in either direction. All three were on
   2026-07-29, and the `planned` column is now empty: two moved state, and the
-  embedded MCP server was decided as `build` and then built the same day. What
-  that criterion no longer covers is the row's new state — `implemented` is not
-  a support claim, so a stable release needs the driven run that promotes it, or
-  a release-facing statement that the setting ships unverified.
+  embedded MCP server was decided as `build`, built, and driven-verified the
+  same day, so `implemented` is empty again too. This criterion is met. It is
+  worth noting what it does *not* assert: the MCP row carries two named upstream
+  defects and a single-tuple, Maven-only, one-project-per-worktree limit, so
+  "decided" and "verified" are not "unconditional".
 - At least one preview release has been published under the M6 currency rules
   and observed in use; the observation, not the inventory count, is what the
   criteria are then written from.
