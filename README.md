@@ -14,12 +14,12 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 1 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 45) |
+| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 1 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 46) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Every driven gate so far used a Maven fixture. Gradle is unobserved rather than unsupported, and resolving that is a stated prerequisite to a stable release, not part of the platform matrix |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between — two of the three were decided on 2026-07-29, and its release criteria are a proposal awaiting a decision |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between — all three scope decisions closed on 2026-07-29, though the embedded MCP server's outcome is an opt-in slice still to build, and its release criteria are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -30,9 +30,11 @@ that are empty, so it can be checked line by line against the inventory summary:
 - `implemented` — built, but not yet observed working on any named tuple. Empty
   by design: nothing ships here on the strength of "the code exists".
 - `planned` — not built yet, and no claim is made. One row is open: the embedded
-  Spring Tools MCP server, whose next step is an observation rather than a
-  build. Spring Initializr and the AI explanation commands were decided on
-  2026-07-29 and moved to the states below.
+  Spring Tools MCP server. Its direction was decided on 2026-07-29 — build it,
+  honouring upstream's own two settings and defaulting off — so what remains is
+  the slice, not the question. The label is unchanged because it is accurate:
+  deciding is not delivering. Spring Initializr and the AI explanation commands
+  were decided the same day and moved to the states below.
 - `blocked-zed-api` — Zed lacks the required UI or protocol surface, and the
   missing surface is named exactly.
 - `blocked-upstream` — held up by Spring Tools or the official Java extension.
