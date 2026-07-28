@@ -19,7 +19,7 @@ the required official Java extension.
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Maven and Gradle. The [Gradle axis](docs/gradle-axis-resolution.md) was driven on 2026-07-29 against two Gradle fixtures, including running the generated `./gradlew bootRun` entries; the build system turned out not to be a dividing line anywhere except the Boot upgrade, which upstream gates on Maven. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) still need a Windows host |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) is written but unexecuted, because `5.2.0.RELEASE` is still the newest upstream release. What is left is the preview release itself, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) is written but unexecuted, because `5.2.0.RELEASE` is still the newest upstream release. The [preview release gate](docs/preview-release-gate.md) — what a release here is, what the seven currency rules mean, and how to roll one back — was defined and run once on 2026-07-29; it passes, and the publish itself is a maintainer decision rather than remaining work. What is left is that decision, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -518,9 +518,13 @@ jdtls process resumed.
   can omit ordinary Java symbols until a document edit forces recollection.
 - First-use artifact acquisition can hang until Zed is restarted.
 - Continuous integration runs format, lint, tests, and the WASM release build;
-  there is no packaged release, no way to install without that one artifact
-  download, and no rollback flow between two pinned Spring Tools releases. Once
-  installed, running offline is verified — see [known limitations](LIMITATIONS.md).
+  there is no packaged release and no way to install without that one artifact
+  download. Rollback is now written down in both directions but exercised in
+  neither: leaving a preview is covered by the [preview release
+  gate](docs/preview-release-gate.md), and moving between two pinned Spring
+  Tools releases by the [refresh gate](docs/pinned-release-refresh-gate.md).
+  Once installed, running offline is verified — see
+  [known limitations](LIMITATIONS.md).
 - SSH remote development and WSL-hosted projects are outside the current scope.
 
 Read [known limitations](LIMITATIONS.md) before relying on the extension.
@@ -535,6 +539,10 @@ Read [known limitations](LIMITATIONS.md) before relying on the extension.
   routes, preserved fallbacks, and verification gates
 - [Implementation plan](docs/implementation-plan.md) — milestones and delivery
   gates
+- [Preview release gate](docs/preview-release-gate.md) — what a release here is,
+  the seven currency rules and their checks, and how to roll one back
+- [Pinned release refresh gate](docs/pinned-release-refresh-gate.md) — the
+  procedure for moving to a newer Spring Tools release
 - [Compatibility](COMPATIBILITY.md) — exact verified and untested environments
 - [Decisions](docs/decisions/README.md) — accepted product direction and stack
 - [Research](docs/research/README.md) and [spikes](docs/spikes/README.md) — source
