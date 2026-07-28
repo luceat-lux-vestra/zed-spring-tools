@@ -1,10 +1,9 @@
 # Product implementation and public-development plan
 
-- Status: In progress; M1-M4 complete, M5 in progress — slice 1 (the JDK 21
-  floor on macOS arm64) is driven, slice 2 is blocked on its hardware
-  prerequisite. M6 now records the three non-platform gaps that sit between a
-  finished M5 and a stable release; the one product defect M5 slice 1 found is
-  fixed and driven
+- Status: In progress; M1-M4 complete, M5 slice 1 (the JDK 21 floor on macOS
+  arm64) is driven and its remaining slices are blocked on hardware, so M6 is
+  the active milestone. The one product defect M5 slice 1 found is fixed and
+  driven, and two of M6's three `planned` scope decisions are closed
 - Last updated: 2026-07-29
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -575,14 +574,33 @@ matrix is left" became an easy and wrong reading of the plan.
    is re-audited, which driven gates are re-run, and how a regression is
    reported. Undefined today.
 3. **Closing the three `planned` scope decisions.** Spring Initializr, the AI
-   explanation commands, and the embedded MCP server each wait on a direction
-   decision, not a slice. Shipping a stable release with three rows open in that
-   state is defensible only if each has been explicitly decided — built, or
-   moved to `not-pursued` with its reason — rather than left pending.
+   explanation commands, and the embedded MCP server each waited on a direction
+   decision, not a slice. Shipping a stable release with rows open in that state
+   is defensible only if each has been explicitly decided — built, or moved to
+   `not-pursued` with its reason — rather than left pending.
+
+   **Two are decided as of 2026-07-29** (inventory version 45). Spring
+   Initializr is `not-pursued`: it is not in the pinned VSIX at all, so it was
+   never inside the parity target, and building it would be a new product
+   surface rather than an adaptation. The AI explanation commands are
+   `blocked-zed-api`: nothing about them changed, but `planned` implied a
+   pending slice when what is pending is a Zed API — no Agent-state detection,
+   no Agent dispatch or prefill — plus a privacy decision about transmitting the
+   user's source.
+
+   **The embedded MCP server stays `planned`, pending one observation.** Its
+   blocker turned out to be a fact nobody had checked: the pinned jar ships the
+   server enabled, but this project launches Spring with
+   `-Dspring.main.web-application-type=NONE`, so the embedded Tomcat cannot
+   start and the row's premise is untested in both directions. A spike
+   establishes whether the server starts when that flag is lifted, whether one
+   JVM serves streamable-HTTP MCP and LSP at once (R018 hypothesis 6), and how
+   the random port is announced; the listening-port, `api.spring.io` and
+   offline consequences are then decided on evidence.
 
 The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
-closed on 2026-07-29; it was separate from all three, and all three remain open.
+closed on 2026-07-29; it was separate from all three.
 
 #### Candidate stable-release criteria — proposed, not accepted
 
@@ -597,7 +615,8 @@ of it.
   release-facing Maven-only limitation.
 - A pinned-release refresh gate exists and has been executed at least once, so
   the project has demonstrated it can follow upstream rather than only pin.
-- The three `planned` rows are decided, in either direction.
+- The `planned` rows are decided, in either direction. Two of the original
+  three were on 2026-07-29; the embedded MCP server is the remaining one.
 - At least one preview release has been published under the M6 currency rules
   and observed in use; the observation, not the inventory count, is what the
   criteria are then written from.
