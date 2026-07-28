@@ -538,7 +538,10 @@ port handling).
 
 ### M6: Preview and incremental public releases
 
-Status: not started.
+Status: in progress. The three gaps below are closed as far as this host allows,
+and the preview release gate is [defined and has been run
+once](preview-release-gate.md). What remains is the publish itself, which is the
+maintainer's to fire, and the two sub-axes that need a Windows host.
 
 Publish experimental previews only when their capability inventory,
 compatibility table, tested matrix, known blockers, third-party notices,
@@ -713,6 +716,44 @@ The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
 closed on 2026-07-29; it was separate from all three.
 
+#### The preview release itself, and what "current" means
+
+The three gaps above are about being *ready* to release. They say nothing about
+what a release of this project actually is, and the milestone's own opening
+sentence — publish previews only when seven named surfaces are "current" — names
+seven things and defines none of them, so it could be neither passed nor failed.
+
+**Defined on 2026-07-29** in the [preview release
+gate](preview-release-gate.md), which turns that sentence into a runnable gate:
+one rule per surface, each with a check and a blocking verdict, plus a manual
+publish procedure and the rollback instructions that were missing entirely. It
+adds no release automation, because AGENTS.md puts packaging, release automation
+and product CI behind their own direction decision and none exists.
+
+Two findings from writing it are worth stating here rather than only there.
+First, **this project does not control its own distribution channel**: a Zed
+extension reaches users through the registry, and
+[zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875)
+is still open, so a preview cannot mean "installable from Zed". It means a
+tagged commit, a GitHub pre-release, and the commit the registry pointer
+targets. Second, preview identity is carried by **GitHub's pre-release flag, not
+by the version string** — `extension.toml`'s version is what the registry would
+publish and must stay plain SemVer — which keeps this milestone's standing rule
+that a version number is not a stability signal from being smuggled back in.
+
+**The gate was then run once, against `main` at the slice-5 merge.** Four rules
+passed and three found currency drift, none of it a product fault: `LIMITATIONS.md`
+still said 46 capabilities were proven against an actual 47, because the prose
+count went stale when the MCP row was promoted in #78 and only the README and the
+inventory summary were updated; `THIRD_PARTY_NOTICES.md` covered the VSIX, the
+grammar and the proxy patches but not the 106 locked Rust crates that are
+compiled into the WASM the registry builds and serves; and no rollback
+instruction existed in either direction. All three are fixed. The gate now
+passes, and no preview has been published.
+
+That last point is the honest state of this milestone: the readiness work is
+done on this host, and the release is a decision rather than a task.
+
 #### Candidate stable-release criteria — proposed, not accepted
 
 Recorded so the question is answerable rather than open-ended. These are a
@@ -744,7 +785,12 @@ of it.
   "decided" and "verified" are not "unconditional".
 - At least one preview release has been published under the M6 currency rules
   and observed in use; the observation, not the inventory count, is what the
-  criteria are then written from.
+  criteria are then written from. The rules [now exist and have been run
+  once](preview-release-gate.md), which is what makes "published under them" a
+  checkable statement rather than a gesture. Both halves of this criterion are
+  still open, and they are open for different reasons: publishing is a
+  maintainer decision that could be taken today, while being *observed in use*
+  depends on users this project does not yet have and cannot be shortcut.
 
 The private official-Java provider transport remains a structural risk that no
 criterion removes. The versioned adapter narrows it; a stable release should

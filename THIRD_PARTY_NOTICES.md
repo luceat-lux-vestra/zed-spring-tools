@@ -1,7 +1,10 @@
 # Third-party material and boundaries
 
-This file describes the current experimental source tree. It is not a complete
-notice inventory for a future product distribution.
+This file covers both things a release of this project puts in front of a user:
+the experimental source tree, and the WebAssembly binary the Zed extension
+registry builds from it. It is not a complete notice inventory for a future
+repackaged product distribution, which remains an open question — see the Spring
+Tools section below.
 
 ## No third-party runtime binaries in Git
 
@@ -60,3 +63,39 @@ requires a grammar.
 
 Zed fetches and builds this grammar at extension install time. No grammar source
 or generated parser is committed here.
+
+## Rust dependencies compiled into the distributed WebAssembly
+
+This repository commits no binary, but the extension registry builds
+`zed-spring-tools` from this source on its own runners and serves the resulting
+`extension.wasm` to every user. The Rust dependency tree is statically linked
+into that binary, so those crates are redistributed even though they appear here
+only as a lockfile. They are listed for that reason.
+
+`Cargo.lock` is the authoritative pinned set: 106 packages besides this crate,
+all resolved through crates.io with a recorded checksum. The four direct
+dependencies are:
+
+| Crate | Version | License |
+| --- | --- | --- |
+| `zed_extension_api` | 0.7.0 | Apache-2.0 |
+| `flate2` | 1.1.9 | MIT OR Apache-2.0 |
+| `sha2` | 0.11.0 | MIT OR Apache-2.0 |
+| `zip` | 6.0.0 | MIT |
+
+Across the whole locked tree, 104 of the 106 packages were read from the local
+cargo registry cache and every one carries a permissive license: `MIT OR
+Apache-2.0` and its orderings dominate, alongside `Unicode-3.0` for the ICU
+crates, `Zlib` for `foldhash`, `0BSD OR MIT OR Apache-2.0` for `adler2`,
+`Unlicense OR MIT` for `memchr`, and `MIT OR Apache-2.0 OR LGPL-2.1-or-later`
+for `r-efi`, whose disjunction permits taking MIT or Apache-2.0. No copyleft-only
+license appears.
+
+Two packages, `derive_arbitrary` 1.4.2 and `linux-raw-sys` 0.12.1, were not
+present in the local cache and are therefore **unread rather than cleared**.
+Neither is reachable on the `wasm32-wasip2` target this extension builds for, but
+that is an inference from the target and not a license reading.
+
+The Java bridge under `bridge/` is this project's own source, compiled by
+`build.rs` with `javac --release 21` and embedded in the WASM. It adds no
+third-party dependency.
