@@ -572,7 +572,25 @@ matrix is left" became an easy and wrong reading of the plan.
    and rollback between two pinned releases has never been exercised because
    only one has ever been pinned. What is needed is a written refresh gate: what
    is re-audited, which driven gates are re-run, and how a regression is
-   reported. Undefined today.
+   reported.
+
+   **Defined on 2026-07-29** in the [pinned release refresh
+   gate](pinned-release-refresh-gate.md): a mechanical re-pin whose artifact
+   digests fail closed, a source re-audit that diffs the 118 keys,
+   `problem-types.json`, the absent-key defaults, the commands and — added
+   because the MCP work found settings that exist nowhere else — the VSIX's own
+   client launcher, then driven gates tiered so that a refresh is finishable.
+   Tier A always runs, Tier B is selected by what the audit found, and Tier C is
+   recorded as not re-run rather than implied to pass. A regression moves the
+   inventory row out of `verified` and is reported, not reverted.
+
+   **It has not been executed, and cannot be today**: `5.2.0.RELEASE`
+   (2026-06-10) is still the newest upstream release, so there is nothing to
+   refresh to. The stable-release criterion asks for a gate that exists *and*
+   has run once, so that criterion is half met. The document records one route
+   that does not wait on upstream — rehearsing the gate backwards against an
+   earlier release, which would also exercise the never-tested rollback path —
+   and does not schedule it.
 3. **Closing the three `planned` scope decisions.** Spring Initializr, the AI
    explanation commands, and the embedded MCP server each waited on a direction
    decision, not a slice. Shipping a stable release with rows open in that state
@@ -650,7 +668,10 @@ of it.
 - The Gradle axis is resolved per capability into driven evidence or a
   release-facing Maven-only limitation.
 - A pinned-release refresh gate exists and has been executed at least once, so
-  the project has demonstrated it can follow upstream rather than only pin.
+  the project has demonstrated it can follow upstream rather than only pin. The
+  gate [now exists](pinned-release-refresh-gate.md); the execution half is
+  blocked on upstream publishing anything newer than `5.2.0.RELEASE`, or on
+  choosing to rehearse it backwards against an earlier release.
 - The `planned` rows are decided, in either direction. All three were on
   2026-07-29, and the `planned` column is now empty: two moved state, and the
   embedded MCP server was decided as `build` and then built the same day. What
