@@ -1,0 +1,50 @@
+// Gradle mirror of tests/fixtures/spring-boot-basic. The Java sources, the
+// shared metadata file, and both resource trees are copied from it unchanged, so
+// any difference a driven run finds between the two fixtures is a build-system
+// difference and not a fixture difference. That is the whole point of this
+// fixture: it is the control arm for the Gradle axis (docs/gradle-axis-resolution.md).
+
+plugins {
+    id 'java'
+    id 'application'
+    // Deliberately one patch behind the Maven fixture's 3.5.5. Spring's version
+    // validation publishes `Newer patch version of Spring Boot available` against
+    // IProjectBuild.getBuildFile(), and the Gradle question is whether that
+    // diagnostic anchors on build.gradle. A current version would publish nothing
+    // and the observation would be indistinguishable from a broken route.
+    id 'org.springframework.boot' version '3.5.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'dev.zed.spring'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // Same reasoning as the Maven fixture: Spring indexes statically and never
+    // starts the app, so the JPA annotations are what the query intelligence
+    // needs; H2 is runtime-only and a plain build still resolves without a
+    // database.
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+    // Generates spring-configuration-metadata.json for the fixture's own
+    // @ConfigurationProperties, without which hover and property-to-definition
+    // have nothing project-provided to resolve for fixture.greeting.*.
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+}
+
+// Official Java 6.8.23's task helper runs `gradle run -PmainClass=<fqn>`; honour
+// that property while a plain `gradle run` still starts the fixture.
+application {
+    mainClass = providers.gradleProperty('mainClass').orElse('dev.zed.spring.fixture.FixtureApplication')
+}

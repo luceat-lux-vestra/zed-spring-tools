@@ -6,6 +6,12 @@
 !tests/fixtures/spring-boot-basic/.zed/
 tests/fixtures/spring-boot-basic/.zed/*
 !tests/fixtures/spring-boot-basic/.zed/settings.json
+# The Gradle fixture is a copy of the same fixture on a Gradle build, so it needs
+# the identical exception — otherwise the two arms differ by their settings file
+# and no comparison between them means anything.
+!tests/fixtures/spring-boot-gradle/.zed/
+tests/fixtures/spring-boot-gradle/.zed/*
+!tests/fixtures/spring-boot-gradle/.zed/settings.json
 *.log
 tmp/
 target/

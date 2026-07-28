@@ -1,0 +1,13 @@
+# Build outputs and the third-party Gradle wrapper binary are not committed (the
+# repository does not commit third-party binaries), matching the spike fixture's
+# rule and the Maven fixture's ignored `target/`. Before a driven run:
+#
+#   gradle wrapper --gradle-version 9.5.1
+#   ./gradlew classes
+#
+# Both are prerequisites, not conveniences. `gradlew` is what the run/debug
+# generator is expected to select over the bare `gradle`, and Modulith metadata
+# generation runs against compiled classes.
+.gradle/
+build/
+gradle/wrapper/gradle-wrapper.jar
