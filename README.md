@@ -420,13 +420,17 @@ the Rust/WASM Zed adapter, the Node coordinator, the reviewed Java bridge, and
 the versioned coordination protocol. It does not provide a reduced or
 self-managed JDT fallback.
 
-The coordinator now retries a classpath-listener handshake that times out while
-the official Java server is still importing the project. Regression tests cover
-transient recovery, grace-window exhaustion, and immediate reporting for
-unrelated Java-route failures. A 2026-07-22 real-Zed run paused the isolated
-jdtls process, observed the official-Java route's five-second bridge timeout and
-bounded re-enablement without a misleading compatibility notice, then observed
-bridge registration after that same jdtls process resumed.
+The coordinator retries a classpath-listener handshake that times out while the
+official Java server is still importing the project, and applies the same rule
+to Spring's Java data requests: a failure is startup noise until it outlives the
+handshake window, and it can never claim an incompatibility once the route has
+answered. Regression tests cover transient recovery, grace-window exhaustion,
+and reporting on both routes. Two real-Zed runs paused the isolated jdtls
+process to force official Java's five-second timeout — 2026-07-22 for the
+classpath handshake, 2026-07-29 for the data route, the latter A/B'd against a
+build without the rule, which raised the notice fifteen seconds into an ordinary
+project import. Both observed bounded recovery in the same session once that
+jdtls process resumed.
 
 ## Important limitations
 

@@ -178,34 +178,102 @@ test("an answered Java data request is logged once per method, with no parameter
   assert.ok(!logs[0].includes("Integer"), "route log must not carry request parameters");
 });
 
-test("a failed Java data request is not logged and reports the requirement immediately", async () => {
+// A failing data route is built the same way in every case below: only the
+// session state around it changes, which is the whole point of the fix.
+function failingDataRouteCoordinator({ javaHandshakeGraceMs, answerFirst = false } = {}) {
   const logs = [];
+  const springWrites = [];
   const zedWrites = [];
+  let answered = answerFirst;
   const coordinator = new Coordinator({
-    sendSpring() {},
+    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: {
       supportsSpringClientMethod: () => true,
       executeSpringClientMethod: async () => {
-        throw new Error("official Java route was not found");
+        if (answered) {
+          answered = false;
+          return { name: "example.Demo" };
+        }
+        throw new Error("official Java rejected command sts.java.type");
       },
     },
     worktree: "/tmp/project",
     logger: (message) => logs.push(message),
+    ...(javaHandshakeGraceMs === undefined ? {} : { javaHandshakeGraceMs }),
   });
-  await coordinator.handleSpringMessage({
+  const request = (id) => coordinator.handleSpringMessage({
     jsonrpc: "2.0",
-    id: 9,
+    id,
     method: "sts/javaType",
     params: {},
   });
-  assert.deepEqual(logs, []);
-  assert.equal(zedWrites.length, 1);
-  assert.equal(zedWrites[0].method, "window/showMessageRequest");
-  assert.match(zedWrites[0].params.message, /requires a working official Java extension/);
-  assert.match(zedWrites[0].params.message, /java-data-route-failed-v1/);
-  assert.match(zedWrites[0].params.message, /Nothing is submitted/);
-  assert.deepEqual(zedWrites[0].params.actions, [{ title: "Not now" }]);
+  const openJavaDocument = () =>
+    coordinator.observeZedMessage({
+      jsonrpc: "2.0",
+      method: "textDocument/didOpen",
+      params: {
+        textDocument: {
+          uri: "file:///tmp/project/src/main/java/com/example/Demo.java",
+          languageId: "java",
+          version: 1,
+          text: "",
+        },
+      },
+    });
+  return { coordinator, logs, springWrites, zedWrites, request, openJavaDocument };
+}
+
+test("a data route that fails inside the handshake grace window claims no incompatibility", async () => {
+  // The M5 JDK 21 gate's defect: one `sts.java.type` exceeded official Java's
+  // own five-second command timeout ten seconds after the Java document opened,
+  // and three seconds before the same route answered normally.
+  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 60_000 });
+  gate.openJavaDocument();
+  await gate.request(9);
+  assert.deepEqual(gate.zedWrites, [], "a transient failure must not claim the JDK is unusable");
+  assert.ok(gate.logs.includes("an official Java data request failed inside the handshake grace window"));
+  // Suppressing the notice is presentation-only: Spring is still told it failed.
+  assert.equal(gate.springWrites.length, 1);
+  assert.equal(gate.springWrites[0].id, 9);
+  assert.match(gate.springWrites[0].error.message, /official Java rejected command/);
+});
+
+test("a data route that keeps failing past the grace window reports the requirement", async () => {
+  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0 });
+  gate.openJavaDocument();
+  await gate.request(9);
+  assert.equal(gate.zedWrites.length, 1);
+  assert.equal(gate.zedWrites[0].method, "window/showMessageRequest");
+  assert.match(gate.zedWrites[0].params.message, /requires a working official Java extension/);
+  assert.match(gate.zedWrites[0].params.message, /java-data-route-failed-v1/);
+  assert.match(gate.zedWrites[0].params.message, /Nothing is submitted/);
+  assert.deepEqual(gate.zedWrites[0].params.actions, [{ title: "Not now" }]);
+});
+
+test("a data route that has answered never claims the requirement is unmet", async () => {
+  // The notice states that a working official Java extension and JDK are
+  // required. A route that already answered proves both, whatever fails later.
+  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0, answerFirst: true });
+  gate.openJavaDocument();
+  await gate.request(1);
+  await gate.request(2);
+  assert.deepEqual(gate.zedWrites, []);
+  assert.deepEqual(gate.logs, [
+    "a Java document was opened; the official Java route is now expected",
+    "official Java data request sts/javaType answered",
+    "an official Java data request failed after the route had answered",
+  ]);
+});
+
+test("a data route failure before any Java document is not an incompatibility", async () => {
+  // Nothing has started the official Java server yet, so there is no route to
+  // be incompatible with; `#showJavaNotStarted` owns this case.
+  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0 });
+  await gate.request(9);
+  assert.deepEqual(gate.zedWrites, []);
+  assert.ok(gate.logs.includes("an official Java data request failed before any Java document opened"));
+  assert.equal(gate.springWrites.length, 1);
 });
 
 test("ordinary LSP traffic remains visible to Zed", async () => {
