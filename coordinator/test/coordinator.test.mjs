@@ -16,6 +16,7 @@ import {
   parseOptions,
   run,
   sanitizedEnvironment,
+  springArguments,
   validateCompatibility,
 } from "../src/main.mjs";
 import { LspDecoder } from "../src/lsp.mjs";
@@ -38,11 +39,60 @@ test("product arguments are positional, absolute, and shell independent", () => 
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
     "--automatic-live-connection", "true",
+    "--mcp-server-port", "off",
   ]);
   assert.equal(options.worktree, "/tmp/work tree");
   assert.equal(options.hostOs, "macos");
   assert.equal(options.automaticLiveConnection, true);
+  assert.equal(options.mcpServerPort, null);
   assert.throws(() => parseOptions(["--worktree", "/tmp"]));
+});
+
+test("the embedded MCP server port is a port or nothing", () => {
+  const withPort = (value) =>
+    parseOptions([
+      "--worktree", "/tmp/work",
+      "--java", "/tmp/jdk/bin/java",
+      "--spring-server", "/tmp/spring/server.jar",
+      "--spring-home", "/tmp/spring",
+      "--java-work-dir", "/tmp/extensions/work/java",
+      "--compatibility", "/tmp/runtime/providers.json",
+      "--host-os", "macos",
+      "--extension-version", "0.1.0-alpha.1",
+      "--automatic-live-connection", "false",
+      "--mcp-server-port", value,
+    ]);
+  assert.equal(withPort("off").mcpServerPort, null);
+  assert.equal(withPort("50627").mcpServerPort, 50627);
+  // Spring reads 0 as "pick a free port", which upstream also allows.
+  assert.equal(withPort("0").mcpServerPort, 0);
+  // A malformed value must fail the launch rather than degrade into a default,
+  // because the degraded outcome would be a listening socket nobody asked for.
+  for (const invalid of ["70000", "-1", "12.5", "true", "50627 ", "0x80"]) {
+    assert.throws(() => withPort(invalid), /embedded MCP server port option is invalid/);
+  }
+});
+
+test("the MCP port is the only thing that changes the Spring launch vector", () => {
+  const off = springArguments("/tmp/spring/server.jar", null);
+  const on = springArguments("/tmp/spring/server.jar", 50627);
+
+  // Default launch: unchanged from every release before this capability, which
+  // is what keeps the embedded server absent unless a user asks for it.
+  assert.ok(off.includes("-Dspring.main.web-application-type=NONE"));
+  assert.ok(!off.some((argument) => argument.startsWith("-Dserver.port=")));
+
+  // Opted in: the port argument replaces the flag rather than joining it. Both
+  // together would leave the jar's own `server.port=0` overridden but the web
+  // context still disabled, so the server would never bind.
+  assert.ok(on.includes("-Dserver.port=50627"));
+  assert.ok(!on.includes("-Dspring.main.web-application-type=NONE"));
+
+  assert.equal(off.length, on.length);
+  assert.deepEqual(
+    off.filter((argument) => argument !== "-Dspring.main.web-application-type=NONE"),
+    on.filter((argument) => argument !== "-Dserver.port=50627"),
+  );
 });
 
 test("environment allowlist excludes unrelated secrets", () => {
@@ -1369,6 +1419,7 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
     "--automatic-live-connection", "false",
+    "--mcp-server-port", "off",
   ], {
     input,
     output: new PassThrough(),

@@ -32,12 +32,10 @@ impl zed::Extension for SpringToolsExtension {
             .map_err(|error| format!("resolve extension work directory: {error}"))?;
         let java_work = platform::official_java_work_dir(&extension_work)?;
         let root = worktree.root_path();
-        let automatic_live_connection =
-            zed::settings::LspSettings::for_worktree(SERVER_ID, worktree)
-                .ok()
-                .and_then(|settings| settings.settings)
-                .as_ref()
-                .is_some_and(automatic_live_connection_enabled);
+        let user = zed::settings::LspSettings::for_worktree(SERVER_ID, worktree)
+            .ok()
+            .and_then(|settings| settings.settings);
+        let launch = LaunchSettings::from_user(user.as_ref());
 
         Ok(zed::Command {
             command: node,
@@ -48,7 +46,7 @@ impl zed::Extension for SpringToolsExtension {
                 &java,
                 &java_work,
                 zed::current_platform().0,
-                automatic_live_connection,
+                launch,
             )?,
             env: worktree.shell_env(),
         })
@@ -233,6 +231,72 @@ fn automatic_live_connection_enabled(configuration: &zed::serde_json::Value) -> 
         == Some(true)
 }
 
+// VS Code's default for `boot-java.ai.mcp-server-port`. Only reachable once the
+// user has also set `mcp-server-enabled`, so it opens no port by itself.
+const MCP_SERVER_PORT_DEFAULT: u16 = 50627;
+
+// The user settings that shape how the Spring process is launched, as opposed to
+// the far larger set forwarded to it afterwards through
+// `spring_workspace_configuration`. They are read once, at launch, because
+// neither can be applied to a process that is already running.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct LaunchSettings {
+    automatic_live_connection: bool,
+    mcp_server_port: Option<u16>,
+}
+
+impl LaunchSettings {
+    fn from_user(configuration: Option<&zed::serde_json::Value>) -> Self {
+        Self {
+            automatic_live_connection: configuration.is_some_and(automatic_live_connection_enabled),
+            mcp_server_port: configuration.and_then(mcp_server_port),
+        }
+    }
+}
+
+// The pinned VS Code extension's launcher decides this before starting the
+// server, and reproducing its branch is what keeps the two products at parity:
+//
+//   enabled === true && port >= 0 && port <= 655536
+//     ? "-Dserver.port=" + port
+//     : "-Dspring.main.web-application-type=NONE"
+//
+// `None` means "launch exactly as this extension always has", which is the
+// default, because `mcp-server-enabled` defaults false upstream too. So the
+// embedded MCP server, its unauthenticated loopback endpoint, and the
+// `api.spring.io` tools it exposes stay absent until a user asks for them.
+//
+// Two deliberate departures from that expression:
+//
+// 1. The upper bound is 65535, not upstream's 655536. That literal is past the
+//    last valid TCP port, so upstream would forward a port like 70000 to Spring
+//    and fail the whole server start; here it reads as "not a port", which
+//    leaves the server running with MCP off.
+// 2. Any malformed value — a string, a float, a negative — disables the server
+//    rather than falling back to the default port. Silently opening a listening
+//    socket on a value the user did not write is the wrong failure direction for
+//    a network-facing setting.
+//
+// Port `0` is accepted and is upstream's behaviour: Spring then picks a random
+// free port, which only `EmbeddedMcpServer`'s `window/showMessage` and Tomcat's
+// own stderr line report. A user who wants a predictable endpoint sets a port.
+fn mcp_server_port(configuration: &zed::serde_json::Value) -> Option<u16> {
+    let ai = configuration
+        .get("boot-java")
+        .and_then(|boot| boot.get("ai"))?;
+    if ai
+        .get("mcp-server-enabled")
+        .and_then(|value| value.as_bool())
+        != Some(true)
+    {
+        return None;
+    }
+    match ai.get("mcp-server-port") {
+        None => Some(MCP_SERVER_PORT_DEFAULT),
+        Some(value) => u16::try_from(value.as_u64()?).ok(),
+    }
+}
+
 // Deep-merge objects key by key; any non-object user value replaces ours
 // outright, so a user can turn an enabled default back off.
 fn merge_configuration(target: &mut zed::serde_json::Value, source: zed::serde_json::Value) {
@@ -284,7 +348,7 @@ fn coordinator_arguments(
     java: &str,
     java_work: &Path,
     os: zed::Os,
-    automatic_live_connection: bool,
+    launch: LaunchSettings,
 ) -> Result<Vec<String>, String> {
     Ok(vec![
         platform::path_string(&runtime.coordinator)?,
@@ -310,7 +374,14 @@ fn coordinator_arguments(
         "--extension-version".to_owned(),
         EXTENSION_VERSION.to_owned(),
         "--automatic-live-connection".to_owned(),
-        automatic_live_connection.to_string(),
+        launch.automatic_live_connection.to_string(),
+        // Resolved here rather than forwarding both settings, so the coordinator
+        // applies one decision instead of re-deriving it. `off` keeps the
+        // argument vector fixed-arity, which is the contract parseOptions checks.
+        "--mcp-server-port".to_owned(),
+        launch
+            .mcp_server_port
+            .map_or_else(|| "off".to_owned(), |port| port.to_string()),
     ])
 }
 
@@ -339,7 +410,10 @@ mod tests {
             "/jdks/temurin 25/bin/java",
             Path::new("/extensions/work/java"),
             zed::Os::Mac,
-            false,
+            LaunchSettings {
+                automatic_live_connection: false,
+                mcp_server_port: None,
+            },
         )
         .unwrap();
         assert_eq!(arguments[0], "/extension work/runtime/main.mjs");
@@ -348,11 +422,114 @@ mod tests {
         assert_eq!(arguments[10], "/extensions/work/java");
         assert_eq!(arguments[16], EXTENSION_VERSION);
         assert_eq!(arguments[18], "false");
+        assert_eq!(arguments[19], "--mcp-server-port");
+        assert_eq!(arguments[20], "off");
         assert!(!arguments.iter().any(|argument| argument == "sh"));
         assert!(
             include_str!("../extension.toml")
                 .contains(&format!("version = \"{EXTENSION_VERSION}\""))
         );
+    }
+
+    #[test]
+    fn embedded_mcp_server_is_absent_until_a_user_opts_in() {
+        // The whole point of the default: no listening port, no `api.spring.io`
+        // reachability, and a launch identical to every release before this one.
+        assert_eq!(mcp_server_port(&zed::serde_json::json!({})), None);
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({ "boot-java": {} })),
+            None
+        );
+        // A port without the switch must stay off — VS Code gates on `enabled`,
+        // and configuring a port is not the same as asking for a server.
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({
+                "boot-java": { "ai": { "mcp-server-port": 51000 } }
+            })),
+            None
+        );
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({
+                "boot-java": { "ai": { "mcp-server-enabled": false, "mcp-server-port": 51000 } }
+            })),
+            None
+        );
+    }
+
+    #[test]
+    fn opting_in_uses_the_upstream_default_port_or_the_users_own() {
+        // Enabled with no port is VS Code's own default, 50627.
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({
+                "boot-java": { "ai": { "mcp-server-enabled": true } }
+            })),
+            Some(MCP_SERVER_PORT_DEFAULT)
+        );
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({
+                "boot-java": { "ai": { "mcp-server-enabled": true, "mcp-server-port": 51000 } }
+            })),
+            Some(51000)
+        );
+        // Upstream accepts 0, which makes Spring pick a random free port.
+        assert_eq!(
+            mcp_server_port(&zed::serde_json::json!({
+                "boot-java": { "ai": { "mcp-server-enabled": true, "mcp-server-port": 0 } }
+            })),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn an_unusable_mcp_port_disables_the_server_rather_than_guessing() {
+        // Upstream's own bound is 655536, which is past the last TCP port and
+        // would hand Spring a value that fails the entire server start. Reject
+        // it here instead, and never silently substitute the default port —
+        // opening a socket the user did not write is the wrong direction.
+        for port in [
+            zed::serde_json::json!(70000),
+            zed::serde_json::json!(655536),
+            zed::serde_json::json!(-1),
+            zed::serde_json::json!("51000"),
+            zed::serde_json::json!(51000.5),
+        ] {
+            assert_eq!(
+                mcp_server_port(&zed::serde_json::json!({
+                    "boot-java": { "ai": { "mcp-server-enabled": true, "mcp-server-port": port } }
+                })),
+                None,
+                "port {port} must disable the embedded MCP server"
+            );
+        }
+    }
+
+    #[test]
+    fn an_opted_in_mcp_port_reaches_the_coordinator_contract() {
+        let runtime = runtime::RuntimePaths {
+            coordinator: "/extension work/runtime/main.mjs".into(),
+            bridge: "/extension work/runtime/bridge.jar".into(),
+            compatibility: "/extension work/runtime/providers.json".into(),
+        };
+        let spring = artifacts::SpringPaths {
+            root: "/extension work/spring".into(),
+            server: "/extension work/spring/server.jar".into(),
+            bundles: Vec::new(),
+        };
+        let arguments = coordinator_arguments(
+            &runtime,
+            &spring,
+            "/work",
+            "/jdk/bin/java",
+            Path::new("/extensions/work/java"),
+            zed::Os::Linux,
+            LaunchSettings {
+                automatic_live_connection: false,
+                mcp_server_port: Some(50627),
+            },
+        )
+        .unwrap();
+        assert_eq!(arguments[19], "--mcp-server-port");
+        assert_eq!(arguments[20], "50627");
     }
 
     #[test]

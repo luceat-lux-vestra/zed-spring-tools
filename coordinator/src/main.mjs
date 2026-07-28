@@ -3758,6 +3758,7 @@ export function parseOptions(arguments_) {
     ["--host-os", "hostOs"],
     ["--extension-version", "extensionVersion"],
     ["--automatic-live-connection", "automaticLiveConnection"],
+    ["--mcp-server-port", "mcpServerPort"],
   ];
   if (arguments_.length !== fields.length * 2) {
     throw new Error("coordinator arguments do not match the product contract");
@@ -3769,10 +3770,11 @@ export function parseOptions(arguments_) {
     if (arguments_[index * 2] !== flag || typeof value !== "string" || value.length === 0) {
       throw new Error(`missing required coordinator argument ${flag}`);
     }
-    values[name] =
-      name === "hostOs" || name === "extensionVersion" || name === "automaticLiveConnection"
-        ? value
-        : path.resolve(value);
+    values[name] = new Set(["hostOs", "extensionVersion", "automaticLiveConnection", "mcpServerPort"]).has(
+      name,
+    )
+      ? value
+      : path.resolve(value);
   }
   if (!new Set(["macos", "linux", "windows"]).has(values.hostOs)) {
     throw new Error("coordinator host OS is invalid");
@@ -3784,6 +3786,17 @@ export function parseOptions(arguments_) {
     throw new Error("automatic live connection option is invalid");
   }
   values.automaticLiveConnection = values.automaticLiveConnection === "true";
+  // `off` is the default and the only non-numeric value the extension emits.
+  // Anything else must be a plain TCP port, so a malformed value fails the
+  // launch loudly instead of silently opening a listening socket the user did
+  // not ask for — the fail-closed direction for a network-facing option.
+  if (values.mcpServerPort === "off") {
+    values.mcpServerPort = null;
+  } else if (/^(0|[1-9][0-9]{0,4})$/.test(values.mcpServerPort) && Number(values.mcpServerPort) <= 65535) {
+    values.mcpServerPort = Number(values.mcpServerPort);
+  } else {
+    throw new Error("embedded MCP server port option is invalid");
+  }
   return values;
 }
 
@@ -3940,12 +3953,16 @@ export async function run(arguments_, dependencies = {}) {
     throw new Error("JDK 21 or newer is required by Spring Tools");
   }
 
-  const child = (dependencies.spawn ?? spawn)(options.java, springArguments(options.springServer), {
-    cwd: options.worktree,
-    env: environment,
-    shell: false,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const child = (dependencies.spawn ?? spawn)(
+    options.java,
+    springArguments(options.springServer, options.mcpServerPort),
+    {
+      cwd: options.worktree,
+      env: environment,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
   const input = dependencies.input ?? process.stdin;
   const output = dependencies.output ?? process.stdout;
   const errorOutput = dependencies.errorOutput ?? process.stderr;
@@ -4023,12 +4040,24 @@ export async function run(arguments_, dependencies = {}) {
   return { child, coordinator, stop };
 }
 
-function springArguments(server) {
+// The pinned VS Code extension's own launcher makes exactly this choice before
+// starting the server: with the embedded MCP server enabled it passes
+// `-Dserver.port=<port>`, and otherwise it passes
+// `-Dspring.main.web-application-type=NONE` so the bundled Tomcat cannot start.
+// The two are mutually exclusive because the jar ships the MCP server enabled
+// with `server.port=0`; the port argument is what overrides that random port.
+//
+// The extension resolves both user settings into this single value, so the
+// decision lives in one place: a number means the user opted in, and `null`
+// means the default, which keeps this vector byte-identical to the pre-MCP one.
+export function springArguments(server, mcpServerPort = null) {
   return [
     "-Xmx1024m",
     "-Dspring.config.location=classpath:/application.properties",
     "-Djdk.util.zip.disableZip64ExtraFieldValidation=true",
-    "-Dspring.main.web-application-type=NONE",
+    mcpServerPort === null
+      ? "-Dspring.main.web-application-type=NONE"
+      : `-Dserver.port=${mcpServerPort}`,
     "-Xlog:jni+resolve=off",
     "-jar",
     server,

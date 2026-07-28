@@ -14,12 +14,12 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 1 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 46) |
+| Capability inventory | 59 tracked: 46 `verified`, 1 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 47) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Every driven gate so far used a Maven fixture. Gradle is unobserved rather than unsupported, and resolving that is a stated prerequisite to a stable release, not part of the platform matrix |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between — all three scope decisions closed on 2026-07-29, though the embedded MCP server's outcome is an opt-in slice still to build, and its release criteria are a proposal awaiting a decision |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between — all three scope decisions closed on 2026-07-29 and the embedded MCP server they turned on was built the same day as an off-by-default setting, still awaiting a driven run; its release criteria are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -27,13 +27,14 @@ components. The row above carries all seven inventory states, including the two
 that are empty, so it can be checked line by line against the inventory summary:
 
 - `verified` — observed working on a named runtime tuple.
-- `implemented` — built, but not yet observed working on any named tuple. Empty
-  by design: nothing ships here on the strength of "the code exists".
-- `planned` — not built yet, and no claim is made. One row is open: the embedded
-  Spring Tools MCP server. Its direction was decided on 2026-07-29 — build it,
-  honouring upstream's own two settings and defaulting off — so what remains is
-  the slice, not the question. The label is unchanged because it is accurate:
-  deciding is not delivering. Spring Initializr and the AI explanation commands
+- `implemented` — built, but not yet observed working on any named tuple. One
+  row is here: the embedded Spring Tools MCP server, built on 2026-07-29 behind
+  an off-by-default setting. Nothing ships as working on the strength of "the
+  code exists", so it stays out of *What works today* until a driven run shows
+  its tools answering against a real project.
+- `planned` — not built yet, and no claim is made. Currently empty: the last row
+  in this state was the embedded MCP server, whose direction was decided and
+  then built on 2026-07-29. Spring Initializr and the AI explanation commands
   were decided the same day and moved to the states below.
 - `blocked-zed-api` — Zed lacks the required UI or protocol surface, and the
   missing surface is named exactly.
@@ -408,6 +409,51 @@ embedded credentials: Zed settings are ordinary files, and a project-level
 `.zed/settings.json` is easy to commit by accident. The driven gate used a
 localhost target over `http`, so a physically remote host and a
 `service:jmx:rmi://` URL remain untested.
+
+`boot-java.ai.mcp-server-enabled` starts Spring Tools' own embedded MCP server,
+which lets an AI agent query the Spring index directly — the project list, bean
+details and usage, beans by type, request mappings, stereotypes and components,
+resolved classpath, Boot and Java versions, Spring Tools diagnostics, plus live
+`api.spring.io` release and support-generation lookups. It is **off by default**,
+exactly as in the VS Code extension, and while it is off this extension launches
+Spring precisely as it always has.
+
+```json
+{
+  "lsp": {
+    "spring-tools": {
+      "settings": {
+        "boot-java": {
+          "ai": { "mcp-server-enabled": true, "mcp-server-port": 50627 }
+        }
+      }
+    }
+  }
+}
+```
+
+`mcp-server-port` defaults to `50627` and is ignored unless the server is
+enabled. Read what turning this on means before you do:
+
+- The endpoint is **unauthenticated**. It binds to loopback only, so it is not
+  reachable from the network, but any process on your machine can call it and
+  read your beans, endpoints, and classpath through it.
+- Five of the tools call `api.spring.io` at request time. With the server off,
+  this extension makes no runtime network call at all; enabling it changes that
+  for those tools.
+- Point your MCP client at `http://localhost:<port>/mcp`, which speaks
+  streamable HTTP. Zed supports remote MCP servers, but connecting it is your
+  configuration step — this extension starts the server and does not register it
+  as an MCP server on your behalf.
+- Setting the port to `0` reproduces upstream's behaviour of letting Spring pick
+  a free port. The chosen port is then only reported in the server's own log, so
+  prefer a fixed port unless you have a reason not to.
+
+The server has been observed serving all 18 tools alongside the language server
+in one JVM ([S019](docs/spikes/019-embedded-mcp-server.md)), but that run had no
+resolved project, so tool *results* against a real project are not yet verified
+on any tuple. Treat this setting as experimental — upstream labels it that way
+too.
 
 ## How it fits together
 
