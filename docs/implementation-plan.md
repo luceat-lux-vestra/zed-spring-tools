@@ -622,12 +622,13 @@ matrix is left" became an easy and wrong reading of the plan.
    means. The implementation is a separate `feat/` slice: honour both settings,
    defaulting off, so the default launch stays byte-identical to today's and the
    unauthenticated loopback endpoint plus the `api.spring.io` calls exist only
-   for a user who opts in. That slice needs a path this extension does not have
-   yet — every `boot-java.*` key handled so far is forwarded *to* the server,
-   while these two change how the process is launched — and a later `verified`
-   promotion must additionally show index-backed tool payloads against a
-   resolved project, which S019 could not observe without the official-Java
-   bridge.
+   for a user who opts in. That slice follows an established route rather than a
+   new one: `boot-java.live-information.automatic-connection.on` is already read
+   from `LspSettings` at launch and passed to the coordinator as
+   `--automatic-live-connection`, and these two settings take the same path into
+   `springArguments`. A later `verified` promotion must additionally show
+   index-backed tool payloads against a resolved project, which S019 could not
+   observe without the official-Java bridge.
 
 The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
