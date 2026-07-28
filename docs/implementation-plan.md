@@ -618,14 +618,19 @@ matrix is left" became an easy and wrong reading of the plan.
    artefact of how the spike was run, not a property of the capability, so the
    port-discovery problem S019 reported does not need solving.
 
-   The row **stays `planned` until it is built**, which is what that label
-   means. The implementation is a separate `feat/` slice: honour both settings,
-   defaulting off, so the default launch stays byte-identical to today's and the
-   unauthenticated loopback endpoint plus the `api.spring.io` calls exist only
-   for a user who opts in. That slice needs a path this extension does not have
-   yet — every `boot-java.*` key handled so far is forwarded *to* the server,
-   while these two change how the process is launched — and a later `verified`
-   promotion must additionally show index-backed tool payloads against a
+   **Built the same day** (inventory version 47), so the row is now
+   `implemented`: both settings are read from `LspSettings` at launch, resolved
+   into one `--mcp-server-port` coordinator argument, and applied in
+   `springArguments`. Defaulting off keeps the launch vector byte-identical to
+   every release before it, so the unauthenticated loopback endpoint and the
+   `api.spring.io` calls exist only for a user who opts in.
+
+   That slice also refuted this section's own prediction that it would need a
+   settings path the extension lacks.
+   `boot-java.live-information.automatic-connection.on` was already read at
+   launch and passed as `--automatic-live-connection`, so the MCP settings
+   reused an established route and the slice came in smaller than described.
+   Promotion to `verified` still needs index-backed tool payloads against a
    resolved project, which S019 could not observe without the official-Java
    bridge.
 
@@ -647,11 +652,11 @@ of it.
 - A pinned-release refresh gate exists and has been executed at least once, so
   the project has demonstrated it can follow upstream rather than only pin.
 - The `planned` rows are decided, in either direction. All three were on
-  2026-07-29 — two by moving state, and the embedded MCP server by settling its
-  direction as `build`. That last one is the case this criterion has to be read
-  carefully for: the direction is closed but the row is still `planned`, so a
-  stable release either ships the opt-in slice or restates the row as an
-  accepted gap. Deciding is not the same as delivering.
+  2026-07-29, and the `planned` column is now empty: two moved state, and the
+  embedded MCP server was decided as `build` and then built the same day. What
+  that criterion no longer covers is the row's new state — `implemented` is not
+  a support claim, so a stable release needs the driven run that promotes it, or
+  a release-facing statement that the setting ships unverified.
 - At least one preview release has been published under the M6 currency rules
   and observed in use; the observation, not the inventory count, is what the
   criteria are then written from.
