@@ -19,7 +19,7 @@ extension.
   run at all; the extension reports that as a visible error naming the remedy
   rather than failing silently, but it does not create or modify Maven
   configuration on the user's behalf.
-- 44 of 59 tracked capabilities are proven on the tested tuple, and much of the
+- 46 of 59 tracked capabilities are proven on the tested tuple, and part of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
@@ -43,6 +43,20 @@ extension.
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
   fallback; the opt-in Structure document is the verified grouping companion.
+- **Every driven capability gate so far has used a Maven fixture**, so read the
+  proven set above as Maven evidence unless a row says otherwise. The individual
+  Gradle gaps are stated in their own entries below; collected, they are: the
+  Boot upgrade rejects Gradle outright, because the pinned release asserts a
+  Maven project before it does anything else; Modulith metadata generation is
+  untested on Gradle; the generated run/debug entries are wrapper-aware and
+  include `bootRun`, but only the Maven form has been executed; the Windows
+  wrapper forms `mvnw.cmd` and `gradlew.bat` are untested on any build system;
+  and Spring's own `sts.gradle.build` command has no caller in the pinned
+  release, so no Gradle build reaches this extension through Spring at all.
+  Nothing here says Gradle fails — it says Gradle is unobserved, which under
+  this repository's own rules is not a support claim in either direction. The
+  plan records resolving this as a prerequisite to a stable release rather than
+  as part of the M5 platform matrix.
 - The official Java language server starts only when a Java file is open, and
   this extension cannot start it. Zed's extension API exposes no call for
   starting another extension's language server, and `languages.<Language>.

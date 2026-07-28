@@ -53,8 +53,9 @@ and uninstall cycle reproduced real Spring Boot property completions, executed
 the authentic bridge removal, left no owned process or route, and kept
 credentials and classpaths out of the logs. M3 published the repository at
 <https://github.com/luceat-lux-vestra/zed-spring-tools> under Apache-2.0, so
-development is now public and the current work is M4's capability-parity
-program. Spike code remains excluded from production.
+development is now public. M4's capability-parity program closed on 2026-07-26
+with an empty `implemented` column, and the current work is M5 platform
+validation. Spike code remains excluded from production.
 
 ## Product goal and delivery strategy
 
@@ -201,7 +202,7 @@ mechanical.
   hygiene may have no milestone. Create future milestones only when that phase
   becomes active, and do not invent due dates without an actual commitment.
 - The implementation plan and capability inventory remain the roadmap during
-  solo M4 work, so do not duplicate them in a GitHub Project. Revisit Projects
+  solo work, so do not duplicate them in a GitHub Project. Revisit Projects
   when multiple contributors or a durable concurrent backlog needs a status
   board.
 - The maintainer checks metadata before merge. Historical pull requests do not
