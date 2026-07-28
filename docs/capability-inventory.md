@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 45
+- Inventory version: 46
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
 - Last updated: 2026-07-29
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
@@ -9,8 +9,9 @@
   [R016](research/016-zed-github-compatibility-reporting.md),
   [R017](research/017-zed-codelens-hover-command-compatibility.md),
   [R018](research/018-spring-tools-zed-outcome-parity-audit.md),
-  [R019](research/019-zed-codelens-agent-navigation-and-build-output.md), and
-  [S018](spikes/018-references-highlights-multiserver-composition.md)
+  [R019](research/019-zed-codelens-agent-navigation-and-build-output.md),
+  [S018](spikes/018-references-highlights-multiserver-composition.md), and
+  [S019](spikes/019-embedded-mcp-server.md)
 - Delivery routes: [M4 capability delivery plan](capability-delivery-plan.md),
   selected by [D005](decisions/005-lsp-first-capability-delivery.md), with
   compatibility/reporting policy from
@@ -626,6 +627,72 @@ whether the random port is announced only through that message. The decision —
 including the listening-port, `api.spring.io` and offline consequences — is then
 made on evidence rather than on a reading of the jar.
 
+Inventory version 46 decides that third row. It changes no capability's
+behaviour either: the decision is a direction, and the slice that acts on it is
+separate.
+
+[S019](spikes/019-embedded-mcp-server.md) ran the spike on 2026-07-29 and
+answered all three questions. Lifting the one flag is sufficient — the
+unmodified pinned jar bound `127.0.0.1:<random>`, served all 18 tools over
+`POST /mcp`, and left the stdio LSP stream byte-clean with diagnostics identical
+to the control, which closes R018 hypothesis 6 on its first observation. The
+port reached stderr as well as `window/showMessage`, and the spring.io tools
+were observed making live outbound calls.
+
+**One fact found after that spike merged reframes the whole row, and it is the
+reason the decision is "build" rather than "decline".** The two settings below
+were read from the pinned VSIX's own launcher, not from the server jar, which is
+why no previous settings audit had surfaced them — every prior audit compared
+VS Code's schema against `BootJavaConfig`, and these are consumed by the client
+before the server exists.
+
+```js
+n === true && i >= 0 && i <= 655536
+  ? e.push("-Dserver.port=" + i)
+  : e.push("-Dspring.main.web-application-type=NONE")
+```
+
+`boot-java.ai.mcp-server-enabled` defaults `false`; `boot-java.ai.mcp-server-port`
+defaults `50627`. Two consequences follow, and both cut against the reading this
+project had been carrying:
+
+1. **Our flag is not a deviation from the parity target — it is that target's
+   own default branch, faithfully reproduced.** VS Code ships the embedded MCP
+   server off. So the current state is already correct for a user who has not
+   opted in, and the gap is narrower than "the capability is missing": we
+   implement one of the two branches.
+2. **The random port is an artefact of the spike, not of the capability.** When
+   the setting is on, upstream passes an explicit `-Dserver.port=<setting>`,
+   which overrides the jar's `server.port=0`. The spike observed a random port
+   because it lifted the flag *without* supplying the port setting — a state
+   upstream never produces. S019's third clause is therefore sound as an
+   observation and misleading as a constraint; the follow-up note in that
+   document records the correction rather than restating the result.
+
+**The row is decided as build, and stays `planned` until it is built.** That is
+not a hedge: `planned` means "not built yet, no claim", which is exactly true,
+and the M6 criterion asks for the *direction* to be settled rather than for the
+label to change. `not-pursued` would be wrong here, because that label means a
+documented exception outside the parity target — the correct reading for Spring
+Initializr, which is absent from the pinned VSIX entirely, and the wrong reading
+for a capability that VSIX exposes through two documented settings.
+
+The implementation is a separate `feat/` slice and is deliberately not started
+here. Its shape: honour both settings, defaulting off, so that the default
+launch is byte-identical to today's. Everything that made this row uncomfortable
+— an unauthenticated loopback endpoint, a runtime network dependency that would
+reopen the closed offline row, a listening port at all — then exists only for a
+user who asked for it, and AGENTS' prohibition on adding a runtime network call
+without an explicit decision is satisfied by this entry rather than bypassed.
+
+Two costs are recorded rather than discovered later. First, this is a **new
+kind** of setting for this extension: every `boot-java.*` key handled so far is
+forwarded *to* the server through `spring_workspace_configuration`, whereas
+these two change **how the process is launched**, which is a layer no current
+code touches. Second, connecting Zed's MCP client to the resulting endpoint is
+user configuration, not something the extension performs; that belongs in
+release-facing documentation and is not a blocker.
+
 Two constraints of the Zed extension API shape several rows below. Both are read
 from the `zed_extension_api` 0.7.0 world's complete export list and corroborated
 by Zed's documentation, which states an extension "can provide languages, themes,
@@ -744,7 +811,7 @@ verified structure-navigation fallback.
 | Modulith projects | `verified` | Verified 2026-07-26 on the same tuple. No new surface was needed: `SpringIndexCommands` chooses `ModulithStructureView` over `JMoleculesStructureView` for any project that depends on `spring-modulith-core` (gated only by the JVM property `disable-modulith-structure-view`, which this product does not set), so the already-verified opt-in Structure document *is* the module/dependency grouping. Driven, it rendered each Modulith project's application modules with their named-interface exposure — `Catalog (c.e.i.catalog)` carrying `c.e.i.c.CatalogService (API)` and `c.e.i.c.internal.CatalogRepository (internal)` — while the non-Modulith `plain-boot` in the same worktree kept the ordinary package grouping, which is the control proving the switch is Modulith-specific. That `(API)`/`(internal)` split is the same exposure fact the `MODULITH_TYPE_REF_VIOLATION` reconciler enforces: with `boot-java.modulith-project-tracking` supplied, three Error-severity `Invalid reference to non-exposed type of module 'catalog'!` diagnostics published with no user action, on the import, the field and the constructor parameter that reach into `catalog.internal`, while the legal import of the exposed `CatalogService` was correctly not flagged. As with the Spring Data row, the first reconcile after a cold start published only one of the three and the settled reconcile published all three. **Residual limit:** the grouping comes from the Modulith metadata but the members come from the Spring index, so a project whose files have not been opened in the session renders as `<name> ()` with its modules listed and empty; opening one of its files and regenerating fills it in. Workspace Symbols were not separately re-exercised here — Spring symbol search has its own verified row. Evidence: `tmp/modulith-20260726/evidence/`. |
 | Spring Initializr | `not-pursued` | **Decided 2026-07-29, out of scope rather than pending.** It is not in the pinned VSIX at all: a separate VS Code extension (`vscjava.vscode-spring-initializr`) owns project generation there, so it was never inside the parity target this project fixed as its goal, and there is no upstream Spring Tools behaviour here to mirror. Building it anyway would not be adaptation but a new product surface — outbound calls to `start.spring.io`, archive download and extraction into the user's filesystem, and a multi-step scaffolding UX — none of which the rest of this extension has, and each of which would have to be defended on its own. The user-facing outcome is already available and is not degraded by this decision: `start.spring.io` in a browser, or the `spring` CLI, produces the same project, and neither depends on the editor. This is recorded as a documented exception, not backlog; a future reversal would need its own network, artifact, scope, and privacy decision rather than a slice. |
 | Explain SpEL / queries / AOP (AI assistant) | `blocked-zed-api` | **Decided 2026-07-29.** The row was `planned`, which implied intended future work; the blocker is a missing Zed surface, so it is now labelled as one. `query.explain` and `sts/enable/copilot/features` are VS Code Copilot-bound, and the pinned Spring server has no non-AI explanation command to fall back to — the lens text is generated locally and its action *is* the prompt. The exact missing surfaces: Zed's public extension and CodeLens APIs expose no authoritative Agent-state detection, and no way to dispatch to or prefill the Agent. Neither is a widget complaint that some other Zed workflow routes around, which is what would make this `zed-native-equivalent` instead: a user opening the Agent panel and asking their own question is the user delivering the outcome, not this extension, and the product already says exactly that. What is built is the honest half — the lens is offered, and acting on it explains that the action exists only as a VS Code Copilot prompt, that this extension cannot detect or drive Zed Agent, and that **nothing is sent to any AI service**. That last property is not a limitation to be lifted quietly: a future direct Agent workflow needs a new Zed API *and* an explicit privacy and consent decision, because it would mean transmitting the user's source. |
-| Embedded Spring Tools MCP server | `planned` | Spring Tools 5.2.0 contains an experimental streamable-HTTP MCP server with project, Spring index, component, endpoint, diagnostics, Spring-version and Spring.io tools; Zed supports remote MCP tools and prompts. Enabling a listening port and external Spring.io calls is a new runtime/network/security surface and requires an explicit decision before implementation or support claims. **This is the one row of the three that stays `planned` after the 2026-07-29 decisions, and its next step is an observation, not a build.** A source read of the pinned jar's own `application.properties` shows the server already enabled (`spring.ai.mcp.server.enabled=true`, `stdio=false`, `protocol=STREAMABLE`, `server.port=0`, `server.address=localhost`) with `tomcat-embed` and `spring-ai-starter-mcp-server-webmvc` in `lib/` — but this extension launches Spring with `-Dspring.main.web-application-type=NONE` (`coordinator/src/main.mjs`), which prevents that embedded web server from starting at all. So the row's premise is unverified in both directions: nothing here has ever observed the server running, and the absence of its "started at port" `window/showMessage` from every captured trace is explained by our own launch flag rather than by any upstream property. The spike must establish whether the server starts when that flag is lifted, whether one JVM serves streamable-HTTP MCP and LSP simultaneously (R018 hypothesis 6), and whether the random port is reachable only through that message. Deciding before that would be deciding on a reading of the jar. |
+| Embedded Spring Tools MCP server | `planned` | Spring Tools 5.2.0 contains an experimental streamable-HTTP MCP server exposing 18 tools and one prompt — project list, Boot/Java version, resolved classpath, bean details and usage, beans by type, request mappings, stereotypes and components, Spring Tools diagnostics, plus five `api.spring.io` release/generation tools — and Zed supports remote MCP tools and prompts. **Decided 2026-07-29 (inventory version 46): build it, honouring upstream's two settings, defaulting off. The row stays `planned` because it is not built yet; the direction is no longer open.** [S019](spikes/019-embedded-mcp-server.md) observed the capability working: dropping `-Dspring.main.web-application-type=NONE` from `springArguments` (`coordinator/src/main.mjs`) is by itself sufficient, the unmodified jar then bound `127.0.0.1:<port>` and returned all 18 tools over `POST /mcp`, and the same JVM served stdio LSP concurrently with **zero** contaminating bytes on stdout and diagnostics byte-identical to the control arm — the first observation of R018 hypothesis 6. The decisive fact came after that spike: the pinned VSIX's own launcher already branches on `boot-java.ai.mcp-server-enabled` (default `false`) and `boot-java.ai.mcp-server-port` (default `50627`), pushing `-Dserver.port=<port>` when enabled and our exact flag when not. So this extension currently implements one of upstream's two branches rather than deviating from it, and the "random port announced only through `window/showMessage`" concern is an artefact of how the spike was run: upstream supplies a fixed port, and the port also reaches stderr. `not-pursued` is therefore the wrong label — it means a documented exception outside the parity target, which is true of Spring Initializr and false here. The residual costs are real and opt-in only: the endpoint is unauthenticated (loopback-bound, but any local process could enumerate beans, mappings and classpath through it), and the five spring.io tools make live outbound calls that would reopen the closed offline row for a user who enables them. Defaulting off keeps the default launch byte-identical to today's. Implementation is a separate `feat/` slice and needs a path this extension does not yet have: every `boot-java.*` key handled so far is forwarded *to* the server via `spring_workspace_configuration`, while these two change how the process is launched. Tool **payloads** against a resolved project remain unobserved — S019 ran without the official-Java bridge, so index-backed tools were reachable but empty — and that is what a later `verified` promotion must show. |
 
 ## Workstream 6 — settings, diagnostics, and lifecycle
 

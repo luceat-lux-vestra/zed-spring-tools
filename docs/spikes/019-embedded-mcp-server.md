@@ -1,7 +1,9 @@
 # S019: The embedded MCP server in the pinned Spring language server
 
 - Status: Mixed — clauses 1 and 2 Supported (the flag alone gates it; one JVM
-  serves both), clause 3 **Refuted** (the port is also on stderr)
+  serves both), clause 3 **Refuted** (the port is also on stderr). See the
+  2026-07-29 follow-up note: clause 3's premise was itself an artefact of this
+  spike, because upstream supplies a fixed port when the capability is enabled.
 - Date: 2026-07-29
 - Related: [capability-inventory](../capability-inventory.md) row *Embedded MCP
   server*; [implementation-plan](../implementation-plan.md) M6, "Closing the
@@ -222,6 +224,42 @@ argument they need. Reachability, not payload, is what these calls establish.
 Clause 3 failing makes the row *easier*, which is why it is stated plainly
 rather than smoothed into the other two: a coordinator that wants the port does
 not have to intercept a user-facing notification to get it.
+
+## Follow-up note, 2026-07-29 (after this spike merged)
+
+The observations above stand. This note corrects what they were taken to *mean*,
+and it is added rather than folded in so the sequence stays visible.
+
+Clause 3 was written as though the random port were a property of the
+capability. It is a property of **how this spike ran it**. The pinned VSIX's own
+launcher — `extension/dist/extension.js`, not the server jar — already branches:
+
+```js
+n === true && i >= 0 && i <= 655536
+  ? e.push("-Dserver.port=" + i)
+  : e.push("-Dspring.main.web-application-type=NONE")
+```
+
+with `boot-java.ai.mcp-server-enabled` (default `false`) and
+`boot-java.ai.mcp-server-port` (default `50627`). So upstream ships the server
+**off by default** — meaning this project's flag reproduces upstream's own
+default branch rather than deviating from it — and when a user turns it on,
+upstream passes an explicit fixed port that overrides the jar's `server.port=0`.
+The random port this spike observed is a state upstream never produces, because
+the spike lifted the flag without supplying the port setting.
+
+This was missed here because the spike varied one flag against the *jar*, and
+the deciding evidence was in the *client*. Prior settings audits would not have
+caught it either: they compare VS Code's schema against `BootJavaConfig`, and
+these two keys are consumed by the launcher before any server exists. The
+general lesson is worth more than the correction — when a capability is gated by
+a launch argument, the parity question is what the upstream **launcher** does
+with its settings, not only what the artifact contains.
+
+Consequence for the row: the port-discovery problem this spike reported does not
+need solving, and the capability is inside the parity target through two
+documented settings. Inventory version 46 decides the row as *build, defaulting
+off* on that basis.
 
 ## Remaining uncertainty
 

@@ -604,11 +604,30 @@ matrix is left" became an easy and wrong reading of the plan.
    left the stdio LSP stream byte-clean with diagnostics identical to the
    control — so R018 hypothesis 6 is closed. The port reaches stderr as well as
    `window/showMessage`, and the spring.io tools were observed making live
-   outbound calls. **The row is still `planned`**: the spike was scoped to
-   evidence, and the decision it feeds — whether a host-local unauthenticated
-   endpoint, a network dependency that reopens the offline row, and an
-   index-backed payload never observed against a resolved project are worth the
-   agent-callable surface — is the next slice, not this one.
+   outbound calls.
+
+   **Decided the same day, as `build`** (inventory version 46), on a fact found
+   after S019 merged: the pinned VSIX's own launcher already branches on
+   `boot-java.ai.mcp-server-enabled` (default `false`) and
+   `boot-java.ai.mcp-server-port` (default `50627`), emitting
+   `-Dserver.port=<port>` when enabled and this project's exact flag when not.
+   Two things follow. This project implements one of upstream's two branches
+   rather than deviating from it, so the capability sits inside the parity
+   target through two documented settings — which is what makes `not-pursued`
+   wrong here and right for Spring Initializr. And the random port is an
+   artefact of how the spike was run, not a property of the capability, so the
+   port-discovery problem S019 reported does not need solving.
+
+   The row **stays `planned` until it is built**, which is what that label
+   means. The implementation is a separate `feat/` slice: honour both settings,
+   defaulting off, so the default launch stays byte-identical to today's and the
+   unauthenticated loopback endpoint plus the `api.spring.io` calls exist only
+   for a user who opts in. That slice needs a path this extension does not have
+   yet — every `boot-java.*` key handled so far is forwarded *to* the server,
+   while these two change how the process is launched — and a later `verified`
+   promotion must additionally show index-backed tool payloads against a
+   resolved project, which S019 could not observe without the official-Java
+   bridge.
 
 The transient official-Java route timeout misreported as an incompatibility
 (`coordinator/src/main.mjs`, the data route) was the next product slice and was
@@ -627,8 +646,12 @@ of it.
   release-facing Maven-only limitation.
 - A pinned-release refresh gate exists and has been executed at least once, so
   the project has demonstrated it can follow upstream rather than only pin.
-- The `planned` rows are decided, in either direction. Two of the original
-  three were on 2026-07-29; the embedded MCP server is the remaining one.
+- The `planned` rows are decided, in either direction. All three were on
+  2026-07-29 — two by moving state, and the embedded MCP server by settling its
+  direction as `build`. That last one is the case this criterion has to be read
+  carefully for: the direction is closed but the row is still `planned`, so a
+  stable release either ships the opt-in slice or restates the row as an
+  accepted gap. Deciding is not the same as delivering.
 - At least one preview release has been published under the M6 currency rules
   and observed in use; the observation, not the inventory count, is what the
   criteria are then written from.
