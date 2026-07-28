@@ -2,8 +2,9 @@
 
 - Status: In progress; M1-M4 complete, M5 in progress — slice 1 (the JDK 21
   floor on macOS arm64) is driven, slice 2 is blocked on its hardware
-  prerequisite
-- Last updated: 2026-07-26
+  prerequisite. M6 now records the three non-platform gaps that sit between a
+  finished M5 and a stable release
+- Last updated: 2026-07-28
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
   on that tuple from a driven clean install, restart, and uninstall cycle
@@ -532,11 +533,108 @@ port handling).
 
 ### M6: Preview and incremental public releases
 
+Status: not started.
+
 Publish experimental previews only when their capability inventory,
 compatibility table, tested matrix, known blockers, third-party notices,
 checksums, and rollback instructions are current. Stable release criteria are
 defined later from observed preview reliability; feature count alone is not a
 stability signal.
+
+#### What M5 completion does not deliver
+
+M5 answers one question: does what already works keep working on another
+platform. Finishing it is therefore not the same as being releasable, and three
+gaps sit between the two. Each was visible in scattered limitation text before
+this amendment but none was tracked as work, which is how "only the platform
+matrix is left" became an easy and wrong reading of the plan.
+
+1. **Gradle coverage.** The whole build-system axis is thinner than the Maven
+   evidence suggests, and it is thin in different ways per capability rather
+   than uniformly: the Boot upgrade rejects Gradle outright (upstream assert),
+   Modulith metadata generation is Maven-only in practice, run/debug generation
+   emits wrapper-aware Gradle entries whose execution is unrun, the Windows
+   wrapper forms (`mvnw.cmd`/`gradlew.bat`) are untested, and Spring's own
+   `sts.gradle.build` has no caller in the pinned release at all. Before a
+   stable release this must be resolved into exactly one of two states per
+   capability — driven on a Gradle fixture, or declared a first-class Maven-only
+   limitation in release-facing text. It is currently neither. Note what this
+   axis is *not*: it is not a platform tuple, so M5 will never touch it.
+2. **Refreshing the pinned upstream release.** Every parity claim in this
+   repository is anchored to Spring Tools `5.2.0.RELEASE`
+   (`vscode-spring-boot-2.2.0-RC1.vsix`), and there is no recorded procedure for
+   moving to a newer one. A refresh is not a version-string bump: R011/R018
+   derived the inventory from that package's 118 settings, several `verified`
+   rows rest on that release's own defaults and preconditions
+   (`problem-types.json`, absent-key behaviour, the patch-only upgrade asserts),
+   and rollback between two pinned releases has never been exercised because
+   only one has ever been pinned. What is needed is a written refresh gate: what
+   is re-audited, which driven gates are re-run, and how a regression is
+   reported. Undefined today.
+3. **Closing the three `planned` scope decisions.** Spring Initializr, the AI
+   explanation commands, and the embedded MCP server each wait on a direction
+   decision, not a slice. Shipping a stable release with three rows open in that
+   state is defensible only if each has been explicitly decided — built, or
+   moved to `not-pursued` with its reason — rather than left pending.
+
+The transient official-Java route timeout misreported as an incompatibility
+(`coordinator/src/main.mjs`, the data route) remains the next product slice and
+is separate from all three.
+
+#### Candidate stable-release criteria — proposed, not accepted
+
+Recorded so the question is answerable rather than open-ended. These are a
+proposal awaiting the project owner's decision; nothing below is a commitment,
+and the standing rule that feature count is not a stability signal outranks any
+of it.
+
+- The six-tuple desktop matrix and the declared JDK matrix pass their
+  portability cores, per M5 and the AGENTS platform requirements.
+- The Gradle axis is resolved per capability into driven evidence or a
+  release-facing Maven-only limitation.
+- A pinned-release refresh gate exists and has been executed at least once, so
+  the project has demonstrated it can follow upstream rather than only pin.
+- The three `planned` rows are decided, in either direction.
+- At least one preview release has been published under the M6 currency rules
+  and observed in use; the observation, not the inventory count, is what the
+  criteria are then written from.
+
+The private official-Java provider transport remains a structural risk that no
+criterion removes. The versioned adapter narrows it; a stable release should
+state it rather than imply it has been engineered away.
+
+### An undecided axis: coverage beyond VS Code Spring Tools
+
+Not a milestone, and deliberately not placed in the delivery order. AGENTS.md
+fixes the product goal as capability parity with VS Code Spring Tools, and M4
+closed that program. The question of whether the goal should extend past it is
+therefore live, unanswered, and recorded here only so that it is not mistaken
+for either an accepted plan or a settled no.
+
+IntelliJ IDEA Ultimate's Spring support is the obvious larger comparator and
+appears nowhere in this repository — not in the inventory, not in R011/R018, not
+in any research document. Two things should be established before it ever does:
+
+- **Most of that surface is tool-window, dashboard, and diagram shaped** — bean
+  dependency graphs, an endpoints panel with request execution, a run dashboard,
+  security matrices. D005 and R014 already settled that stock Zed extensions
+  cannot contribute a custom panel, webview, tree, or arbitrary command-palette
+  action, so a naive comparison would mostly generate `blocked-zed-api` rows and
+  teach nothing. The only demonstrated route to that class of outcome in this
+  project is the **generated document** pattern already used by
+  `.zed/spring-structure.md` and the generated task/debug entries. Whether that
+  pattern extends usefully — a generated endpoint index, for instance — is
+  unevaluated, and would need its own research document before any claim.
+- **One already-inventoried row would go beyond both editors rather than catch
+  up to either.** The embedded Spring Tools MCP server is present in the pinned
+  package, and Zed supports remote MCP tools and prompts, so connecting them
+  would put a project's live Spring index in front of Zed's Agent. That is not
+  parity work and must not be smuggled in as parity work: it is a new listening
+  port and new outbound calls, which AGENTS.md lists as requiring an explicit
+  direction decision before implementation.
+
+Any movement on this axis starts with a research document and a decision
+document, in that order, and does not begin by writing product code.
 
 ## Review record
 
@@ -613,6 +711,20 @@ timeout reported to the user as an incompatibility. The gate also fixes the
 method for the tuples that follow: pin the JDK at both resolvers, capture the
 JDT LS command line rather than assuming it, and treat a single unreproducible
 anomaly as a defect to characterise rather than as a platform finding.
+
+Amended on 2026-07-28 to answer a question the plan could not previously
+answer: what remains after M5, and what a stable release would require. Nothing
+about a milestone's status changed. The amendment is a documentation-gap fix,
+prompted by noticing that "M5 is the last milestone with open work" reads as
+true from the delivery order alone while three non-platform gaps — Gradle
+coverage, refreshing the pinned upstream release, and closing the three
+`planned` scope decisions — existed only as scattered limitation prose. M6 now
+states them, and proposes stable-release criteria explicitly marked as awaiting
+the project owner's decision rather than accepted. A separate section records
+the coverage-beyond-VS-Code question, including the IntelliJ comparison that
+appears nowhere else in this repository, as undecided and gated behind a
+research and decision document — not as a goal. AGENTS.md's product goal is
+unchanged by this amendment.
 
 The highest known risks are the official proxy's private compatibility surface
 and observed JDT/port-file lifecycle caveat, third-party artifact distribution,
