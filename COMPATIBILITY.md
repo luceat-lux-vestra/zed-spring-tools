@@ -50,7 +50,7 @@ tuple:
 | JDT LS | `1.60.0-202606262232`, source commit `57ed41bdddc93df13ace6a266d8e3c1d35c95618` |
 | Spring Tools | `5.2.0.RELEASE`, source commit `18d1a975dbea4f9314fd736d0237bd9e23f243f9` |
 | Server runtime | Eclipse Temurin JDK 25.0.3 |
-| Fixtures | Maven Spring Boot 3.5.5; disposable Gradle 9.5.1 coordination mirror |
+| Fixtures | Maven Spring Boot 3.5.5; disposable Gradle 9.5.1 coordination mirror. The durable Gradle 9.5.1 fixtures added later for the build-system axis are `tests/fixtures/spring-boot-gradle` and `tests/fixtures/spring-modulith-gradle` |
 
 This is bounded compatibility evidence, not a general support claim. S016 also
 showed that the product's former embedded `extensionVersion: 6.8.21` record was
@@ -64,7 +64,13 @@ The supported observation is also bounded. Maven and Gradle coordination,
 visible Spring completion, product uninstall, warm cached startup with outbound
 network denied, and the ordinary-profile Maven main runnable passed. Gradle and
 vanilla task execution, test runnables, first-install offline behavior, and all
-other desktop/JDK tuples were outside S016. First-install offline behaviour has
+other desktop/JDK tuples were outside S016. **Gradle task execution has since
+been observed**, on 2026-07-29 under Zed 1.12.1 and official Java 6.8.21: the
+`./gradlew bootRun` entries this extension generates were run verbatim and
+served the application, the profile entry on the port its profile file sets.
+That is this extension's own generated task, not official Java's task helper,
+which remains unexercised on Gradle. See the
+[Gradle axis resolution](docs/gradle-axis-resolution.md). First-install offline behaviour has
 since been observed separately, on 2026-07-26 under Zed 1.12.0 and official Java
 6.8.23: with outbound network denied to Zed, the coordinator, and the JVMs, a
 cold profile fails closed naming the pinned release and its artifact URL, a warm
@@ -262,9 +268,13 @@ and `getLatestReleaseInformation` returns `null` where
 Neither is confirmed against VS Code, so both are recorded as very likely
 upstream rather than proven so.
 
-This covers one tuple, one Maven fixture, and one project per worktree. Gradle,
-multi-project worktrees, and any actual MCP client connection are untested; the
-endpoint was driven over HTTP directly.
+This covers one tuple and one project per worktree. A 2026-07-29 Gradle run
+repeated the index-backed tools against a Gradle project and they answered from
+that project's resolved classpath, including a Boot version read from the Gradle
+build; `getResolvedProjectClasspath` failed there with the identical null
+dereference, which corroborates that the defect is upstream's. Multi-project
+worktrees and any actual MCP client connection are untested; the endpoint was
+driven over HTTP directly.
 
 ## Out of scope
 

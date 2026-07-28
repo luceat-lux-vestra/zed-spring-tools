@@ -1,0 +1,11 @@
+# Same rule as the sibling Gradle fixture: build outputs and the third-party
+# wrapper binary are not committed. Before a driven run:
+#
+#   gradle wrapper --gradle-version 9.5.1
+#   ./gradlew classes
+#
+# The compile step is not optional here — Spring refuses metadata generation for
+# a project with no compiled classes, with its own error message.
+.gradle/
+build/
+gradle/wrapper/gradle-wrapper.jar

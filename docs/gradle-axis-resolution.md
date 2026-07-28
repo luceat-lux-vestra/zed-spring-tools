@@ -1,7 +1,12 @@
 # Gradle axis resolution
 
-- Status: **Survey complete, driven gate pending**
+- Status: **Resolved**, except the Windows wrapper forms, which stay
+  hardware-blocked
 - Date: 2026-07-29
+- Driven tuple: macOS 26.5.2 arm64, Zed 1.12.1, official Java 6.8.21 (jdtls
+  1.60.0), Spring Tools 5.2.0, Temurin JDK 25.0.3 for jdtls / project JRE
+  21.0.11, Gradle 9.5.1 wrapper
+- Evidence: `tmp/gradle-axis-20260729/evidence/`
 - Related: [implementation-plan](implementation-plan.md) M6 gap 1;
   [capability-inventory](capability-inventory.md);
   [capability-delivery-plan](capability-delivery-plan.md);
@@ -137,17 +142,90 @@ further up the tree would change which build the user asked for — and it
 applies identically to Maven multi-module. The Gradle gate should observe it
 rather than leave it as a code comment.
 
-## Fixture
+## Fixtures
 
-`tests/fixtures/spring-boot-gradle/` — added by this slice, and durable rather
-than disposable, because the Gradle axis is a standing re-test surface and every
-future gate needs it.
+Both are durable rather than disposable, because the Gradle axis is a standing
+re-test surface and every future gate needs it.
+
+- `tests/fixtures/spring-boot-gradle/` — a copy of `spring-boot-basic` on a
+  Gradle build, pinned one patch behind at Boot 3.5.0 so version validation has
+  something to publish, with `dev` and `prod` profile files.
+- `tests/fixtures/spring-modulith-gradle/` — a copy of the Maven Modulith
+  fixture's `inventory-app` arm, same Boot 3.5.5 / Spring Modulith 1.4.12, the
+  arm that carries the application-module violation.
 
 ## Outcome
 
-Pending the driven gate. Each row above lands in exactly one of:
+Both Gradle projects resolved through jdtls's Buildship import in one isolated
+Zed, and the gate was driven against them together.
 
-- **Driven** — evidence path recorded, inventory row amended.
-- **Maven-only** — stated in `LIMITATIONS.md` and the row, with what the user
-  sees instead.
-- **Unreachable upstream** — no parity target exists, recorded as such.
+### Class A holds — the classification was not refuted
+
+Spring answered from the resolved Gradle classpath on every class-A surface the
+run touched, and the shapes are identical to the Maven arm:
+
+| Surface | Observed on Gradle |
+| --- | --- |
+| Property completion | `ser` → the whole `server.*` list with types and `Network address to which the server should bind.` |
+| Property validation | `PROP_UNKNOWN_PROPERTY` `'ser' is an unknown property. Did you mean 'server.address'?` plus `PROP_SYNTAX_ERROR` |
+| Java reconcilers | `JAVA_PUBLIC_BEAN_METHOD`, `JAVA_REPOSITORY` |
+| Spring Data queries | `HQL_SYNTAX` and `SQL_SYNTAX` (PostgreSQL), i.e. the dependency-selected grammars |
+| SpEL | `JAVA_SPEL_EXPRESSION_SYNTAX` and `PROPERTY_PLACE_HOLDER_SYNTAX` |
+| Cron | `SYNTAX` `CRON: mismatched input '<EOF>' expecting WS` |
+| CodeLens / code actions | all seven product `source` actions offered, unioned with jdtls's own |
+
+No class-A row behaved differently, so none moves to class B.
+
+### Class B — all driven
+
+| Row | Result |
+| --- | --- |
+| Boot project info | `gradle build` — the notice read *project zed-spring-tools-fixture-gradle-worktree — main class dev.zed.spring.fixture.FixtureApplication · gradle build · Spring Boot 3.5.0 · Java 21.0.11*. Closes the row's "`buildTool` was `maven` throughout" limit. |
+| Executable Boot projects discovery | Found the Gradle project; single project, so no selection prompt, as designed |
+| Run / debug generation | `./gradlew` (the wrapper, over the bare `gradle`), `bootRun`, three task entries and three debug entries, `$ZED_WORKTREE_ROOT` cwd |
+| Run / debug **execution** | **Both generated commands were run verbatim.** The base entry served `GET /greeting` → `200 hello` on 8080; the `dev` entry, with the Gradle-specific `--args=--spring.profiles.active=dev`, served the same on **8081** — the port `application-dev.properties` sets. The port move is what proves the argument took effect rather than merely being accepted. |
+| Version / support validation | Publishes on **`build.gradle`** in both projects: `Newer patch version of Spring Boot available: 3.5.16` and the OSS-support-ended notice |
+| Modulith metadata refresh | Spring's own `Project 'inventory-app-gradle-modulith' Modulith metadata has been changed.` The non-Modulith Gradle project was correctly not offered. |
+| Modulith violation diagnostic | `MODULITH_TYPE_REF_VIOLATION` `Invalid reference to non-exposed type of module 'catalog'!` |
+| Embedded MCP server | Through the shipped opt-in setting on the Gradle worktree: `getProjectList` → the Gradle project with JRE 21.0.11, `getSpringBootVersion` → 3.5.0 (i.e. read from the Gradle build), `getRequestMappings` → the `/greeting` `GET` mapping, `getBeanDetails` 27 895 B with source ranges, `getProjectDiagnostics` 11 932 B |
+| Maven goal / Gradle build | Not driveable and correctly so — see below |
+
+**`getResolvedProjectClasspath` fails identically on Gradle**, with the same
+`Classpath$CPE.getVersion()` null dereference the Maven run found. Reproducing
+across both build systems is useful corroboration that the defect is upstream's
+missing null check and not a Maven-shaped input.
+
+**The plan's "Modulith metadata generation is Maven-only in practice" was
+wrong.** `ModulithService` builds a classpath string from `IClasspath` entries
+and spawns `ApplicationModulesExporter` against it; nothing in that path reads a
+build file. The real precondition is *compiled classes*, which is build-system
+agnostic — `./gradlew classes` satisfies it exactly as `mvn compile` does.
+
+### Class C — Maven-only, stated
+
+Spring Boot upgrade, for the reasons read from the jar above. The
+release-facing statement is in [LIMITATIONS](../LIMITATIONS.md).
+
+### Unreachable upstream, not a coverage gap
+
+`sts.gradle.build`. There is no Gradle build surface in the pinned release to
+reach parity with, so this cannot be driven and its absence is not a limitation
+of this extension.
+
+## What is still open
+
+**The Windows wrapper forms.** `mvnw.cmd` and `gradlew.bat` are selected by
+`detectBuildTool` only when the host OS is Windows, and there is no Windows host
+here. Contract tests cover the branch; a contract test is not a driven gate.
+**M6 therefore does not fully close on this host**, and the honest statement is
+that the Gradle axis is resolved on macOS arm64 while one wrapper sub-axis
+remains blocked on the same hardware M5 slices 2-4 are blocked on.
+
+Two smaller items the gate did not cover, recorded rather than implied:
+
+- Workspace symbol search was not exercised on Gradle, because Zed's picker
+  cannot be driven from `osascript`. It is class A and the same index answered
+  every other request in the run, but it was not individually observed.
+- Multi-project Gradle builds. Each fixture is a single-project build, so the
+  documented behaviour that a subproject without its own wrapper resolves to the
+  bare `gradle` remains contract-tested only.

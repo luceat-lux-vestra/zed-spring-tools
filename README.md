@@ -14,12 +14,12 @@ the required official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 47 `verified`, 0 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 48) |
+| Capability inventory | 59 tracked: 47 `verified`, 0 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 49) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
-| Build systems | Every driven gate so far used a Maven fixture. Gradle is unobserved rather than unsupported, and resolving that is a stated prerequisite to a stable release, not part of the platform matrix |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [refresh gate](docs/pinned-release-refresh-gate.md) is now written but unexecuted, because `5.2.0.RELEASE` is still the newest upstream release. Gradle remains open, and the release criteria are a proposal awaiting a decision |
+| Build systems | Maven and Gradle. The [Gradle axis](docs/gradle-axis-resolution.md) was driven on 2026-07-29 against two Gradle fixtures, including running the generated `./gradlew bootRun` entries; the build system turned out not to be a dividing line anywhere except the Boot upgrade, which upstream gates on Maven. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) still need a Windows host |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) is written but unexecuted, because `5.2.0.RELEASE` is still the newest upstream release. What is left is the preview release itself, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -320,8 +320,9 @@ edit it.
    [Zed's development-extension instructions](https://zed.dev/docs/extensions/developing-extensions).
 4. Open a Spring Boot project and wait for Java project import and Spring
    indexing to finish. The broadest end-to-end coverage uses this repository's
-   Maven fixture; narrower multi-project and Gradle observations are identified
-   separately in the compatibility and capability evidence.
+   Maven fixture, with a matching pair of Gradle fixtures covering the build
+   system axis; narrower multi-project observations are identified separately in
+   the compatibility and capability evidence.
 
 Keep at least one `.java` file open. Zed starts the official Java language
 server only for Java buffers, and no extension can start it for you, so a
@@ -575,6 +576,14 @@ The Spring Boot fixture can be compiled independently with:
 
 ```sh
 mvn -f tests/fixtures/spring-boot-basic/pom.xml clean test
+```
+
+The Gradle fixtures behind the [Gradle axis](docs/gradle-axis-resolution.md)
+need their wrapper regenerated first, because this repository does not commit
+third-party binaries:
+
+```sh
+cd tests/fixtures/spring-boot-gradle && gradle wrapper --gradle-version 9.5.1 && ./gradlew classes
 ```
 
 ## License
