@@ -13,13 +13,13 @@ the required official Java extension.
 
 | Item | Current state |
 | --- | --- |
-| Development phase | M5 platform validation; the JDK 21 floor gate is driven, the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 3 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 1 `not-pursued` (inventory version 43) |
+| Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
+| Capability inventory | 59 tracked: 46 `verified`, 0 `implemented`, 1 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 45) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Every driven gate so far used a Maven fixture. Gradle is unobserved rather than unsupported, and resolving that is a stated prerequisite to a stable release, not part of the platform matrix |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the three open scope decisions as the gaps in between, and its release criteria are a proposal awaiting a decision |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between — two of the three were decided on 2026-07-29, and its release criteria are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -29,9 +29,10 @@ that are empty, so it can be checked line by line against the inventory summary:
 - `verified` — observed working on a named runtime tuple.
 - `implemented` — built, but not yet observed working on any named tuple. Empty
   by design: nothing ships here on the strength of "the code exists".
-- `planned` — not built yet, and no claim is made. Each open row needs a scope
-  decision first: Spring Initializr, the AI explanation commands, and the
-  embedded Spring Tools MCP server.
+- `planned` — not built yet, and no claim is made. One row is open: the embedded
+  Spring Tools MCP server, whose next step is an observation rather than a
+  build. Spring Initializr and the AI explanation commands were decided on
+  2026-07-29 and moved to the states below.
 - `blocked-zed-api` — Zed lacks the required UI or protocol surface, and the
   missing surface is named exactly.
 - `blocked-upstream` — held up by Spring Tools or the official Java extension.
@@ -130,10 +131,12 @@ The following outcomes have been observed on the tested environment:
 
 Zed-native language-server startup replaces the VS Code-specific
 `vscode-spring-boot.ls.start` command. The parity walk through the pinned VS Code
-Spring Tools surface is finished: what is left is three capabilities that need a
-direction decision rather than more work — Spring Initializr, the experimental
-embedded MCP server, and the AI explanation commands — plus three that name an
-exact missing Zed client surface. Everything else is either observed working on
+Spring Tools surface is finished: what is left is one capability awaiting a
+direction decision rather than more work — the experimental embedded MCP server,
+whose blocker turned out to be a fact nobody had checked — plus four that name an
+exact missing Zed client surface. Spring Initializr is now a documented
+exception: it is not in the pinned package at all, so it was never inside the
+parity target. Everything else is either observed working on
 the tested tuple or delivered through a different Zed workflow, and the
 [capability inventory](docs/capability-inventory.md) says which, row by row. That
 is parity evidence on one platform; every other desktop tuple is still
