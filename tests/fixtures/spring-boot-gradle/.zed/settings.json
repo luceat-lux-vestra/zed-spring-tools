@@ -1,0 +1,13 @@
+{
+  "lsp": {
+    "spring-tools": {
+      "settings": {
+        "boot-java": {
+          "common": {
+            "properties-metadata": "config/shared-metadata.json"
+          }
+        }
+      }
+    }
+  }
+}

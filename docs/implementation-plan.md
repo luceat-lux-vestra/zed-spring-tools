@@ -3,7 +3,10 @@
 - Status: In progress; M1-M4 complete, M5 slice 1 (the JDK 21 floor on macOS
   arm64) is driven and its remaining slices are blocked on hardware, so M6 is
   the active milestone. The one product defect M5 slice 1 found is fixed and
-  driven, and two of M6's three `planned` scope decisions are closed
+  driven, all three of M6's `planned` scope decisions are closed, and the Gradle
+  axis is resolved on macOS arm64 — leaving the preview release itself, plus the
+  Windows wrapper forms and the pinned-release refresh, both of which wait on
+  something outside this host
 - Last updated: 2026-07-29
 - Architecture: D002-D006 Accepted
 - Local evidence: S013 Supported on macOS arm64/JDK 25; the M2 exit gate closed
@@ -562,6 +565,49 @@ matrix is left" became an easy and wrong reading of the plan.
    capability — driven on a Gradle fixture, or declared a first-class Maven-only
    limitation in release-facing text. It is currently neither. Note what this
    axis is *not*: it is not a platform tuple, so M5 will never touch it.
+
+   **Resolved on 2026-07-29** in the [Gradle axis
+   resolution](gradle-axis-resolution.md), and the answer is that the build
+   system is not a dividing line anywhere except one capability. The work began
+   with a survey rather than a sweep, because a capability is build-system-
+   sensitive only if some code branches on the build tool, reads the build file,
+   or writes a build command — everything else reaches Spring through the jdtls
+   classpath, where Maven and Gradle are already one `IJavaProject`. That
+   reduced 59 rows to nine needing their own evidence plus one Maven-only in
+   upstream's code, and the class claim was then driven rather than asserted.
+
+   Two Gradle fixtures were added under `tests/fixtures/` as durable re-test
+   surfaces, both copies of their Maven counterparts so that any difference
+   found is a build-system difference. Against them: property completion and
+   validation, the Java reconcilers, Spring Data query and SpEL diagnostics,
+   cron, CodeLens and all seven product code actions, Boot project info
+   (reporting `gradle build`), version and support validation (anchored on
+   `build.gradle`), Modulith metadata refresh and the module-violation
+   diagnostic, and the embedded MCP server's index-backed tools all worked. Run
+   and debug generation produced `./gradlew bootRun` with the profile forwarded
+   in Gradle's own form, and **both generated commands were then executed**: the
+   base entry served the application on 8080 and the `dev` entry on 8081, the
+   port its profile file sets — which is what turns "generated" into "verified",
+   because the moved port proves the argument took effect.
+
+   Two of this section's own characterisations were wrong and are corrected
+   there. Modulith metadata generation is **not** Maven-only; it spawns its
+   exporter against a classpath string and never reads a build file, so the
+   precondition is compiled classes. And the Boot upgrade does not fail at the
+   user on Gradle: `UpdateBootVersion.canProvideQuickfix` gates on the build
+   type *before* attaching the action while the release-notes action is added
+   outside that branch, so a Gradle user gets the diagnostic and one action and
+   simply never sees the one-click upgrade. That is the single first-class
+   Maven-only limitation, now stated in `LIMITATIONS.md`. `sts.gradle.build`
+   remains unreachable upstream, which is an absent parity target rather than a
+   gap here.
+
+   **What did not close: the Windows wrapper forms.** `mvnw.cmd` and
+   `gradlew.bat` are selected only on a Windows host, and there is none here, so
+   that sub-axis is blocked for exactly the reason M5 slices 2-4 are. Contract
+   tests cover the branch; a contract test is not a driven gate. Multi-project
+   Gradle selection is likewise contract-tested only. **M6 therefore does not
+   fully close on this host**, and that is stated rather than smoothed over.
 2. **Refreshing the pinned upstream release.** Every parity claim in this
    repository is anchored to Spring Tools `5.2.0.RELEASE`
    (`vscode-spring-boot-2.2.0-RC1.vsix`), and there is no recorded procedure for
@@ -677,7 +723,13 @@ of it.
 - The six-tuple desktop matrix and the declared JDK matrix pass their
   portability cores, per M5 and the AGENTS platform requirements.
 - The Gradle axis is resolved per capability into driven evidence or a
-  release-facing Maven-only limitation.
+  release-facing Maven-only limitation. **Met on 2026-07-29 for every capability
+  except one sub-axis**: nine capabilities were driven on two Gradle fixtures,
+  the Boot upgrade is declared Maven-only with the reason read from upstream's
+  own bytecode, and `sts.gradle.build` is recorded as an absent upstream
+  surface. The Windows wrapper forms `mvnw.cmd`/`gradlew.bat` remain untested
+  because they need a Windows host, so this criterion is met on macOS arm64 and
+  finishes with the platform matrix rather than before it.
 - A pinned-release refresh gate exists and has been executed at least once, so
   the project has demonstrated it can follow upstream rather than only pin. The
   gate [now exists](pinned-release-refresh-gate.md); the execution half is

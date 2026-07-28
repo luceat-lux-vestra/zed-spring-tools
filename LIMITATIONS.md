@@ -30,9 +30,10 @@ extension.
   live-process/metrics/logger workflows, remote live-data targets, the
   patch-level Boot upgrade described above, Boot version/support validation, and
   Spring Modulith metadata refresh with application-module structure. Modulith
-  coverage is Maven-only: metadata generation runs Spring Modulith's own exporter
-  against the compiled classes, so an uncompiled project is refused, and Gradle
-  Modulith projects are untested. See the
+  metadata generation runs Spring Modulith's own exporter against the compiled
+  classes, so an uncompiled project is refused whatever the build system; a
+  2026-07-29 Gradle gate confirmed the precondition is the compiled classes and
+  not Maven. See the
   [capability inventory](docs/capability-inventory.md) for the per-row evidence.
   Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
   Document Symbols for Outline and Breadcrumbs when the default-off Java
@@ -43,20 +44,36 @@ extension.
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
   fallback; the opt-in Structure document is the verified grouping companion.
-- **Every driven capability gate so far has used a Maven fixture**, so read the
-  proven set above as Maven evidence unless a row says otherwise. The individual
-  Gradle gaps are stated in their own entries below; collected, they are: the
-  Boot upgrade rejects Gradle outright, because the pinned release asserts a
-  Maven project before it does anything else; Modulith metadata generation is
-  untested on Gradle; the generated run/debug entries are wrapper-aware and
-  include `bootRun`, but only the Maven form has been executed; the Windows
-  wrapper forms `mvnw.cmd` and `gradlew.bat` are untested on any build system;
-  and Spring's own `sts.gradle.build` command has no caller in the pinned
-  release, so no Gradle build reaches this extension through Spring at all.
-  Nothing here says Gradle fails — it says Gradle is unobserved, which under
-  this repository's own rules is not a support claim in either direction. The
-  plan records resolving this as a prerequisite to a stable release rather than
-  as part of the M5 platform matrix.
+- **Gradle is driven, with exactly one exception: the Boot upgrade.** Until
+  2026-07-29 every capability gate had used a Maven fixture and the whole build
+  system axis was unobserved. It was then driven end to end against two Gradle
+  fixtures — a Boot 3.5.0 web app and a Spring Modulith 1.4.12 app — and the
+  outcome is that the build system is not a dividing line anywhere except that
+  one row. Property completion and validation, the Java reconcilers, Spring Data
+  query and SpEL diagnostics, cron, CodeLens and every product code action, Boot
+  project info (reporting `gradle build`), Boot version and support validation
+  (anchored on `build.gradle`), run/debug generation *and execution*, Modulith
+  metadata refresh, the module-violation diagnostic, and the embedded MCP
+  server's index-backed tools were all observed working on Gradle. The generated
+  `./gradlew bootRun` entries were run verbatim and served the application, with
+  the profile entry moving the port exactly as its profile file specifies, so
+  the Gradle profile form is verified rather than merely written.
+  **The Boot upgrade is genuinely Maven-only**, in upstream's code rather than
+  in this extension: the pinned release attaches its upgrade quick fix only when
+  the project's build type is Maven, and the command behind it asserts the same
+  thing. A Gradle user still gets the version diagnostic and the "read the
+  release notes" action; what is missing is the one-click upgrade, and there is
+  no fallback for it other than editing the build file.
+  **Two Gradle-shaped things remain untested**: the Windows wrapper forms
+  `mvnw.cmd` and `gradlew.bat`, which need a Windows host and are blocked for
+  the same reason the rest of the platform matrix is, and multi-project Gradle
+  builds, where a subproject without its own wrapper deliberately resolves to
+  the bare `gradle` from `PATH`. Both are covered by contract tests, which is
+  not the same as a driven gate. Spring's own `sts.gradle.build` command has no
+  caller in the pinned release, so no Gradle build reaches this extension
+  through Spring at all — that is an absent upstream surface, not a gap here.
+  Evidence and the per-row detail are in the
+  [Gradle axis resolution](docs/gradle-axis-resolution.md).
 - The official Java language server starts only when a Java file is open, and
   this extension cannot start it. Zed's extension API exposes no call for
   starting another extension's language server, and `languages.<Language>.
@@ -127,9 +144,13 @@ extension.
   HTTP `localhost` callback, so a system HTTP proxy must bypass `localhost` and
   `127.0.0.1`; otherwise main-class resolution times out before launch. The
   isolated-profile DAP helper path remains an S016 caveat. Maven multi-project
-  selection is verified; Gradle interaction and Windows wrapper forms
-  (`mvnw.cmd`/`gradlew.bat`) are untested. The synthetic action offers on any
-  Java file, not only Boot mains.
+  selection is verified. **Gradle is verified too, as of 2026-07-29**: the action
+  generated `./gradlew bootRun` with the profile forwarded as
+  `--args=--spring.profiles.active=<p>`, and both the base and `dev` commands
+  were run verbatim and served `GET /greeting`, the `dev` one on the port its
+  profile file sets. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) and
+  multi-project *Gradle* selection remain untested. The synthetic action offers
+  on any Java file, not only Boot mains.
 - The Data AOT CodeLenses (`CL-4a`, `CL-4e`) no longer start a build when
   clicked. Spring's own handler for those commands runs Maven inside the
   language-server process and never reads its output: it reports nothing on

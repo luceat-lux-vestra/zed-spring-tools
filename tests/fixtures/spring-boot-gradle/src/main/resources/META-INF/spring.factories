@@ -1,0 +1,9 @@
+# Classic Spring factories registration. Without a Zed language claiming
+# `*.factories` this file reaches no language server at all, so its presence in
+# the fixture is what makes that gap observable in a driven run.
+#
+# The registered class really does implement the factory type. Spring instantiates
+# every entry during startup and fails the context on a mismatch, which would break
+# the run/debug checks that boot this fixture.
+org.springframework.context.ApplicationListener=\
+  dev.zed.spring.fixture.GreetingStartupListener

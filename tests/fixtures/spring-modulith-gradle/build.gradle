@@ -1,0 +1,45 @@
+// Gradle mirror of the Maven Modulith fixture that closed the Modulith rows on
+// 2026-07-26 (inventory-app, evidence tmp/modulith-20260726/). The Java sources
+// are copied from it unchanged and the versions are pinned to the same Boot
+// 3.5.5 / Spring Modulith 1.4.12, so the only difference between the two arms is
+// the build system — which is the question this fixture exists to answer
+// (docs/gradle-axis-resolution.md).
+//
+// The inventory-app arm was chosen over orders-app because it carries the
+// application-module violation: OrderService reaches into catalog.internal,
+// which no other module may reference.
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.modulith:spring-modulith-bom:1.4.12"
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+    // ModulithService.isModulithDependentProject tests the resolved classpath for
+    // spring-modulith, so this dependency is what makes the project qualify at
+    // all — and metadata generation then spawns
+    // org.springframework.modulith.core.util.ApplicationModulesExporter against
+    // that same classpath, which is why `./gradlew classes` is a prerequisite.
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+}
