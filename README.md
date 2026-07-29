@@ -1,20 +1,23 @@
 # Zed Spring Tools
 
-Experimental Spring Boot language intelligence for Zed, built as a companion to
-the required official Java extension.
+Spring Boot language intelligence for Zed, built as a companion to the required
+official Java extension.
 
-> This is an early public-development project, not a stable release. The
-> WASM adapter and OS-aware coordinator are designed for Zed's Linux, macOS,
-> and Windows desktop boundary. Runtime evidence to date is limited to macOS
-> arm64 on Temurin JDK 25.0.3 and 21.0.11, and the extension-registry submission
-> is under review.
+> The capability surface is complete: 47 of 59 tracked capabilities are
+> driven-verified, and each of the remaining twelve names an exact missing Zed
+> API, a native Zed equivalent, or a decided-out exception. What is not finished
+> is distribution and platform breadth. No release is published yet — the
+> extension-registry submission is under review — and runtime evidence to date is
+> macOS arm64 on Temurin JDK 25.0.3 and 21.0.11. The WASM adapter and OS-aware
+> coordinator are written for Zed's Linux, macOS, and Windows desktop boundary,
+> but writing for a platform is not a support claim for it.
 
 ## Project status
 
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 47 `verified`, 0 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 49) |
+| Capability inventory | 59 tracked: 47 `verified`, 0 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 50) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
@@ -498,10 +501,10 @@ jdtls process resumed.
 
 ## Important limitations
 
-- This is not a stable release. The adapter and coordinator are written for
-  Linux, macOS, and Windows, but only macOS arm64 has runtime evidence, on two
-  JDKs. Other desktop platforms remain untested, and the platform-aware
-  implementation is not itself a support claim.
+- No release is published yet, and runtime evidence is single-platform. The
+  adapter and coordinator are written for Linux, macOS, and Windows, but only
+  macOS arm64 has runtime evidence, on two JDKs. Other desktop platforms remain
+  untested, and the platform-aware implementation is not itself a support claim.
 - On a project's very first import, the compatibility notification can fire on a
   transient official-Java route timeout even though nothing is incompatible. See
   [known limitations](LIMITATIONS.md).
