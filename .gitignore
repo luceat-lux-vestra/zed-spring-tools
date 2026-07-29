@@ -21,3 +21,4 @@ spikes/**/extension/extension.wasm
 /artifacts/
 # Zed compiles the pinned grammar here at install time.
 /grammars/
+.cptr
