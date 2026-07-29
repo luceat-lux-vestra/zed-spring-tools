@@ -814,9 +814,11 @@ closed that program. The question of whether the goal should extend past it is
 therefore live, unanswered, and recorded here only so that it is not mistaken
 for either an accepted plan or a settled no.
 
-IntelliJ IDEA Ultimate's Spring support is the obvious larger comparator and
-appears nowhere in this repository — not in the inventory, not in R011/R018, not
-in any research document. Two things should be established before it ever does:
+IntelliJ IDEA Ultimate's Spring support is the obvious larger comparator. It
+appeared nowhere in this repository until [R020](research/020-intellij-idea-ultimate-spring-comparator.md)
+measured it on 2026-07-30, and the two things this section said should be
+established first are now both answered — the first by measurement, the second by
+delivery. Their original text is kept below, each followed by what was found.
 
 - **Most of that surface is tool-window, dashboard, and diagram shaped** — bean
   dependency graphs, an endpoints panel with request execution, a run dashboard,
@@ -828,6 +830,20 @@ in any research document. Two things should be established before it ever does:
   `.zed/spring-structure.md` and the generated task/debug entries. Whether that
   pattern extends usefully — a generated endpoint index, for instance — is
   unevaluated, and would need its own research document before any claim.
+
+  **Measured in R020, and the shape claim holds while the size claim was too
+  pessimistic.** Of roughly 345 user-facing Spring declarations in IntelliJ
+  2026.2, 306 arrive through delivery shapes this product already implements —
+  inspections, references, line markers, completion, intentions, annotators —
+  so a naive comparison would *not* mostly produce `blocked-zed-api` rows; it
+  would mostly produce rows this project already satisfies in a different shape,
+  whose remaining content gaps belong to the language server rather than to this
+  extension. Exactly 38 declarations need what stock Zed cannot give: 30
+  arbitrary actions, 6 diagram providers, and the `Endpoints` and `Beans` tool
+  windows — the latter two declared by IntelliJ's own platform plugins rather
+  than by any Spring plugin, which is itself the point. The generated-document
+  question resolves to one candidate, an endpoint index, and R020 records the
+  one runtime observation that would settle it.
 - **One already-inventoried row would go beyond both editors rather than catch
   up to either.** The embedded Spring Tools MCP server is present in the pinned
   package, and Zed supports remote MCP tools and prompts, so connecting them
@@ -836,8 +852,24 @@ in any research document. Two things should be established before it ever does:
   port and new outbound calls, which AGENTS.md lists as requiring an explicit
   direction decision before implementation.
 
+  **Decided and delivered in inventory versions 46-48**, defaulting off, and the
+  row is `verified`. Two facts found afterwards bound what it can be claimed to
+  achieve. First, upstream's own VS Code package declares no
+  `mcpServerDefinitionProviders` contribution and calls no MCP client API; its
+  `lib/Main.ts` only pushes `-Dserver.port=` into the JVM, so VS Code likewise
+  ships a server that nothing is connected to. Second, Zed's extension API can
+  contribute a context server only as a stdio `Command`
+  (`extension_api.rs`, `fn context_server_command(…) -> Result<Command>`), while
+  this server speaks streamable HTTP and cannot move to stdio because the same
+  JVM's stdout already carries LSP. A shipped connection would therefore need a
+  stdio-to-HTTP proxy maintained here; the alternative is the user's own
+  `context_servers` entry with `"source": "http"`. Either way the consumer is an
+  agent, not an editor surface, so this row does not close any IntelliJ gap.
+
 Any movement on this axis starts with a research document and a decision
-document, in that order, and does not begin by writing product code.
+document, in that order, and does not begin by writing product code. R020 is that
+research document and deliberately stops short of the decision: it proposes no
+change to the product goal, and it moves no capability-inventory state.
 
 ## Review record
 
