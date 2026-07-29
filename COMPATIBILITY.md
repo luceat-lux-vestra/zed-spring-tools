@@ -261,18 +261,28 @@ payloads; an unknown-project negative control was refused. Enabling the server
 did not delay teardown — Spring exited 3.70 s after quit with the setting off
 and 3.66 s with it on, leaving no process and no held port.
 
-Two upstream defects were observed and do not affect the other sixteen tools:
-`getResolvedProjectClasspath` fails on a classpath entry whose version is null,
-and `getLatestReleaseInformation` returns `null` where
-`getLatestBootVersionsFromMavenRepo` answers correctly for the same project.
-Neither is confirmed against VS Code, so both are recorded as very likely
-upstream rather than proven so.
+One upstream defect was observed, and it does not affect the other seventeen
+tools: `getResolvedProjectClasspath` fails on a classpath entry whose version is
+null. It is confirmed as upstream's without needing VS Code, by reading the
+pinned jars on 2026-07-29: the version is a `transient` field derived inside the
+language server from the jar's file name, so no client supplies it, and one
+ordinary two-segment name such as `snakeyaml-2.4.jar` is enough to fail the
+call. Reported as
+[spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
+
+A second defect was claimed here and withdrawn on 2026-07-30.
+`getLatestReleaseInformation` returned `null` in this run because the sweep
+passed the IDE workspace project name, while the tool documents its argument as
+the Spring portfolio id (`spring-boot`, `spring-framework`). Re-driven against
+the same jar with the documented argument it answers with the current release
+and both support end dates, so the tool works and the earlier reading was a
+harness error.
 
 This covers one tuple and one project per worktree. A 2026-07-29 Gradle run
 repeated the index-backed tools against a Gradle project and they answered from
 that project's resolved classpath, including a Boot version read from the Gradle
 build; `getResolvedProjectClasspath` failed there with the identical null
-dereference, which corroborates that the defect is upstream's. Multi-project
+dereference, as the file-name derivation predicts. Multi-project
 worktrees and any actual MCP client connection are untested; the endpoint was
 driven over HTTP directly.
 

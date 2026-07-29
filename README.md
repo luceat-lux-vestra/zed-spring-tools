@@ -17,7 +17,7 @@ official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 52) |
+| Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 53) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
@@ -486,12 +486,13 @@ points, request mappings, project diagnostics, and live `api.spring.io` release
 information. Enabling the server did not delay shutdown: Spring exits in 3.7
 seconds either way.
 
-Two upstream defects are known. `getResolvedProjectClasspath` fails with a null
-version on a classpath entry, and `getLatestReleaseInformation` returns `null`
-where its Maven-repo sibling answers correctly. Neither affects the other
-sixteen tools. Treat the setting as experimental — upstream labels it that way
-too — and note that only Maven, one project per worktree, and this one tuple
-have been exercised.
+One upstream defect is known: `getResolvedProjectClasspath` fails with a null
+version on a classpath entry — one jar named like `snakeyaml-2.4.jar` is enough,
+so it affects most projects — and is reported as
+[spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
+It does not affect the other seventeen tools. Treat the setting as experimental
+— upstream labels it that way too — and note that only Maven, one project per
+worktree, and this one tuple have been exercised.
 
 ## How it fits together
 
