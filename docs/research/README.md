@@ -125,3 +125,16 @@ blocked-action wording until Zed exports an Agent action/state API; `CL-4d` has
 a completed project-side one-click translation with a driven ignored-target
 gate; and arbitrary Maven `target/` ordering remains
 user/editor policy, with the showcase itself fixed by its local `.gitignore`.
+
+R020 measures the larger comparator the implementation plan names but had never
+sized. Reading IntelliJ IDEA Ultimate 2026.2's eleven Spring plugins as
+declaration metadata, 306 of roughly 345 user-facing surfaces arrive through
+delivery shapes this product already implements, and their content belongs to
+the language server rather than to this extension; 38 need an arbitrary action,
+a diagram, or a tool window, each already ruled out by R013, R014 and D005; and
+one or two — an endpoint index, and an extension of the existing bean structure
+document — would be new work here. The diagnostic sets do not rank: IntelliJ
+leads on bean, AOP, cache, transaction and test model analysis, while this
+product leads on configuration-file validation, version and support currency,
+Boot modernization and Spring AI. R020 is a reference audit and proposes no
+change to the product goal.
