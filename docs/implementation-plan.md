@@ -188,10 +188,15 @@ boundary), the embedded Spring Tools MCP server (a new listening port and
 outbound Spring.io calls), and the AI explanation commands (which need a Zed
 Agent API that does not exist, plus a privacy decision if it ever does). The
 three `blocked-zed-api` rows each name the exact missing client surface —
-cross-server document highlights, the semantic-token request path for Java, and
-`InlayHintLabelPart.command` activation — and each was established by a driven
-control, so reopening them is a Zed-release question, not an open work item
-here.
+cross-server document highlights, `InlayHintLabelPart.command` activation, and
+Zed Agent state/dispatch — and each was established by a driven control that was
+then confirmed against Zed's current source, so reopening them is a Zed-release
+question, not an open work item here. **A fourth row used to be on that list and
+should not have been**: the semantic-token request path for Java was recorded as
+missing on 2026-07-21 and is `verified` as of 2026-07-29, because the observation
+was produced by Zed's `semantic_tokens` setting defaulting to `"off"` rather than
+by an absent surface. That is why the source check now belongs to the promotion
+rule and not just to the driven control.
 
 What closing M4 does **not** claim: every state above rests on the macOS arm64
 tuples named in the inventory header. Parity evidence and platform evidence are

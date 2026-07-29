@@ -122,6 +122,19 @@ fn spring_initialization_options() -> zed::serde_json::Value {
 // query intelligence — embedded JPQL/HQL semantic tokens and the
 // positional-parameter inlay hint — never runs. Enable it explicitly.
 //
+// `embedded-syntax-highlighting` is the same trap and was misread as a Zed gap
+// for a week. `BootJavaConfig.isJavaEmbeddedLanguagesSyntaxHighlighting()` is
+// `isEnabled != null && isEnabled.booleanValue()`, so an absent key reads false
+// while the VSIX schema defaults it `true`. With it off,
+// `EmbeddedLanguagesSemanticTokensSupport` strips `java` from the semantic-token
+// document selector, so Spring never offers a Java token provider at all and the
+// JPQL/HQL/SpEL text inside a `@Query` renders as one uniform string. With it on
+// Spring registers `textDocument/semanticTokens` dynamically and tokenizes the
+// embedded region — verified 2026-07-29 on Zed 1.12.1. Note that this key is
+// only half of it: Zed's own `semantic_tokens` language setting defaults to
+// `"off"`, which no extension can change, so the user must also set it to
+// `"combined"` (or `"full"`). That is documented rather than worked around.
+//
 // `java.completions.inject-bean` is the same trap: VS Code's schema defaults it
 // `true`, but `BootJavaConfig.isBeanInjectionCompletionEnabled()` is
 // `Boolean.TRUE.equals(...)`, so an absent key reads false and
@@ -176,6 +189,7 @@ fn spring_default_configuration() -> zed::serde_json::Value {
                 "on": true
             },
             "jpql": true,
+            "embedded-syntax-highlighting": true,
             "modulith-project-tracking": true,
             "live-information": {
                 "all-local-java-processes": true
@@ -572,6 +586,7 @@ mod tests {
                     "highlight-codelens": { "on": true },
                     "highlight-copilot-codelens": { "on": true },
                     "jpql": true,
+                    "embedded-syntax-highlighting": true,
                     "modulith-project-tracking": true,
                     "live-information": {
                         "all-local-java-processes": true
@@ -648,6 +663,37 @@ mod tests {
         // the positional-parameter inlay hint) never runs.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
+    }
+
+    #[test]
+    fn spring_workspace_configuration_enables_embedded_syntax_highlighting() {
+        // `isJavaEmbeddedLanguagesSyntaxHighlighting()` reads false for an absent
+        // key while the VSIX schema defaults it true. Without this key Spring
+        // strips `java` from its semantic-token selector, so no amount of client
+        // configuration can produce embedded JPQL/HQL/SpEL highlighting.
+        let config = spring_workspace_configuration(None, "/work");
+        assert_eq!(
+            config["boot-java"]["embedded-syntax-highlighting"],
+            zed::serde_json::json!(true)
+        );
+    }
+
+    #[test]
+    fn spring_workspace_configuration_lets_user_disable_embedded_highlighting() {
+        // Spring answers with tokens for the whole Java file, not only the
+        // embedded region, so a user who dislikes the result must be able to drop
+        // Spring's provider without turning Zed's `semantic_tokens` off globally
+        // and losing the official Java server's tokens with it.
+        let config = spring_workspace_configuration(
+            Some(zed::serde_json::json!({
+                "boot-java": { "embedded-syntax-highlighting": false }
+            })),
+            "/work",
+        );
+        assert_eq!(
+            config["boot-java"]["embedded-syntax-highlighting"],
+            zed::serde_json::json!(false)
+        );
     }
 
     #[test]

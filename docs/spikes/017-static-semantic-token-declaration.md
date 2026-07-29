@@ -1,6 +1,11 @@
 # S017: Static semantic-token declaration through the coordinator
 
-- Status: Refuted
+- Status: **Refuted 2026-07-21, and the refutation overturned 2026-07-29** — see
+  [Correction](#correction-2026-07-29) at the end. The hypothesis was tested
+  against a client setting that was off, so both the Observations and the Result
+  below measure `semantic_tokens: "off"`, not Zed's semantic-token support. The
+  capability is now `verified`. The original text is kept unedited because the
+  way it reached a wrong conclusion is the reusable part.
 - Date: 2026-07-21
 - Related research: [R013](../research/013-zed-native-capability-delivery-surfaces.md),
   [capability inventory](../capability-inventory.md) rows *Embedded language
@@ -170,3 +175,59 @@ If Refuted, the remaining candidate is the opt-in tree-sitter Java query pack
 with an injection grammar, which bypasses LSP entirely. That is not a follow-on
 to this spike: D005 excludes it from the baseline and it needs its own direction
 decision, because it means owning a Java language registration.
+
+## Correction (2026-07-29)
+
+**The Result above is wrong, and so is the reasoning that made it feel
+conclusive.** Re-driven on Zed **1.12.1** with the same fixture and the same
+`boot-java.embedded-syntax-highlighting: true`, but with one line added to the
+run profile's settings:
+
+```json
+"semantic_tokens": "combined"
+```
+
+Zed then issued `textDocument/semanticTokens/full` immediately, Spring answered
+with tokens covering the JPQL text block, and the editor rendered them. Both
+success criteria above are met. The capability inventory row moves to `verified`
+in version 51, and the coordinator adaptation this spike built is **not**
+needed — Spring's `client/registerCapability` passes through unchanged and Zed
+honours it, so branch `spike/s017-static-semantic-tokens` stays unmerged as a
+historical artifact rather than a shelved implementation.
+
+**Cause.** Zed's `semantic_tokens` is a *language* setting whose default in
+`assets/settings/default.json` is `"off"`, described there as "do not request
+semantic tokens from language servers". Every observation in this spike follows
+from that one line. Upstream had shipped the feature long before the spike ran
+(`zed#7450`, closed 2026-02-06) and had fixed dynamic-registration handling
+before it (`zed#60015`, merged 2026-06-28); no Zed change was needed to make the
+capability work, and it would have worked on 1.11.3 too.
+
+**What made a wrong conclusion feel safe, and the lesson.** The decisive-looking
+control — jdtls, the primary server, declaring `semanticTokensProvider`
+statically and drawing no request either — was read as ruling out anything
+specific to our registration, leaving "Zed has no Java semantic-token path" as
+the only survivor. But the control shares a cause with the treatment: a single
+global switch suppresses requests to *both* servers at once. A control only
+isolates a variable it does not itself depend on. The general form is that a
+negative client observation has two families of explanation — the client cannot,
+or the client was told not to — and this spike only searched the first, reading
+Zed's `initialize` client capabilities (which advertise semantic tokens
+regardless of the setting) and never Zed's default settings or source. The
+`document_symbols` correction recorded in [LIMITATIONS](../../LIMITATIONS.md)
+was the same trap, from the same block of the same defaults file, found and
+forgotten within the same month.
+
+**Standing rule this produces:** before recording a `blocked-zed-api` row, read
+the client's default settings and current source for the feature, not only the
+protocol trace. Applied to the two neighbouring blocked rows on 2026-07-29, that
+check *confirmed* both rather than overturning them — document highlights stop
+at `LanguageServerToQuery::FirstCapable` in `crates/project/src/project.rs`, and
+inlay-hint label parts are built with `command: None` in
+`crates/project/src/lsp_command.rs`, so neither is a settings artifact. The check
+is cheap and it is not merely destructive.
+
+Evidence: `tmp/semantic-tokens-recheck-20260729/evidence/` — trace, decoded
+per-server tokens, the profile settings used, and the rendered screenshots. The
+per-row detail, including the legend-size trick for attributing a response to a
+server and the cold-start caveat, is in the capability inventory row.

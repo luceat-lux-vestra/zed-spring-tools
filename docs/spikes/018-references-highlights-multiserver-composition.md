@@ -112,9 +112,15 @@ highlighting is single-server.)
   qualifier, property, and distinct Jakarta `@Named` targets.
 - **Document highlights: Refuted for Spring-specific highlights.** Zed routes
   `documentHighlight` to the buffer's single primary server (jdtls) despite the
-  coordinator advertising the provider. Spring's highlights cannot surface — the
-  same *class* of missing surface as S017's semantic tokens (Zed never asks the
-  secondary server), reached by a different route. The row stays `planned` /
+  coordinator advertising the provider. Spring's highlights cannot surface.
+  (**Corrected 2026-07-29:** this originally read "the same *class* of missing
+  surface as S017's semantic tokens". It is not. S017's result was a default-off
+  client setting and its row is now `verified`; semantic tokens in fact fan out
+  to *every* capable server, while `document_highlights` is the one request that
+  passes `LanguageServerToQuery::FirstCapable` in Zed's
+  `crates/project/src/project.rs`. This row's own evidence — one outgoing request
+  per gesture, every time — stands unchanged and was re-confirmed against that
+  source.) The row stays `planned` /
   effectively `blocked-zed-api` for the Spring-specific slice; ordinary jdtls
   highlighting is unaffected. Do **not** build coordinator highlight code.
 

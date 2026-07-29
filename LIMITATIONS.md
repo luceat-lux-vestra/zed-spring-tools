@@ -19,7 +19,7 @@ extension.
   run at all; the extension reports that as a visible error naming the remedy
   rather than failing silently, but it does not create or modify Maven
   configuration on the user's behalf.
-- 47 of 59 tracked capabilities are proven on the tested tuple, and part of the
+- 48 of 59 tracked capabilities are proven on the tested tuple, and part of the
   VS Code Spring Tools surface is still unimplemented or unverified. The proven
   set is the properties/YAML line (completion, hover, validation, definition,
   `.properties`↔`.yaml` conversion, shared-metadata reload, and the
@@ -28,7 +28,8 @@ extension.
   inlay hints, quick fixes, Boot run/debug configuration generation, the
   Structure document, and explicit plus automatic
   live-process/metrics/logger workflows, remote live-data targets, the
-  patch-level Boot upgrade described above, Boot version/support validation, and
+  patch-level Boot upgrade described above, Boot version/support validation,
+  embedded query syntax highlighting under the setting described below, and
   Spring Modulith metadata refresh with application-module structure. Modulith
   metadata generation runs Spring Modulith's own exporter against the compiled
   classes, so an uncompiled project is refused whatever the build system; a
@@ -44,6 +45,26 @@ extension.
   cached a Spring-only Outline that omitted ordinary Java symbols until a source
   edit forced recollection. The verified Project Symbols workflow remains the
   fallback; the opt-in Structure document is the verified grouping companion.
+- **Embedded query highlighting needs one Zed setting that no extension can set
+  for you.** The JPQL, HQL, SQL and SpEL text inside a `@Query` or `@Value` is
+  highlighted by Spring's LSP semantic tokens, and Zed's `semantic_tokens`
+  language setting defaults to `"off"` — meaning it asks no language server for
+  tokens at all. Set it to `"combined"` (tree-sitter as the base) or `"full"`;
+  the extension supplies the Spring-side half itself. Corrected 2026-07-29: this
+  capability was recorded as blocked on a missing Zed API for eight days, and it
+  was not. S017 read the zero requests as Zed having no semantic-token path for
+  Java, on a control — the official Java server's own static declaration drawing
+  no request either — that is exactly what a default-off global switch produces.
+  It is the same trap as the `document_symbols` correction above, and both
+  settings live in the same block of Zed's defaults. Two caveats remain, both
+  measured: Spring answers with tokens for the **whole** Java file rather than
+  only the embedded region, so `boot-java.embedded-syntax-highlighting: false` is
+  the way to drop back to tree-sitter without giving up the official Java
+  server's tokens; and on a cold start the first request can return nothing,
+  because a transient upstream `NullPointerException` in Spring's token handler
+  answers null and **Zed caches that per buffer and does not ask again on
+  refocus**. Any edit, or opening a different Java file, restores it in well
+  under a second.
 - **Gradle is driven, with exactly one exception: the Boot upgrade.** Until
   2026-07-29 every capability gate had used a Maven fixture and the whole build
   system axis was unobserved. It was then driven end to end against two Gradle
