@@ -88,7 +88,7 @@ was bumped by whatever last moved a row.
 statements of the same fact and drift between them is invisible by eye:
 
 ```bash
-awk 'NR>=864' docs/capability-inventory.md | awk -F'|' 'NF>=4 {gsub(/[ `]/,"",$3); if ($3 ~ /^(verified|implemented|planned|blocked-zed-api|blocked-upstream|zed-native-equivalent|not-pursued)$/) print $3}' | sort | uniq -c
+awk 'NR>=891' docs/capability-inventory.md | awk -F'|' 'NF>=4 {gsub(/[ `]/,"",$3); if ($3 ~ /^(verified|implemented|planned|blocked-zed-api|blocked-upstream|zed-native-equivalent|not-pursued)$/) print $3}' | sort | uniq -c
 ```
 
 The line offset is the first workstream heading; the state is the second table
