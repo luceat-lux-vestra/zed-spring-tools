@@ -709,12 +709,15 @@ matrix is left" became an easy and wrong reading of the plan.
    `api.spring.io` data — with an unknown-project negative control refused. A
    suspected cleanup regression was measured rather than argued and did not
    exist: Spring exits in 3.70 s with the setting off and 3.66 s with it on. The
-   run also found two upstream defects, `getResolvedProjectClasspath` throwing
-   on a null classpath-entry version and `getLatestReleaseInformation`
-   returning `null`; both are named in the row and neither blocks it. The first
-   was attributed to upstream and reported on 2026-07-29 as
+   run also found one upstream defect, `getResolvedProjectClasspath` throwing on
+   a null classpath-entry version; it is named in the row and does not block it,
+   and it was reported on 2026-07-29 as
    [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
-   Evidence: `tmp/mcp-verify-20260729/evidence/`.
+   A second defect was claimed and withdrawn on 2026-07-30:
+   `getLatestReleaseInformation` had been called with the IDE workspace project
+   name rather than the Spring portfolio id its argument contract names, and it
+   answers correctly once called as documented. Evidence:
+   `tmp/mcp-verify-20260729/evidence/`.
 
    With that, **the `planned` and `implemented` columns are both empty**, which
    is the state M4 closed on and M6 has now restored after adding a capability.
