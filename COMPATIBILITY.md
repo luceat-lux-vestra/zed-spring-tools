@@ -276,6 +276,37 @@ dereference, which corroborates that the defect is upstream's. Multi-project
 worktrees and any actual MCP client connection are untested; the endpoint was
 driven over HTTP directly.
 
+## Embedded syntax highlighting evidence
+
+Embedded query and SpEL highlighting was driven on 2026-07-29 on the tuple below,
+with Zed's `semantic_tokens` set to `"combined"` — the setting whose default
+`"off"` had produced the earlier, mistaken `blocked-zed-api` reading.
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2, arm64 |
+| Zed | 1.12.1 |
+| Official Zed Java extension | 6.8.21 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | `5.2.0.RELEASE` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 |
+| Fixture | Maven, Spring Boot 3.5.5, single module |
+
+One buffer gesture produced two outgoing `textDocument/semanticTokens/full`
+requests, one per language server, both answered: Spring returned 106 tokens for
+`GreetingRepository.java` including keyword, class, property and parameter tokens
+*inside* the `@Query` text block, and the official Java server returned 55 with
+nothing inside it. Responses are attributable because the two legends differ in
+size — Spring registers 21 token types, JDT LS declares 17 — so a token type
+index of 17 or higher can only be Spring's. The rendered result was captured.
+
+Zed 1.11.3, on which the original spike ran, is not implicated and was not
+retested: the setting it depends on has existed since Zed shipped semantic tokens
+in February 2026. On a cold start the first request can be answered `null` by a
+transient upstream failure in Spring's token handler, and Zed caches that per
+buffer until the buffer changes; both requests 4-5 s after launch hit it, and
+every request after the project warmed returned tokens in 70-230 ms.
+
 ## Out of scope
 
 Zed SSH remote development and WSL-hosted remote projects are outside the

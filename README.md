@@ -3,8 +3,8 @@
 Spring Boot language intelligence for Zed, built as a companion to the required
 official Java extension.
 
-> The capability surface is complete: 47 of 59 tracked capabilities are
-> driven-verified, and each of the remaining twelve names an exact missing Zed
+> The capability surface is complete: 48 of 59 tracked capabilities are
+> driven-verified, and each of the remaining eleven names an exact missing Zed
 > API, a native Zed equivalent, or a decided-out exception. What is not finished
 > is distribution and platform breadth. No release is published yet — the
 > extension-registry submission is under review — and runtime evidence to date is
@@ -17,7 +17,7 @@ official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 47 `verified`, 0 `implemented`, 0 `planned`, 4 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 50) |
+| Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 51) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
@@ -192,16 +192,31 @@ shows the same address; because stock Zed cannot run its VS Code open-URL comman
 and a language server cannot open a browser itself, that notice points to the
 Hover link rather than dead-ending.
 
-Highlighting embedded SpEL and query fragments *inside* Java strings is not
-delivered, and that is now settled rather than pending. It needs LSP semantic
-tokens, and Zed 1.11.3 requests none for a Java buffer — not after Spring
-registers the provider dynamically, and not after a static declaration either,
-including the official Java server's own. Java code itself highlights correctly
-through Zed's own grammar meanwhile, so only token-level colouring within those
-strings is affected. Everything else for those embedded languages rides ordinary
-LSP and works today: SpEL validation and navigation are verified above, and so
-are query validation and parameter navigation inside `@Query` and in
-`META-INF/jpa-named-queries.properties`.
+Embedded SpEL and query fragments *inside* Java strings are highlighted as the
+languages they are — the JPQL in a `@Query` gets its keywords, entity, property
+and `?1` parameter coloured, with the surrounding Java untouched. This needs one
+setting on your side, because it rides LSP semantic tokens and Zed's
+`semantic_tokens` defaults to `"off"`:
+
+```json
+{ "semantic_tokens": "combined" }
+```
+
+The extension supplies the Spring half itself. This was published as blocked on
+a missing Zed API for eight days and it was not: the spike that concluded it read
+Zed's silence without reading the setting that causes it, which is written up in
+full in [S017](docs/spikes/017-static-semantic-token-declaration.md) rather than
+quietly deleted. Two things are worth knowing before you turn it on. Spring
+answers with tokens for the whole Java file rather than only the embedded region,
+so if you prefer Zed's own colouring for Java, set
+`"boot-java": { "embedded-syntax-highlighting": false }` under
+`lsp."spring-tools".settings` and keep the official Java server's tokens. And on
+a cold start the first Java file you open can miss the highlighting, because a
+transient upstream error answers the first request empty and Zed caches that per
+buffer — any edit brings it back. Everything else for those embedded languages
+rides ordinary LSP and works regardless: SpEL validation and navigation are
+verified above, and so are query validation and parameter navigation inside
+`@Query` and in `META-INF/jpa-named-queries.properties`.
 
 The coordinator also implements Spring CodeLens compatibility: standard Spring
 lenses retain server actions, source-opening lenses use Zed's native location
@@ -370,6 +385,13 @@ editing that file, run the **Spring Boot: Reload shared properties metadata**
 code action from any properties or YAML file to pick up the change without
 restarting the server; with no such file configured the action says so instead
 of claiming a reload.
+
+`boot-java.embedded-syntax-highlighting` is sent as `true`, matching the VS Code
+extension's own default, and is what colours the JPQL, HQL, SQL and SpEL inside
+your Java strings. It does nothing unless Zed's `semantic_tokens` is also on —
+see [what works today](#what-works-today) above for that half and for the two
+caveats. Set it to `false` to keep Zed's own colouring for Java: Spring
+answers with tokens for the whole file, not only the embedded region.
 
 `boot-java.live-information.automatic-connection.on` is optional and defaults
 off. When enabled, rerun **Spring Boot: Configure run/debug for a project…** so
