@@ -487,11 +487,13 @@ information. Enabling the server did not delay shutdown: Spring exits in 3.7
 seconds either way.
 
 Two upstream defects are known. `getResolvedProjectClasspath` fails with a null
-version on a classpath entry, and `getLatestReleaseInformation` returns `null`
-where its Maven-repo sibling answers correctly. Neither affects the other
-sixteen tools. Treat the setting as experimental — upstream labels it that way
-too — and note that only Maven, one project per worktree, and this one tuple
-have been exercised.
+version on a classpath entry — one jar named like `snakeyaml-2.4.jar` is enough,
+so it affects most projects — and is reported as
+[spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
+`getLatestReleaseInformation` returns `null` where its Maven-repo sibling
+answers correctly. Neither affects the other sixteen tools. Treat the setting
+as experimental — upstream labels it that way too — and note that only Maven,
+one project per worktree, and this one tuple have been exercised.
 
 ## How it fits together
 

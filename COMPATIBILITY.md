@@ -265,14 +265,18 @@ Two upstream defects were observed and do not affect the other sixteen tools:
 `getResolvedProjectClasspath` fails on a classpath entry whose version is null,
 and `getLatestReleaseInformation` returns `null` where
 `getLatestBootVersionsFromMavenRepo` answers correctly for the same project.
-Neither is confirmed against VS Code, so both are recorded as very likely
-upstream rather than proven so.
+The first is confirmed as upstream's without needing VS Code, by reading the
+pinned jars on 2026-07-29: the version is a `transient` field derived inside the
+language server from the jar's file name, so no client supplies it, and one
+ordinary two-segment name such as `snakeyaml-2.4.jar` is enough to fail the
+call. Reported as
+[spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
 
 This covers one tuple and one project per worktree. A 2026-07-29 Gradle run
 repeated the index-backed tools against a Gradle project and they answered from
 that project's resolved classpath, including a Boot version read from the Gradle
 build; `getResolvedProjectClasspath` failed there with the identical null
-dereference, which corroborates that the defect is upstream's. Multi-project
+dereference, as the file-name derivation predicts. Multi-project
 worktrees and any actual MCP client connection are untested; the endpoint was
 driven over HTTP directly.
 

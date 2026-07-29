@@ -711,8 +711,10 @@ matrix is left" became an easy and wrong reading of the plan.
    exist: Spring exits in 3.70 s with the setting off and 3.66 s with it on. The
    run also found two upstream defects, `getResolvedProjectClasspath` throwing
    on a null classpath-entry version and `getLatestReleaseInformation`
-   returning `null`; both are named in the row and neither blocks it. Evidence:
-   `tmp/mcp-verify-20260729/evidence/`.
+   returning `null`; both are named in the row and neither blocks it. The first
+   was attributed to upstream and reported on 2026-07-29 as
+   [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
+   Evidence: `tmp/mcp-verify-20260729/evidence/`.
 
    With that, **the `planned` and `implemented` columns are both empty**, which
    is the state M4 closed on and M6 has now restored after adding a capability.
