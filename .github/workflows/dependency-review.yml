@@ -1,0 +1,25 @@
+name: Dependency review
+
+# Free for public repositories, and it answers a question this project already
+# answers by hand in THIRD_PARTY_NOTICES.md: what does a pull request add to the
+# set of packages redistributed inside the registry-built `extension.wasm`?
+#
+# It reports the dependency diff and fails on a known vulnerability at moderate
+# or higher. Permissions stay read-only, so no summary comment is posted: a
+# Dependabot pull request runs with a read-only token and a comment step would
+# fail there rather than report. The diff is in the job summary.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: moderate

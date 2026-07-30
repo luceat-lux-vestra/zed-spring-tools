@@ -1,0 +1,56 @@
+version: 2
+
+# Two ecosystems exist in this repository and both are redistributed, so both
+# are watched. The Cargo tree is statically linked into the `extension.wasm`
+# that the Zed extension registry builds and serves to every user
+# (THIRD_PARTY_NOTICES.md), and the workflow actions run with repository
+# credentials. The coordinator and the Java bridge have no third-party
+# dependency to update, by design.
+#
+# Every direct Cargo requirement is an exact `=` pin, which is deliberate: a
+# pin never moves on its own, so without this file the pinned set silently ages.
+# Dependabot proposes the move and CI is the gate that accepts it.
+#
+# A Cargo bump also changes facts recorded in THIRD_PARTY_NOTICES.md (the direct
+# dependency table and the locked package count). `scripts/check-third-party-notices.mjs`
+# runs in CI and fails such a pull request until the notice is updated, so these
+# updates cannot quietly drift the licensing record.
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+      - area:extension
+    groups:
+      # One pull request for the routine moves; a major bump arrives alone so it
+      # gets its own CI run and its own review.
+      cargo-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(ci)
+    labels:
+      - dependencies
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

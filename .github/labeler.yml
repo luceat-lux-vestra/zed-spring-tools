@@ -1,0 +1,61 @@
+# Path-based routing labels for pull requests, applied by
+# `.github/workflows/labeler.yml`.
+#
+# This automates exactly one documented chore: the `area:*` routing label that
+# CONTRIBUTING.md says capability and product work receives after triage, plus
+# the three evidence labels whose meaning is already a directory. It is additive
+# only (`sync-labels` stays off), so the maintainer keeps the last word on
+# metadata and nothing removes a label applied deliberately.
+#
+# Deliberately not automated:
+# - `state:*`, which records an inventory state a path cannot know;
+# - `bug`, `question`, and the rest of ordinary triage, which is a judgement.
+
+"area:extension":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/**
+          - build.rs
+          - Cargo.toml
+          - Cargo.lock
+          - extension.toml
+          - languages/**
+
+"area:coordinator":
+  - changed-files:
+      - any-glob-to-any-file:
+          - coordinator/**
+
+"area:bridge":
+  - changed-files:
+      - any-glob-to-any-file:
+          - bridge/**
+
+"area:protocol":
+  - changed-files:
+      - any-glob-to-any-file:
+          - protocol/**
+
+research:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/research/**
+
+decision:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/decisions/**
+
+spike:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/spikes/**
+          - spikes/**
+
+# Ordinary documentation: the root files and the top-level docs, but not the
+# evidence trees above, which carry their own label and are not general docs.
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - docs/*.md

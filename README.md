@@ -601,10 +601,16 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --locked
 node --test "coordinator/test/*.test.mjs"
 node scripts/generate-contributors.mjs --check
+node scripts/check-third-party-notices.mjs
 cargo build --locked --release --target wasm32-wasip2
 ```
 
 Continuous integration runs these same checks on every push and pull request.
+Three more workflows run there and nowhere else: CodeQL analysis of the
+workflows, coordinator, bridge, and Rust adapter; a dependency review of every
+pull request; and path-based `area:*` labelling. Dependabot proposes weekly Cargo
+and Actions updates, which land as ordinary pull requests through the checks
+above.
 
 The Spring Boot fixture can be compiled independently with:
 
