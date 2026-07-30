@@ -27,6 +27,17 @@ updates:
     labels:
       - dependencies
       - area:extension
+    ignore:
+      # `zip` 7.2.0 and later cannot compile for `wasm32-wasip2` on stable Rust:
+      # they pull `typed-path`, which declares `#![feature(wasip2)]` for that exact
+      # target, so rustc fails with E0554. The reasoning and the primary source are
+      # recorded beside the pin in `Cargo.toml`. Observed on PR #88, where
+      # Dependabot proposed 8.6.0 and the build failed; without this the same
+      # unbuildable pull request would arrive every week. Remove the entry once
+      # `typed-path` compiles on stable — that is what makes this an ignore of a
+      # version range rather than of the dependency.
+      - dependency-name: zip
+        versions: [">=7.2.0"]
     groups:
       # One pull request for the routine moves; a major bump arrives alone so it
       # gets its own CI run and its own review.

@@ -14,7 +14,17 @@ crate-type = ["cdylib", "rlib"]
 flate2 = { version = "=1.1.9", default-features = false, features = ["rust_backend"] }
 sha2 = "=0.11.0"
 zed_extension_api = "=0.7.0"
-zip = { version = "=6.0.0", default-features = false, features = ["deflate-flate2"] }
+# 7.1.0 is the newest release that builds for `wasm32-wasip2` on stable Rust, and
+# the ceiling is a hard one rather than a preference. From 7.2.0 on, `zip` takes a
+# non-optional dependency on `typed-path`, whose `lib.rs` opens with
+# `#![cfg_attr(all(target_os = "wasi", target_env = "p2"), feature(wasip2))]` — a
+# `#![feature]` attribute, so rustc rejects it with E0554 on the stable channel for
+# exactly the target this extension ships. `typed-path` exposes no feature that
+# turns it off and 0.12.3 is the newest of that line, so no version choice avoids
+# it. The extension registry builds this crate on its own runners, so requiring a
+# nightly toolchain is not ours to require. `.github/dependabot.yml` holds the
+# matching ignore.
+zip = { version = "=7.1.0", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"
