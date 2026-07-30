@@ -83,6 +83,11 @@ information.
   or a durable concurrent backlog makes a separate status board useful.
 - The maintainer applies or corrects metadata before merge; contributors do not
   need repository triage permission to submit a complete change.
+- `area:*`, `research`, `decision`, `spike`, and `documentation` are applied
+  automatically from the paths a pull request touches
+  (`.github/labeler.yml`). The automation only adds labels and never removes
+  one, so a label the maintainer sets or clears stands. `state:*` stays manual:
+  it records an inventory state that a file path cannot know.
 
 The responsible human remains the Git author. Material Codex assistance may be
 recorded with `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`.
@@ -108,6 +113,11 @@ label when the active Codex model changes.
   downloaded VSIX/JAR/JDT/Zed artifacts, generated WASM, or build output.
 - Pin external inputs by version and checksum; never treat an unpinned `latest`
   download as supported evidence.
+- Dependency updates arrive as weekly Dependabot pull requests and stay pinned:
+  every Cargo requirement is an exact `=` version. A bump that changes the direct
+  dependency table or the locked package count in `THIRD_PARTY_NOTICES.md` fails
+  `node scripts/check-third-party-notices.mjs` until the notice is updated,
+  license reading included.
 - Keep paths and process launching platform-neutral from the first product
   scaffold. Untested platforms must remain labeled `untested`.
 - Preserve upstream attribution for research patches and do not imply that this

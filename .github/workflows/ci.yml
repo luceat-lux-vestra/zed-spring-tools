@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: these checks only read the tree. Nothing here writes to the
+# repository, so this token cannot be used to change it.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -45,3 +50,9 @@ jobs:
         run: node --test coordinator/test/*.test.mjs
       - name: Contributors list is current
         run: node scripts/generate-contributors.mjs --check
+      # A dependency bump changes the locked package count and the direct
+      # dependency versions that THIRD_PARTY_NOTICES.md states, and the notice
+      # is what a user reads about the redistributed WASM. Fail the bump, not
+      # the release.
+      - name: Third-party notices are current
+        run: node scripts/check-third-party-notices.mjs

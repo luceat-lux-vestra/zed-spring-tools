@@ -1,0 +1,26 @@
+name: Labeler
+
+# `pull_request_target` so a pull request from a fork can be labelled too: the
+# `pull_request` token is read-only for forks. This is safe here because the
+# action reads the changed-file list through the API and this job checks out no
+# pull-request code at all.
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          # Additive only. The maintainer's own metadata is never removed.
+          sync-labels: false
