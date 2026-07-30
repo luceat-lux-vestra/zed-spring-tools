@@ -21,7 +21,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history so git log sees every author and co-author.
           fetch-depth: 0

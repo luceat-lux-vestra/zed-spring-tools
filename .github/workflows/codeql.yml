@@ -50,7 +50,7 @@ jobs:
           - java-kotlin
           - rust
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The Rust extractor requires `cargo` to resolve the manifest. The image
       # ships a toolchain, but pinning it keeps this job on the same stable
       # channel the CI build uses instead of whatever the image happens to carry.
