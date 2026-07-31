@@ -1,8 +1,10 @@
 # R021: Spring Tools 5.3.0 refresh — Stage 0 and Stage 2 audit
 
-- Status: Stages 0 and 2 complete; Stages 1, 3 and 4 not executed
+- Status: Stages 0, 1 and 2 complete; Stage 3 partially executed; Stage 4 not
+  reached (no regression found so far)
 - Last updated: 2026-08-01
 - Investigator: Claude Opus 5
+- Driven results: [`tmp/refresh-530-gates-20260801/evidence/RUNTIME-GATE.md`](../../tmp/refresh-530-gates-20260801/evidence/RUNTIME-GATE.md)
 
 ## Question
 
@@ -394,9 +396,19 @@ replaced. Testing both extracted patterns against the reported input:
 So the two-component jar version that could not be parsed in `5.2.0.RELEASE`
 parses in `5.3.0.RELEASE`. Whether that removes the NPE depends on what the
 caller does with the now-successful parse, which a class diff cannot settle — the
-two changed `boot/mcp` classes moved no string constants. It should be treated
-as a strong hypothesis for the MCP gate to test, not as a fix confirmed by the
-milestone label.
+two changed `boot/mcp` classes moved no string constants. It was therefore
+recorded as a hypothesis for the MCP gate to test.
+
+**The gate has now tested it, and the conclusion holds while this mechanism does
+not.** Driven 2026-08-01: `snakeyaml-2.4.jar` is present in the fixture's
+classpath, `getResolvedProjectClasspath` answers successfully with no NPE — and
+that entry's `version` comes back **`null`**, not `"2.4"`. The parse relaxation
+never reaches this path. The actual fix is a type change:
+`Classpath$CPE.getVersion()` returns `String` in `5.3.0.RELEASE` where it
+returned `Version` in `5.2.0.RELEASE`, and `ProjectInformation` no longer calls
+`.toString()` on it, so the null flows through as a JSON null instead of
+throwing. #1949 is fixed in `5.3.0.RELEASE` despite its `5.4.0.RELEASE`
+milestone; #1950 remains unverified either way.
 
 #1950 has no such corroboration here: it is a client-side `Runtime.exec`
 draining defect, and neither the launcher's command set nor its process handling
@@ -456,9 +468,33 @@ technique is not repeated incorrectly:
 
 ## Status
 
-Stage 2 is complete and no repository state was changed by it. `src/artifacts.rs`
-and `extension.toml` still pin `5.2.0.RELEASE`, every inventory row still says
-what it said, and `COMPATIBILITY.md` still records one tuple.
+Stage 1 landed as its own commit and **passed**: a cold profile downloads,
+verifies and installs `5.3.0.RELEASE`, and the running Spring server is the
+2.3.0 jar. Stage 1 also corrected this document's own accounting — the pin lives
+in **four** files, not the two the gate documents. `coordinator/src/main.mjs`
+carries `SERVER_JAR` and `SPRING_TOOLS_VERSION`, and `SERVER_JAR` is a
+fail-closed startup guard; `protocol/spring-artifacts.json` duplicates the whole
+identity with nothing enforcing it.
 
-The next step is Stage 1 as its own commit, using the constants tabulated above,
-followed by the Tier A and Tier B gates mapped here.
+Stage 3 is partially executed. **No regression has been found**, so Stage 4 has
+not been reached and no inventory row has moved.
+
+| | Result |
+| --- | --- |
+| Tier A: cold install and artifact verification | PASS |
+| Tier A: handshake and classpath bridge to a resolved project | PASS |
+| Tier A: removal / cleanup contract | PASS |
+| Tier A: JDK 21 floor | not re-run |
+| Tier A: offline gate | not re-run |
+| Tier B: version/support validation | PASS — 9/9 diagnostics identical to the 5.2.0 baseline across four Boot generations |
+| Tier B: Boot upgrade patch-only assert | PASS — quick-fix sets identical |
+| Tier B: embedded MCP server | PASS — 18 tools answering on MCP SDK 2.0.0 |
+| Tier B: Java Spring diagnostics | partial — one reconciler observed |
+| Tier B: live-data rows, remote connect, Spring AI, symbols/Structure | not re-run |
+
+The highest-risk finding in this document — the `Version` rewrite — produced
+**no observable change**. The second-highest, the relocated local live-process
+attach (finding 3), is still untested.
+
+Details and the Stage 1 wasm trap are in the runtime-gate document linked in the
+header.
