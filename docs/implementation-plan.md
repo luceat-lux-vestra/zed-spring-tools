@@ -719,8 +719,10 @@ matrix is left" became an easy and wrong reading of the plan.
    run also found one upstream defect, `getResolvedProjectClasspath` throwing on
    a null classpath-entry version; it is named in the row and does not block it,
    and it was reported on 2026-07-29 as
-   [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
-   A second defect was claimed and withdrawn on 2026-07-30:
+   [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949)
+   — **fixed in the `5.3.0.RELEASE` the refresh gate pinned on 2026-08-01**, driven
+   on the same trigger jar, despite an upstream milestone label naming a later
+   release. A second defect was claimed and withdrawn on 2026-07-30:
    `getLatestReleaseInformation` had been called with the IDE workspace project
    name rather than the Spring portfolio id its argument contract names, and it
    answers correctly once called as documented. Evidence:
