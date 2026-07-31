@@ -88,13 +88,19 @@ was bumped by whatever last moved a row.
 statements of the same fact and drift between them is invisible by eye:
 
 ```bash
-awk 'NR>=891' docs/capability-inventory.md | awk -F'|' 'NF>=4 {gsub(/[ `]/,"",$3); if ($3 ~ /^(verified|implemented|planned|blocked-zed-api|blocked-upstream|zed-native-equivalent|not-pursued)$/) print $3}' | sort | uniq -c
+awk '/^## Workstream 1 /{on=1} on' docs/capability-inventory.md | awk -F'|' 'NF>=4 {gsub(/[ `]/,"",$3); if ($3 ~ /^(verified|implemented|planned|blocked-zed-api|blocked-upstream|zed-native-equivalent|not-pursued)$/) print $3}' | sort | uniq -c
 ```
 
-The line offset is the first workstream heading; the state is the second table
+Counting starts at the first workstream heading; the state is the second table
 column. Compare the result against the `## Summary` table and against the tracked
 total. Any mismatch is blocking, because the summary is what every other document
 quotes.
+
+This command used to hardcode `NR>=891` as the offset. That number went stale the
+first time prose was added above the tables — it still gave the right answer,
+which is the bad kind of wrong: a check that silently stops checking what it
+claims to. Anchor on the heading, never on a line number, in a document that is
+appended to every time a row moves.
 
 ### 2. Compatibility table — blocking
 

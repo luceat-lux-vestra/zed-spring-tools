@@ -46,11 +46,23 @@ inspected in `5.2.0.RELEASE` (11,615 bytes). So the Eclipse Public License 1.0
 characterisation above is verified against the artifact now shipped, not
 inherited from the previous one.
 
-Neither inspected release includes the complete third-party inventory needed to
-approve project-operated repackaging or mirroring — re-checked in the
-`5.3.0.RELEASE` package, which carries no notice or dependency inventory file
-either. The current low-risk boundary is user-supplied or direct acquisition of
-the unchanged official asset; the production acquisition decision remains open.
+**A third-party inventory does ship, and it covers part of the package.** The
+language server jar carries `META-INF/third-party-open-source-licenses.txt`, a
+per-artifact list naming groupId, artifactId, version and license: **243
+artifacts in `5.3.0.RELEASE`** and 244 in `5.2.0.RELEASE`, the difference being
+the dependency movement the refresh audit recorded. An earlier version of this
+file said no such inventory existed; that was read from the VSIX tree, which has
+no package-level notice file, and it missed the one inside the jar.
+
+What is still missing is coverage of the rest of the package: the seven other
+bundled jars — `commons-lsp-extensions`, `jdt-ls-commons`, `jdt-ls-extension`,
+`xml-ls-extension`, `sts-gradle-tooling`, `reactor-core` and
+`reactive-streams` — carry no notice or license file of their own, and the VSIX
+has none at the package level. So the inventory is real but partial, which is
+not the same as absent and still not enough to approve project-operated
+repackaging or mirroring. The current low-risk boundary is user-supplied or
+direct acquisition of the unchanged official asset; the production acquisition
+decision remains open.
 
 See [`docs/research/005-distribution-and-licensing.md`](docs/research/005-distribution-and-licensing.md)
 for exact artifact identity, checksums, primary sources, inferences, and

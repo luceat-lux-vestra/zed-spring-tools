@@ -1,8 +1,8 @@
 # Pinned upstream release refresh gate
 
-- Status: **Executed once** against `5.3.0.RELEASE` — Stages 0, 1, 2 and 5
-  complete, Stage 3 partially complete, Stage 4 not reached (no regression
-  found). Rollback rehearsed. See [Execution status](#execution-status)
+- Status: **Executed once, in full** against `5.3.0.RELEASE` — Stages 0-5
+  complete, Stage 4 reached for one row. Rollback rehearsed. See
+  [Execution status](#execution-status)
 - Date: 2026-07-29, last updated 2026-08-01
 - Currently pinned: Spring Tools `5.3.0.RELEASE` /
   `vscode-spring-boot-2.3.0-RC2.vsix`, pinned 2026-08-01
@@ -236,16 +236,16 @@ dev extension through Zed's own action.
 **Executed against `5.3.0.RELEASE` on 2026-08-01**, the first real execution of
 this gate. Upstream published the first release since this repository pinned
 `5.2.0.RELEASE`, so Stage 0's first precondition passed and the gate became
-executable. **The product is now pinned to `5.3.0.RELEASE`, and no regression was
-found.**
+executable. **The product is now pinned to `5.3.0.RELEASE`. One regression was
+found, in one row, and it costs a click rather than a capability.**
 
 | Stage | Status |
 | --- | --- |
 | Stage 0 — preconditions | **Passed** 2026-08-01. All three: a full VSIX (`vscode-spring-boot-2.3.0-RC2.vsix`, 83,000,863 bytes) on a non-prerelease tag; no other slice in flight; the baseline VSIX under `tmp/s002-artifacts/` hashing to the pinned `SHA256` verbatim. |
 | Stage 1 — mechanical re-pin | **Passed** 2026-08-01 as its own commit (`fa11beb`). A cold profile downloads, verifies and installs the release, and the running server is the 2.3.0 jar — reachable only through the fail-closed `SERVER_JAR` guard. Corrected this document's own two-file claim to four. |
 | Stage 2 — source re-audit | **Complete** 2026-08-01 — [R021](research/021-spring-tools-5.3.0-refresh-audit.md). |
-| Stage 3 — driven gates | **Tier A complete, Tier B partial.** All five Tier A gates pass; 5 of the mapped Tier B gates pass and the rest are recorded as not re-run. `tmp/refresh-530-gates-20260801/evidence/RUNTIME-GATE.md`. |
-| Stage 4 — regression reporting | **Not reached** — no regression found, so no inventory row moved. |
+| Stage 3 — driven gates | **Tier A and Tier B complete.** All five Tier A gates pass (`tmp/refresh-530-gates-20260801/evidence/`). Every mapped Tier B row was then driven (`tmp/residual-tierb-20260801/evidence/`): all pass byte-identically except remote connect. Tier C recorded as not re-run. |
+| Stage 4 — regression reporting | **Reached for one row.** Remote connect no longer attaches on declaration; root-caused to an unconditional `setManualConnection(true)` upstream. The row keeps `verified` because no outcome was lost. |
 | Stage 5 — currency | **Complete** 2026-08-01. Added by this execution, which is what exposed its absence. |
 | Rollback | **Rehearsed** 2026-08-01 — `tmp/rollback-rehearsal-20260801/evidence/ROLLBACK-GATE.md`. |
 
