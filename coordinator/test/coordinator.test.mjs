@@ -121,7 +121,7 @@ test("compatibility report URL contains only bounded allowlisted fields", () => 
   const body = url.searchParams.get("body");
   assert.match(body, /Failure: Official Java classpath registration failed/);
   assert.match(body, /Fingerprint: `classpath-registration-failed-v1`/);
-  assert.match(body, /Spring Tools: `5\.2\.0\.RELEASE`/);
+  assert.match(body, /Spring Tools: `5\.3\.0\.RELEASE`/);
   assert.match(body, /JDK: `25\.0\.3`/);
   assert.match(body, /Host: `macOS arm64`/);
   assert.match(body, /Zed Spring Tools: `0\.1\.0-alpha\.1`/);
@@ -1391,7 +1391,7 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
   fs.mkdirSync(springHome);
   fs.mkdirSync(javaWork);
   const java = path.join(root, "java");
-  const springServer = path.join(springHome, "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar");
+  const springServer = path.join(springHome, "spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar");
   const compatibilityFile = path.join(root, "java-providers.json");
   fs.writeFileSync(java, "fake");
   fs.writeFileSync(springServer, "fake");

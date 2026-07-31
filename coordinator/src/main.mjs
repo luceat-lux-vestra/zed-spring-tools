@@ -219,8 +219,8 @@ const INLAY_PREWARM_LIMIT = 8;
 // short internal request timeout. It is still bounded so a dismissed or lost
 // prompt cannot leak a pending request for the session lifetime.
 const ZED_REQUEST_TIMEOUT_MS = 5 * 60_000;
-const SERVER_JAR = "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar";
-const SPRING_TOOLS_VERSION = "5.2.0.RELEASE";
+const SERVER_JAR = "spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar";
+const SPRING_TOOLS_VERSION = "5.3.0.RELEASE";
 const COMPATIBILITY_REPORT_URL =
   "https://github.com/luceat-lux-vestra/zed-spring-tools/issues/new";
 const MAX_COMPATIBILITY_REPORT_URL_LENGTH = 2_000;
