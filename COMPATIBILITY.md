@@ -174,12 +174,37 @@ embedded MCP server across a major SDK bump (1.1.0 to 2.0.0), with 18 tools
 answering real project payloads; and the local live-process connect route, whose
 `sts/liveprocess/connected` payload is byte-identical between the two releases.
 
-**Not re-run, and therefore untested against `5.3.0.RELEASE`** — which is a
-different statement from failing: live hover, metrics, loggers,
-show/hide/refresh and automatic connection; remote connect; the full Java
-reconciler sweep; Spring AI annotation diagnostics; and the workspace-symbol and
-Structure surfaces. Everything the audit classed as Tier C was untouched by any
-upstream delta and was not re-run either.
+**The residual Tier B rows were closed the same day** in a second pass
+(`tmp/residual-tierb-20260801/evidence/`), each as an A/B on one fixture with the
+two releases installed side by side:
+
+- **Java reconcilers and Spring AI** — 27 problem types, 32 diagnostics,
+  byte-identical across four Boot generations, plus the two-sided
+  `API_VERSIONING_NOT_CONFIGURED` control. R021 finding 4's ten new
+  minimum-version literals change no observable outcome.
+- **Live data** — 15 measured outcomes byte-identical: `beans` 405, `mappings` 8,
+  properties, loggers, refresh, disconnect, and the notification sequence.
+  Automatic connection reproduces through the real product with a byte-identical
+  `sts/liveprocess/connected` payload.
+- **Workspace symbols, the on-disc index cache and the Structure document** — 34
+  identical symbols through Zed's own picker, cache write and reload identical on
+  all four projects, and a byte-identical 73-line Structure document. R021
+  finding 5's 15 changed cache classes change nothing observable.
+
+**One regression, and it is upstream's.** Remote connect keeps the capability —
+connecting a declared target yields an identical payload, `beans` 409,
+`mappings` 30, loggers, and clearing the array still disconnects — but
+`5.3.0.RELEASE` **no longer connects a remote app on declaration**. 5.2.0 does;
+5.3.0 does not, at a 150-second wait, and writing `"manualConnect": false`
+explicitly does not restore it. Root cause read from the bytecode:
+`BootLanguageServerBootApp.lambda$remoteAppsFromSettingsConnector$0` now calls
+`RemoteBootAppData.setManualConnection(true)` unconditionally on every entry
+parsed from `boot-java.remote-apps`, so the user's own value is deserialised and
+then overwritten. The target is still offered in the connect action, so this
+costs one click rather than the capability.
+
+Tier C was untouched by any upstream delta and was not re-run, and is therefore
+untested against `5.3.0.RELEASE` — which is a different statement from failing.
 
 **One upstream defect this project reported is fixed by the move.**
 `getResolvedProjectClasspath` threw on any classpath entry whose jar name is not

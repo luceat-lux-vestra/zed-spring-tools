@@ -644,8 +644,11 @@ matrix is left" became an easy and wrong reading of the plan.
    118 keys with zero changed defaults, a byte-identical `problem-types.json`,
    identical command sets — and put all the risk in implementation, chiefly a
    rewritten version parser and a relocated live-process attach. Both reproduced
-   the previous release's behaviour exactly when driven, so no regression was
-   found and no row moved.
+   the previous release's behaviour exactly when driven. A second pass the same
+   day closed the residual Tier B rows, all byte-identical except one: remote
+   connect no longer attaches on declaration, because upstream now overrides the
+   `manualConnect` value read from settings. No row moved — the target is still
+   offered in a verified action — but Stage 4 is reached for that row.
 
    Two things the execution corrected. The pin lives in **four** files, not the
    two the gate documented: `coordinator/src/main.mjs` carries a fail-closed
