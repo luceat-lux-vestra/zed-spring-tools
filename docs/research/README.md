@@ -138,3 +138,19 @@ leads on bean, AOP, cache, transaction and test model analysis, while this
 product leads on configuration-file validation, version and support currency,
 Boot modernization and Spring AI. R020 is a reference audit and proposes no
 change to the product goal.
+
+R021 executes Stages 0 and 2 of the pinned-release refresh gate against Spring
+Tools `5.3.0.RELEASE`, the first upstream release published since this
+repository pinned `5.2.0.RELEASE`. The declared surface is unchanged — 118
+configuration keys with zero changed defaults, a byte-identical
+`problem-types.json`, a byte-identical `BootJavaConfig`, and an unchanged
+command set on both the client and the server side — so the entire risk is in
+implementation. It concentrates in four places: a rewritten `Version` class
+whose parse pattern relaxes from strict three-component SemVer to one-to-five
+components and whose release predicate now turns on a new `ReleaseType` enum;
+the local live-process attach mechanism relocating into a new server-side
+`LocalJvmAttach` class as the client stops injecting JMX port arguments; 15
+changed index-cache classes with new path-separator validation on cache keys;
+and an MCP SDK major bump from 1.1.0 to 2.0.0 alongside Spring AI reaching GA.
+R021 carries the Tier A/B/C gate mapping for Stage 3 and changes no inventory
+row, no pinned constant, and no compatibility tuple.
