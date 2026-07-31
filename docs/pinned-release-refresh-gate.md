@@ -245,7 +245,7 @@ found, in one row, and it costs a click rather than a capability.**
 | Stage 1 — mechanical re-pin | **Passed** 2026-08-01 as its own commit (`fa11beb`). A cold profile downloads, verifies and installs the release, and the running server is the 2.3.0 jar — reachable only through the fail-closed `SERVER_JAR` guard. Corrected this document's own two-file claim to four. |
 | Stage 2 — source re-audit | **Complete** 2026-08-01 — [R021](research/021-spring-tools-5.3.0-refresh-audit.md). |
 | Stage 3 — driven gates | **Tier A and Tier B complete.** All five Tier A gates pass (`tmp/refresh-530-gates-20260801/evidence/`). Every mapped Tier B row was then driven (`tmp/residual-tierb-20260801/evidence/`): all pass byte-identically except remote connect. Tier C recorded as not re-run. |
-| Stage 4 — regression reporting | **Reached for one row.** Remote connect no longer attaches on declaration; root-caused to an unconditional `setManualConnection(true)` upstream. The row keeps `verified` because no outcome was lost. |
+| Stage 4 — regression reporting | **Reached for one row.** Remote connect no longer attaches on declaration; root-caused to an unconditional `setManualConnection(true)` upstream and reported as [spring-tools#1956](https://github.com/spring-projects/spring-tools/issues/1956). The row keeps `verified` because no outcome was lost. |
 | Stage 5 — currency | **Complete** 2026-08-01. Added by this execution, which is what exposed its absence. |
 | Rollback | **Rehearsed** 2026-08-01 — `tmp/rollback-rehearsal-20260801/evidence/ROLLBACK-GATE.md`. |
 

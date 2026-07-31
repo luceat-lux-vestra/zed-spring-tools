@@ -201,7 +201,8 @@ explicitly does not restore it. Root cause read from the bytecode:
 `RemoteBootAppData.setManualConnection(true)` unconditionally on every entry
 parsed from `boot-java.remote-apps`, so the user's own value is deserialised and
 then overwritten. The target is still offered in the connect action, so this
-costs one click rather than the capability.
+costs one click rather than the capability. Reported upstream as
+[spring-tools#1956](https://github.com/spring-projects/spring-tools/issues/1956).
 
 Tier C was untouched by any upstream delta and was not re-run, and is therefore
 untested against `5.3.0.RELEASE` — which is a different statement from failing.
