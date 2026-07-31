@@ -5,19 +5,19 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use zed_extension_api as zed;
 
-const VERSION: &str = "5.2.0.RELEASE";
-const ASSET: &str = "vscode-spring-boot-2.2.0-RC1.vsix";
-const URL: &str = "https://github.com/spring-projects/spring-tools/releases/download/5.2.0.RELEASE/vscode-spring-boot-2.2.0-RC1.vsix";
-const SIZE: u64 = 82_759_143;
-const SHA256: &str = "70943c4e434d469090f8cee54dacf1de10ec1161f92685581dc2ef6164971bb3";
+const VERSION: &str = "5.3.0.RELEASE";
+const ASSET: &str = "vscode-spring-boot-2.3.0-RC2.vsix";
+const URL: &str = "https://github.com/spring-projects/spring-tools/releases/download/5.3.0.RELEASE/vscode-spring-boot-2.3.0-RC2.vsix";
+const SIZE: u64 = 83_000_863;
+const SHA256: &str = "8e555da123e5b4edb7449d3ef1f922a922503e64a86cd66cbe713638f94a9e50";
 const MAX_ENTRIES: usize = 10_000;
 const MAX_FILE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 const REQUIRED: &[(&str, &str)] = &[
     (
-        "extension/language-server/spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar",
-        "ec922c593895331943ee1eccda434461da034bb87ac20f406fd7fb5e211bc8e1",
+        "extension/language-server/spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar",
+        "eed894c869caa71ce139eaf1f95f56120e97518102d52471803fd5a9d436a682",
     ),
     (
         "extension/jars/io.projectreactor.reactor-core.jar",
@@ -29,15 +29,15 @@ const REQUIRED: &[(&str, &str)] = &[
     ),
     (
         "extension/jars/jdt-ls-commons.jar",
-        "0134b2b2afdd2207be8c271c5501d916ca14fc709ae6d0c8067ea646955fbf69",
+        "bfdb51f0ae7df7bd4f1ba7a07109ccab361b62f1f003ac1613cede0434040530",
     ),
     (
         "extension/jars/jdt-ls-extension.jar",
-        "692e8a63e6fc57a9c314121b506a0a709ddbcfcc9580c18aef6ed9b612b972ce",
+        "7a6d24e436adec9674098b15fc3f28b8161d216d5bd372b7fdc29c50491e261c",
     ),
     (
         "extension/jars/sts-gradle-tooling.jar",
-        "9fd8165a92a930021ad93b7640ac6ebb06bb6659f65aa641ba9b4f4295901ec4",
+        "8063a93858cc90bcf8d3f890a0c5ff11b557f9b4fd24cb0b954bb1e1b96c6d0e",
     ),
 ];
 

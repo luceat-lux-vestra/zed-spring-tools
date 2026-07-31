@@ -55,6 +55,6 @@ path = [
   "spring-tools",
   "releases",
   "download",
-  "5.2.0.RELEASE",
-  "vscode-spring-boot-2.2.0-RC1.vsix",
+  "5.3.0.RELEASE",
+  "vscode-spring-boot-2.3.0-RC2.vsix",
 ]
