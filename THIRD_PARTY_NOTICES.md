@@ -32,16 +32,25 @@ included, and the accepted product architecture does not use either patch.
 
 ## Spring Tools experiment inputs
 
-The local PoC used the unchanged official Spring Tools `5.2.0.RELEASE` VSIX as
-a separately acquired, pinned, checksum-verified input. The package identifies
-its content as Eclipse Public License 1.0. Neither the VSIX nor its extracted
-content is committed here, and this repository's eventual project license will
-not relicense it.
+This extension downloads the unchanged official Spring Tools VSIX as a separately
+acquired, pinned, checksum-verified input. The pin is **`5.3.0.RELEASE`**
+(`vscode-spring-boot-2.3.0-RC2.vsix`) since 2026-08-01; the local PoC and every
+gate before that date used `5.2.0.RELEASE` (`vscode-spring-boot-2.2.0-RC1.vsix`).
+Neither VSIX nor its extracted content is committed here, and this repository's
+eventual project license will not relicense it.
 
-The inspected release did not include the complete third-party inventory needed
-to approve project-operated repackaging or mirroring. The current low-risk
-boundary is user-supplied or direct acquisition of the unchanged official asset;
-the production acquisition decision remains open.
+The licensing input was re-read when the pin moved rather than carried over. In
+the `5.3.0.RELEASE` package, `extension/package.json` declares `"license":
+"EPL-1.0"`, and `extension/LICENSE.txt` is **byte-identical** to the file already
+inspected in `5.2.0.RELEASE` (11,615 bytes). So the Eclipse Public License 1.0
+characterisation above is verified against the artifact now shipped, not
+inherited from the previous one.
+
+Neither inspected release includes the complete third-party inventory needed to
+approve project-operated repackaging or mirroring — re-checked in the
+`5.3.0.RELEASE` package, which carries no notice or dependency inventory file
+either. The current low-risk boundary is user-supplied or direct acquisition of
+the unchanged official asset; the production acquisition decision remains open.
 
 See [`docs/research/005-distribution-and-licensing.md`](docs/research/005-distribution-and-licensing.md)
 for exact artifact identity, checksums, primary sources, inferences, and

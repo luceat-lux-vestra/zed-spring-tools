@@ -181,6 +181,23 @@ reconciler sweep; Spring AI annotation diagnostics; and the workspace-symbol and
 Structure surfaces. Everything the audit classed as Tier C was untouched by any
 upstream delta and was not re-run either.
 
+**One upstream defect this project reported is fixed by the move.**
+`getResolvedProjectClasspath` threw on any classpath entry whose jar name is not
+strict three-part SemVer ([spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949)),
+which on `5.2.0.RELEASE` failed the call on essentially every Boot application.
+Driven on `5.3.0.RELEASE` with `snakeyaml-2.4.jar` — the reported trigger — on the
+fixture's classpath, the call answers with no error and that entry's version comes
+back as a JSON `null`. Upstream's milestone label reads `5.4.0.RELEASE`, so the
+label alone would have said it does not ship here; the mechanism is a type change
+in `Classpath$CPE.getVersion()`, read from the pinned jars rather than inferred
+from the issue. Checking blockers against the release rather than the label is now
+Stage 5 of the refresh gate.
+
+**Rollback was rehearsed** against this pin on 2026-08-01: two releases coexist in
+one work directory, reverting the Stage 1 commit restores the previous identity
+completely, and the rollback needs no network. Evidence in
+`tmp/rollback-rehearsal-20260801/evidence/`.
+
 Analysis in [R021](docs/research/021-spring-tools-5.3.0-refresh-audit.md);
 evidence in `tmp/refresh-530-gates-20260801/evidence/`.
 
@@ -308,6 +325,10 @@ language server from the jar's file name, so no client supplies it, and one
 ordinary two-segment name such as `snakeyaml-2.4.jar` is enough to fail the
 call. Reported as
 [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
+**It is fixed in the currently pinned `5.3.0.RELEASE`**, driven 2026-08-01 on the
+same fixture — see the [refresh evidence](#spring-tools-530-refresh-evidence)
+section above. This paragraph records what `5.2.0.RELEASE` did, per this page's
+rule that each section names the release it observed.
 
 A second defect was claimed here and withdrawn on 2026-07-30.
 `getLatestReleaseInformation` returned `null` in this run because the sweep

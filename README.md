@@ -481,16 +481,20 @@ enabled. Read what turning this on means before you do:
   prefer a fixed port unless you have a reason not to.
 
 All 18 tools were driven against a real resolved project on the tested tuple on
-2026-07-29 and returned real data — beans with their source ranges and injection
-points, request mappings, project diagnostics, and live `api.spring.io` release
-information. Enabling the server did not delay shutdown: Spring exits in 3.7
-seconds either way.
+2026-07-29, and 17 returned real data — beans with their source ranges and
+injection points, request mappings, project diagnostics, and live
+`api.spring.io` release information. The eighteenth is the defect described
+below. Enabling the server did not delay shutdown: Spring exits in 3.7 seconds
+either way.
 
-One upstream defect is known: `getResolvedProjectClasspath` fails with a null
-version on a classpath entry — one jar named like `snakeyaml-2.4.jar` is enough,
-so it affects most projects — and is reported as
+One upstream defect was found here and **is fixed in the pinned release**.
+`getResolvedProjectClasspath` failed with a null version on a classpath entry on
+`5.2.0.RELEASE` — one jar named like `snakeyaml-2.4.jar` was enough, so it
+affected most projects — and was reported as
 [spring-tools#1949](https://github.com/spring-projects/spring-tools/issues/1949).
-It does not affect the other seventeen tools. Treat the setting as experimental
+Upstream's milestone label says `5.4.0.RELEASE`, but the 2026-08-01 refresh gate
+drove the same fixture on `5.3.0.RELEASE` and the call answers with no error; the
+entry's version simply comes back `null`. Treat the setting as experimental
 — upstream labels it that way too — and note that only Maven, one project per
 worktree, and this one tuple have been exercised.
 
