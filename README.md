@@ -17,12 +17,12 @@ official Java extension.
 | Item | Current state |
 | --- | --- |
 | Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
-| Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 53) |
+| Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 54) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Maven and Gradle. The [Gradle axis](docs/gradle-axis-resolution.md) was driven on 2026-07-29 against two Gradle fixtures, including running the generated `./gradlew bootRun` entries; the build system turned out not to be a dividing line anywhere except the Boot upgrade, which upstream gates on Maven. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) still need a Windows host |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) is written but unexecuted, because `5.2.0.RELEASE` is still the newest upstream release. The [preview release gate](docs/preview-release-gate.md) — what a release here is, what the seven currency rules mean, and how to roll one back — was defined and run once on 2026-07-29; it passes, and the publish itself is a maintainer decision rather than remaining work. What is left is that decision, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
+| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) was written and then **executed for the first time on 2026-08-01**, against Spring Tools `5.3.0.RELEASE`: the extension is now pinned to that release, and the gate found no regression — the audit's two highest-risk changes, a rewritten version parser and a relocated live-process attach, both reproduce the previous release's behaviour exactly ([R021](docs/research/021-spring-tools-5.3.0-refresh-audit.md)). The [preview release gate](docs/preview-release-gate.md) — what a release here is, what the seven currency rules mean, and how to roll one back — was defined and run once on 2026-07-29; it passes, and the publish itself is a maintainer decision rather than remaining work. What is left is that decision, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -545,10 +545,13 @@ jdtls process resumed.
 - First-use artifact acquisition can hang until Zed is restarted.
 - Continuous integration runs format, lint, tests, and the WASM release build;
   there is no packaged release and no way to install without that one artifact
-  download. Rollback is now written down in both directions but exercised in
-  neither: leaving a preview is covered by the [preview release
-  gate](docs/preview-release-gate.md), and moving between two pinned Spring
-  Tools releases by the [refresh gate](docs/pinned-release-refresh-gate.md).
+  download. Rollback is written down in both directions and exercised in one:
+  leaving a preview is covered by the [preview release
+  gate](docs/preview-release-gate.md) and remains unexercised, while moving
+  between two pinned Spring Tools releases is covered by the [refresh
+  gate](docs/pinned-release-refresh-gate.md), which ran for real on 2026-08-01.
+  That run put the whole release identity in a single revertible commit, which is
+  what makes a rollback one command — but reverting it has still not been tried.
   Once installed, running offline is verified — see
   [known limitations](LIMITATIONS.md).
 - SSH remote development and WSL-hosted projects are outside the current scope.

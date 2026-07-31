@@ -145,6 +145,45 @@ a spring-cloud-commons release whose spring.io generation does not link the
 project's Boot generation — so both are recorded here as fixture pins, not as
 platform evidence.
 
+## Spring Tools 5.3.0 refresh evidence
+
+The pinned upstream release moved from `5.2.0.RELEASE` to `5.3.0.RELEASE` on
+2026-08-01, through the [refresh gate](docs/pinned-release-refresh-gate.md). This
+tuple sits **beside** the ones below rather than replacing them: every other
+section on this page records what was observed on `5.2.0.RELEASE`, and those
+observations are not retroactively claims about `5.3.0.RELEASE`.
+
+| Component | Observed value |
+| --- | --- |
+| Host | macOS 26.5.2, arm64 |
+| Zed | isolated `--user-data-dir` profile |
+| Official Zed Java extension | 6.8.21 |
+| JDT LS | `1.60.0-202606262232` |
+| Spring Tools | **`5.3.0.RELEASE`**, VSIX `vscode-spring-boot-2.3.0-RC2.vsix`, source commit `573f714dc76f178bfb2af392d03864f2a0a540ac` |
+| Server runtime | Eclipse Temurin JDK 25.0.3 host; JDK 21.0.11 for the floor gate |
+| Fixtures | Maven; a four-module aggregator spanning Boot 2.7.18 / 3.3.5 / 3.5.5 / 4.0.6, and a Boot 3.5.5 Actuator app |
+
+**No regression was found.** What was re-run and passed: cold install and
+artifact verification; the LSP handshake and classpath bridge reaching a resolved
+project; the removal and cleanup contract; the declared JDK 21 floor; offline
+behaviour on both arms, including repair of a deliberately corrupted install with
+the network denied; Spring Boot version and support validation, whose nine
+diagnostics reproduce the 2026-07-25 baseline exactly across all four Boot
+generations, quick fixes included; the Boot upgrade row's patch-only assert; the
+embedded MCP server across a major SDK bump (1.1.0 to 2.0.0), with 18 tools
+answering real project payloads; and the local live-process connect route, whose
+`sts/liveprocess/connected` payload is byte-identical between the two releases.
+
+**Not re-run, and therefore untested against `5.3.0.RELEASE`** — which is a
+different statement from failing: live hover, metrics, loggers,
+show/hide/refresh and automatic connection; remote connect; the full Java
+reconciler sweep; Spring AI annotation diagnostics; and the workspace-symbol and
+Structure surfaces. Everything the audit classed as Tier C was untouched by any
+upstream delta and was not re-run either.
+
+Analysis in [R021](docs/research/021-spring-tools-5.3.0-refresh-audit.md);
+evidence in `tmp/refresh-530-gates-20260801/evidence/`.
+
 ## M5 JDK 21 floor evidence
 
 The first M5 tuple gate ran the plan's bounded portability core on 2026-07-26

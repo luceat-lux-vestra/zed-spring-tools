@@ -310,8 +310,11 @@ extension.
   binary is stored in Git. Reproduction requires separately acquired, pinned,
   checksum-verified inputs.
 - The extension downloads the pinned, checksum-verified Spring Tools
-  `5.2.0.RELEASE` VSIX from its official GitHub release on first use. It requires
+  `5.3.0.RELEASE` VSIX from its official GitHub release on first use. It requires
   network access for that download and does not mirror or repackage the artifact.
+  The pin moved from `5.2.0.RELEASE` on 2026-08-01 through the refresh gate; most
+  capability evidence below and in the inventory was recorded against
+  `5.2.0.RELEASE` and each row names the release its evidence belongs to.
 - Offline behaviour is verified on macOS arm64/Zed 1.12.0/JDK 25 (2026-07-26),
   with outbound network denied to Zed, the coordinator, and the JVMs alike. A
   first install without network **fails closed**: the error names the pinned

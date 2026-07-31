@@ -1,8 +1,19 @@
 # Capability inventory
 
-- Inventory version: 53
-- Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`
-- Last updated: 2026-07-29
+- Inventory version: 54
+- Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`.
+  **The product pin moved to `5.3.0.RELEASE` / `2.3.0` on 2026-08-01, and the
+  derivation survives the move unchanged**: the 118 configuration keys are
+  identical with zero changed defaults, `problem-types.json` is byte-identical,
+  and the client and server command sets are identical
+  ([R021](research/021-spring-tools-5.3.0-refresh-audit.md)). No row's state
+  changed, because the refresh found no regression.
+- Evidence release: each row names the release its driven evidence belongs to.
+  Rows re-run against `5.3.0.RELEASE` are listed in
+  [COMPATIBILITY](../COMPATIBILITY.md#spring-tools-530-refresh-evidence); every
+  other row's evidence is `5.2.0.RELEASE` and is untested against the new
+  release, which is not the same statement as failing.
+- Last updated: 2026-08-01
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
