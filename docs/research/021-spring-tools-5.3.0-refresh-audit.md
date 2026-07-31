@@ -484,17 +484,25 @@ not been reached and no inventory row has moved.
 | Tier A: cold install and artifact verification | PASS |
 | Tier A: handshake and classpath bridge to a resolved project | PASS |
 | Tier A: removal / cleanup contract | PASS |
-| Tier A: JDK 21 floor | not re-run |
-| Tier A: offline gate | not re-run |
+| Tier A: JDK 21 floor | PASS — server starts on Temurin 21.0.11; both releases target class-file 65 |
+| Tier A: offline gate | PASS — both arms: clean offline failure, and offline repair of a corrupted install |
 | Tier B: version/support validation | PASS — 9/9 diagnostics identical to the 5.2.0 baseline across four Boot generations |
 | Tier B: Boot upgrade patch-only assert | PASS — quick-fix sets identical |
 | Tier B: embedded MCP server | PASS — 18 tools answering on MCP SDK 2.0.0 |
+| Tier B: local live-process connect | PASS — byte-identical connect payload on both releases |
 | Tier B: Java Spring diagnostics | partial — one reconciler observed |
-| Tier B: live-data rows, remote connect, Spring AI, symbols/Structure | not re-run |
+| Tier B: live hover, metrics, loggers, show/hide/refresh, auto-connect | not re-run |
+| Tier B: remote connect, Spring AI, symbols/Structure surfaces | not re-run |
 
-The highest-risk finding in this document — the `Version` rewrite — produced
-**no observable change**. The second-highest, the relocated local live-process
-attach (finding 3), is still untested.
+Both of this document's highest-risk findings produced **no observable change**.
+The `Version` rewrite reproduces all nine version/support diagnostics across four
+Boot generations exactly; the relocated local attach (finding 3) produces a
+byte-identical `sts/liveprocess/connected` payload.
+
+Finding 3 also needs one correction: the server's local `processKey` was
+**already** the PID in `5.2.0.RELEASE`, so the client's move from a `jmxurl`-keyed
+to a `processId`-keyed `live.activate` payload was VS Code's own bookkeeping, not
+a change in how the server identifies a local process.
 
 Details and the Stage 1 wasm trap are in the runtime-gate document linked in the
 header.
