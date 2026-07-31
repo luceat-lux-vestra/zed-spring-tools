@@ -1,12 +1,16 @@
 # Pinned upstream release refresh gate
 
-- Status: Defined, **never executed**
-- Date: 2026-07-29
+- Status: **In execution** against `5.3.0.RELEASE` — Stages 0 and 2 complete,
+  Stage 1 and Stage 3 outstanding
+- Date: 2026-07-29, last updated 2026-08-01
 - Currently pinned: Spring Tools `5.2.0.RELEASE` /
   `vscode-spring-boot-2.2.0-RC1.vsix`
+- Refreshing to: Spring Tools `5.3.0.RELEASE` /
+  `vscode-spring-boot-2.3.0-RC2.vsix`
 - Related: [implementation-plan](implementation-plan.md) M6 gap 2;
   [capability-inventory](capability-inventory.md);
-  [COMPATIBILITY](../COMPATIBILITY.md)
+  [COMPATIBILITY](../COMPATIBILITY.md);
+  [R021 Stage 2 audit](research/021-spring-tools-5.3.0-refresh-audit.md)
 
 Every parity claim in this repository is anchored to one upstream release. This
 document is the procedure for moving to another one. It exists because M6 named
@@ -155,17 +159,32 @@ coupled.
 
 ## Execution status
 
-**This gate has not been executed, and cannot be today.** Spring Tools
-`5.2.0.RELEASE` (2026-06-10) is still the newest upstream release, so there is
-nothing to refresh to. Stage 0's first precondition fails.
+**In execution against `5.3.0.RELEASE` (2026-07-29).** Upstream published the
+first release since this repository pinned `5.2.0.RELEASE`, so Stage 0's first
+precondition now passes and the gate became executable on 2026-08-01.
 
-That leaves the M6 stable-release criterion — that the gate exists *and has been
-executed at least once* — half satisfied, and it should be read that way rather
-than as done.
+| Stage | Status |
+| --- | --- |
+| Stage 0 — preconditions | **Passed** 2026-08-01. All three: a full VSIX (`vscode-spring-boot-2.3.0-RC2.vsix`, 83,000,863 bytes) on a non-prerelease tag; no other slice in flight; the baseline VSIX under `tmp/s002-artifacts/` hashing to the pinned `SHA256` verbatim. |
+| Stage 1 — mechanical re-pin | Not started. Constants and all six recomputed `REQUIRED` digests are tabulated in R021 and ready to apply. Must be its own commit. |
+| Stage 2 — source re-audit | **Complete** 2026-08-01 — [R021](research/021-spring-tools-5.3.0-refresh-audit.md). |
+| Stage 3 — driven gates | Not started. R021 carries the Tier A/B/C mapping. |
+| Stage 4 — regression reporting | Not reached. |
 
-One option would satisfy it without waiting for upstream: **rehearse the gate
-backwards** against an earlier release such as `5.1.1.RELEASE`. A downgrade
-exercises every stage, including the rollback path that is otherwise untestable,
-and Stage 2's diff would be real rather than synthetic. It is a genuine driven
-cost and is not scheduled here; it is recorded so the criterion has a route that
-does not depend on upstream's schedule.
+Stage 2's headline: the *declared* surface is unchanged — 118 configuration keys
+with zero changed defaults, a byte-identical `problem-types.json`, a
+byte-identical `BootJavaConfig`, and an unchanged command set on both the client
+and the server side. The risk is entirely in implementation, and it concentrates
+in four places: a rewritten `Version` class whose release predicate and parse
+pattern both moved, a local live-process attach mechanism that relocated into a
+new `LocalJvmAttach` server class as the client stopped injecting JMX port
+arguments, 15 changed index-cache classes, and an MCP SDK major bump from 1.1.0
+to 2.0.0.
+
+The backwards-rehearsal option recorded here previously — downgrading to
+`5.1.1.RELEASE` to exercise the stages without upstream — is **withdrawn as
+unnecessary**. A real release is now available and Stage 2's diff against it is
+genuine, so the rehearsal would cost driven time to prove less. The rollback
+path it was also meant to exercise gets its first real test in this refresh
+instead, which is why Stage 1 must land as a separate commit from any adaptation
+Stages 2-3 require.
