@@ -638,13 +638,20 @@ matrix is left" became an easy and wrong reading of the plan.
    recorded as not re-run rather than implied to pass. A regression moves the
    inventory row out of `verified` and is reported, not reverted.
 
-   **It has not been executed, and cannot be today**: `5.2.0.RELEASE`
-   (2026-06-10) is still the newest upstream release, so there is nothing to
-   refresh to. The stable-release criterion asks for a gate that exists *and*
-   has run once, so that criterion is half met. The document records one route
-   that does not wait on upstream — rehearsing the gate backwards against an
-   earlier release, which would also exercise the never-tested rollback path —
-   and does not schedule it.
+   **Executed 2026-08-01 against `5.3.0.RELEASE`** (published 2026-07-29), so
+   this gap is closed and the stable-release criterion is fully met. The product
+   is re-pinned; Stage 2's re-audit found the *declared* surface unchanged — the
+   118 keys with zero changed defaults, a byte-identical `problem-types.json`,
+   identical command sets — and put all the risk in implementation, chiefly a
+   rewritten version parser and a relocated live-process attach. Both reproduced
+   the previous release's behaviour exactly when driven, so no regression was
+   found and no row moved.
+
+   Two things the execution corrected. The pin lives in **four** files, not the
+   two the gate documented: `coordinator/src/main.mjs` carries a fail-closed
+   `SERVER_JAR` guard, and `protocol/spring-artifacts.json` duplicates the whole
+   identity with nothing enforcing it. And the backwards-rehearsal route recorded
+   here as a fallback is withdrawn — a real release made it unnecessary.
 3. **Closing the three `planned` scope decisions.** Spring Initializr, the AI
    explanation commands, and the embedded MCP server each waited on a direction
    decision, not a slice. Shipping a stable release with rows open in that state
@@ -782,10 +789,15 @@ of it.
   because they need a Windows host, so this criterion is met on macOS arm64 and
   finishes with the platform matrix rather than before it.
 - A pinned-release refresh gate exists and has been executed at least once, so
-  the project has demonstrated it can follow upstream rather than only pin. The
-  gate [now exists](pinned-release-refresh-gate.md); the execution half is
-  blocked on upstream publishing anything newer than `5.2.0.RELEASE`, or on
-  choosing to rehearse it backwards against an earlier release.
+  the project has demonstrated it can follow upstream rather than only pin.
+  **This criterion is now fully met.** The gate
+  [exists](pinned-release-refresh-gate.md) and was executed end to end on
+  2026-08-01 against Spring Tools `5.3.0.RELEASE`, published 2026-07-29: the
+  product is re-pinned to it, Stage 2's source re-audit is
+  [R021](research/021-spring-tools-5.3.0-refresh-audit.md), and Stage 3's Tier A
+  plus the mapped Tier B rows were driven. No regression was found, so Stage 4
+  was not reached and no inventory row moved. The backwards-rehearsal fallback
+  recorded when this criterion was written is withdrawn as unnecessary.
 - The `planned` rows are decided, in either direction. All three were on
   2026-07-29, and the `planned` column is now empty: two moved state, and the
   embedded MCP server was decided as `build`, built, and driven-verified the
