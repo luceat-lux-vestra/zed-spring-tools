@@ -93,27 +93,33 @@ This repository commits no binary, but the extension registry builds
 into that binary, so those crates are redistributed even though they appear here
 only as a lockfile. They are listed for that reason.
 
-`Cargo.lock` is the authoritative pinned set: 104 packages besides this crate,
+`Cargo.lock` is the authoritative pinned set: 105 packages besides this crate,
 all resolved through crates.io with a recorded checksum. The four direct
 dependencies are:
 
 | Crate | Version | License |
 | --- | --- | --- |
 | `zed_extension_api` | 0.7.0 | Apache-2.0 |
-| `flate2` | 1.1.9 | MIT OR Apache-2.0 |
+| `flate2` | 1.1.10 | MIT OR Apache-2.0 |
 | `sha2` | 0.11.0 | MIT OR Apache-2.0 |
 | `zip` | 7.1.0 | MIT |
 
-Across the whole locked tree, all 104 packages were read from the local cargo
-registry cache and every one carries a permissive license: `MIT OR Apache-2.0`
-and its orderings dominate (54), alongside `Unicode-3.0` for the 18 ICU crates,
+Across the whole locked tree, all 105 packages are accounted for and every one
+carries a permissive license: `MIT OR Apache-2.0` and its orderings dominate
+(54), alongside `Unicode-3.0` for the 18 ICU crates,
 `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` for the 12 `rustix`-family
-crates, `Zlib` for `foldhash`, `0BSD OR MIT OR Apache-2.0` for `adler2`,
-`MIT OR Zlib OR Apache-2.0` for `miniz_oxide`, `Unlicense OR MIT` for `memchr`,
-`(MIT OR Apache-2.0) AND Unicode-3.0` for `unicode-ident`, and
+crates, `Zlib` for `foldhash` and `zlib-rs`, `0BSD OR MIT OR Apache-2.0` for
+`adler2`, `MIT OR Zlib OR Apache-2.0` for `miniz_oxide`, `Unlicense OR MIT` for
+`memchr`, `(MIT OR Apache-2.0) AND Unicode-3.0` for `unicode-ident`, and
 `MIT OR Apache-2.0 OR LGPL-2.1-or-later` for `r-efi`, whose disjunction permits
 taking MIT or Apache-2.0. No copyleft-only license appears, and no package leaves
 its license field unstated.
+
+For the `flate2` 1.1.10 refresh, the changed and newly introduced package
+metadata was re-read rather than carried forward: `flate2` 1.1.10 remains
+`MIT OR Apache-2.0`, `miniz_oxide` 0.9.1 remains
+`MIT OR Zlib OR Apache-2.0`, and the newly locked `zlib-rs` 0.6.7 declares
+`Zlib`.
 
 The two packages this section previously recorded as **unread rather than
 cleared** are both resolved. `derive_arbitrary` 1.4.2 left the tree with `zip`
