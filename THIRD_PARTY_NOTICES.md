@@ -104,9 +104,9 @@ dependencies are:
 | `sha2` | 0.11.0 | MIT OR Apache-2.0 |
 | `zip` | 7.1.0 | MIT |
 
-Across the whole locked tree, all 105 packages were read from their published
-crate metadata and every one carries a permissive license: `MIT OR Apache-2.0`
-and its orderings dominate (54), alongside `Unicode-3.0` for the 18 ICU crates,
+Across the whole locked tree, all 105 packages are accounted for and every one
+carries a permissive license: `MIT OR Apache-2.0` and its orderings dominate
+(54), alongside `Unicode-3.0` for the 18 ICU crates,
 `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` for the 12 `rustix`-family
 crates, `Zlib` for `foldhash` and `zlib-rs`, `0BSD OR MIT OR Apache-2.0` for
 `adler2`, `MIT OR Zlib OR Apache-2.0` for `miniz_oxide`, `Unlicense OR MIT` for
