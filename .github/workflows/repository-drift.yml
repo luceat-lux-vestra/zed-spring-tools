@@ -1,5 +1,7 @@
-# Scheduled, read-mostly repository drift audit. It reports policy/settings
-# drift but never edits issues, branches, releases, or artifacts.
+# Scheduled, read-mostly repository drift audit. Static provenance checks always
+# run. Live repository/ruleset/settings reconciliation runs only with an explicit
+# least-privilege administration-read credential; an ordinary GITHUB_TOKEN is
+# not treated as proof that those settings were checked.
 
 name: Repository drift audit
 
@@ -27,10 +29,20 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
-      - name: Reconcile live repository policy
+
+      - name: Reconcile repository workflow policy
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/check-workflow-policy.mjs --live
+          HARDENING_AUDIT_TOKEN: ${{ secrets.HARDENING_AUDIT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HARDENING_AUDIT_TOKEN:-}" ]; then
+            export GH_TOKEN="$HARDENING_AUDIT_TOKEN"
+            node scripts/check-workflow-policy.mjs --live
+          else
+            echo "::warning::HARDENING_AUDIT_TOKEN is not provisioned; live repository/ruleset/settings readback is explicitly skipped."
+            node scripts/check-workflow-policy.mjs
+          fi
+
       - name: Reconcile Spring Tools pin inventory
         run: node scripts/check-pin-inventory.mjs
       - name: Reconcile third-party notices
