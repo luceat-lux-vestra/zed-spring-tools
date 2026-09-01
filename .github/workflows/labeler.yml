@@ -1,12 +1,11 @@
 name: Labeler
 
-# `pull_request_target` so a pull request from a fork can be labelled too: the
-# `pull_request` token is read-only for forks. This is safe here because the
-# action reads the changed-file list through the API and this job checks out no
-# pull-request code at all.
+# `pull_request` keeps the workflow on the reviewed pull-request revision and
+# avoids granting a privileged token to workflow code from a fork. Forks are
+# intentionally skipped because their token cannot write labels.
 
 on:
-  pull_request_target:
+  pull_request:
 
 permissions:
   contents: read
@@ -18,6 +17,7 @@ concurrency:
 
 jobs:
   label:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

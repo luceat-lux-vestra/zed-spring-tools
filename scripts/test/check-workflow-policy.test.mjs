@@ -65,6 +65,12 @@ test("a privileged workflow checkout is rejected", () => {
   edit(
     root,
     ".github/workflows/labeler.yml",
+    "  pull_request:\n",
+    "  pull_request_target:\n",
+  );
+  edit(
+    root,
+    ".github/workflows/labeler.yml",
     "    steps:\n",
     "    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
   );
