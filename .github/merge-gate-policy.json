@@ -90,7 +90,7 @@
       "class": "automation",
       "workflow": "labeler.yml",
       "job": "label",
-      "proves": "Nothing about the change. Applies additive routing labels. Runs on `pull_request_target` with a write-capable token, so it must never become a merge gate — that would let label automation decide mergeability."
+      "proves": "Nothing about the change. Applies additive routing labels on `pull_request` for same-repository branches only; fork pull requests are intentionally skipped because their read-only token cannot write labels. It is automation metadata, never a merge gate."
     }
   ]
 }
