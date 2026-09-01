@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "$comment": [
+    "Accepted merge-gate policy for `main`. This file is the written intent;",
+    "`scripts/check-workflow-policy.mjs` is what makes it true. Offline it",
+    "reconciles this policy against the workflow files that actually produce the",
+    "contexts; with `--live` it also reads back the repository settings and the",
+    "`main` ruleset. Both directions fail: a context here that no workflow emits,",
+    "and a pull-request job that no entry claims.",
+    "",
+    "`class` records the authority of a check, which is not the same question as",
+    "whether it is required today:",
+    "  required     a merge gate; must be emitted on every ordinary pull request",
+    "  staged       intended to become required, held back until observed stable",
+    "  advisory     reports, never blocks (path-filtered or scheduled coverage)",
+    "  automation   repository automation, not a statement about the change"
+  ],
+  "repository": "luceat-lux-vestra/zed-spring-tools",
+  "branch": "main",
+  "codeql_authority": "custom-workflow",
+  "actions_policy": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false,
+    "sha_pinning_required": true
+  },
+  "settings": {
+    "allow_squash_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "allow_update_branch": true,
+    "allow_auto_merge": false,
+    "delete_branch_on_merge": true
+  },
+  "ruleset": {
+    "name": "main",
+    "enforcement": "active",
+    "bypass_actors": [],
+    "allowed_merge_methods": ["squash"],
+    "strict_required_status_checks_policy": true,
+    "required_approving_review_count": 0,
+    "required_review_thread_resolution": true,
+    "require_extra_approval_for_unattributed_changes": true,
+    "required_rule_types": [
+      "pull_request",
+      "required_status_checks",
+      "required_linear_history",
+      "non_fast_forward",
+      "deletion"
+    ]
+  },
+  "contexts": [
+    {
+      "context": "rust",
+      "class": "required",
+      "workflow": "ci.yml",
+      "job": "rust",
+      "proves": "The extension crate formats, passes clippy with warnings denied, passes `cargo test --locked`, and builds for `wasm32-wasip2` — the target the extension registry ships. It does not prove anything about Spring Tools behaviour."
+    },
+    {
+      "context": "coordinator",
+      "class": "required",
+      "workflow": "ci.yml",
+      "job": "coordinator",
+      "proves": "Coordinator and repository-check tests pass, and the derivable records — contributors list, third-party notices, Spring Tools pin inventory — match the tree they describe."
+    },
+    {
+      "context": "review",
+      "class": "required",
+      "workflow": "dependency-review.yml",
+      "job": "review",
+      "proves": "The dependency diff this pull request introduces carries no known advisory at moderate or above. Scoped to the diff only; the standing graph is Dependabot's."
+    },
+    {
+      "context": "workflow-security",
+      "class": "staged",
+      "workflow": "ci.yml",
+      "job": "workflow-security",
+      "proves": "actionlint, zizmor and this policy check all pass, so no workflow carries a mutable action ref, a missing timeout, an unsafe `pull_request_target` checkout, or a context that has drifted from this file.",
+      "promotion": "Add to the ruleset's required contexts once it has been observed passing on `main` and on ordinary pull requests. Required-context migration is staged deliberately: a context that has never run cannot be required without wedging every pull request."
+    },
+    {
+      "context": "Analyze ${{ matrix.language }}",
+      "class": "advisory",
+      "workflow": "codeql.yml",
+      "job": "analyze",
+      "proves": "CodeQL findings for one language reach the Security tab. Deliberately never required: `codeql.yml` ignores documentation-only changes, so the context legitimately disappears on the bulk of this repository's traffic, and a required check that vanishes is a gate in name only."
+    },
+    {
+      "context": "label",
+      "class": "automation",
+      "workflow": "labeler.yml",
+      "job": "label",
+      "proves": "Nothing about the change. Applies additive routing labels. Runs on `pull_request_target` with a write-capable token, so it must never become a merge gate — that would let label automation decide mergeability."
+    }
+  ]
+}
