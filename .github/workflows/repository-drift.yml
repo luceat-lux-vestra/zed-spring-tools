@@ -1,0 +1,49 @@
+# Scheduled, read-mostly repository drift audit. Static provenance checks always
+# run. Live repository/ruleset/settings reconciliation runs only with an explicit
+# least-privilege administration-read credential; an ordinary GITHUB_TOKEN is
+# not treated as proof that those settings were checked.
+
+name: Repository drift audit
+
+on:
+  schedule:
+    - cron: '37 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-drift-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Repository drift audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+
+      - name: Reconcile repository workflow policy
+        env:
+          HARDENING_AUDIT_TOKEN: ${{ secrets.HARDENING_AUDIT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HARDENING_AUDIT_TOKEN:-}" ]; then
+            export GH_TOKEN="$HARDENING_AUDIT_TOKEN"
+            node scripts/check-workflow-policy.mjs --live
+          else
+            echo "::warning::HARDENING_AUDIT_TOKEN is not provisioned; live repository/ruleset/settings readback is explicitly skipped."
+            node scripts/check-workflow-policy.mjs
+          fi
+
+      - name: Reconcile Spring Tools pin inventory
+        run: node scripts/check-pin-inventory.mjs
+      - name: Reconcile third-party notices
+        run: node scripts/check-third-party-notices.mjs

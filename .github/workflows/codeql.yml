@@ -38,6 +38,7 @@ jobs:
   analyze:
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
@@ -50,16 +51,21 @@ jobs:
           - java-kotlin
           - rust
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # The Rust extractor requires `cargo` to resolve the manifest. The image
-      # ships a toolchain, but pinning it keeps this job on the same stable
-      # channel the CI build uses instead of whatever the image happens to carry.
+      # ships a toolchain, but pinning it puts this job on the exact compiler the
+      # `rust` CI job uses instead of whatever the image happens to carry, so a
+      # CodeQL finding and a clippy finding refer to the same rustc.
       - if: matrix.language == 'rust'
-        uses: dtolnay/rust-toolchain@stable
-      - uses: github/codeql-action/init@v4.37.9
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: "1.98.0"
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: ${{ matrix.language }}
           build-mode: none
-      - uses: github/codeql-action/analyze@v4.37.9
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: /language:${{ matrix.language }}
