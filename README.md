@@ -16,13 +16,13 @@ official Java extension.
 
 | Item | Current state |
 | --- | --- |
-| Development phase | M6 preview and release readiness; M5's JDK 21 floor gate is driven and its remaining tuples are blocked on hardware, and the M4 capability-parity program closed on 2026-07-26 |
+| Development phase | Capability delivery is complete for the declared scope. Release/distribution readiness is now tracked by [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108): first publish the existing `0.1.0` Zed Registry submission, then exercise the real Registry-install lifecycle before any v1.0 promotion. |
 | Capability inventory | 59 tracked: 48 `verified`, 0 `implemented`, 0 `planned`, 3 `blocked-zed-api`, 0 `blocked-upstream`, 6 `zed-native-equivalent`, 2 `not-pursued` (inventory version 55) |
 | Distribution | Local development extension today; submitted to the Zed extension registry as [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), awaiting maintainer review |
 | Runtime coverage | macOS arm64 with Temurin JDK 25.0.3, and the declared floor 21.0.11 through the M5 portability core; exact point releases and slices are recorded in compatibility evidence |
 | Other desktop tuples and JDKs | Untested — five desktop tuples and JDK 22 through 24; the implementation is platform-aware, but that is not a support claim |
 | Build systems | Maven and Gradle. The [Gradle axis](docs/gradle-axis-resolution.md) was driven on 2026-07-29 against two Gradle fixtures, including running the generated `./gradlew bootRun` entries; the build system turned out not to be a dividing line anywhere except the Boot upgrade, which upstream gates on Maven. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) still need a Windows host |
-| Path to a stable release | No preview and no stable release exists. Finishing M5 is not the last step: [M6](docs/implementation-plan.md) names Gradle coverage, a pinned-upstream refresh gate, and the open scope decisions as the gaps in between. All three scope decisions closed on 2026-07-29, and the embedded MCP server they turned on was built and driven-verified the same day as an off-by-default setting. The [Gradle axis](docs/gradle-axis-resolution.md) closed the same day, on macOS arm64. The [refresh gate](docs/pinned-release-refresh-gate.md) was written and then **executed for the first time on 2026-08-01**, against Spring Tools `5.3.0.RELEASE`: the extension is now pinned to that release. The audit's two highest-risk changes, a rewritten version parser and a relocated live-process attach, both reproduce the previous release's behaviour exactly, and so does every other row driven in the follow-up pass that closed the residual tier the same day ([R021](docs/research/021-spring-tools-5.3.0-refresh-audit.md)). **One regression was found**, in remote connect: a declared remote app no longer connects on its own, because upstream now overrides the `manualConnect` value read from settings. The target is still offered in the connect action, so it costs a click rather than the capability. Rollback was rehearsed against the new pin and needs no network. The [preview release gate](docs/preview-release-gate.md) — what a release here is, what the seven currency rules mean, and how to roll one back — was defined and run once on 2026-07-29; it passes, and the publish itself is a maintainer decision rather than remaining work. What is left is that decision, two things that wait on a Windows host, and release criteria that are a proposal awaiting a decision |
+| Path to a stable release | Keep the submitted Registry version at `0.1.0` until the first Registry publication completes. Then run the bounded real Registry install/first-run/restart/offline/uninstall gate. If no release-blocking defect is found and release-facing claims remain evidence-correct, the next intentional release may be `1.0.0`. Arbitrary `0.x` version churn, an arbitrary soak duration, the untested desktop matrix, and JDK 22/23/24 are not independent v1.0 blockers. See the current [release gate](docs/preview-release-gate.md) and [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108). |
 
 See the [capability inventory](docs/capability-inventory.md) for the evidence
 behind each state and [compatibility](COMPATIBILITY.md) for the exact tested
@@ -144,7 +144,7 @@ Zed-native language-server startup replaces the VS Code-specific
 Spring Tools surface is finished: the last capability awaiting a direction
 decision — the experimental embedded MCP server, whose blocker turned out to be
 a fact nobody had checked — was decided, built and driven-verified on
-2026-07-29, so what remains is four capabilities that each name an exact missing
+2026-07-29, so what remains is three capabilities that each name an exact missing
 Zed client surface. Spring Initializr is now a documented
 exception: it is not in the pinned package at all, so it was never inside the
 parity target. Everything else is either observed working on
@@ -560,13 +560,12 @@ jdtls process resumed.
 - Continuous integration runs format, lint, tests, and the WASM release build;
   there is no packaged release and no way to install without that one artifact
   download. Rollback is written down in both directions and exercised in one:
-  leaving a preview is covered by the [preview release
-  gate](docs/preview-release-gate.md) and remains unexercised, while moving
-  between two pinned Spring Tools releases is covered by the [refresh
-  gate](docs/pinned-release-refresh-gate.md), which ran for real on 2026-08-01.
-  That run put the whole release identity in a single revertible commit, which is
-  what makes a rollback one command — but reverting it has still not been tried.
-  Once installed, running offline is verified — see
+  leaving a preview is covered by the [release gate](docs/preview-release-gate.md),
+  while moving between two pinned Spring Tools releases is covered by the
+  [refresh gate](docs/pinned-release-refresh-gate.md), which ran for real on
+  2026-08-01. That run put the whole release identity in a single revertible
+  commit, which is what makes a rollback one command — but reverting it has still
+  not been tried. Once installed, running offline is verified — see
   [known limitations](LIMITATIONS.md).
 - SSH remote development and WSL-hosted projects are outside the current scope.
 
@@ -580,10 +579,11 @@ Read [known limitations](LIMITATIONS.md) before relying on the extension.
   the provider/subfeature implementation and verification matrix
 - [M4 capability delivery plan](docs/capability-delivery-plan.md) — preferred
   routes, preserved fallbacks, and verification gates
-- [Implementation plan](docs/implementation-plan.md) — milestones and delivery
-  gates
-- [Preview release gate](docs/preview-release-gate.md) — what a release here is,
-  the seven currency rules and their checks, and how to roll one back
+- [Implementation plan](docs/implementation-plan.md) — historical milestone
+  delivery plan; current capability state is owned by the inventory and current
+  release work by Epic #108
+- [Release gate](docs/preview-release-gate.md) — current Registry-first release
+  policy, release-currency checks, v1.0 meaning, and rollback rules
 - [Pinned release refresh gate](docs/pinned-release-refresh-gate.md) — the
   procedure for moving to a newer Spring Tools release
 - [Compatibility](COMPATIBILITY.md) — exact verified and untested environments
