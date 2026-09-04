@@ -1,8 +1,9 @@
 # Release gate and registry lifecycle
 
 - Status: Current release policy
-- Updated: 2026-09-03
-- Authoritative tracker: [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108)
+- Updated: 2026-09-04
+- Authoritative release tracker: [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108)
+- Native release milestone: `Registry publication & v1.0 readiness`
 - Related: [capability inventory](capability-inventory.md),
   [compatibility](../COMPATIBILITY.md), [limitations](../LIMITATIONS.md),
   [pinned release refresh gate](pinned-release-refresh-gate.md)
@@ -17,6 +18,34 @@ that capability inventory, compatibility claims, limitations, third-party
 notices, pinned-artifact checksums, and rollback instructions could be audited
 as one release-currency set. Those checks remain part of the release gate. What
 changed is the **promotion policy**, not the evidence discipline.
+
+## GitHub-native planning model
+
+The release program uses GitHub's native planning surfaces for different jobs:
+
+- release Epic #108 is the policy and ownership root;
+- native sub-issues under #108 are authoritative for Epic → Track → Task
+  decomposition;
+- native milestone `Registry publication & v1.0 readiness` is the bounded
+  release horizon and owns #108, release Tracks #109/#110, release Tasks
+  #112/#113, and any later issue whose completion is required for this release
+  horizon;
+- community platform Track #111 and Tasks #114-#118 remain outside that
+  milestone while they are non-blocking validation work;
+- #113 is release-blocked by #112 and should use the native GitHub issue
+  dependency relationship in addition to prose references;
+- #112 remains externally blocked until
+  [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875)
+  is merged and the extension is actually visible through the Zed Registry.
+
+Do not add an arbitrary milestone due date. Add one only when there is a real
+external or project delivery commitment that the repository can cite.
+
+The release milestone closes only after all release-owned issues are complete
+or explicitly reclassified/moved, any release-blocking defects are resolved or
+have an evidence-backed defer decision, release-facing documentation agrees
+with the delivered state, and release Epic #108 is completed. Community
+platform validation may remain open independently.
 
 ## Current release policy
 
