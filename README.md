@@ -48,6 +48,8 @@ Until the Registry submission is merged and installable, use a local checkout as
 
 The extension requires the official Java extension. If the Spring extension is installed after JDT LS has already started, restart Zed so the coordinated runtime can initialize cleanly.
 
+The currently pinned Spring Tools runtime is `5.3.0.RELEASE` (`vscode-spring-boot` `2.3.0`). It is acquired from the official Spring Tools release on first use and then reused from the local cache.
+
 Registry installation instructions will replace this section after the extension is actually published.
 
 ## Compatibility policy
