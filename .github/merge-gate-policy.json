@@ -72,11 +72,11 @@
     },
     {
       "context": "workflow-security",
-      "class": "staged",
+      "class": "required",
       "workflow": "ci.yml",
       "job": "workflow-security",
       "proves": "actionlint, zizmor and this policy check all pass, so no workflow carries a mutable action ref, a missing timeout, an unsafe `pull_request_target` checkout, or a context that has drifted from this file.",
-      "promotion": "Add to the ruleset's required contexts once it has been observed passing on `main` and on ordinary pull requests. Required-context migration is staged deliberately: a context that has never run cannot be required without wedging every pull request."
+      "promotion_evidence": "Observed passing on ordinary pull requests and merged `main`; authoritative live audit run 34118039906 on exact `main` d07834ddf9a10bee23e6868ba610f18bf21d77c3 confirmed repository settings and the pre-promotion live ruleset matched this policy before the required-context migration."
     },
     {
       "context": "Analyze ${{ matrix.language }}",
