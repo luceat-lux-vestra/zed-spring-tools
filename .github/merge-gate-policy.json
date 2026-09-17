@@ -83,7 +83,7 @@
       "class": "advisory",
       "workflow": "platform-validation.yml",
       "job": "platform",
-      "proves": "Each Linux, macOS, and Windows x86_64/arm64 leg runs on its native GitHub-hosted architecture with JDK 25, Node 24, and Rust 1.98.0; drives the complete coordinator capability-contract suite, Java bridge self-test and native Rust tests; verifies native path/wrapper behaviour; and checksum-verifies then launches the canonical pinned Spring Tools runtime for real headless LSP initialize/open/completion/hover/shutdown traffic. It is still not integrated Zed + official Java/JDT runtime evidence."
+      "proves": "Each Linux, macOS, and Windows x86_64/arm64 leg runs on its native GitHub-hosted architecture with JDK 25, Node 24, and Rust 1.98.0. Linux/macOS drive every existing coordinator contract directly; Windows drives every platform-neutral contract and proof-equivalent native path/wall-clock replacements for seven legacy fixture-bound forms. Every leg also runs the Java bridge self-test, native Rust tests, native path/wrapper checks, and checksum-verifies then launches the canonical pinned Spring Tools runtime for real headless LSP initialize/open/completion/hover/shutdown traffic. It is still not integrated Zed + official Java/JDT runtime evidence."
     },
     {
       "context": "spring-runtime-floor",
@@ -91,6 +91,13 @@
       "workflow": "platform-validation.yml",
       "job": "spring-runtime-floor",
       "proves": "The canonical pinned Spring Tools runtime checksum-verifies, starts with the production Spring JVM launch vector, serves real headless LSP traffic, and terminates under the declared JDK 21 floor on Linux x86_64. Host portability remains owned by the six-tuple `platform` matrix; this context does not prove integrated Zed + official Java/JDT behaviour."
+    },
+    {
+      "context": "platform-gate",
+      "class": "staged",
+      "workflow": "platform-validation.yml",
+      "job": "platform-gate",
+      "proves": "All six native `platform` matrix legs and the independent JDK 21 `spring-runtime-floor` job completed successfully for the same workflow revision. This is the stable aggregate context intended for later ruleset promotion after it has demonstrated ordinary-PR and merged-main stability."
     },
     {
       "context": "Analyze ${{ matrix.language }}",
