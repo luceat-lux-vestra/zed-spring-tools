@@ -126,10 +126,6 @@ jobs:
           curl --fail --silent --show-error --location --output zizmor.tar.gz \
             "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           echo "${ZIZMOR_SHA256}  zizmor.tar.gz" | sha256sum --check --strict
-          tar -xzf actionlint.tar.gz actionlint
-          curl --fail --silent --show-error --location --output zizmor.tar.gz \
-            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
-          echo "${ZIZMOR_SHA256}  zizmor.tar.gz" | sha256sum --check --strict
           tar -xzf zizmor.tar.gz zizmor
           echo "${RUNNER_TEMP}/policy-tools" >> "${GITHUB_PATH}"
       - name: actionlint
