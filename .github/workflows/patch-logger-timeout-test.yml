@@ -1,0 +1,54 @@
+name: Patch logger timeout test
+
+on:
+  push:
+    branches:
+      - test/m5-platform-validation-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: test/m5-platform-validation-matrix
+          fetch-depth: 0
+
+      - name: Make timeout assertion deterministic and remove helper workflow
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('coordinator/test/coordinator.test.mjs')
+          text = path.read_text()
+          old = '''    liveLogLevelConfirmMs: 5,\n'''
+          new = '''    liveLogLevelConfirmMs: 20,\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one logger timeout setting, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: configure.id, result: null });\n  const notice = await waitFor(\n    zedWrites,\n    (message) => message.method === "window/showMessage" && /did not confirm the runtime change/.test(message.params.message),\n    "unconfirmed logger notice",\n  );\n'''
+          new = '''  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: configure.id, result: null });\n  // `waitFor` polls with setImmediate and can exhaust its attempts before a\n  // wall-clock timer fires. Give the confirmation timer explicit room, just as\n  // the live-connect timeout test does below.\n  await new Promise((resolve) => setTimeout(resolve, 40));\n  const notice = await waitFor(\n    zedWrites,\n    (message) => message.method === "window/showMessage" && /did not confirm the runtime change/.test(message.params.message),\n    "unconfirmed logger notice",\n  );\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one logger notice block, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          git rm .github/workflows/patch-logger-timeout-test.yml
+          git diff --check
+          git diff -- coordinator/test/coordinator.test.mjs .github/workflows/patch-logger-timeout-test.yml
+
+      - name: Commit exact patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coordinator/test/coordinator.test.mjs
+          git commit -m "test: make logger timeout assertion deterministic"
+          git push origin HEAD:test/m5-platform-validation-matrix
