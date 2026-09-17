@@ -1,0 +1,103 @@
+name: Platform Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_LTS: "25"
+  NODE_LTS: "24"
+  RUST_TOOLCHAIN: "1.98.0"
+
+jobs:
+  platform:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x86_64
+            runner: ubuntu-24.04
+            expected_os: linux
+            expected_arch: x86_64
+          - id: linux-arm64
+            runner: ubuntu-24.04-arm
+            expected_os: linux
+            expected_arch: arm64
+          - id: macos-x86_64
+            runner: macos-15-intel
+            expected_os: macos
+            expected_arch: x86_64
+          - id: macos-arm64
+            runner: macos-15
+            expected_os: macos
+            expected_arch: arm64
+          - id: windows-x86_64
+            runner: windows-2025
+            expected_os: windows
+            expected_arch: x86_64
+          - id: windows-arm64
+            runner: windows-11-arm
+            expected_os: windows
+            expected_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      EXPECTED_OS: ${{ matrix.expected_os }}
+      EXPECTED_ARCH: ${{ matrix.expected_arch }}
+      PLATFORM_EVIDENCE: ${{ github.workspace }}/platform-evidence.json
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Microsoft OpenJDK publishes the same current JDK 25 LTS line for all
+      # six native tuples, including Windows ARM64. A single distribution keeps
+      # this matrix comparable instead of silently dropping that tuple.
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: microsoft
+          java-version: ${{ env.JAVA_LTS }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_LTS }}
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: platform-${{ matrix.id }}
+      - name: Record and verify native runner
+        run: node scripts/platform-validation.mjs
+      - name: Check coordinator sources
+        run: |
+          node --check coordinator/src/bridge_session.mjs
+          node --check coordinator/src/java_transport.mjs
+          node --check coordinator/src/lsp.mjs
+          node --check coordinator/src/main.mjs
+      # The complete coordinator suite already runs in the required coordinator
+      # job. Repeat only contracts whose behavior can genuinely change with host
+      # path/process semantics: native paths, wrapper selection, and loopback
+      # Java transport routing.
+      - name: Native coordinator contracts
+        run: node --test coordinator/test/platform_native.test.mjs coordinator/test/java_transport.test.mjs
+      - name: Java bridge self-test
+        run: node scripts/verify-bridge.mjs
+      - name: Native Rust tests
+        run: cargo test --locked
+      - name: Retain platform evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-evidence-${{ matrix.id }}-${{ env.SOURCE_HEAD_SHA }}
+          path: ${{ env.PLATFORM_EVIDENCE }}
+          if-no-files-found: warn
+          retention-days: 14

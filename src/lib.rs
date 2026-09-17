@@ -499,7 +499,7 @@ mod tests {
         // Upstream's own bound is 655536, which is past the last TCP port and
         // would hand Spring a value that fails the entire server start. Reject
         // it here instead, and never silently substitute the default port —
-        // opening a socket the user did not write is the wrong direction.
+        // opening a socket the user did not write is the wrong failure direction.
         for port in [
             zed::serde_json::json!(70000),
             zed::serde_json::json!(655536),
@@ -863,16 +863,25 @@ mod tests {
     #[test]
     fn a_relative_metadata_path_anchors_to_the_worktree_root() {
         // Spring calls `Paths.get(value)`, which would otherwise resolve
-        // against the coordinator's working directory.
+        // against the coordinator's working directory. Use a native absolute
+        // root so the invariant is independent of the host path separator.
+        let worktree_root = std::env::temp_dir().join("zed-spring-tools-worktree");
+        let worktree_root = worktree_root
+            .to_str()
+            .expect("temporary worktree path must be UTF-8");
+        let expected = Path::new(worktree_root).join("config/shared-metadata.json");
+        let expected = expected
+            .to_str()
+            .expect("resolved metadata path must be UTF-8");
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "common": { "properties-metadata": "config/shared-metadata.json" } }
             })),
-            "/work/project",
+            worktree_root,
         );
         assert_eq!(
             config["boot-java"]["common"]["properties-metadata"],
-            zed::serde_json::json!("/work/project/config/shared-metadata.json")
+            zed::serde_json::json!(expected)
         );
     }
 }

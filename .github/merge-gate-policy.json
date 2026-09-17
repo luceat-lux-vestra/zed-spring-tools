@@ -79,6 +79,13 @@
       "promotion_evidence": "Observed passing on ordinary pull requests and merged `main`; authoritative live audit run 34118039906 on exact `main` d07834ddf9a10bee23e6868ba610f18bf21d77c3 confirmed repository settings and the pre-promotion live ruleset matched this policy before the required-context migration."
     },
     {
+      "context": "platform",
+      "class": "advisory",
+      "workflow": "platform-validation.yml",
+      "job": "platform",
+      "proves": "Each Linux, macOS, and Windows x86_64/arm64 leg runs on its native GitHub-hosted architecture with JDK 25, Node 24, and Rust 1.98.0, then drives coordinator syntax/contracts, the Java bridge self-test, native Rust tests, filesystem/path smoke checks, and records exact runner evidence. Matrix success is evidence only until all six tuples have been reviewed and an aggregate gate is deliberately promoted."
+    },
+    {
       "context": "Analyze ${{ matrix.language }}",
       "class": "advisory",
       "workflow": "codeql.yml",

@@ -4,17 +4,21 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { JavaTransport, routeId } from "../src/java_transport.mjs";
 
 test("official Java route ID is the normalized UTF-8 worktree hex", () => {
-  assert.equal(routeId("/tmp/프로젝트/"), Buffer.from("/tmp/프로젝트").toString("hex"));
+  const worktree = path.join(os.tmpdir(), "프로젝트");
+  const normalized = path.resolve(worktree).replace(/[\\/]$/, "");
+  assert.equal(routeId(`${worktree}${path.sep}`), Buffer.from(normalized, "utf8").toString("hex"));
 });
 
 test("allowlisted Spring Java requests use the official loopback route", async (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-java-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const worktree = path.join(root, "work tree");
+  const projectUri = pathToFileURL(worktree).href;
   const javaWork = path.join(root, "java");
   fs.mkdirSync(path.join(javaWork, "proxy"), { recursive: true });
   const received = [];
@@ -45,7 +49,7 @@ test("allowlisted Spring Java requests use the official loopback route", async (
   );
   assert.deepEqual(
     await transport.executeSpringClientMethod("sts/project/gav", {
-      projectUris: ["file:///tmp/work%20tree"],
+      projectUris: [projectUri],
     }),
     [{ groupId: "example", artifactId: "demo", version: "1.0.0" }],
   );
@@ -61,7 +65,7 @@ test("allowlisted Spring Java requests use the official loopback route", async (
       method: "workspace/executeCommand",
       params: {
         command: "sts.project.gav",
-        arguments: [{ projectUris: ["file:///tmp/work%20tree"] }],
+        arguments: [{ projectUris: [projectUri] }],
       },
     },
   ]);

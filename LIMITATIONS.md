@@ -85,15 +85,15 @@ extension.
   thing. A Gradle user still gets the version diagnostic and the "read the
   release notes" action; what is missing is the one-click upgrade, and there is
   no fallback for it other than editing the build file.
-  **Two Gradle-shaped things remain untested**: the Windows wrapper forms
-  `mvnw.cmd` and `gradlew.bat`, which need a Windows host and are blocked for
-  the same reason the rest of the platform matrix is, and multi-project Gradle
-  builds, where a subproject without its own wrapper deliberately resolves to
-  the bare `gradle` from `PATH`. Both are covered by contract tests, which is
-  not the same as a driven gate. Spring's own `sts.gradle.build` command has no
-  caller in the pinned release, so no Gradle build reaches this extension
-  through Spring at all — that is an absent upstream surface, not a gap here.
-  Evidence and the per-row detail are in the
+  Windows wrapper selection and native path contracts for `mvnw.cmd` and
+  `gradlew.bat` are CI-verified on native Windows x86_64 and arm64 hosts. That is
+  not a Zed-integrated task-execution gate: actually launching those generated
+  wrapper tasks from Zed on Windows remains runtime-unverified. Multi-project
+  Gradle builds also remain untested, where a subproject without its own wrapper
+  deliberately resolves to the bare `gradle` from `PATH`. Spring's own
+  `sts.gradle.build` command has no caller in the pinned release, so no Gradle
+  build reaches this extension through Spring at all — that is an absent upstream
+  surface, not a gap here. Evidence and the per-row detail are in the
   [Gradle axis resolution](docs/gradle-axis-resolution.md).
 - The official Java language server starts only when a Java file is open, and
   this extension cannot start it. Zed's extension API exposes no call for
@@ -169,9 +169,11 @@ extension.
   generated `./gradlew bootRun` with the profile forwarded as
   `--args=--spring.profiles.active=<p>`, and both the base and `dev` commands
   were run verbatim and served `GET /greeting`, the `dev` one on the port its
-  profile file sets. The Windows wrapper forms (`mvnw.cmd`/`gradlew.bat`) and
-  multi-project *Gradle* selection remain untested. The synthetic action offers
-  on any Java file, not only Boot mains.
+  profile file sets. Windows `mvnw.cmd`/`gradlew.bat` selection and native path
+  handling are CI-verified on x86_64 and arm64, but actual Zed-integrated task
+  execution on Windows remains unverified. Multi-project *Gradle* selection also
+  remains untested. The synthetic action offers on any Java file, not only Boot
+  mains.
 - The Data AOT CodeLenses (`CL-4a`, `CL-4e`) no longer start a build when
   clicked. Spring's own handler for those commands runs Maven inside the
   language-server process and never reads its output: it reports nothing on
@@ -219,12 +221,16 @@ extension.
   build. Installation today means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a
   product implementation and will not be promoted directly into one.
-- Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. The
-  adapter and coordinator are written for Linux, macOS, and Windows, but every
-  other desktop and runtime tuple is untested at runtime. The declared Java
-  floor is the one exception: Temurin 21.0.11 ran the M5 portability core on
-  macOS arm64 on 2026-07-26. JDK 22, 23 and 24 remain untested, and 24 is not
-  interpolation — official Java changes the JDT LS command line at 24 or newer.
+- Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. The native
+  CI substrate is separately verified on Linux, macOS, and Windows across
+  x86_64/arm64 for runner identity, JDK 25, Node 24, Rust 1.98.0, native
+  filesystem/path and wrapper contracts, Java bridge self-test, and native Rust
+  tests. That matrix is not an integrated Zed + official Java/JDT + Spring Tools
+  runtime gate: every desktop/runtime tuple other than the driven macOS arm64 PoC
+  remains runtime-unverified. The declared Java floor is the one exception:
+  Temurin 21.0.11 ran the M5 portability core on macOS arm64 on 2026-07-26. JDK
+  22, 23 and 24 remain untested, and 24 is not interpolation — official Java
+  changes the JDT LS command line at 24 or newer.
 - The compatibility notification is still a one-shot claim about the whole
   official Java route, so it names the requirement rather than the request that
   failed. It now waits for evidence that the requirement is genuinely unmet — a
