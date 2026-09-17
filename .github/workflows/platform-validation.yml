@@ -54,6 +54,7 @@ jobs:
       EXPECTED_OS: ${{ matrix.expected_os }}
       EXPECTED_ARCH: ${{ matrix.expected_arch }}
       PLATFORM_EVIDENCE: ${{ github.workspace }}/platform-evidence.json
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,7 +97,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: platform-evidence-${{ matrix.id }}-${{ github.sha }}
+          name: platform-evidence-${{ matrix.id }}-${{ env.SOURCE_HEAD_SHA }}
           path: ${{ env.PLATFORM_EVIDENCE }}
           if-no-files-found: warn
           retention-days: 14
