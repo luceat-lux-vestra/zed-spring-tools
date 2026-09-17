@@ -70,7 +70,7 @@ function nativeArgumentProbe() {
     assert.equal(options.java, path.resolve(java));
     assert.equal(options.springServer, path.resolve(springServer));
     assert.equal(options.springHome, path.resolve(springHome));
-    assert.equal(options.javaWorkDir, path.resolve(javaWorkDir));
+    assert.equal(options.javaWorkDirectory, path.resolve(javaWorkDir));
     assert.equal(options.compatibility, path.resolve(compatibility));
     assert.equal(path.isAbsolute(options.worktree), true);
     assert.equal(options.hostOs, hostOs());
