@@ -2,7 +2,14 @@
 
 **Spring Boot language intelligence for Zed.**
 
+[![CI](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml)
 [![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
+[![CodeQL](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/codeql.yml)
+[![License](https://img.shields.io/github/license/luceat-lux-vestra/zed-spring-tools)](LICENSE)
+<br>
+[![Zed Registry](https://img.shields.io/badge/Zed%20Registry-pending-yellow)](https://github.com/zed-industries/extensions/pull/6875)
+[![JDK](https://img.shields.io/badge/JDK-21%2B-blue)](COMPATIBILITY.md)
+[![Spring Tools](https://img.shields.io/badge/Spring%20Tools-5.3.0.RELEASE-6DB33F)](protocol/spring-artifacts.json)
 
 Zed Spring Tools brings Spring-aware editing, navigation, diagnostics, quick fixes, live-application integration, and selected Spring tooling into Zed while working alongside the required official Java extension.
 
