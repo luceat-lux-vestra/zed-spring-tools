@@ -174,6 +174,7 @@ async function main() {
       sourceCommit: pin.sourceCommit,
       asset: pin.asset,
       archiveSha256: pin.sha256,
+      extraction: "full-canonical-vsix",
       requiredFiles: [],
     },
     lsp: {
@@ -194,12 +195,14 @@ async function main() {
     assert.equal(fs.statSync(archivePath).size, pin.size, "Spring Tools archive size");
     assert.equal(sha256File(archivePath), pin.sha256, "Spring Tools archive SHA-256");
 
+    // Production extracts the complete checksum-verified VSIX and then validates
+    // the identity-critical files. Mirror that installation shape here: the
+    // executable Spring Boot LS JAR loads runtime dependencies from sibling
+    // language-server/lib entries that are intentionally not part of the small
+    // required-file identity set.
     fs.mkdirSync(extractionRoot, { recursive: true });
-    const requiredPaths = pin.requiredFiles.map((entry) => {
-      assertSafeRelativePath(entry.path);
-      return entry.path;
-    });
-    execFileSync(jarTool(), ["xf", archivePath, ...requiredPaths], {
+    for (const entry of pin.requiredFiles) assertSafeRelativePath(entry.path);
+    execFileSync(jarTool(), ["xf", archivePath], {
       cwd: extractionRoot,
       shell: false,
       windowsHide: true,
