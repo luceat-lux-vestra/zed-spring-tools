@@ -79,13 +79,6 @@
       "promotion_evidence": "Observed passing on ordinary pull requests and merged `main`; authoritative live audit run 34118039906 on exact `main` d07834ddf9a10bee23e6868ba610f18bf21d77c3 confirmed repository settings and the pre-promotion live ruleset matched this policy before the required-context migration."
     },
     {
-      "context": "package",
-      "class": "advisory",
-      "workflow": "platform-validation.yml",
-      "job": "package",
-      "proves": "The product builds its release `wasm32-wasip2` artifact once on the latest-LTS JDK baseline used by M5, avoiding six redundant WASI release builds while retaining the exact artifact as evidence."
-    },
-    {
       "context": "platform",
       "class": "advisory",
       "workflow": "platform-validation.yml",
