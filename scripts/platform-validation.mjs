@@ -12,6 +12,8 @@ const EXPECTED_RUST = "1.98.0";
 const expectedOs = requiredEnv("EXPECTED_OS");
 const expectedArch = requiredEnv("EXPECTED_ARCH");
 const evidencePath = requiredEnv("PLATFORM_EVIDENCE");
+const sourceHead = requiredEnv("SOURCE_HEAD_SHA");
+const testedCommit = requiredEnv("GITHUB_SHA");
 
 const actualOs = normalizeOs(process.platform);
 const actualArch = normalizeArch(process.arch);
@@ -27,6 +29,8 @@ assertEqual(Number(nodeVersion.split(".")[0]), EXPECTED_NODE_MAJOR, "Node major 
 assertEqual(javaMajor(javaVersion), EXPECTED_JAVA_MAJOR, "Java major version");
 assertEqual(javaMajor(javacVersion), EXPECTED_JAVA_MAJOR, "javac major version");
 assertEqual(rustVersion(rustcVersion), EXPECTED_RUST, "Rust toolchain version");
+assertSha(sourceHead, "source HEAD");
+assertSha(testedCommit, "tested commit");
 
 const roundTripRoot = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-platform-"));
 try {
@@ -41,7 +45,8 @@ try {
 const evidence = {
   schemaVersion: 1,
   repository: process.env.GITHUB_REPOSITORY ?? null,
-  commit: process.env.GITHUB_SHA ?? null,
+  sourceHead,
+  testedCommit,
   runId: process.env.GITHUB_RUN_ID ?? null,
   runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
   runner: {
@@ -129,6 +134,12 @@ function rustVersion(output) {
 
 function firstLine(value) {
   return value.split(/\r?\n/, 1)[0];
+}
+
+function assertSha(value, label) {
+  if (!/^[0-9a-f]{40}$/i.test(value)) {
+    throw new Error(`${label} is not a full Git SHA: ${JSON.stringify(value)}`);
+  }
 }
 
 function assertEqual(actual, expected, label) {
