@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -18,197 +18,6 @@ const DOWNLOAD_TIMEOUT_MS = 120_000;
 const MAX_STDERR_BYTES = 256 * 1024;
 const MAX_STDOUT_CONTAMINATION = 8 * 1024;
 
-const evidencePath = requiredEnv("SPRING_RUNTIME_EVIDENCE");
-const sourceHead = requiredEnv("SOURCE_HEAD_SHA");
-const testedCommit = requiredEnv("GITHUB_SHA");
-assertSha(sourceHead, "source HEAD");
-assertSha(testedCommit, "tested commit");
-
-const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
-assert.equal(manifest.schemaVersion, 1, "Spring artifact manifest schema");
-const pin = manifest.springTools;
-assert.ok(pin && typeof pin === "object", "Spring Tools pin is required");
-assert.match(pin.url, /^https:\/\/github\.com\/spring-projects\/spring-tools\/releases\/download\//);
-assert.match(pin.sha256, /^[0-9a-f]{64}$/);
-assert.ok(Number.isSafeInteger(pin.size) && pin.size > 0);
-assert.ok(Array.isArray(pin.requiredFiles) && pin.requiredFiles.length > 0);
-
-const serverEntry = pin.requiredFiles.find((entry) =>
-  entry.path.startsWith("extension/language-server/") && entry.path.endsWith("-exec.jar"),
-);
-assert.ok(serverEntry, "canonical pin must contain the Spring Boot language-server jar");
-
-const runRoot = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-runtime-"));
-const archivePath = path.join(runRoot, pin.asset);
-const extractionRoot = path.join(runRoot, "extracted");
-const worktree = path.join(runRoot, "worktree space 한글");
-const documentPath = path.join(worktree, "src", "main", "resources", "application.properties");
-
-const evidence = {
-  schemaVersion: 1,
-  sourceHead,
-  testedCommit,
-  platform: {
-    os: process.platform,
-    arch: process.arch,
-    release: os.release(),
-  },
-  runtime: {
-    node: process.versions.node,
-    java: firstLine(commandOutput(javaTool("java"), ["-version"])),
-  },
-  springTools: {
-    tag: pin.tag,
-    sourceCommit: pin.sourceCommit,
-    asset: pin.asset,
-    archiveSha256: pin.sha256,
-    requiredFiles: [],
-  },
-  lsp: {
-    initializeCapabilityKeys: [],
-    serverRequests: [],
-    completion: null,
-    hover: null,
-    stdoutContamination: [],
-    requiredTermination: false,
-  },
-  status: "running",
-};
-
-let child;
-let stderr = "";
-
-try {
-  await downloadPinnedArtifact(pin.url, archivePath);
-  assert.equal(fs.statSync(archivePath).size, pin.size, "Spring Tools archive size");
-  assert.equal(sha256File(archivePath), pin.sha256, "Spring Tools archive SHA-256");
-
-  fs.mkdirSync(extractionRoot, { recursive: true });
-  const requiredPaths = pin.requiredFiles.map((entry) => {
-    assertSafeRelativePath(entry.path);
-    return entry.path;
-  });
-  execFileSync(jarTool(), ["xf", archivePath, ...requiredPaths], {
-    cwd: extractionRoot,
-    shell: false,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  for (const entry of pin.requiredFiles) {
-    const extracted = path.join(extractionRoot, ...entry.path.split("/"));
-    const stat = fs.statSync(extracted);
-    assert.ok(stat.isFile(), `required Spring Tools file is regular: ${entry.path}`);
-    assert.equal(sha256File(extracted), entry.sha256, `required Spring Tools SHA-256: ${entry.path}`);
-    evidence.springTools.requiredFiles.push({ path: entry.path, sha256: entry.sha256 });
-  }
-
-  fs.mkdirSync(path.dirname(documentPath), { recursive: true });
-  fs.writeFileSync(documentPath, "ser\n", "utf8");
-
-  const serverPath = path.join(extractionRoot, ...serverEntry.path.split("/"));
-  child = spawn(javaTool("java"), springArguments(serverPath, null), {
-    cwd: worktree,
-    env: process.env,
-    shell: false,
-    windowsHide: true,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  child.stderr.on("data", (chunk) => {
-    stderr += chunk.toString("utf8");
-    if (stderr.length > MAX_STDERR_BYTES) stderr = stderr.slice(-MAX_STDERR_BYTES);
-  });
-
-  const workspaceUri = directoryUri(worktree);
-  const client = new LspClient(child, [{ uri: workspaceUri, name: "runtime-smoke" }]);
-  const initialize = await client.request("initialize", {
-    processId: process.pid,
-    clientInfo: { name: "zed-spring-tools-ci", version: "1" },
-    rootUri: workspaceUri,
-    workspaceFolders: [{ uri: workspaceUri, name: "runtime-smoke" }],
-    capabilities: {
-      workspace: {
-        configuration: true,
-        applyEdit: true,
-        workspaceFolders: true,
-        executeCommand: { dynamicRegistration: true },
-        symbol: { dynamicRegistration: true },
-        didChangeConfiguration: { dynamicRegistration: true },
-      },
-      textDocument: {
-        synchronization: { dynamicRegistration: false },
-        publishDiagnostics: {},
-        completion: { dynamicRegistration: true, completionItem: { snippetSupport: false } },
-        hover: { dynamicRegistration: true, contentFormat: ["markdown", "plaintext"] },
-      },
-      window: { showMessage: {}, workDoneProgress: true },
-    },
-    initializationOptions: { enableJdtClasspath: false },
-  });
-
-  assert.ok(initialize && typeof initialize === "object", "Spring LS initialize result");
-  assert.ok(initialize.capabilities && typeof initialize.capabilities === "object", "Spring LS capabilities");
-  evidence.lsp.initializeCapabilityKeys = Object.keys(initialize.capabilities).sort();
-
-  client.notify("initialized", {});
-  const documentUri = pathToFileURL(documentPath).href;
-  client.notify("textDocument/didOpen", {
-    textDocument: {
-      uri: documentUri,
-      languageId: "spring-boot-properties",
-      version: 1,
-      text: fs.readFileSync(documentPath, "utf8"),
-    },
-  });
-
-  // These calls deliberately do not claim metadata-aware completion without a
-  // JDT classpath. Their purpose is to prove that the real pinned Spring server
-  // starts with the production JVM vector and serves the real Properties LSP
-  // handlers on every native CI tuple.
-  const completion = await client.request("textDocument/completion", {
-    textDocument: { uri: documentUri },
-    position: { line: 0, character: 3 },
-  });
-  evidence.lsp.completion = summarizeCollectionResult(completion);
-
-  const hover = await client.request("textDocument/hover", {
-    textDocument: { uri: documentUri },
-    position: { line: 0, character: 1 },
-  });
-  evidence.lsp.hover = summarizeValue(hover);
-  evidence.lsp.serverRequests = client.serverRequests;
-  evidence.lsp.stdoutContamination = client.stdoutContamination;
-  assert.equal(client.stdoutContamination.length, 0, "Spring LS must not contaminate LSP stdout");
-
-  await client.request("shutdown", null, 30_000);
-  client.notify("exit", null);
-
-  const exitedAfterLspExit = await waitForExit(child, 1_500);
-  if (!exitedAfterLspExit) {
-    evidence.lsp.requiredTermination = true;
-    child.kill();
-    assert.equal(await waitForExit(child, 5_000), true, "Spring LS terminates when its owner kills it");
-  }
-
-  evidence.status = "pass";
-  evidence.finishedAt = new Date().toISOString();
-  evidence.stderrTail = tailLines(stderr, 40);
-  writeEvidence(evidencePath, evidence);
-  process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
-} catch (error) {
-  if (child && child.exitCode === null && child.signalCode === null) {
-    child.kill();
-  }
-  evidence.status = "fail";
-  evidence.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  evidence.finishedAt = new Date().toISOString();
-  evidence.stderrTail = tailLines(stderr, 80);
-  writeEvidence(evidencePath, evidence);
-  throw error;
-} finally {
-  fs.rmSync(runRoot, { recursive: true, force: true });
-}
-
 class LspClient {
   constructor(process, workspaceFolders) {
     this.process = process;
@@ -218,15 +27,17 @@ class LspClient {
     this.nextId = 1;
     this.serverRequests = [];
     this.stdoutContamination = [];
+    this.fatalError = null;
 
-    process.stdout.on("data", (chunk) => this.onData(chunk));
-    process.on("exit", (code, signal) => {
-      const error = new Error(`Spring LS exited before response: code=${code} signal=${signal}`);
-      for (const pending of this.pending.values()) {
-        clearTimeout(pending.timer);
-        pending.reject(error);
+    process.stdout.on("data", (chunk) => {
+      try {
+        this.onData(chunk);
+      } catch (error) {
+        this.fail(error);
       }
-      this.pending.clear();
+    });
+    process.on("exit", (code, signal) => {
+      this.fail(new Error(`Spring LS exited before response: code=${code} signal=${signal}`));
     });
   }
 
@@ -261,9 +72,10 @@ class LspClient {
 
   handle(message) {
     if (message.id !== undefined && message.method === undefined) {
-      const pending = this.pending.get(String(message.id));
+      const key = String(message.id);
+      const pending = this.pending.get(key);
       if (!pending) return;
-      this.pending.delete(String(message.id));
+      this.pending.delete(key);
       clearTimeout(pending.timer);
       if (message.error) pending.reject(new Error(`Spring LS ${pending.method}: ${JSON.stringify(message.error)}`));
       else pending.resolve(message.result);
@@ -280,7 +92,18 @@ class LspClient {
     }
   }
 
+  fail(error) {
+    if (this.fatalError) return;
+    this.fatalError = error;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+    this.pending.clear();
+  }
+
   request(method, params, timeoutMs = REQUEST_TIMEOUT_MS) {
+    if (this.fatalError) return Promise.reject(this.fatalError);
     const id = this.nextId++;
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -293,6 +116,7 @@ class LspClient {
   }
 
   notify(method, params) {
+    if (this.fatalError) throw this.fatalError;
     this.send({ jsonrpc: "2.0", method, params });
   }
 
@@ -305,10 +129,198 @@ class LspClient {
   }
 }
 
-function serverRequestResult(method, params, workspaceFolders) {
-  if (method === "workspace/configuration") {
-    return (params?.items ?? []).map(() => ({}));
+async function main() {
+  const evidencePath = requiredEnv("SPRING_RUNTIME_EVIDENCE");
+  const sourceHead = requiredEnv("SOURCE_HEAD_SHA");
+  const testedCommit = requiredEnv("GITHUB_SHA");
+  assertSha(sourceHead, "source HEAD");
+  assertSha(testedCommit, "tested commit");
+
+  const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+  assert.equal(manifest.schemaVersion, 1, "Spring artifact manifest schema");
+  const pin = manifest.springTools;
+  assert.ok(pin && typeof pin === "object", "Spring Tools pin is required");
+  assert.match(pin.url, /^https:\/\/github\.com\/spring-projects\/spring-tools\/releases\/download\//);
+  assert.match(pin.sha256, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isSafeInteger(pin.size) && pin.size > 0);
+  assert.ok(Array.isArray(pin.requiredFiles) && pin.requiredFiles.length > 0);
+
+  const serverEntry = pin.requiredFiles.find((entry) =>
+    entry.path.startsWith("extension/language-server/") && entry.path.endsWith("-exec.jar"),
+  );
+  assert.ok(serverEntry, "canonical pin must contain the Spring Boot language-server jar");
+
+  const runRoot = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-runtime-"));
+  const archivePath = path.join(runRoot, pin.asset);
+  const extractionRoot = path.join(runRoot, "extracted");
+  const worktree = path.join(runRoot, "worktree space 한글");
+  const documentPath = path.join(worktree, "src", "main", "resources", "application.properties");
+
+  const evidence = {
+    schemaVersion: 1,
+    sourceHead,
+    testedCommit,
+    platform: {
+      os: process.platform,
+      arch: process.arch,
+      release: os.release(),
+    },
+    runtime: {
+      node: process.versions.node,
+      java: firstLine(commandOutput(javaTool("java"), ["-version"])),
+    },
+    springTools: {
+      tag: pin.tag,
+      sourceCommit: pin.sourceCommit,
+      asset: pin.asset,
+      archiveSha256: pin.sha256,
+      requiredFiles: [],
+    },
+    lsp: {
+      initializeCapabilityKeys: [],
+      serverRequests: [],
+      completion: null,
+      hover: null,
+      stdoutContamination: [],
+      exitMode: null,
+    },
+    status: "running",
+  };
+
+  let child;
+  let stderr = "";
+  try {
+    await downloadPinnedArtifact(pin.url, archivePath);
+    assert.equal(fs.statSync(archivePath).size, pin.size, "Spring Tools archive size");
+    assert.equal(sha256File(archivePath), pin.sha256, "Spring Tools archive SHA-256");
+
+    fs.mkdirSync(extractionRoot, { recursive: true });
+    const requiredPaths = pin.requiredFiles.map((entry) => {
+      assertSafeRelativePath(entry.path);
+      return entry.path;
+    });
+    execFileSync(jarTool(), ["xf", archivePath, ...requiredPaths], {
+      cwd: extractionRoot,
+      shell: false,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    for (const entry of pin.requiredFiles) {
+      const extracted = path.join(extractionRoot, ...entry.path.split("/"));
+      const stat = fs.statSync(extracted);
+      assert.ok(stat.isFile(), `required Spring Tools file is regular: ${entry.path}`);
+      assert.equal(sha256File(extracted), entry.sha256, `required Spring Tools SHA-256: ${entry.path}`);
+      evidence.springTools.requiredFiles.push({ path: entry.path, sha256: entry.sha256 });
+    }
+
+    fs.mkdirSync(path.dirname(documentPath), { recursive: true });
+    fs.writeFileSync(documentPath, "ser\n", "utf8");
+
+    const serverPath = path.join(extractionRoot, ...serverEntry.path.split("/"));
+    child = spawn(javaTool("java"), springArguments(serverPath, null), {
+      cwd: worktree,
+      env: process.env,
+      shell: false,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+      if (stderr.length > MAX_STDERR_BYTES) stderr = stderr.slice(-MAX_STDERR_BYTES);
+    });
+
+    const workspaceUri = directoryUri(worktree);
+    const client = new LspClient(child, [{ uri: workspaceUri, name: "runtime-smoke" }]);
+    const initialize = await client.request("initialize", {
+      processId: process.pid,
+      clientInfo: { name: "zed-spring-tools-ci", version: "1" },
+      rootUri: workspaceUri,
+      workspaceFolders: [{ uri: workspaceUri, name: "runtime-smoke" }],
+      capabilities: {
+        workspace: {
+          configuration: true,
+          applyEdit: true,
+          workspaceFolders: true,
+          executeCommand: { dynamicRegistration: true },
+          symbol: { dynamicRegistration: true },
+          didChangeConfiguration: { dynamicRegistration: true },
+        },
+        textDocument: {
+          synchronization: { dynamicRegistration: false },
+          publishDiagnostics: {},
+          completion: { dynamicRegistration: true, completionItem: { snippetSupport: false } },
+          hover: { dynamicRegistration: true, contentFormat: ["markdown", "plaintext"] },
+        },
+        window: { showMessage: {}, workDoneProgress: true },
+      },
+      initializationOptions: { enableJdtClasspath: false },
+    });
+
+    assert.ok(initialize && typeof initialize === "object", "Spring LS initialize result");
+    assert.ok(initialize.capabilities && typeof initialize.capabilities === "object", "Spring LS capabilities");
+    evidence.lsp.initializeCapabilityKeys = Object.keys(initialize.capabilities).sort();
+
+    client.notify("initialized", {});
+    const documentUri = pathToFileURL(documentPath).href;
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri: documentUri,
+        languageId: "spring-boot-properties",
+        version: 1,
+        text: fs.readFileSync(documentPath, "utf8"),
+      },
+    });
+
+    // These calls deliberately do not claim metadata-aware completion without a
+    // JDT classpath. Their purpose is to prove that the real pinned Spring server
+    // starts with the production JVM vector and serves the real Properties LSP
+    // handlers on every native CI tuple.
+    const completion = await client.request("textDocument/completion", {
+      textDocument: { uri: documentUri },
+      position: { line: 0, character: 3 },
+    });
+    evidence.lsp.completion = summarizeCollectionResult(completion);
+
+    const hover = await client.request("textDocument/hover", {
+      textDocument: { uri: documentUri },
+      position: { line: 0, character: 1 },
+    });
+    evidence.lsp.hover = summarizeValue(hover);
+    evidence.lsp.serverRequests = client.serverRequests;
+    evidence.lsp.stdoutContamination = client.stdoutContamination;
+    assert.equal(client.stdoutContamination.length, 0, "Spring LS must not contaminate LSP stdout");
+
+    await client.request("shutdown", null, 30_000);
+    client.notify("exit", null);
+    if (await waitForExit(child, 1_500)) {
+      evidence.lsp.exitMode = "lsp-exit";
+    } else {
+      child.kill();
+      assert.equal(await waitForExit(child, 5_000), true, "Spring LS terminates when its owner kills it");
+      evidence.lsp.exitMode = "owner-kill";
+    }
+
+    evidence.status = "pass";
+    evidence.finishedAt = new Date().toISOString();
+    evidence.stderrTail = tailLines(stderr, 40);
+    writeEvidence(evidencePath, evidence);
+    process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
+  } catch (error) {
+    if (child && child.exitCode === null && child.signalCode === null) child.kill();
+    evidence.status = "fail";
+    evidence.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    evidence.finishedAt = new Date().toISOString();
+    evidence.stderrTail = tailLines(stderr, 80);
+    writeEvidence(evidencePath, evidence);
+    throw error;
+  } finally {
+    fs.rmSync(runRoot, { recursive: true, force: true });
   }
+}
+
+function serverRequestResult(method, params, workspaceFolders) {
+  if (method === "workspace/configuration") return (params?.items ?? []).map(() => ({}));
   if (method === "workspace/workspaceFolders") return workspaceFolders;
   if (method === "workspace/applyEdit") return { applied: false };
   return null;
@@ -321,8 +333,7 @@ async function downloadPinnedArtifact(url, destination) {
     headers: { "user-agent": "zed-spring-tools-platform-validation" },
   });
   if (!response.ok) throw new Error(`download ${url} failed: HTTP ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(destination, bytes);
+  fs.writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
 }
 
 function summarizeCollectionResult(value) {
@@ -350,19 +361,18 @@ function jarTool() {
 }
 
 function commandOutput(command, args) {
-  try {
-    return execFileSync(command, args, {
-      encoding: "utf8",
-      shell: false,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    const stdout = error.stdout?.toString?.() ?? "";
-    const stderrText = error.stderr?.toString?.() ?? "";
-    if (stdout || stderrText) return `${stdout}\n${stderrText}`.trim();
-    throw error;
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error) throw result.error;
+  const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+  if (result.status !== 0) {
+    throw new Error(`${command} ${args.join(" ")} failed with status ${result.status}: ${combined}`);
   }
+  return combined;
 }
 
 function sha256File(file) {
@@ -420,3 +430,5 @@ function waitForExit(process, timeoutMs) {
     process.once("exit", onExit);
   });
 }
+
+await main();
