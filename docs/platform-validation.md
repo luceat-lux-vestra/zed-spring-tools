@@ -2,7 +2,7 @@
 
 [![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
 
-`Platform Validation` is the repository's continuously refreshed native CI evidence. The badge above reflects the latest `main` workflow result; the workflow artifacts retain the exact source HEAD, synthetic tested commit, runner identity, toolchain versions, and pinned Spring runtime observations for each run.
+`Platform Validation` is the repository's continuously refreshed native CI evidence. The badge above reflects the latest `main` workflow result; the workflow artifacts retain the exact source HEAD, synthetic tested commit, runner identity, toolchain versions, and pinned Spring plus JDT/Spring/bridge runtime observations for each run.
 
 ## Native matrix
 
@@ -15,7 +15,7 @@
 | Windows | x86_64 | `windows-2025` |
 | Windows | arm64 | `windows-11-arm` |
 
-Each tuple runs the same three evidence layers plus the native Rust/bridge checks.
+Each tuple runs the same four evidence layers plus the native Rust/bridge checks.
 
 ### Layer 1 — native substrate
 
@@ -27,12 +27,20 @@ The coordinator contract suite is enumerated by `scripts/run-coordinator-tests.m
 
 ### Layer 3 — real pinned Spring runtime
 
-Every native tuple reads the canonical `protocol/spring-artifacts.json` pin, downloads the exact official Spring Tools VSIX, checks the archive identity and required runtime-file hashes, extracts the real runtime, and starts the pinned Spring Boot language server with the production JVM launch vector. The smoke drives real LSP initialize, a `spring-boot-properties` document, completion, hover, shutdown, and process termination. A separate JDK 21 job runs the same real-runtime smoke as the declared Java floor.
+Every native tuple reads the canonical `protocol/spring-artifacts.json` pin, downloads the exact official Spring Tools VSIX, checks the archive identity and required runtime-file hashes, extracts the real runtime, and starts the pinned Spring Boot language server with the production JVM launch vector. The smoke drives real LSP initialize, a `spring-boot-properties` document, completion, hover, shutdown, and process termination.
 
-This is stronger than a compile-only or mock-only portability check, but it is still **headless CI evidence**. It does not run the Zed desktop application or the official Java extension/JDT LS end to end on every tuple, and therefore it does not by itself promote a tuple to a fully verified Zed runtime/support claim. `COMPATIBILITY.md` remains authoritative for driven integrated runtime observations.
+### Layer 4 — real pinned JDT/Spring/bridge integration
+
+Every native tuple independently downloads and checksum-verifies the pinned Eclipse JDT LS 1.60.0 milestone archive. It extracts and verifies the canonical five Spring 5.3 Java-extension JARs from the same pinned Spring Tools VSIX, builds the current bridge from repository source with Java 21 bytecode, and injects the five Spring bundles plus that bridge into the real JDT LS runtime. The smoke requires JDT LS to advertise `sts.java.search.types` and both `zed.spring.bridge.v1.*ClasspathListener` delegate commands, then executes the bridge remove command and performs bounded LSP shutdown/process cleanup.
+
+That executed remove command proves that the current bridge bundle resolved and activated inside the real JDT runtime, its delegate handler was registered and invoked, and the bridge linked against the Spring JDT commons dependency. It deliberately does **not** claim that the add/listener/callback route was driven end to end, nor that the official Java extension/proxy participated in this headless smoke.
+
+A separate JDK 21 floor job runs both Layer 3 and Layer 4 on Linux x86_64. The six-way matrix owns host portability; the floor job owns the declared minimum Java runtime.
+
+These checks are stronger than compile-only or mock-only portability tests, but they remain **headless CI evidence**. They do not run Zed desktop together with the official Java extension/proxy, JDT LS, Spring Tools, and this extension end to end on every tuple. Therefore they do not by themselves promote a tuple to a fully verified Zed runtime/support claim. `COMPATIBILITY.md` remains authoritative for driven integrated runtime observations.
 
 ## Evidence artifacts
 
-Each platform job uploads `platform-evidence.json` and `spring-runtime-evidence.json`. The evidence identifies both the source branch HEAD and the pull-request synthetic merge commit, so a later HEAD cannot inherit evidence from an earlier revision. The JDK-floor job retains its own Spring runtime evidence as well.
+Each platform job uploads `platform-evidence.json`, `spring-runtime-evidence.json`, and `jdt-spring-runtime-evidence.json`. The evidence identifies both the source branch HEAD and the pull-request synthetic merge commit, so a later HEAD cannot inherit evidence from an earlier revision. The JDK-floor job independently retains both its Spring runtime evidence and its JDT/Spring/bridge runtime evidence.
 
 A deterministic failure is a failed gate. The acceptance path is to fix the failing contract at a new HEAD and rerun the complete gate; rerun-until-green is not evidence.
