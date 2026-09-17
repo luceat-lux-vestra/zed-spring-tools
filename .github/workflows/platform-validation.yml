@@ -168,7 +168,6 @@ jobs:
   # consumer from accidentally treating one successful matrix leg as six-way
   # evidence. Promotion into the repository ruleset is a separate policy step.
   platform-gate:
-    name: platform-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
