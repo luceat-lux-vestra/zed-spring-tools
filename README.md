@@ -2,6 +2,8 @@
 
 **Spring Boot language intelligence for Zed.**
 
+[![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
+
 Zed Spring Tools brings Spring-aware editing, navigation, diagnostics, quick fixes, live-application integration, and selected Spring tooling into Zed while working alongside the required official Java extension.
 
 > **Distribution status:** the extension is not published in the Zed Registry yet. The current supported testing path is a local Zed development extension checkout. The initial Registry submission is tracked in [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875).
@@ -70,11 +72,11 @@ The current inventory tracks 59 capabilities, with 48 verified on the named evid
 
 ## Verified runtime boundary
 
-Current runtime evidence is centered on macOS arm64 with Temurin JDK 25.0.3 and the declared JDK 21 floor exercised through the portability work. Other desktop/JDK tuples remain unverified until they receive equivalent driven evidence.
+Current driven runtime evidence is centered on macOS arm64 with Temurin JDK 25.0.3. Separately, automated native CI continuously exercises Linux, macOS, and Windows on both x86_64 and arm64, including the full portable coordinator capability-contract surface, native replacements for fixture-bound Windows cases, and a real checksum-verified pinned Spring language-server smoke. The declared JDK 21 floor runs the same real-runtime smoke independently.
 
-The implementation contains OS-aware coordination for Zed desktop platforms, but implementation portability is **not** treated as a support claim by itself.
+That automated evidence is intentionally narrower than an integrated support claim: it does not run Zed desktop plus the official Java extension/JDT LS end to end on every tuple. Other desktop tuples therefore remain unverified as full Zed runtime/support tuples until they receive equivalent driven evidence.
 
-See [COMPATIBILITY.md](COMPATIBILITY.md) for the exact tested versions and runtime slices.
+See [Automated platform validation](docs/platform-validation.md) for the continuously refreshed CI evidence boundary and [COMPATIBILITY.md](COMPATIBILITY.md) for exact driven runtime observations.
 
 ## Embedded syntax highlighting
 
@@ -102,6 +104,7 @@ No public release is claimed before the Registry lifecycle actually succeeds.
 
 - [Capability inventory](docs/capability-inventory.md) — exact status of every tracked capability.
 - [Compatibility](COMPATIBILITY.md) — tested components and runtime tuples.
+- [Automated platform validation](docs/platform-validation.md) — native six-tuple CI coverage, real Spring runtime smoke, and the boundary between CI evidence and driven support claims.
 - [Limitations](LIMITATIONS.md) — current unsupported or constrained behavior.
 - [Capability delivery plan](docs/capability-delivery-plan.md) — architecture and fallback routes.
 - [Release gate](docs/preview-release-gate.md) — Registry-first release policy and promotion rules.
