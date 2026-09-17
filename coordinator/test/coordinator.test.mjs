@@ -2525,7 +2525,7 @@ test("Live logger configuration reports an unconfirmed request instead of false 
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
     javaTransport: { supportsSpringClientMethod: () => false },
     worktree: "/tmp/project",
-    liveLogLevelConfirmMs: 5,
+    liveLogLevelConfirmMs: 20,
   });
 
   coordinator.observeZedMessage({ ...CONFIGURE_LIVE_LOG_LEVEL_COMMAND });
@@ -2578,6 +2578,10 @@ test("Live logger configuration reports an unconfirmed request instead of false 
     "unconfirmed configure request",
   );
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: configure.id, result: null });
+  // `waitFor` polls with setImmediate and can exhaust its attempts before a
+  // wall-clock timer fires. Give the confirmation timer explicit room, just as
+  // the live-connect timeout test does below.
+  await new Promise((resolve) => setTimeout(resolve, 40));
   const notice = await waitFor(
     zedWrites,
     (message) => message.method === "window/showMessage" && /did not confirm the runtime change/.test(message.params.message),
