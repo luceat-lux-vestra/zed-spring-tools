@@ -71,8 +71,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+      # Use the same explicit cross-platform discovery path as the six-tuple
+      # platform matrix so adding a new coordinator test cannot diverge between
+      # required CI and portability CI.
       - name: Coordinator tests
-        run: node --test coordinator/test/*.test.mjs
+        run: node scripts/run-coordinator-tests.mjs
       - name: Repository check tests
         run: node --test scripts/test/*.test.mjs
       - name: Contributors list is current
