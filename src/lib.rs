@@ -447,15 +447,11 @@ mod tests {
 
     #[test]
     fn embedded_mcp_server_is_absent_until_a_user_opts_in() {
-        // The whole point of the default: no listening port, no `api.spring.io`
-        // reachability, and a launch identical to every release before this one.
         assert_eq!(mcp_server_port(&zed::serde_json::json!({})), None);
         assert_eq!(
             mcp_server_port(&zed::serde_json::json!({ "boot-java": {} })),
             None
         );
-        // A port without the switch must stay off — VS Code gates on `enabled`,
-        // and configuring a port is not the same as asking for a server.
         assert_eq!(
             mcp_server_port(&zed::serde_json::json!({
                 "boot-java": { "ai": { "mcp-server-port": 51000 } }
@@ -472,7 +468,6 @@ mod tests {
 
     #[test]
     fn opting_in_uses_the_upstream_default_port_or_the_users_own() {
-        // Enabled with no port is VS Code's own default, 50627.
         assert_eq!(
             mcp_server_port(&zed::serde_json::json!({
                 "boot-java": { "ai": { "mcp-server-enabled": true } }
@@ -485,7 +480,6 @@ mod tests {
             })),
             Some(51000)
         );
-        // Upstream accepts 0, which makes Spring pick a random free port.
         assert_eq!(
             mcp_server_port(&zed::serde_json::json!({
                 "boot-java": { "ai": { "mcp-server-enabled": true, "mcp-server-port": 0 } }
@@ -496,10 +490,6 @@ mod tests {
 
     #[test]
     fn an_unusable_mcp_port_disables_the_server_rather_than_guessing() {
-        // Upstream's own bound is 655536, which is past the last TCP port and
-        // would hand Spring a value that fails the entire server start. Reject
-        // it here instead, and never silently substitute the default port —
-        // opening a socket the user did not write is the wrong direction.
         for port in [
             zed::serde_json::json!(70000),
             zed::serde_json::json!(655536),
@@ -548,19 +538,12 @@ mod tests {
 
     #[test]
     fn spring_only_files_are_classified_and_carry_their_own_language_ids() {
-        // Spring keys its component set off the didOpen language id, so routing
-        // these files as ordinary Properties would silently hand them to the
-        // Boot properties components instead of the JPA/factories ones.
         let manifest = include_str!("../extension.toml");
         assert!(manifest.contains(r#""Spring Factories" = "spring-factories""#));
         assert!(manifest.contains(r#""JPA Query Properties" = "jpa-query-properties""#));
         assert!(manifest.contains(
             r#"languages = ["languages/spring-factories", "languages/jpa-query-properties"]"#
         ));
-        // The grammar is a third-party dependency, so it stays pinned to an
-        // exact revision rather than a branch — and to the same revision the
-        // official Java extension already pins, so this adds no new upstream
-        // source for a user who already has that extension installed.
         assert!(manifest.contains(r#"rev = "579b62f5ad8d96c2bb331f07d1408c92767531d9""#));
 
         let factories = include_str!("../languages/spring-factories/config.toml");
@@ -608,9 +591,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_makes_opt_in_xml_config_functional() {
-        // The master switch `support-spring-xml-config.on` stays absent: it is
-        // false-when-absent on the server *and* in VS Code, so it is genuinely
-        // opt-in and must not be forced on.
         let config = spring_workspace_configuration(None, "/work");
         assert!(
             config["boot-java"]["support-spring-xml-config"]
@@ -618,9 +598,6 @@ mod tests {
                 .is_none(),
             "the XML master switch must remain user opt-in, not defaulted on"
         );
-        // The three sub-settings read off/empty when absent while VS Code's
-        // schema defaults them on, so once a user sets `on: true` these must be
-        // present or the feature is enabled-but-inert.
         let xml = &config["boot-java"]["support-spring-xml-config"];
         assert_eq!(xml["content-assist"], zed::serde_json::json!(true));
         assert_eq!(xml["hyperlinks"], zed::serde_json::json!(true));
@@ -629,8 +606,6 @@ mod tests {
 
     #[test]
     fn a_user_can_enable_xml_config_without_losing_the_sub_setting_defaults() {
-        // Opting in through user settings must deep-merge over our sub-defaults
-        // rather than replacing the whole object and re-introducing the gap.
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "support-spring-xml-config": { "on": true } }
@@ -646,9 +621,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_enables_bean_injection_completion() {
-        // `boot-java.java.completions.inject-bean` reads false when absent
-        // (`Boolean.TRUE.equals`), while VS Code's schema defaults it true, so
-        // without this key `BeanCompletionProvider` is silently dead.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(
             config["boot-java"]["java"]["completions"]["inject-bean"],
@@ -658,19 +630,12 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_enables_jpql_query_intelligence() {
-        // `boot-java.jpql` defaults off on the server, so it must be sent
-        // explicitly or Spring Data query intelligence (semantic tokens +
-        // the positional-parameter inlay hint) never runs.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(config["boot-java"]["jpql"], zed::serde_json::json!(true));
     }
 
     #[test]
     fn spring_workspace_configuration_enables_embedded_syntax_highlighting() {
-        // `isJavaEmbeddedLanguagesSyntaxHighlighting()` reads false for an absent
-        // key while the VSIX schema defaults it true. Without this key Spring
-        // strips `java` from its semantic-token selector, so no amount of client
-        // configuration can produce embedded JPQL/HQL/SpEL highlighting.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(
             config["boot-java"]["embedded-syntax-highlighting"],
@@ -680,10 +645,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_lets_user_disable_embedded_highlighting() {
-        // Spring answers with tokens for the whole Java file, not only the
-        // embedded region, so a user who dislikes the result must be able to drop
-        // Spring's provider without turning Zed's `semantic_tokens` off globally
-        // and losing the official Java server's tokens with it.
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "embedded-syntax-highlighting": false }
@@ -698,11 +659,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_enables_modulith_project_tracking() {
-        // `BootJavaConfig.isModulithAutoProjectTrackingEnabled()` reads false for
-        // an absent key while VS Code's schema defaults it true. Without it
-        // `ModulithService` registers no project listener, so Modulith metadata
-        // is never generated, never regenerated after a build, and the module
-        // grouping the Structure document renders stays empty.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(
             config["boot-java"]["modulith-project-tracking"],
@@ -712,8 +668,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_lets_user_disable_modulith_tracking() {
-        // Automatic tracking spawns an exporter process per project, so a user
-        // who does not want that must be able to turn it back off.
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "modulith-project-tracking": false }
@@ -728,9 +682,6 @@ mod tests {
 
     #[test]
     fn spring_workspace_configuration_enables_explicit_local_process_discovery() {
-        // `SpringProcessConnectorLocal.isAvailable()` returns false when this
-        // key is absent or false, making `sts/livedata/listProcesses` return no
-        // local JVMs even when a JMX-enabled Boot process is running.
         let config = spring_workspace_configuration(None, "/work");
         assert_eq!(
             config["boot-java"]["live-information"]["all-local-java-processes"],
@@ -769,9 +720,6 @@ mod tests {
 
     #[test]
     fn user_settings_reach_spring_without_dropping_defaults() {
-        // Without this passthrough `BootJavaConfig.getCommonPropertiesFile()`
-        // is always null, so `reloadCommonProperties()` returns false and the
-        // reload command is a guaranteed no-op.
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "common": { "properties-metadata": "/shared/metadata.json" } }
@@ -789,12 +737,6 @@ mod tests {
         );
     }
 
-    // Remote live data has no dedicated command in the pinned VS Code extension:
-    // its only route is this settings array, which the server reads in
-    // `remoteAppsFromSettingsConnector` and hands to
-    // `SpringProcessConnectorRemote.updateApps`. The array is user-authored and
-    // absent by default, so the whole capability rides on this passthrough
-    // surviving the deep merge with its element objects intact.
     #[test]
     fn remote_apps_reach_spring_untouched() {
         let config = spring_workspace_configuration(
@@ -821,16 +763,12 @@ mod tests {
         assert_eq!(apps[0]["host"], zed::serde_json::json!("staging"));
         assert_eq!(apps[0]["urlScheme"], zed::serde_json::json!("https"));
         assert_eq!(apps[0]["port"], zed::serde_json::json!(8443));
-        // Declaring a remote target must not disturb the local-discovery default.
         assert_eq!(
             config["boot-java"]["live-information"]["all-local-java-processes"],
             zed::serde_json::json!(true)
         );
     }
 
-    // Absent is the default: the server replaces its whole remote-app set from
-    // this key, so shipping an empty array of our own would be indistinguishable
-    // from a user clearing theirs.
     #[test]
     fn remote_apps_are_absent_without_user_settings() {
         let config = spring_workspace_configuration(None, "/work");
@@ -853,7 +791,6 @@ mod tests {
             config["boot-java"]["live-information"]["all-local-java-processes"],
             zed::serde_json::json!(false)
         );
-        // A sibling under the same object survives the merge.
         assert_eq!(
             config["boot-java"]["java"]["codelens-over-query-methods"],
             zed::serde_json::json!(true)
@@ -862,17 +799,23 @@ mod tests {
 
     #[test]
     fn a_relative_metadata_path_anchors_to_the_worktree_root() {
-        // Spring calls `Paths.get(value)`, which would otherwise resolve
-        // against the coordinator's working directory.
+        let worktree_root = std::env::temp_dir().join("zed-spring-tools-worktree");
+        let worktree_root = worktree_root
+            .to_str()
+            .expect("temporary worktree path must be UTF-8");
+        let expected = Path::new(worktree_root).join("config/shared-metadata.json");
+        let expected = expected
+            .to_str()
+            .expect("resolved metadata path must be UTF-8");
         let config = spring_workspace_configuration(
             Some(zed::serde_json::json!({
                 "boot-java": { "common": { "properties-metadata": "config/shared-metadata.json" } }
             })),
-            "/work/project",
+            worktree_root,
         );
         assert_eq!(
             config["boot-java"]["common"]["properties-metadata"],
-            zed::serde_json::json!("/work/project/config/shared-metadata.json")
+            zed::serde_json::json!(expected)
         );
     }
 }
