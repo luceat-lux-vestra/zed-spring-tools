@@ -55,6 +55,7 @@ jobs:
       EXPECTED_ARCH: ${{ matrix.expected_arch }}
       PLATFORM_EVIDENCE: ${{ github.workspace }}/platform-evidence.json
       SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/spring-runtime-evidence.json
+      JDT_SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/jdt-spring-runtime-evidence.json
       SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,6 +88,7 @@ jobs:
           node --check scripts/run-coordinator-tests.mjs
           node --check scripts/platform-capability-probes.mjs
           node --check scripts/spring-runtime-smoke.mjs
+          node --check scripts/jdt-spring-runtime-smoke.mjs
       # Linux/macOS execute every existing coordinator contract directly. On
       # Windows, seven legacy tests whose fixtures themselves hard-code POSIX
       # paths or tight event-loop spins are replaced by proof-equivalent native
@@ -104,6 +106,13 @@ jobs:
       # that Zed + official Java/JDT integration has been driven on this tuple.
       - name: Pinned Spring runtime smoke
         run: node scripts/spring-runtime-smoke.mjs
+      # Drive the next integration layer without a desktop client: independently
+      # pin JDT LS 1.60.0, inject the canonical Spring 5.3 Java-extension bundle
+      # set plus the bridge built from this HEAD, assert both Spring and bridge
+      # commands are registered, execute the bridge inside real JDT LS, then
+      # shut it down. This still does not exercise the Zed/official-Java proxy.
+      - name: Pinned JDT Spring bridge smoke
+        run: node scripts/jdt-spring-runtime-smoke.mjs
       - name: Native Rust tests
         run: cargo test --locked
       - name: Retain platform evidence
@@ -114,17 +123,19 @@ jobs:
           path: |
             ${{ env.PLATFORM_EVIDENCE }}
             ${{ env.SPRING_RUNTIME_EVIDENCE }}
+            ${{ env.JDT_SPRING_RUNTIME_EVIDENCE }}
           if-no-files-found: warn
           retention-days: 14
 
-  # Keep the declared JDK 21 floor continuously exercised against the same real
-  # pinned Spring runtime. One Linux x86_64 arm is sufficient here: the six-way
+  # Keep the declared JDK 21 floor continuously exercised against both real
+  # pinned Java runtimes. One Linux x86_64 arm is sufficient here: the six-way
   # matrix above owns host portability while this job owns the JVM floor.
   spring-runtime-floor:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/spring-runtime-floor-evidence.json
+      JDT_SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/jdt-spring-runtime-floor-evidence.json
       SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -139,12 +150,16 @@ jobs:
           node-version: ${{ env.NODE_LTS }}
       - name: Pinned Spring runtime smoke on JDK 21 floor
         run: node scripts/spring-runtime-smoke.mjs
+      - name: Pinned JDT Spring bridge smoke on JDK 21 floor
+        run: node scripts/jdt-spring-runtime-smoke.mjs
       - name: Retain JDK floor evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: spring-runtime-floor-evidence-${{ env.SOURCE_HEAD_SHA }}
-          path: ${{ env.SPRING_RUNTIME_EVIDENCE }}
+          path: |
+            ${{ env.SPRING_RUNTIME_EVIDENCE }}
+            ${{ env.JDT_SPRING_RUNTIME_EVIDENCE }}
           if-no-files-found: warn
           retention-days: 14
 
