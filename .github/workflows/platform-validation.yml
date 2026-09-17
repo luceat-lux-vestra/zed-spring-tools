@@ -85,11 +85,14 @@ jobs:
           node --check coordinator/src/lsp.mjs
           node --check coordinator/src/main.mjs
           node --check scripts/run-coordinator-tests.mjs
+          node --check scripts/platform-capability-probes.mjs
           node --check scripts/spring-runtime-smoke.mjs
-      # Run the full coordinator capability-contract suite on every native tuple.
-      # The runner enumerates test files itself so Windows does not depend on
-      # shell wildcard expansion and new *.test.mjs files cannot be silently
-      # omitted from this matrix.
+      # Linux/macOS execute every existing coordinator contract directly. On
+      # Windows, seven legacy tests whose fixtures themselves hard-code POSIX
+      # paths or tight event-loop spins are replaced by proof-equivalent native
+      # path + wall-clock probes; every platform-neutral contract still runs.
+      # Test files are enumerated in Node so shell wildcard behaviour cannot
+      # silently change coverage.
       - name: Coordinator capability contracts
         run: node scripts/run-coordinator-tests.mjs
       - name: Java bridge self-test
@@ -144,3 +147,18 @@ jobs:
           path: ${{ env.SPRING_RUNTIME_EVIDENCE }}
           if-no-files-found: warn
           retention-days: 14
+
+  # One stable context represents the complete automated platform gate. Keeping
+  # the fan-out matrix observable while depending on this aggregate prevents a
+  # consumer from accidentally treating one successful matrix leg as six-way
+  # evidence. Promotion into the repository ruleset is a separate policy step.
+  platform-gate:
+    name: platform-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      - platform
+      - spring-runtime-floor
+    steps:
+      - name: Confirm complete platform evidence
+        run: echo "all six native platform legs and the JDK 21 runtime floor passed"
