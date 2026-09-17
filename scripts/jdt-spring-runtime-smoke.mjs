@@ -319,7 +319,10 @@ async function main() {
       },
       initializationOptions: {
         bundles: [...bundlePaths, bridgeJar],
-        workspaceFolders: [{ uri: workspaceUri, name: "jdt-spring-runtime-smoke" }],
+        // JDT LS 1.60 expects URI strings here. This matches the official Zed
+        // Java extension; the standard LSP top-level workspaceFolders remains
+        // the WorkspaceFolder object array above.
+        workspaceFolders: [workspaceUri],
         settings: {
           java: {
             autobuild: { enabled: false },
