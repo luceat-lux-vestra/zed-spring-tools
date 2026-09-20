@@ -33,6 +33,7 @@ test("explicit repository title protocol maps deterministically", () => {
 });
 
 test("policy never declares heuristic area/state inference", () => {
+  assert.equal(policy.cardinality, "one-managed-kind-per-issue");
   assert.equal(policy.body_inference, false);
   assert.equal(policy.area_inference, false);
   assert.equal(policy.state_inference, false);
