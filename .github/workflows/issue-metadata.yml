@@ -65,8 +65,14 @@ jobs:
               for (const entry of policy.managed_labels) {
                 try {
                   const { data } = await github.rest.issues.getLabel({ owner, repo, name: entry.name });
-                  if ((data.description || "") !== entry.description) {
-                    await github.rest.issues.updateLabel({ owner, repo, name: entry.name, description: entry.description });
+                  if ((data.description || "") !== entry.description || (data.color || "").toLowerCase() !== entry.color.toLowerCase()) {
+                    await github.rest.issues.updateLabel({
+                      owner,
+                      repo,
+                      name: entry.name,
+                      color: entry.color,
+                      description: entry.description
+                    });
                   }
                 } catch (error) {
                   if (error.status !== 404) throw error;
