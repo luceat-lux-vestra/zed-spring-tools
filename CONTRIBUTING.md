@@ -92,8 +92,11 @@ information.
 - Issue titles that use the repository's explicit `bug/fix`, `docs`,
   `research`, `decision/adr/architecture/design`, `spike`, `task`,
   `track`, or `epic` protocol are reconciled to the corresponding managed
-  label by `.github/workflows/issue-metadata.yml`. Titles outside that protocol
-  are left unchanged; body text is never classified heuristically.
+  label by `.github/workflows/issue-metadata.yml`. For issues, these managed
+  labels form one singular work-kind dimension, so an explicit prefix may
+  replace a conflicting managed kind. Titles outside that protocol are left
+  unchanged; body text is never classified heuristically. This does not change
+  PR path labels, which remain additive routing metadata.
 - `state:*` and `area:*` remain manual for issues because a title or body cannot
   prove inventory state or component ownership.
 
