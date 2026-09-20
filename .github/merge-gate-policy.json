@@ -35,7 +35,9 @@
     "name": "main",
     "enforcement": "active",
     "bypass_actors": [],
-    "allowed_merge_methods": ["squash"],
+    "allowed_merge_methods": [
+      "squash"
+    ],
     "strict_required_status_checks_policy": true,
     "required_approving_review_count": 0,
     "required_review_thread_resolution": true,
@@ -113,5 +115,20 @@
       "job": "label",
       "proves": "Nothing about the change. Applies additive routing labels on `pull_request` for same-repository branches only; fork pull requests are intentionally skipped because their read-only token cannot write labels. It is automation metadata, never a merge gate."
     }
-  ]
+  ],
+  "issue_metadata": {
+    "policy": ".github/issue-metadata-policy.json",
+    "workflow": ".github/workflows/issue-metadata.yml",
+    "trust_boundary": "issues-event/default-branch-only",
+    "permissions": [
+      "contents:read",
+      "issues:write"
+    ],
+    "inference": {
+      "body": false,
+      "area": false,
+      "state": false
+    },
+    "backfill": "workflow_dispatch dry-run by default"
+  }
 }

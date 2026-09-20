@@ -1,0 +1,120 @@
+name: Issue Metadata
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report intended label changes without mutating issues
+        required: true
+        default: true
+        type: boolean
+      backfill:
+        description: Reconcile all open issues
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-metadata-${{ github.event.issue.number || 'backfill' }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Fetch trusted default-branch policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Reconcile deterministic issue metadata
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill || false }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const policy = JSON.parse(fs.readFileSync(".github/issue-metadata-policy.json", "utf8"));
+            const rules = policy.rules.map(({ pattern, label }) => [new RegExp(pattern, "i"), label]);
+            const managed = new Set(policy.managed_labels.map((entry) => entry.name));
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const dryRun = process.env.DRY_RUN === "true";
+            const backfill = process.env.BACKFILL === "true";
+
+            function expectedLabel(title) {
+              const value = String(title || "").trim();
+              for (const [pattern, label] of rules) {
+                if (pattern.test(value)) return label;
+              }
+              return null;
+            }
+
+            async function ensureLabels() {
+              for (const entry of policy.managed_labels) {
+                try {
+                  const { data } = await github.rest.issues.getLabel({ owner, repo, name: entry.name });
+                  if ((data.description || "") !== entry.description || (data.color || "").toLowerCase() !== entry.color.toLowerCase()) {
+                    await github.rest.issues.updateLabel({
+                      owner,
+                      repo,
+                      name: entry.name,
+                      color: entry.color,
+                      description: entry.description
+                    });
+                  }
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                  await github.rest.issues.createLabel({ owner, repo, ...entry });
+                }
+              }
+            }
+
+            async function reconcile(issue) {
+              if (!issue || issue.pull_request) return;
+              const expected = expectedLabel(issue.title);
+              const labels = (issue.labels || []).map((label) => typeof label === "string" ? label : label.name);
+
+              if (!expected) {
+                core.info(`#${issue.number}: title outside managed protocol; leaving metadata unchanged`);
+                return;
+              }
+
+              const existing = labels.filter((label) => managed.has(label));
+              const remove = existing.filter((label) => label !== expected);
+              const add = labels.includes(expected) ? [] : [expected];
+              core.info(`#${issue.number} expected=${expected} add=${add.join(",") || "-"} remove=${remove.join(",") || "-"}`);
+
+              if (dryRun) return;
+
+              for (const label of remove) {
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: issue.number, name: label });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+              if (add.length) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: add });
+              }
+            }
+
+            if (!dryRun) await ensureLabels();
+
+            if (context.eventName === "issues") {
+              await reconcile(context.payload.issue);
+            } else if (context.eventName === "workflow_dispatch" && backfill) {
+              const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: "open", per_page: 100 });
+              for (const issue of issues) await reconcile(issue);
+            }

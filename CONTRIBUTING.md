@@ -2,8 +2,10 @@
 
 Thanks for helping build Spring tooling for Zed. This repository has an
 installable extension whose capability parity with VS Code Spring Tools is
-tracked row by row and observed on a single host tuple; the current work is
-validating it on the other desktop platforms and JDKs, in public.
+tracked row by row. Headless integration evidence now runs across the maintained
+desktop architecture/JDK matrix, while Zed desktop + official Java extension
+end-to-end claims remain bounded by the exact runtime evidence recorded for each
+capability.
 
 ## Before proposing a change
 
@@ -60,8 +62,9 @@ pushes, no force pushes, and no non-linear history.
   `spike/s013-authentic-spring-removal-contract`.
 - Every commit needs a body explaining why the change is needed, what materially
   changed, and which validation was run or remains pending.
-- Pull requests merge by rebase, or by squash when the intermediate commits are
-  not worth keeping.
+- Pull requests merge by squash only. Rebase-merge and merge commits are disabled
+  by repository policy; intermediate branch commits may still be rewritten during
+  development when that helps produce a coherent candidate.
 
 ## Issue and pull-request metadata
 
@@ -83,11 +86,19 @@ information.
   or a durable concurrent backlog makes a separate status board useful.
 - The maintainer applies or corrects metadata before merge; contributors do not
   need repository triage permission to submit a complete change.
-- `area:*`, `research`, `decision`, `spike`, and `documentation` are applied
-  automatically from the paths a pull request touches
-  (`.github/labeler.yml`). The automation only adds labels and never removes
-  one, so a label the maintainer sets or clears stands. `state:*` stays manual:
-  it records an inventory state that a file path cannot know.
+- Pull-request `area:*`, `research`, `decision`, `spike`, and `documentation`
+  labels are applied from changed paths by `.github/labeler.yml`. That PR
+  automation is additive only.
+- Issue titles that use the repository's explicit `bug/fix`, `docs`,
+  `research`, `decision/adr/architecture/design`, `spike`, `task`,
+  `track`, or `epic` protocol are reconciled to the corresponding managed
+  label by `.github/workflows/issue-metadata.yml`. For issues, these managed
+  labels form one singular work-kind dimension, so an explicit prefix may
+  replace a conflicting managed kind. Titles outside that protocol are left
+  unchanged; body text is never classified heuristically. This does not change
+  PR path labels, which remain additive routing metadata.
+- `state:*` and `area:*` remain manual for issues because a title or body cannot
+  prove inventory state or component ownership.
 
 The responsible human remains the Git author. Material Codex assistance may be
 recorded with `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`.
