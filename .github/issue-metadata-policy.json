@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "managed_labels": [
+    {"name": "bug", "color": "d73a4a", "description": "Incorrect behavior or regression"},
+    {"name": "documentation", "color": "0075ca", "description": "Ordinary documentation work"},
+    {"name": "research", "color": "5319e7", "description": "Research or evidence-bearing investigation"},
+    {"name": "decision", "color": "a371f7", "description": "Architecture/product decision work"},
+    {"name": "spike", "color": "fbca04", "description": "Bounded experimental work"},
+    {"name": "task", "color": "0e8a16", "description": "Concrete implementation, validation, release, or maintenance task"},
+    {"name": "track", "color": "1d76db", "description": "Multi-task work track"},
+    {"name": "epic", "color": "0052cc", "description": "Cross-track project or release objective"}
+  ],
+  "rules": [
+    {"pattern": "^(fix|bug)(\\([^)]*\\))?:", "label": "bug"},
+    {"pattern": "^docs(\\([^)]*\\))?:", "label": "documentation"},
+    {"pattern": "^research(\\([^)]*\\))?:", "label": "research"},
+    {"pattern": "^(decision|adr|architecture|design)(\\([^)]*\\))?:", "label": "decision"},
+    {"pattern": "^spike(\\([^)]*\\))?:", "label": "spike"},
+    {"pattern": "^(task|test|build|ci|chore|refactor|perf|release)(\\([^)]*\\))?:", "label": "task"},
+    {"pattern": "^track(\\([^)]*\\))?:", "label": "track"},
+    {"pattern": "^epic(\\([^)]*\\))?:", "label": "epic"}
+  ],
+  "body_inference": false,
+  "area_inference": false,
+  "state_inference": false
+}
