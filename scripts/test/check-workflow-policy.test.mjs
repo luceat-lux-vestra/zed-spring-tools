@@ -41,7 +41,18 @@ test("a renamed required producer is rejected", () => {
   edit(root, ".github/workflows/ci.yml", "  rust:\n", "  rust:\n    name: Rust renamed\n");
   const result = run(root);
   assert.equal(result.code, 1, result.output);
-  assert.match(result.output, /sets `name:`/);
+  assert.match(result.output, /emits `Rust renamed`, expected required context `rust`/);
+});
+
+test("pull_request_target authority is limited to failure-triage", () => {
+  const root = fixture();
+  const path = join(root, ".github/merge-gate-policy.json");
+  const policy = JSON.parse(readFileSync(path, "utf8"));
+  policy.contexts.find((entry) => entry.context === "rust").trigger = "pull_request_target";
+  writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /only for the audited failure-triage producer/);
 });
 
 test("a path filter on a required workflow is rejected", () => {
