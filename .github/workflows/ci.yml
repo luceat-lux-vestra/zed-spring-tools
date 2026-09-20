@@ -141,3 +141,5 @@ jobs:
         run: zizmor --no-online-audits --format plain .github/workflows/
       - name: Merge-gate and workflow policy
         run: node scripts/check-workflow-policy.mjs
+      - name: Issue metadata policy
+        run: node --test scripts/test-issue-metadata.mjs
