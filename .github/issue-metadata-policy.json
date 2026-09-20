@@ -16,7 +16,7 @@
     {"pattern": "^research(\\([^)]*\\))?:", "label": "research"},
     {"pattern": "^(decision|adr|architecture|design)(\\([^)]*\\))?:", "label": "decision"},
     {"pattern": "^spike(\\([^)]*\\))?:", "label": "spike"},
-    {"pattern": "^(task|test|build|ci|chore|refactor|perf|release)(\\([^)]*\\))?:", "label": "task"},
+    {"pattern": "^(task|test|build|ci|chore|refactor|perf|release|hardening)(\\([^)]*\\))?:", "label": "task"},
     {"pattern": "^track(\\([^)]*\\))?:", "label": "track"},
     {"pattern": "^epic(\\([^)]*\\))?:", "label": "epic"}
   ],
