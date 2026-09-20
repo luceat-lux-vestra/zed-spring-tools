@@ -58,7 +58,7 @@ jobs:
           }
 
           TRUSTED_BOT_LOGINS = {"dependabot[bot]"}
-          UNRESOLVED_ROOT = re.compile(r"(?i)\\b(?:unknown|unverified|tbd|todo)\\b|insufficient\\s+evidence")
+          UNRESOLVED_ROOT = re.compile(r"(?i)\b(?:unknown|unverified|tbd|todo)\b|insufficient\s+evidence")
 
           class TriageError(ValueError):
               pass
