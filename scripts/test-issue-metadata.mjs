@@ -24,6 +24,7 @@ test("explicit repository title protocol maps deterministically", () => {
     ["spike(s017): bounded probe", "spike"],
     ["task(release): verify registry install", "task"],
     ["test(platform): validate host", "task"],
+    ["hardening(reassessment): refresh controls", "task"],
     ["track(release): v1.0 readiness", "track"],
     ["epic(repo): repository hardening", "epic"],
     ["Close live-data show, hide, and refresh parity", null],
