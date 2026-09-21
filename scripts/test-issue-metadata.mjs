@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const policy = JSON.parse(readFileSync(new URL("../.github/issue-metadata-policy.json", import.meta.url)));
+const workflowSource = readFileSync(new URL("../.github/workflows/issue-metadata.yml", import.meta.url), "utf8");
 const rules = policy.rules.map(({ pattern, label }) => [new RegExp(pattern, "i"), label]);
 
 function classify(title) {
@@ -43,4 +44,21 @@ test("managed labels are unique and every rule targets one", () => {
   const names = policy.managed_labels.map((entry) => entry.name);
   assert.equal(new Set(names).size, names.length);
   for (const { label } of policy.rules) assert.ok(names.includes(label), label);
+});
+
+test("manual issue backfill is dry-run first and explicit opt-in", () => {
+  assert.match(workflowSource, /dry_run:\n[\s\S]*?default: true/);
+  assert.match(workflowSource, /backfill:\n[\s\S]*?default: false/);
+});
+
+test("mutating issue backfill is bound to default branch", () => {
+  assert.ok(workflowSource.includes("const defaultBranchRef = `refs/heads/${context.payload.repository.default_branch}`;"));
+  assert.ok(workflowSource.includes('context.eventName === "workflow_dispatch" && backfill && !dryRun && context.ref !== defaultBranchRef'));
+  assert.ok(workflowSource.includes("Mutating backfill must run from"));
+});
+
+test("issue metadata write authority stays narrow", () => {
+  assert.ok(workflowSource.includes("issues: write # Required only for canonical issue metadata reconciliation."));
+  assert.ok(workflowSource.includes("ref: ${{ github.event.repository.default_branch }}"));
+  assert.ok(workflowSource.includes("persist-credentials: false"));
 });
