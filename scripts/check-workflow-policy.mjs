@@ -212,10 +212,11 @@ for (const entry of contexts) {
   claimed.add(`${entry.workflow}#${entry.job}`);
 
   if (entry.class === "required" || entry.class === "staged") {
-    // A required context is the job id, so a `name:` renames it out of the
-    // ruleset without any error anywhere.
-    if (job.name) {
-      fail(`${entry.workflow}: job \`${job.id}\` sets \`name:\`, which renames its check to something other than \`${entry.context}\`. A ${entry.class} context must keep the job id as its name.`);
+    const explicitName = job.name
+      ? job.name.code.replace(/^\s*name:\s*/, "").trim().replace(/^["']|["']$/g, "")
+      : job.id;
+    if (explicitName !== entry.context) {
+      fail(`${entry.workflow}: job \`${job.id}\` emits \`${explicitName}\`, expected required context \`${entry.context}\`.`);
     }
     if (job.matrix) {
       fail(`${entry.workflow}: job \`${job.id}\` is a matrix job, so it emits one context per leg rather than \`${entry.context}\`. It cannot be ${entry.class}.`);
@@ -223,11 +224,18 @@ for (const entry of contexts) {
     if (job.condition) {
       fail(`${entry.workflow}: job \`${job.id}\` carries a job-level \`if:\`, so it can be skipped while reporting success. A ${entry.class} context must run unconditionally.`);
     }
-    if (!workflow.triggers.has("pull_request")) {
-      fail(`${entry.workflow} does not trigger on \`pull_request\`, so \`${entry.context}\` is never emitted on a pull request.`);
-    }
-    if (workflow.pathFiltered.has("pull_request")) {
-      fail(`${entry.workflow} filters its \`pull_request\` trigger by path, so \`${entry.context}\` disappears on some pull requests instead of failing. A ${entry.class} context must be emitted on every ordinary pull request.`);
+    const trigger = entry.trigger ?? "pull_request";
+    if (!["pull_request", "pull_request_target"].includes(trigger)) {
+      fail(`${POLICY_FILE} gives \`${entry.context}\` unsupported PR trigger \`${trigger}\`.`);
+    } else if (trigger === "pull_request_target" && entry.workflow !== "failure-triage.yml") {
+      fail(`${POLICY_FILE} may use \`pull_request_target\` only for the audited failure-triage producer.`);
+    } else {
+      if (!workflow.triggers.has(trigger)) {
+        fail(`${entry.workflow} does not trigger on \`${trigger}\`, so \`${entry.context}\` is never emitted on a pull request.`);
+      }
+      if (workflow.pathFiltered.has(trigger)) {
+        fail(`${entry.workflow} filters its \`${trigger}\` trigger by path, so \`${entry.context}\` disappears on some pull requests instead of failing.`);
+      }
     }
   }
 

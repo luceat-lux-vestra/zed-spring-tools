@@ -58,7 +58,10 @@ jobs:
           }
 
           TRUSTED_BOT_LOGINS = {"dependabot[bot]"}
-          UNRESOLVED_ROOT = re.compile(r"(?i)\b(?:unknown|unverified|tbd|todo)\b|insufficient\s+evidence")
+          UNRESOLVED_ROOT = re.compile(
+              r"(?i)^\s*(?:(?:the\s+)?(?:root\s+cause|cause|reason)\s*(?:is|remains|[:=])\s*)?"
+              r"(?:still\s+)?(?:unknown|unverified|tbd|todo|insufficient\s+evidence)\b"
+          )
 
           class TriageError(ValueError):
               pass
@@ -186,6 +189,18 @@ jobs:
               "retry state was committed before the business transaction completed",
               "UNKNOWN",
           )
+          descriptive_unverified_root = valid_remediation.replace(
+              "retry state was committed before the business transaction completed",
+              "the capability record previously referenced an unverified upstream limitation",
+          )
+          descriptive_insufficient_root = valid_remediation.replace(
+              "retry state was committed before the business transaction completed",
+              "the previous capability decision accepted insufficient evidence as support",
+          )
+          prefixed_unknown_root = valid_remediation.replace(
+              "retry state was committed before the business transaction completed",
+              "The cause remains UNKNOWN pending reproduction",
+          )
 
           expect_ok("non-remediation", non_remediation)
           expect_ok("valid-remediation", valid_remediation)
@@ -204,6 +219,9 @@ jobs:
           expect_fail("unknown-classification", unknown_remediation)
           expect_fail("unknown-root-cause", unresolved_root)
           expect_fail("decorated-unknown-root-cause", unresolved_root.replace("UNKNOWN", "UNKNOWN pending reproduction"))
+          expect_fail("prefixed-unknown-root-cause", prefixed_unknown_root)
+          expect_ok("descriptive-unverified-root-cause", descriptive_unverified_root)
+          expect_ok("descriptive-insufficient-root-cause", descriptive_insufficient_root)
           expect_fail(
               "ambiguous-selection",
               non_remediation.replace(f"- [ ] {REMEDIATION}", f"- [x] {REMEDIATION}"),

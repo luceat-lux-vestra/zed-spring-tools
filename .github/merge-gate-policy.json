@@ -117,10 +117,11 @@
     },
     {
       "context": "failure-triage",
-      "class": "advisory",
+      "class": "required",
       "workflow": "failure-triage.yml",
       "job": "failure-triage",
-      "proves": "Trusted-base PR metadata validation for classification-before-remediation. Bootstrap remains advisory until a real failure/recovery proof and explicit live-ruleset promotion are complete."
+      "trigger": "pull_request_target",
+      "proves": "Trusted-base classification-before-remediation metadata validation. Proof PR #136: run 35522090740 failed invalid metadata and run 35522348151 passed after body-only correction; live main-ruleset promotion/readback remains required before merge."
     }
   ],
   "issue_metadata": {
