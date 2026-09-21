@@ -64,7 +64,7 @@
       "label": "spike"
     },
     {
-      "pattern": "^(task|test|build|ci|chore|refactor|perf|release|hardening)(\\([^)]*\\))?:",
+      "pattern": "^(task|test|build|ci|chore|refactor|perf|release|hardening|governance)(\\([^)]*\\))?:",
       "label": "task"
     },
     {
