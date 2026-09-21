@@ -18,7 +18,7 @@ The reassessment adds deterministic issue reconciliation. Existing labels remain
 
 Existing `bug`, `documentation`, `research`, `decision`, and `spike` labels are reused.
 
-No issue body, area, state, or arbitrary natural language is inferred. Backfill defaults to dry-run.
+No issue body, area, state, or arbitrary natural language is inferred. Manual backlog reconciliation is now independently opt-in (`backfill=false`) and review-first (`dry_run=true`). A mutating backfill is rejected from a non-default-branch dispatch, and an unselected manual dispatch cannot mutate even the managed label catalog.
 
 ### GAP — contributor merge documentation drift
 
