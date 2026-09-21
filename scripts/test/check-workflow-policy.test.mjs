@@ -103,3 +103,29 @@ test("workflow-level write permission is rejected", () => {
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /grants workflow-level write permission/);
 });
+
+test("inline workflow-level write mapping is rejected", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/labeler.yml",
+    "permissions:\n  contents: read\n",
+    "permissions: { contents: read, pull-requests: write }\n",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /unsupported workflow-level permissions syntax/);
+});
+
+test("workflow-level write-all is rejected", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/labeler.yml",
+    "permissions:\n  contents: read\n",
+    "permissions: write-all\n",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /unsupported workflow-level permissions syntax/);
+});
