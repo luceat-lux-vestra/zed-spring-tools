@@ -26,6 +26,7 @@ test("explicit repository title protocol maps deterministically", () => {
     ["task(release): verify registry install", "task"],
     ["test(platform): validate host", "task"],
     ["hardening(reassessment): refresh controls", "task"],
+    ["governance: classify failure signals", "task"],
     ["track(release): v1.0 readiness", "track"],
     ["epic(repo): repository hardening", "epic"],
     ["Close live-data show, hide, and refresh parity", null],
