@@ -13,7 +13,7 @@ on:
       backfill:
         description: Reconcile all open issues
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      issues: write
+      issues: write # Required only for canonical issue metadata reconciliation.
     steps:
       - name: Fetch trusted default-branch policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +52,12 @@ jobs:
             const repo = context.repo.repo;
             const dryRun = process.env.DRY_RUN === "true";
             const backfill = process.env.BACKFILL === "true";
+            const defaultBranchRef = `refs/heads/${context.payload.repository.default_branch}`;
+
+            if (context.eventName === "workflow_dispatch" && backfill && !dryRun && context.ref !== defaultBranchRef) {
+              core.setFailed(`Mutating backfill must run from ${defaultBranchRef}; got ${context.ref}`);
+              return;
+            }
 
             function expectedLabel(title) {
               const value = String(title || "").trim();
