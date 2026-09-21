@@ -101,7 +101,7 @@ test("workflow-level write permission is rejected", () => {
   );
   const result = run(root);
   assert.equal(result.code, 1, result.output);
-  assert.match(result.output, /grants workflow-level write permission/);
+  assert.match(result.output, /grants workflow-level pull-requests:write/);
 });
 
 test("inline workflow-level write mapping is rejected", () => {
