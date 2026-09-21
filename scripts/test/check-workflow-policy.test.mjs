@@ -89,3 +89,17 @@ test("a privileged workflow checkout is rejected", () => {
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /checks out code in a `pull_request_target` workflow/);
 });
+
+
+test("workflow-level write permission is rejected", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/labeler.yml",
+    "permissions:\n  contents: read\n",
+    "permissions:\n  contents: read\n  pull-requests: write\n",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /grants workflow-level write permission/);
+});
