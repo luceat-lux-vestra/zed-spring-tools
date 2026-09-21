@@ -137,7 +137,8 @@ function scanWorkflow(file, text) {
       ref: line.code.replace(/^\s*(-\s+)?uses:\s*/, "").trim().replace(/^["']|["']$/g, ""),
     }));
 
-  return { file, text, triggers, pathFiltered, jobs, uses, code, hasTopLevelPermissions: Boolean(blockOf("permissions")) };
+  const topLevelPermissions = blockOf("permissions");
+  return { file, text, triggers, pathFiltered, jobs, uses, code, hasTopLevelPermissions: Boolean(topLevelPermissions), topLevelPermissions };
 }
 
 const workflowFiles = readdirSync(WORKFLOW_DIR)
@@ -154,6 +155,12 @@ const IMMUTABLE_REF = /^[\w.-]+\/[\w.-]+(?:\/[\w.-]+)*@[0-9a-f]{40}$/;
 for (const workflow of workflows.values()) {
   if (!workflow.hasTopLevelPermissions) {
     fail(`${workflow.file} declares no top-level \`permissions:\`; it inherits whatever the repository default becomes.`);
+  } else {
+    for (const line of workflow.topLevelPermissions?.body ?? []) {
+      if (indentOf(line.code) === 2 && /^\s*[A-Za-z-]+:\s*write\s*$/.test(line.code)) {
+        fail(`${workflow.file} grants workflow-level write permission at line ${line.number}; keep workflow defaults read-only/empty and elevate only the exact mutation job.`);
+      }
+    }
   }
 
   for (const use of workflow.uses) {
