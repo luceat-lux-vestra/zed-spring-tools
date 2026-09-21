@@ -13,7 +13,7 @@ on:
       backfill:
         description: Reconcile all open issues
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -52,6 +52,12 @@ jobs:
             const repo = context.repo.repo;
             const dryRun = process.env.DRY_RUN === "true";
             const backfill = process.env.BACKFILL === "true";
+            const defaultBranchRef = `refs/heads/${context.payload.repository.default_branch}`;
+
+            if (context.eventName === "workflow_dispatch" && backfill && !dryRun && context.ref !== defaultBranchRef) {
+              core.setFailed(`Mutating backfill must run from ${defaultBranchRef}; got ${context.ref}`);
+              return;
+            }
 
             function expectedLabel(title) {
               const value = String(title || "").trim();
@@ -110,11 +116,13 @@ jobs:
               }
             }
 
-            if (!dryRun) await ensureLabels();
-
             if (context.eventName === "issues") {
+              await ensureLabels();
               await reconcile(context.payload.issue);
             } else if (context.eventName === "workflow_dispatch" && backfill) {
+              if (!dryRun) await ensureLabels();
               const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: "open", per_page: 100 });
               for (const issue of issues) await reconcile(issue);
+            } else if (context.eventName === "workflow_dispatch") {
+              core.notice("No backlog reconciliation selected; no label or issue mutation performed.");
             }

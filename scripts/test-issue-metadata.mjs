@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const policy = JSON.parse(readFileSync(new URL("../.github/issue-metadata-policy.json", import.meta.url)));
+const workflow = readFileSync(new URL("../.github/workflows/issue-metadata.yml", import.meta.url), "utf8");
 const rules = policy.rules.map(({ pattern, label }) => [new RegExp(pattern, "i"), label]);
 
 function classify(title) {
@@ -43,4 +44,29 @@ test("managed labels are unique and every rule targets one", () => {
   const names = policy.managed_labels.map((entry) => entry.name);
   assert.equal(new Set(names).size, names.length);
   for (const { label } of policy.rules) assert.ok(names.includes(label), label);
+});
+
+
+test("manual issue backlog reconciliation is review-first and opt-in", () => {
+  assert.match(workflow, /dry_run:[\s\S]*?default:\s*true/);
+  assert.match(workflow, /backfill:[\s\S]*?default:\s*false/);
+  assert.match(
+    workflow,
+    /context\.eventName === "workflow_dispatch" && backfill && !dryRun && context\.ref !== defaultBranchRef/
+  );
+  assert.ok(workflow.includes("Mutating backfill must run from"));
+  assert.ok(workflow.includes("github.event.repository.default_branch"));
+});
+
+test("manual dispatch cannot mutate the label catalog unless backfill is selected", () => {
+  assert.match(
+    workflow,
+    /if \(context\.eventName === "issues"\) \{\s+await ensureLabels\(\);\s+await reconcile/
+  );
+  assert.match(
+    workflow,
+    /else if \(context\.eventName === "workflow_dispatch" && backfill\) \{\s+if \(!dryRun\) await ensureLabels\(\);/
+  );
+  assert.equal((workflow.match(/await ensureLabels\(\);/g) || []).length, 2);
+  assert.ok(workflow.includes("No backlog reconciliation selected; no label or issue mutation performed."));
 });
