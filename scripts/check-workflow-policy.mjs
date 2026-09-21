@@ -156,9 +156,28 @@ for (const workflow of workflows.values()) {
   if (!workflow.hasTopLevelPermissions) {
     fail(`${workflow.file} declares no top-level \`permissions:\`; it inherits whatever the repository default becomes.`);
   } else {
-    for (const line of workflow.topLevelPermissions?.body ?? []) {
-      if (indentOf(line.code) === 2 && /^\s*[A-Za-z-]+:\s*write\s*$/.test(line.code)) {
-        fail(`${workflow.file} grants workflow-level write permission at line ${line.number}; keep workflow defaults read-only/empty and elevate only the exact mutation job.`);
+    const header = workflow.topLevelPermissions.header.code.trim();
+    if (header !== "permissions:" && header !== "permissions: {}" && header !== "permissions: read-all") {
+      fail(`${workflow.file} uses unsupported workflow-level permissions syntax \`${header}\`; use an explicit read-only block, \`permissions: {}\`, or \`permissions: read-all\`.`);
+    } else if (header === "permissions:") {
+      let entries = 0;
+      for (const line of workflow.topLevelPermissions.body) {
+        if (indentOf(line.code) !== 2) continue;
+        const entry = line.code.trim().match(/^([A-Za-z0-9_-]+):\s*(\S+)\s*$/);
+        if (!entry) {
+          fail(`${workflow.file} has unsupported workflow-level permission entry at line ${line.number}: ${line.code.trim()}`);
+          continue;
+        }
+        entries += 1;
+        const [, scope, value] = entry;
+        if (value === "write") {
+          fail(`${workflow.file} grants workflow-level ${scope}:write at line ${line.number}; keep workflow defaults read-only/empty and elevate only the exact mutation job.`);
+        } else if (value !== "read" && value !== "none") {
+          fail(`${workflow.file} has unsupported workflow-level permission value \`${scope}: ${value}\` at line ${line.number}.`);
+        }
+      }
+      if (entries === 0) {
+        fail(`${workflow.file} has an empty \`permissions:\` block; use \`permissions: {}\` explicitly.`);
       }
     }
   }
