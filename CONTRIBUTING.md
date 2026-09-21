@@ -91,7 +91,7 @@ information.
   automation is additive only.
 - Issue titles that use the repository's explicit `bug/fix`, `docs`,
   `research`, `decision/adr/architecture/design`, `spike`, `task`,
-  `track`, or `epic` protocol are reconciled to the corresponding managed
+  `hardening`, `track`, or `epic` protocol are reconciled to the corresponding managed
   label by `.github/workflows/issue-metadata.yml`. For issues, these managed
   labels form one singular work-kind dimension, so an explicit prefix may
   replace a conflicting managed kind. Titles outside that protocol are left
