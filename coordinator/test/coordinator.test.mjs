@@ -1590,18 +1590,29 @@ function encodeForTest(message) {
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]);
 }
 
-async function waitFor(list, predicate, label) {
-  for (let attempt = 0; attempt < 1000; attempt += 1) {
+async function waitFor(list, predicate, label, { timeoutMs = 1000, pollMs = 1 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  do {
     const found = list.find(predicate);
     if (found !== undefined) return found;
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  throw new Error(`timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  } while (Date.now() < deadline);
+  throw new Error(`timed out after ${timeoutMs}ms waiting for ${label}`);
 }
 
 function makeWorktree() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "zst-run-"));
 }
+
+test("waitFor uses elapsed time rather than event-loop turn count", async () => {
+  const values = [];
+  setTimeout(() => values.push("ready"), 10);
+  const found = await waitFor(values, (value) => value === "ready", "timer fixture", {
+    timeoutMs: 250,
+    pollMs: 0,
+  });
+  assert.equal(found, "ready");
+});
 
 const CONFIGURE_COMMAND = {
   jsonrpc: "2.0",
