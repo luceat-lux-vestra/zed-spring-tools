@@ -93,7 +93,7 @@ This repository commits no binary, but the extension registry builds
 into that binary, so those crates are redistributed even though they appear here
 only as a lockfile. They are listed for that reason.
 
-`Cargo.lock` is the authoritative pinned set: 105 packages besides this crate,
+`Cargo.lock` is the authoritative pinned set: 96 packages besides this crate,
 all resolved through crates.io with a recorded checksum. The four direct
 dependencies are:
 
@@ -104,16 +104,14 @@ dependencies are:
 | `sha2` | 0.11.0 | MIT OR Apache-2.0 |
 | `zip` | 7.1.0 | MIT |
 
-Across the whole locked tree, all 105 packages are accounted for and every one
-carries a permissive license: `MIT OR Apache-2.0` and its orderings dominate
-(54), alongside `Unicode-3.0` for the 18 ICU crates,
-`Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` for the 12 `rustix`-family
-crates, `Zlib` for `foldhash` and `zlib-rs`, `0BSD OR MIT OR Apache-2.0` for
-`adler2`, `MIT OR Zlib OR Apache-2.0` for `miniz_oxide`, `Unlicense OR MIT` for
-`memchr`, `(MIT OR Apache-2.0) AND Unicode-3.0` for `unicode-ident`, and
-`MIT OR Apache-2.0 OR LGPL-2.1-or-later` for `r-efi`, whose disjunction permits
-taking MIT or Apache-2.0. No copyleft-only license appears, and no package leaves
-its license field unstated.
+Across the whole locked tree, all 96 packages are accounted for and every one
+retains the permissive license reading recorded by the previous audit. This
+dependency cleanup adds or upgrades no package: it removes `tempfile` and eight
+packages that were reachable only through it (`errno`, `fastrand`,
+`getrandom` 0.4, `linux-raw-sys`, `r-efi`, `rustix`, `windows-link`, and
+`windows-sys`). The remaining lock graph is therefore a strict subset of the
+previously audited graph. No copyleft-only license appears, and no retained
+package leaves its license field unstated.
 
 For the `flate2` 1.1.10 refresh, the changed and newly introduced package
 metadata was re-read rather than carried forward: `flate2` 1.1.10 remains
@@ -121,12 +119,11 @@ metadata was re-read rather than carried forward: `flate2` 1.1.10 remains
 `MIT OR Zlib OR Apache-2.0`, and the newly locked `zlib-rs` 0.6.7 declares
 `Zlib`.
 
-The two packages this section previously recorded as **unread rather than
-cleared** are both resolved. `derive_arbitrary` 1.4.2 left the tree with `zip`
-6.x, together with `arbitrary` 1.4.2, which is why the count fell from 106 to
-104. `linux-raw-sys` 0.12.1 is now present in the local cache and reads
-`Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT`. Nothing in the current
-tree rests on an inference from the target rather than a license reading.
+The previously unresolved license-reading notes remain closed. The current
+cleanup removes `linux-raw-sys` 0.12.1 with the rest of the tempfile-only
+subtree; it does not introduce any package whose license would require a new
+reading. Nothing in the retained tree rests on an inference from the target
+rather than a license reading.
 
 The Java bridge under `bridge/` is this project's own source, compiled by
 `build.rs` with `javac --release 21` and embedded in the WASM. It adds no
