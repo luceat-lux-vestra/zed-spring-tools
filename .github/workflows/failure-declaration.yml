@@ -1,0 +1,31 @@
+name: Failure triage
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions:
+  contents: read
+
+concurrency:
+  group: failure-declaration-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  failure-triage:
+    name: failure-triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate failure-remediation declaration
+        uses: luceat-lux-vestra/.github/actions/failure-declaration@1845ae0daeac8b899f92040d089a31b1c88f257a
+        with:
+          pr-body: ${{ github.event.pull_request.body }}
+          pr-author-type: ${{ github.event.pull_request.user.type }}
+          pr-author-login: ${{ github.event.pull_request.user.login }}

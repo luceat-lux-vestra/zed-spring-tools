@@ -253,8 +253,8 @@ for (const entry of contexts) {
     const trigger = entry.trigger ?? "pull_request";
     if (!["pull_request", "pull_request_target"].includes(trigger)) {
       fail(`${POLICY_FILE} gives \`${entry.context}\` unsupported PR trigger \`${trigger}\`.`);
-    } else if (trigger === "pull_request_target" && entry.workflow !== "failure-triage.yml") {
-      fail(`${POLICY_FILE} may use \`pull_request_target\` only for the audited failure-triage producer.`);
+    } else if (trigger === "pull_request_target") {
+      fail(`${POLICY_FILE} requires unprivileged \`pull_request\` for every required or advisory PR context.`);
     } else {
       if (!workflow.triggers.has(trigger)) {
         fail(`${entry.workflow} does not trigger on \`${trigger}\`, so \`${entry.context}\` is never emitted on a pull request.`);

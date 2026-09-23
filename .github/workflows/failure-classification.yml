@@ -1,7 +1,7 @@
 name: Failure classification
 
 on:
-  workflow_run: # trusted reporter only; never checkout/execute PR code or artifacts
+  workflow_run: # zizmor: ignore[dangerous-triggers] trusted reporter only; never checkout/execute PR code or artifacts
     workflows:
       - Dependency review
       - CodeQL
