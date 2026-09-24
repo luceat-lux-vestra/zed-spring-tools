@@ -103,18 +103,20 @@ jobs:
   # ordinary pull request. That is a precondition for promoting it to a required
   # context later; see `.github/merge-gate-policy.json`.
   workflow-security:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
       # Keep repository policy checks on the same current Node LTS baseline.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: 24
       - name: Install actionlint and zizmor
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         env:
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
@@ -134,14 +136,18 @@ jobs:
           tar -xzf zizmor.tar.gz zizmor
           echo "${RUNNER_TEMP}/policy-tools" >> "${GITHUB_PATH}"
       - name: actionlint
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: actionlint
       # `--no-online-audits` keeps this offline and tokenless. Every finding
       # fails: the tree is clean today, so a suppression must be written down as
       # a `# zizmor: ignore[...]` comment next to the reason, not absorbed by a
       # severity threshold.
       - name: zizmor
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: zizmor --no-online-audits --format plain .github/workflows/
       - name: Merge-gate and workflow policy
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/check-workflow-policy.mjs
       - name: Issue metadata policy
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node --test scripts/test-issue-metadata.mjs
