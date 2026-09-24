@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +21,7 @@ env:
 
 jobs:
   platform:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -131,6 +133,7 @@ jobs:
   # pinned Java runtimes. One Linux x86_64 arm is sufficient here: the six-way
   # matrix above owns host portability while this job owns the JVM floor.
   spring-runtime-floor:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -168,6 +171,7 @@ jobs:
   # consumer from accidentally treating one successful matrix leg as six-way
   # evidence. Promotion into the repository ruleset is a separate policy step.
   platform-gate:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:

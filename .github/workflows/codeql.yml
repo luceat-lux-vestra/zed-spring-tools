@@ -17,6 +17,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     # A documentation-only pull request changes no analysed source. Research,
     # decision, and spike documents are the bulk of this repository's traffic.
     paths-ignore:
@@ -36,6 +37,7 @@ concurrency:
 
 jobs:
   analyze:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

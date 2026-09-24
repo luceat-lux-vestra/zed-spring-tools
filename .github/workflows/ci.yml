@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Least privilege: these checks only read the tree. Nothing here writes to the
 # repository, so this token cannot be used to change it.
@@ -102,6 +103,7 @@ jobs:
   # ordinary pull request. That is a precondition for promoting it to a required
   # context later; see `.github/merge-gate-policy.json`.
   workflow-security:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
