@@ -44,7 +44,7 @@ test("a renamed required producer is rejected", () => {
   assert.match(result.output, /emits `Rust renamed`, expected required context `rust`/);
 });
 
-test("pull_request_target authority is limited to failure-triage", () => {
+test("pull_request_target is rejected for merge-gate contexts", () => {
   const root = fixture();
   const path = join(root, ".github/merge-gate-policy.json");
   const policy = JSON.parse(readFileSync(path, "utf8"));
@@ -52,7 +52,7 @@ test("pull_request_target authority is limited to failure-triage", () => {
   writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
   const result = run(root);
   assert.equal(result.code, 1, result.output);
-  assert.match(result.output, /only for the audited failure-triage producer/);
+  assert.match(result.output, /requires unprivileged `pull_request`/);
 });
 
 test("a path filter on a required workflow is rejected", () => {
