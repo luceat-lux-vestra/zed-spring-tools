@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -59,27 +60,34 @@ jobs:
       SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
       # Microsoft OpenJDK publishes the same current JDK 25 LTS line for all
       # six native tuples, including Windows ARM64. A single distribution keeps
       # this matrix comparable instead of silently dropping that tuple.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: microsoft
           java-version: ${{ env.JAVA_LTS }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: ${{ env.NODE_LTS }}
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           shared-key: platform-${{ matrix.id }}
       - name: Record and verify native runner
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/platform-validation.mjs
       - name: Check coordinator sources
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: |
           node --check coordinator/src/bridge_session.mjs
           node --check coordinator/src/java_transport.mjs
@@ -96,8 +104,10 @@ jobs:
       # Test files are enumerated in Node so shell wildcard behaviour cannot
       # silently change coverage.
       - name: Coordinator capability contracts
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/run-coordinator-tests.mjs
       - name: Java bridge self-test
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/verify-bridge.mjs
       # Download and checksum the exact canonical Spring Tools pin, verify every
       # required runtime file, then launch the real Spring Boot LS with the
@@ -105,6 +115,7 @@ jobs:
       # hover/shutdown over LSP. This is headless runtime evidence, not a claim
       # that Zed + official Java/JDT integration has been driven on this tuple.
       - name: Pinned Spring runtime smoke
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/spring-runtime-smoke.mjs
       # Drive the next integration layer without a desktop client: independently
       # pin JDT LS 1.60.0, inject the canonical Spring 5.3 Java-extension bundle
@@ -112,11 +123,13 @@ jobs:
       # commands are registered, execute the bridge inside real JDT LS, then
       # shut it down. This still does not exercise the Zed/official-Java proxy.
       - name: Pinned JDT Spring bridge smoke
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/jdt-spring-runtime-smoke.mjs
       - name: Native Rust tests
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: cargo test --locked
       - name: Retain platform evidence
-        if: always()
+        if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (always()) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: platform-evidence-${{ matrix.id }}-${{ env.SOURCE_HEAD_SHA }}
@@ -139,21 +152,26 @@ jobs:
       SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: temurin
           java-version: "21"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: ${{ env.NODE_LTS }}
       - name: Pinned Spring runtime smoke on JDK 21 floor
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/spring-runtime-smoke.mjs
       - name: Pinned JDT Spring bridge smoke on JDK 21 floor
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/jdt-spring-runtime-smoke.mjs
       - name: Retain JDK floor evidence
-        if: always()
+        if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (always()) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: spring-runtime-floor-evidence-${{ env.SOURCE_HEAD_SHA }}
@@ -175,4 +193,5 @@ jobs:
       - spring-runtime-floor
     steps:
       - name: Confirm complete platform evidence
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: echo "all six native platform legs and the JDK 21 runtime floor passed"
