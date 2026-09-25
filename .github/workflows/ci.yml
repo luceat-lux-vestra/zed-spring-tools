@@ -4,11 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Least privilege: these checks only read the tree. Nothing here writes to the
 # repository, so this token cannot be used to change it.
 permissions:
+  checks: read
   contents: read
 
 concurrency:
@@ -30,12 +31,41 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Reuse exact-SHA Fast evidence
+        if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_CHECK: rust
+        run: |
+          set -euo pipefail
+          checks="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SHA/check-runs?filter=all&per_page=100")"
+          current_run="/actions/runs/${GITHUB_RUN_ID}/"
+          latest="$(jq -c --arg name "$EXPECTED_CHECK" --arg current_run "$current_run" '
+            [.check_runs[]
+             | select(.name == $name and .app.slug == "github-actions")
+             | select(((.details_url // "") | contains($current_run)) | not)]
+            | if length == 0 then empty else max_by(.id) end
+          ' <<<"$checks")"
+          if [ -z "$latest" ]; then
+            echo "::error::No prior '$EXPECTED_CHECK' check exists for exact HEAD $EXPECTED_SHA."
+            exit 1
+          fi
+          status="$(jq -r '.status' <<<"$latest")"
+          conclusion="$(jq -r '.conclusion // ""' <<<"$latest")"
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::Latest prior '$EXPECTED_CHECK' evidence for exact HEAD $EXPECTED_SHA is status=$status conclusion=$conclusion; refusing stale-success reuse."
+            exit 1
+          fi
+          echo "Reused latest successful Fast evidence for $EXPECTED_CHECK at $EXPECTED_SHA."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         with:
           persist-credentials: false
       # Java 21 is intentional here: this required job proves the declared JDK
       # floor. M5 platform validation separately drives the latest LTS, JDK 25.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         with:
           distribution: temurin
           java-version: "21"
@@ -46,52 +76,92 @@ jobs:
       # the shipped WASM on its own toolchain, so this pin governs CI only; move
       # it deliberately, with a run that proves the new compiler is clean.
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         with:
           toolchain: "1.98.0"
           components: rustfmt, clippy
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
       - name: Format
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: cargo fmt --check
       - name: Clippy
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: cargo test --locked
       - name: Build WASM release
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: cargo build --locked --release --target wasm32-wasip2
 
   coordinator:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Reuse exact-SHA Fast evidence
+        if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_CHECK: coordinator
+        run: |
+          set -euo pipefail
+          checks="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SHA/check-runs?filter=all&per_page=100")"
+          current_run="/actions/runs/${GITHUB_RUN_ID}/"
+          latest="$(jq -c --arg name "$EXPECTED_CHECK" --arg current_run "$current_run" '
+            [.check_runs[]
+             | select(.name == $name and .app.slug == "github-actions")
+             | select(((.details_url // "") | contains($current_run)) | not)]
+            | if length == 0 then empty else max_by(.id) end
+          ' <<<"$checks")"
+          if [ -z "$latest" ]; then
+            echo "::error::No prior '$EXPECTED_CHECK' check exists for exact HEAD $EXPECTED_SHA."
+            exit 1
+          fi
+          status="$(jq -r '.status' <<<"$latest")"
+          conclusion="$(jq -r '.conclusion // ""' <<<"$latest")"
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::Latest prior '$EXPECTED_CHECK' evidence for exact HEAD $EXPECTED_SHA is status=$status conclusion=$conclusion; refusing stale-success reuse."
+            exit 1
+          fi
+          echo "Reused latest successful Fast evidence for $EXPECTED_CHECK at $EXPECTED_SHA."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         with:
           fetch-depth: 0
           persist-credentials: false
       # Node 24 is the current LTS line and is also the M5 platform baseline.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         with:
           node-version: 24
       # Use the same explicit cross-platform discovery path as the six-tuple
       # platform matrix so adding a new coordinator test cannot diverge between
       # required CI and portability CI.
       - name: Coordinator tests
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: node scripts/run-coordinator-tests.mjs
       - name: Repository check tests
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: node --test scripts/test/*.test.mjs
       - name: Contributors list is current
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: node scripts/generate-contributors.mjs --check
       # A dependency bump changes the locked package count and the direct
       # dependency versions that THIRD_PARTY_NOTICES.md states, and the notice
       # is what a user reads about the redistributed WASM. Fail the bump, not
       # the release.
       - name: Third-party notices are current
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: node scripts/check-third-party-notices.mjs
       # The pinned Spring Tools identity is retyped across the extension
       # manifest, the Rust adapter, the coordinator and the notices. This runs
       # inside an already-required context so a half-applied release pin cannot
       # merge, rather than surfacing at a user's install.
       - name: Spring Tools pin inventory reconciles
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' }}
         run: node scripts/check-pin-inventory.mjs
 
   # Fail-closed workflow policy. Both tools are fetched by exact version and
