@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
 
 # Least privilege: these checks only read the tree. Nothing here writes to the
 # repository, so this token cannot be used to change it.
