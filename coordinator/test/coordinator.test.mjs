@@ -4598,6 +4598,10 @@ test("Boot project info forwards the bare document URI and answers the editor at
     (message) => message.params?.command === "sts/spring-boot/bootProjectInfo",
     "boot project info request",
   );
+  // waitFor advances with setImmediate and can exhaust 1000 iterations in
+  // less than the configured 5 ms on a fast runner. Cross the real timeout
+  // boundary before asserting the asynchronous failure notice.
+  await new Promise((resolve) => setTimeout(resolve, 20));
   // Spring reads `arguments[0]` with `getAsString()` and wraps it in a
   // TextDocumentIdentifier, so an object wrapper would fail on the server side.
   assert.deepEqual(request.params.arguments, [
