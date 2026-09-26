@@ -37,4 +37,37 @@ Proof:
 
 ## Validation
 
-<!-- Commands, checks, evidence, exact revisions, and skipped checks with reasons. -->
+<!--
+Commands, checks, evidence, exact revisions, and skipped checks with reasons.
+"Should work" is not validation.
+-->
+
+- [ ] `cargo fmt --check`, `cargo clippy`, `cargo test`
+- [ ] `node --test "coordinator/test/*.test.mjs"`
+- [ ] Locked `wasm32-wasip2` release build
+- [ ] Driven in a real Zed install, when this change has a runtime surface
+
+## Runtime evidence
+
+<!--
+Only if you observed behaviour. State the exact tuple; an observation without one
+cannot be reused. Delete this section if the change has no runtime surface.
+-->
+
+- Exact source revision:
+- OS + architecture:
+- Zed version:
+- Official Java extension version:
+- JDK:
+- Project under test:
+
+## Unverified
+
+<!--
+What this change does NOT establish. Untested platforms stay `untested`, never
+`supported`. An inference must not be presented as a confirmed fact.
+-->
+
+## Follow-up
+
+<!-- What is deliberately left for later, so it is not mistaken for an oversight. -->
