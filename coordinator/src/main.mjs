@@ -6,14 +6,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { BridgeSession } from "./bridge_session.mjs";
-import { JavaTransport } from "./java_transport.mjs";
 import { LspDecoder, encodeLsp, errorFor, isRequest, responseFor } from "./lsp.mjs";
 
-const ADD_CLASSPATH = "sts/addClasspathListener";
-const REMOVE_CLASSPATH = "sts/removeClasspathListener";
+const PROJECT_GAV_REQUEST = "sts/project/gav";
+const JAVA_CODE_COMPLETE_REQUEST = "sts/javaCodeComplete";
 const EXECUTE_SPRING_COMMAND = "workspace/executeCommand";
-const ENABLE_CLASSPATH = "sts.vscode-spring-boot.enableClasspathListening";
 const ENABLE_AI_CODE_LENSES = "sts/enable/copilot/features";
 const REFRESH_INLAY_HINTS = "workspace/inlayHint/refresh";
 const REFRESH_CODE_LENSES = "workspace/codeLens/refresh";
@@ -197,19 +194,7 @@ const COORDINATOR_COMMANDS = [
 const REGISTER_CAPABILITY = "client/registerCapability";
 const UNREGISTER_CAPABILITY = "client/unregisterCapability";
 const EXECUTE_COMMAND_CAPABILITY = "workspace/executeCommand";
-const CLASSPATH_CALLBACK_COMMAND = /^sts4\.classpath\.[A-Za-z]{8}$/;
-const CALLBACK_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const REQUEST_TIMEOUT_MS = 10_000;
-const JAVA_ROUTE_TIMEOUT_MS = 30_000;
-// A late-starting official Java server can still be importing the project when
-// the route first registers, so the first classpath handshakes time out and
-// recover once the import finishes. Keep re-driving the handshake for this long
-// before surfacing the hard requirement error, so a slow startup does not raise
-// a misleading "requires the official Java extension" popup. Each retry cycle is
-// bounded by the Java transport timeout plus the backoff below, so this leaves
-// room for several attempts against a cold project import.
-const JAVA_HANDSHAKE_GRACE_MS = 60_000;
-const CLASSPATH_RETRY_MS = 1_000;
 // Spring can answer the editor's initial inlay request before its Java index is
 // ready. Pre-warm recently visible documents after indexing, then refresh Zed
 // so a premature empty result cannot become the stable editor state.
@@ -219,32 +204,19 @@ const INLAY_PREWARM_LIMIT = 8;
 // short internal request timeout. It is still bounded so a dismissed or lost
 // prompt cannot leak a pending request for the session lifetime.
 const ZED_REQUEST_TIMEOUT_MS = 5 * 60_000;
-const SERVER_JAR = "spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar";
-const SPRING_TOOLS_VERSION = "5.3.0.RELEASE";
-const COMPATIBILITY_REPORT_URL =
-  "https://github.com/luceat-lux-vestra/zed-spring-tools/issues/new";
-const MAX_COMPATIBILITY_REPORT_URL_LENGTH = 2_000;
+const SPRING_TOOLS_RELEASE = "5.3.0.RELEASE";
+const SERVER_JAR = "spring-boot-language-server-standalone-exec.jar";
 // A web page Spring asks the client to open is rendered as a bounded link, so its
 // address is length-capped and restricted to characters that cannot terminate the
 // Markdown link early or add text after it.
 const MAX_EXTERNAL_PAGE_URL_LENGTH = 2_000;
 const MARKDOWN_SAFE_URL = /^[A-Za-z0-9\-._~:/?#@!$&'*+,;=%]+$/;
-const JAVA_FAILURE_REPORTS = Object.freeze({
-  "java-data-route-failed-v1": "Official Java data route failed",
-  "classpath-registration-failed-v1": "Official Java classpath registration failed",
-  "classpath-enable-failed-v1": "Spring classpath enablement failed",
-  "official-java-capability-failed-v1": "Required official Java capability failed",
-});
-
 export class Coordinator {
   constructor({
     sendSpring,
     sendZed,
-    javaTransport,
     worktree,
     requestTimeoutMs = REQUEST_TIMEOUT_MS,
-    javaHandshakeGraceMs = JAVA_HANDSHAKE_GRACE_MS,
-    classpathRetryMs = CLASSPATH_RETRY_MS,
     inlayRefreshDelayMs = INLAY_REFRESH_DELAY_MS,
     liveConnectConfirmMs = LIVE_CONNECT_CONFIRM_MS,
     liveLogLevelConfirmMs = LIVE_LOG_LEVEL_CONFIRM_MS,
@@ -258,11 +230,8 @@ export class Coordinator {
   }) {
     this.sendSpring = sendSpring;
     this.sendZed = sendZed;
-    this.javaTransport = javaTransport;
     this.worktree = worktree;
     this.requestTimeoutMs = requestTimeoutMs;
-    this.javaHandshakeGraceMs = javaHandshakeGraceMs;
-    this.classpathRetryMs = classpathRetryMs;
     this.inlayRefreshDelayMs = inlayRefreshDelayMs;
     this.liveConnectConfirmMs = liveConnectConfirmMs;
     this.liveLogLevelConfirmMs = liveLogLevelConfirmMs;
@@ -308,20 +277,10 @@ export class Coordinator {
     this.automaticLiveTask = undefined;
     this.automaticLivePollFailureLogged = false;
     this.initialized = false;
-    this.session = undefined;
     this.sequence = 0;
     this.sessionId = randomUUID();
-    this.javaFailureShown = false;
-    this.javaNotStartedShown = false;
-    this.coordinationStartedAt = Date.now();
-    // Set on the first Java document Zed opens; until then the official Java
-    // server is not expected to be running, so no handshake failure is real.
-    this.javaDocumentSeenAt = undefined;
-    this.classpathRetryScheduled = false;
     this.inlayRefreshTimer = undefined;
     this.inlayRefreshPending = false;
-    this.routedJavaMethods = new Set();
-    this.ownedCapabilityRegistrations = new Set();
     this.shutdownIds = new Set();
     this.abortController = new AbortController();
     this.reportContext = {
@@ -330,14 +289,12 @@ export class Coordinator {
       jdkVersion: reportContext.jdkVersion ?? "unknown",
       extensionVersion: reportContext.extensionVersion ?? "development",
     };
-    this.enableTask = undefined;
     this.codeLensEnableTask = undefined;
     this.closed = false;
   }
 
   observeZedMessage(message) {
     this.#observeAutomaticLiveConfiguration(message);
-    this.#observeJavaDocument(message);
     if (message?.method === "textDocument/inlayHint" && message.id !== undefined) {
       const uri = message.params?.textDocument?.uri;
       this.inlayHintRequests.set(idKey(message.id), {
@@ -420,7 +377,6 @@ export class Coordinator {
     if (message?.method === "initialized" && message.id === undefined) {
       this.initialized = true;
       this.#startSpringCodeLensProviders();
-      this.#startClasspathCoordination();
       this.#startAutomaticLiveConnection();
     }
     return true;
@@ -515,37 +471,19 @@ export class Coordinator {
       return;
     }
 
-    if (message.method === ADD_CLASSPATH) {
-      await this.#answer(message, () => this.#addClasspath(message.params));
+    if (message.method === PROJECT_GAV_REQUEST) {
+      await this.#answer(message, () => standaloneProjectGavs(message.params));
       return;
     }
-    if (message.method === REMOVE_CLASSPATH) {
-      await this.#answer(message, () => this.#removeClasspath(message.params));
-      return;
-    }
-    if (this.#ownsClasspathCapabilityRequest(message)) {
-      await this.#answer(message, () => null);
+    if (message.method === JAVA_CODE_COMPLETE_REQUEST) {
+      // Standalone Spring Tools has no public Zed surface for asking the official
+      // Java server for arbitrary completion. Return the protocol's empty result
+      // rather than tunnelling into another extension's private transport.
+      await this.#answer(message, () => []);
       return;
     }
     if (message.method === SHOW_DOCUMENT) {
       await this.#answer(message, () => this.#handleShowDocument(message.params));
-      return;
-    }
-    if (this.javaTransport.supportsSpringClientMethod(message.method)) {
-      await this.#answer(message, async () => {
-        try {
-          const result = await this.javaTransport.executeSpringClientMethod(
-            message.method,
-            message.params,
-            { signal: this.abortController.signal },
-          );
-          this.#noteJavaRoute(message.method);
-          return result;
-        } catch (error) {
-          this.#reportJavaDataRouteFailure(error);
-          throw error;
-        }
-      });
       return;
     }
 
@@ -649,10 +587,6 @@ export class Coordinator {
 
   async close() {
     this.beginClose();
-    const session = this.session;
-    this.session = undefined;
-    if (session !== undefined) await session.close();
-    await this.enableTask;
     await this.codeLensEnableTask;
     await this.automaticLiveTask;
     await this.generatedResolutionTail;
@@ -676,121 +610,6 @@ export class Coordinator {
     } catch (error) {
       if (this.closed || error?.name === "AbortError") return;
       this.logger("Spring AI-assisted CodeLens providers could not be enabled");
-    }
-  }
-
-  async #addClasspath(params) {
-    if (
-      !hasExactKeys(params, ["batched", "callbackCommandId"]) ||
-      params.batched !== true ||
-      !CALLBACK_ID.test(params.callbackCommandId ?? "") ||
-      this.session !== undefined
-    ) {
-      throw new Error("Spring classpath listener registration is invalid");
-    }
-    const session = new BridgeSession({
-      transport: this.javaTransport,
-      worktree: this.worktree,
-      callbackId: params.callbackCommandId,
-      signal: this.abortController.signal,
-      sendClasspathToSpring: async (arguments_) =>
-        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
-          command: params.callbackCommandId,
-          arguments: structuredClone(arguments_),
-        }),
-    });
-    try {
-      await session.open();
-      this.session = session;
-      this.classpathRetryScheduled = false;
-      this.logger("official Java classpath bridge registered");
-      return "ok";
-    } catch (error) {
-      await session.close().catch(() => {});
-      // A late-starting official Java server is still importing the project, so
-      // registering the classpath listener times out and Spring gives up. Spring
-      // does not retry on its own, so re-drive the enable handshake until the
-      // server is ready; only surface the requirement error once that keeps
-      // failing past the grace window.
-      if (!this.closed) {
-        if (this.#javaHandshakeGraceElapsed()) {
-          this.#showJavaFailure("classpath-registration-failed-v1");
-        } else {
-          this.#scheduleClasspathRetry();
-        }
-      }
-      throw error;
-    }
-  }
-
-  #scheduleClasspathRetry() {
-    if (this.classpathRetryScheduled || this.closed) return;
-    this.classpathRetryScheduled = true;
-    void (async () => {
-      await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
-      this.classpathRetryScheduled = false;
-      if (this.closed || this.session !== undefined) return;
-      if (this.#javaHandshakeGraceElapsed()) {
-        this.#showJavaFailure("classpath-registration-failed-v1");
-        return;
-      }
-      this.logger("official Java classpath handshake not ready yet; re-enabling");
-      try {
-        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
-          command: ENABLE_CLASSPATH,
-          arguments: [true],
-        });
-      } catch (error) {
-        if (this.closed || error?.name === "AbortError") return;
-      }
-      // Keep re-driving until the bridge registers or the grace window elapses,
-      // even if Spring does not re-issue the registration request on its own.
-      if (!this.closed && this.session === undefined) this.#scheduleClasspathRetry();
-    })();
-  }
-
-  async #removeClasspath(params) {
-    const callbackId = removalCallbackId(params);
-    if (callbackId === undefined || this.session?.callbackId !== callbackId) {
-      throw new Error("Spring classpath listener removal is invalid");
-    }
-    const session = this.session;
-    await session.close();
-    this.session = undefined;
-    this.logger("official Java classpath bridge removed");
-    return "ok";
-  }
-
-  #startClasspathCoordination() {
-    if (this.enableTask !== undefined || this.closed) return;
-    this.enableTask = this.#enableClasspathWhenJavaReady();
-  }
-
-  async #enableClasspathWhenJavaReady() {
-    this.logger("waiting for the official Java language server route");
-    while (!this.closed) {
-      try {
-        await this.javaTransport.waitUntilReady({ signal: this.abortController.signal });
-      } catch (error) {
-        if (this.closed || error?.name === "AbortError") return;
-        this.logger("official Java route is not ready; continuing to wait");
-        this.#showJavaNotStarted();
-        await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
-        continue;
-      }
-      if (this.closed) return;
-      try {
-        await this.requestSpring(EXECUTE_SPRING_COMMAND, {
-          command: ENABLE_CLASSPATH,
-          arguments: [true],
-        });
-        this.logger("Spring classpath coordination enabled");
-        return;
-      } catch (error) {
-        if (this.closed || error?.name === "AbortError") return;
-        this.#showJavaFailure("classpath-enable-failed-v1");
-        await retryDelay(this.classpathRetryMs, this.abortController.signal).catch(() => {});
-      }
     }
   }
 
@@ -896,43 +715,6 @@ export class Coordinator {
         method: REFRESH_CODE_LENSES,
         params: null,
       }),
-    );
-  }
-
-  // Zed starts the official Java server lazily, on the first Java file, and
-  // nothing this extension can do starts it: the extension API has no call for
-  // starting another extension's language server, and `languages.<Lang>.
-  // language_servers` only chooses among servers already declared for that
-  // language — adding `jdtls` to Properties was driven-refuted on 2026-07-20.
-  // So the two situations get different messages instead of one failure claim:
-  // no Java file open yet is normal and needs an instruction, while a Java file
-  // open with no route is a real compatibility failure.
-  #observeJavaDocument(message) {
-    if (this.javaDocumentSeenAt !== undefined) return;
-    if (message?.method !== "textDocument/didOpen") return;
-    const textDocument = message.params?.textDocument;
-    if (textDocument?.languageId !== "java" && !/\.java$/i.test(textDocument?.uri ?? "")) {
-      return;
-    }
-    this.javaDocumentSeenAt = Date.now();
-    this.logger("a Java document was opened; the official Java route is now expected");
-  }
-
-  #javaHandshakeGraceElapsed() {
-    if (this.javaDocumentSeenAt === undefined) return false;
-    return Date.now() - this.javaDocumentSeenAt >= this.javaHandshakeGraceMs;
-  }
-
-  // Said once, when the classpath is genuinely absent rather than broken. The
-  // user is not left guessing why validation is thin, and the only action that
-  // actually works is the one named.
-  #showJavaNotStarted() {
-    if (this.javaNotStartedShown || this.javaFailureShown || this.closed) return;
-    if (this.javaDocumentSeenAt !== undefined) return;
-    if (Date.now() - this.coordinationStartedAt < this.javaHandshakeGraceMs) return;
-    this.javaNotStartedShown = true;
-    this.#showInfo(
-      "Spring Boot: the official Java extension has not started, because this project has no Java file open. Until it does, property validation and completion only see syntax — key metadata comes from the project classpath. Open any .java file in this project to start it.",
     );
   }
 
@@ -2249,108 +2031,15 @@ export class Coordinator {
     }
   }
 
-  #noteJavaRoute(method) {
-    if (this.routedJavaMethods.has(method)) return;
-    this.routedJavaMethods.add(method);
-    this.logger(`official Java data request ${method} answered`);
-  }
 
-  // One failed data request is not evidence that the official Java extension or
-  // the JDK is unusable, which is the only thing the requirement notice claims.
-  // Official Java answers these by dispatching into JDT LS under its own
-  // five-second command timeout, so the first request against a project that is
-  // still importing can exceed it: the M5 JDK 21 gate saw exactly one
-  // `sts.java.type` time out and raise this notice three seconds before the same
-  // route answered normally, and four further runs never reproduced it. The
-  // classpath path already encodes the rule — a failure inside the handshake
-  // grace window is startup noise, and only one that outlives the window is
-  // real. This is that rule for the route that cannot retry, because its caller
-  // is Spring and the error has to be answered rather than deferred. A route
-  // that is genuinely broken keeps failing past the window, and the classpath
-  // bridge rides the same transport, so nothing is silenced permanently.
-  #reportJavaDataRouteFailure(error) {
-    if (this.closed || error?.name === "AbortError") return;
-    if (this.routedJavaMethods.size > 0) {
-      // The route has already answered in this session, so the requirement the
-      // notice states is demonstrably met and the claim would be false.
-      this.logger("an official Java data request failed after the route had answered");
-      return;
-    }
-    if (this.javaDocumentSeenAt === undefined) {
-      // The same split `#showJavaNotStarted` makes: with no Java file open the
-      // official Java server is not expected to be running at all.
-      this.logger("an official Java data request failed before any Java document opened");
-      return;
-    }
-    if (!this.#javaHandshakeGraceElapsed()) {
-      this.logger("an official Java data request failed inside the handshake grace window");
-      return;
-    }
-    this.#showJavaFailure("java-data-route-failed-v1");
-  }
+}
 
-  #ownsClasspathCapabilityRequest(message) {
-    // Zed 1.11.3 replaces the server's static execute-command list when this
-    // internal callback is dynamically registered. The coordinator owns the
-    // callback route, so keeping the registration here preserves Spring's
-    // user-facing commands without changing the server or Zed.
-    if (message.method === REGISTER_CAPABILITY) {
-      const registrations = message.params?.registrations;
-      if (!Array.isArray(registrations) || registrations.length !== 1) return false;
-      const registration = registrations[0];
-      if (
-        typeof registration?.id !== "string" ||
-        registration.method !== EXECUTE_COMMAND_CAPABILITY ||
-        !Array.isArray(registration.registerOptions?.commands) ||
-        registration.registerOptions.commands.length !== 1 ||
-        !CLASSPATH_CALLBACK_COMMAND.test(registration.registerOptions.commands[0])
-      ) {
-        return false;
-      }
-      this.ownedCapabilityRegistrations.add(registration.id);
-      return true;
-    }
-
-    if (message.method !== UNREGISTER_CAPABILITY) return false;
-    const registrations = message.params?.unregisterations;
-    if (!Array.isArray(registrations) || registrations.length !== 1) return false;
-    const registration = registrations[0];
-    if (
-      typeof registration?.id !== "string" ||
-      registration.method !== EXECUTE_COMMAND_CAPABILITY ||
-      !this.ownedCapabilityRegistrations.delete(registration.id)
-    ) {
-      return false;
-    }
-    return true;
+export function standaloneProjectGavs(params) {
+  const projectUris = params?.projectUris;
+  if (!Array.isArray(projectUris)) {
+    throw new Error("Spring Tools project GAV request is invalid");
   }
-
-  #showJavaFailure(failureKind = "official-java-capability-failed-v1") {
-    if (this.javaFailureShown || this.closed) return;
-    this.javaFailureShown = true;
-    const reportUrl = compatibilityReportUrl({
-      failureKind,
-      ...this.reportContext,
-    });
-    const id = `zed-spring-tools:${this.sessionId}:zed:${++this.sequence}`;
-    this.pendingZedRequests.add(idKey(id));
-    this.sendZed(
-      encodeLsp({
-        jsonrpc: "2.0",
-        id,
-        method: "window/showMessageRequest",
-        params: {
-          type: 1,
-          message:
-            `Zed Spring Tools requires a working official Java extension and JDK 21 or newer. [Review a bounded compatibility report](${reportUrl}). Nothing is submitted until you review and submit the public GitHub form; use private vulnerability reporting for security issues.`,
-          // Zed immediately drops a showMessageRequest with no actions. This
-          // dismissal action keeps the Markdown report link visible without
-          // performing any external action on the user's behalf.
-          actions: [{ title: "Not now" }],
-        },
-      }),
-    );
-  }
+  return projectUris.map(() => null);
 }
 
 function addCoordinatorCommands(message) {
@@ -3753,8 +3442,6 @@ export function parseOptions(arguments_) {
     ["--java", "java"],
     ["--spring-server", "springServer"],
     ["--spring-home", "springHome"],
-    ["--java-work-dir", "javaWorkDirectory"],
-    ["--compatibility", "compatibility"],
     ["--host-os", "hostOs"],
     ["--extension-version", "extensionVersion"],
     ["--automatic-live-connection", "automaticLiveConnection"],
@@ -3837,92 +3524,10 @@ export function javaVersion(versionOutput) {
   return match[1];
 }
 
-export function compatibilityReportUrl({
-  failureKind,
-  hostOs,
-  hostArch,
-  jdkVersion,
-  extensionVersion,
-}) {
-  const failure = JAVA_FAILURE_REPORTS[failureKind];
-  if (failure === undefined) throw new Error("compatibility failure kind is not allowlisted");
-  const os = reportValue(hostOs, "host OS", /^(?:macos|linux|windows|unknown)$/);
-  const architecture = reportValue(
-    hostArch,
-    "host architecture",
-    /^(?:arm64|x86_64|unknown)$/,
-  );
-  const jdk = reportValue(jdkVersion, "JDK version", /^(?:[0-9][0-9A-Za-z._+-]{0,63}|unknown)$/);
-  const product = reportValue(
-    extensionVersion,
-    "extension version",
-    /^(?:[0-9A-Za-z][0-9A-Za-z.+-]{0,63}|development)$/,
-  );
-  const url = new URL(COMPATIBILITY_REPORT_URL);
-  url.searchParams.set("title", `[Compatibility] ${failureKind}`);
-  url.searchParams.set(
-    "body",
-    [
-      "## Automatically prepared compatibility data",
-      "",
-      `- Failure: ${failure}`,
-      `- Fingerprint: \`${failureKind}\``,
-      `- Spring Tools: \`${SPRING_TOOLS_VERSION}\``,
-      `- JDK: \`${jdk}\``,
-      `- Host: \`${displayHostOs(os)} ${architecture}\``,
-      `- Zed Spring Tools: \`${product}\``,
-      "- Zed: `not observable by this extension`",
-      "- Official Java extension: `not observable by this extension`",
-      "",
-      "## What happened?",
-      "",
-      "<!-- Remove private project details, then describe the failure. -->",
-    ].join("\n"),
-  );
-  if (url.href.length > MAX_COMPATIBILITY_REPORT_URL_LENGTH) {
-    throw new Error("compatibility report URL exceeds its bound");
-  }
-  return url.href;
-}
-
-function reportValue(value, label, pattern) {
-  if (typeof value !== "string" || !pattern.test(value)) {
-    throw new Error(`compatibility report ${label} is invalid`);
-  }
-  return value;
-}
-
 function normalizedArchitecture(architecture) {
   if (architecture === "arm64") return "arm64";
   if (architecture === "x64") return "x86_64";
   return "unknown";
-}
-
-function displayHostOs(hostOs) {
-  if (hostOs === "macos") return "macOS";
-  if (hostOs === "windows") return "Windows";
-  if (hostOs === "linux") return "Linux";
-  return "Unknown OS";
-}
-
-export function validateCompatibility(value) {
-  const provider = value?.schemaVersion === 1 && value.providers?.length === 1
-    ? value.providers[0]
-    : undefined;
-  if (
-    provider?.id !== "zed-java" ||
-    provider.targetLanguageServerId !== "jdtls" ||
-    provider.workDirectoryId !== "java" ||
-    provider.route?.kind !== "utf8-worktree-hex-v1" ||
-    provider.route?.directory !== "proxy" ||
-    provider.route?.transport !== "loopback-http-json" ||
-    provider.bridge?.schemaVersion !== 1 ||
-    provider.bridge?.addCommand !== "zed.spring.bridge.v1.addClasspathListener" ||
-    provider.bridge?.removeCommand !== "zed.spring.bridge.v1.removeClasspathListener"
-  ) {
-    throw new Error("official Java compatibility contract is invalid");
-  }
-  return provider;
 }
 
 export async function run(arguments_, dependencies = {}) {
@@ -3931,12 +3536,9 @@ export async function run(arguments_, dependencies = {}) {
   requireFile(options.java, "Java executable");
   requireFile(options.springServer, "Spring Tools server");
   requireDirectory(options.springHome, "Spring Tools home");
-  requireFile(options.compatibility, "Java compatibility contract");
   if (path.basename(options.springServer) !== SERVER_JAR) {
-    throw new Error("Spring Tools server artifact does not match the pinned release");
+    throw new Error(`Spring Tools server artifact does not match pinned ${SPRING_TOOLS_RELEASE}`);
   }
-  validateCompatibility(JSON.parse(fs.readFileSync(options.compatibility, "utf8")));
-
   const environment = sanitizedEnvironment(process.env);
   const version = (dependencies.spawnSync ?? spawnSync)(options.java, ["-version"], {
     encoding: "utf8",
@@ -3955,7 +3557,7 @@ export async function run(arguments_, dependencies = {}) {
 
   const child = (dependencies.spawn ?? spawn)(
     options.java,
-    springArguments(options.springServer, options.mcpServerPort),
+    springArguments(options.springServer, options.worktree, options.mcpServerPort),
     {
       cwd: options.worktree,
       env: environment,
@@ -3970,11 +3572,6 @@ export async function run(arguments_, dependencies = {}) {
   const coordinator = new Coordinator({
     sendSpring: (bytes) => child.stdin.write(bytes),
     sendZed: (bytes) => output.write(bytes),
-    javaTransport: new JavaTransport({
-      javaWorkDirectory: options.javaWorkDirectory,
-      worktree: options.worktree,
-      timeoutMs: JAVA_ROUTE_TIMEOUT_MS,
-    }),
     worktree: options.worktree,
     automaticLiveConnection: options.automaticLiveConnection,
     reportContext: {
@@ -4050,7 +3647,10 @@ export async function run(arguments_, dependencies = {}) {
 // The extension resolves both user settings into this single value, so the
 // decision lives in one place: a number means the user opted in, and `null`
 // means the default, which keeps this vector byte-identical to the pre-MCP one.
-export function springArguments(server, mcpServerPort = null) {
+export function springArguments(server, projectDirectory, mcpServerPort = null) {
+  if (typeof projectDirectory !== "string" || projectDirectory.length === 0) {
+    throw new Error("standalone Spring Tools project directory is required");
+  }
   return [
     "-Xmx1024m",
     "-Dspring.config.location=classpath:/application.properties",
@@ -4059,6 +3659,7 @@ export function springArguments(server, mcpServerPort = null) {
       ? "-Dspring.main.web-application-type=NONE"
       : `-Dserver.port=${mcpServerPort}`,
     "-Xlog:jni+resolve=off",
+    `-Dspring.boot.ls.project.dir=${projectDirectory}`,
     "-jar",
     server,
   ];
@@ -4074,21 +3675,6 @@ function requireDirectory(directory, label) {
   if (!path.isAbsolute(directory) || !fs.statSync(directory).isDirectory()) {
     throw new Error(`${label} is not an absolute directory`);
   }
-}
-
-function removalCallbackId(params) {
-  if (hasExactKeys(params, ["callbackCommandId"])) return params.callbackCommandId;
-  if (hasExactKeys(params, ["batched", "callbackCommandId"]) && params.batched === false) {
-    return params.callbackCommandId;
-  }
-  return undefined;
-}
-
-function hasExactKeys(value, expected) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
 }
 
 function idKey(id) {

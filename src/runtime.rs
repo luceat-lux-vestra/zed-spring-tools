@@ -3,27 +3,15 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const RUNTIME_VERSION: &str = "0.1.0-alpha.1";
-const BRIDGE_JAR: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/zed-spring-bridge.jar"));
+const RUNTIME_VERSION: &str = "0.2.0-alpha.1";
 const COORDINATOR_FILES: &[(&str, &str)] = &[
     ("main.mjs", include_str!("../coordinator/src/main.mjs")),
     ("lsp.mjs", include_str!("../coordinator/src/lsp.mjs")),
-    (
-        "java_transport.mjs",
-        include_str!("../coordinator/src/java_transport.mjs"),
-    ),
-    (
-        "bridge_session.mjs",
-        include_str!("../coordinator/src/bridge_session.mjs"),
-    ),
 ];
-const JAVA_PROVIDERS: &str = include_str!("../protocol/java-providers.json");
 
 #[derive(Debug, Clone)]
 pub struct RuntimePaths {
     pub coordinator: PathBuf,
-    pub bridge: PathBuf,
-    pub compatibility: PathBuf,
 }
 
 pub fn materialize() -> Result<RuntimePaths, String> {
@@ -38,15 +26,9 @@ pub fn materialize() -> Result<RuntimePaths, String> {
     for (name, contents) in COORDINATOR_FILES {
         write_if_changed(&coordinator_root.join(name), contents.as_bytes())?;
     }
-    let bridge = root.join("zed-spring-bridge.jar");
-    write_if_changed(&bridge, BRIDGE_JAR)?;
-    let compatibility = root.join("java-providers.json");
-    write_if_changed(&compatibility, JAVA_PROVIDERS.as_bytes())?;
 
     Ok(RuntimePaths {
         coordinator: coordinator_root.join("main.mjs"),
-        bridge,
-        compatibility,
     })
 }
 
@@ -83,10 +65,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn embedded_assets_are_nonempty_and_product_named() {
-        assert!(BRIDGE_JAR.starts_with(b"PK"));
+    fn embedded_coordinator_assets_are_nonempty() {
         assert!(COORDINATOR_FILES.iter().all(|(_, body)| !body.is_empty()));
-        assert!(JAVA_PROVIDERS.contains("zed.spring.bridge.v1.addClasspathListener"));
-        assert!(!JAVA_PROVIDERS.contains("s012"));
     }
 }
