@@ -1,5 +1,14 @@
 # Compatibility
 
+## Current D007 standalone runtime identity
+
+The release candidate architecture now pins Spring Tools **`5.3.0.RELEASE`**
+source commit `573f714dc76f178bfb2af392d03864f2a0a540ac` and runs the official
+`spring-boot-language-server-standalone-exec.jar` artifact. This identity is
+the current product runtime contract; it is **not** evidence that the historical
+desktop tuples below have already been revalidated on D007. Those observations
+remain attached to the runtime architecture under which they were collected.
+
 This repository records PoC and local product evidence, not product support. The
 words `verified` and `untested` below describe exact observed coverage on one
 host. An installable extension now exists, but nothing here promises that it

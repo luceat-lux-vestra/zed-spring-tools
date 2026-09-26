@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use zed_extension_api as zed;
 
 pub fn resolve_java(worktree: &zed::Worktree) -> Result<String, String> {
@@ -40,16 +40,6 @@ pub fn path_string(path: &Path) -> Result<String, String> {
         .ok_or_else(|| format!("path is not valid UTF-8: {}", path.display()))
 }
 
-pub fn official_java_work_dir(extension_work_dir: &Path) -> Result<PathBuf, String> {
-    let work_root = extension_work_dir.parent().ok_or_else(|| {
-        format!(
-            "extension work directory has no shared parent: {}",
-            extension_work_dir.display()
-        )
-    })?;
-    Ok(work_root.join("java"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,15 +57,6 @@ mod tests {
                 zed::Os::Windows
             ),
             r"C:\work tree\프로젝트\runtime\main.mjs"
-        );
-    }
-
-    #[test]
-    fn derives_the_official_java_sibling_work_directory() {
-        let extension = Path::new("/zed/extensions/work/spring-tools");
-        assert_eq!(
-            official_java_work_dir(extension).unwrap(),
-            Path::new("/zed/extensions/work/java")
         );
     }
 }

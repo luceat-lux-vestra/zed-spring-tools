@@ -9,7 +9,10 @@ the initial public push. D005 selects the stock-Zed LSP-first capability
 delivery strategy while preserving the existing per-capability routes as
 fallbacks. D006 replaces exact official-Java release admission with capability-
 first optimistic compatibility and selects user-reviewed prefilled GitHub issue
-reporting when a required capability fails.
+reporting when a required capability fails. D007 supersedes the private
+cross-extension coordination portions of D002/D003/D004/D006 and selects the
+official Spring Tools standalone language server so the product stays inside
+Zed's publishing boundary.
 
 | ID | Decision | Status |
 | --- | --- | --- |
@@ -18,7 +21,8 @@ reporting when a required capability fails.
 | [D003](003-java-companion-product-architecture.md) | Java-companion product architecture | Accepted |
 | [D004](004-product-stack-build-and-packaging.md) | Product stack, build, and packaging | Accepted |
 | [D005](005-lsp-first-capability-delivery.md) | LSP-first capability delivery with preserved fallbacks | Accepted |
-| [D006](006-capability-first-java-compatibility-and-reporting.md) | Capability-first Java compatibility and user-reviewed reporting | Accepted |
+| [D006](006-capability-first-java-compatibility-and-reporting.md) | Capability-first Java compatibility and user-reviewed reporting | Superseded by D007 for runtime Java coordination |
+| [D007](007-standalone-spring-publishing-boundary.md) | Standalone Spring language server and publishing boundary | Accepted for #159 implementation; exact-head Zed release validation pending |
 
 Decision records in this directory must cite supporting research and spike
 results. S010 supported an isolated managed JDT runtime with private Equinox
@@ -59,3 +63,10 @@ now passes its first ignored-`target/` runtime gate. The bounded compatibility
 notification also opened a populated browser composer without submission.
 
 Use [template.md](template.md) after sufficient evidence exists.
+
+## 2026-09-25 publishing-boundary amendment
+
+The S011-S016 bridge/proxy evidence remains historical evidence for why the
+original companion design worked. It is no longer the production architecture.
+D007 is authoritative for current runtime ownership and Registry preparation.
+D005 remains authoritative for user-facing LSP-first capability delivery.

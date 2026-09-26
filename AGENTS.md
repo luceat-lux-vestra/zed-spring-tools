@@ -80,24 +80,30 @@ validation. Spike code remains excluded from production.
   `docs/decisions/`.
 - Add minimal disposable code under `spikes/` only when a written spike plan
   identifies the hypothesis and success criteria.
-- Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
-  `scripts/`, and `tests/` within the boundary that D002-D006 fix,
-  following the reviewed implementation plan's current milestone.
+- Implement product code under `src/`, `coordinator/`, `protocol/`,
+  `scripts/`, and `tests/` within the boundary fixed by D007 and the
+  capability-delivery policy retained from D005. The former production
+  `bridge/` module is retired by D007 and must not be recreated without a new
+  recorded decision.
 - Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-D002-D006 have settled the architecture, implementation language, build system,
-bridge/coordinator module boundary, and stock-Zed capability-delivery strategy.
+D007 is authoritative for the runtime publishing boundary. D004 still governs
+the source-first product stack where it does not conflict with D007, and D005
+still governs stock-Zed capability delivery. D002/D003/D006 remain historical
+records for the superseded private Java coordination design.
 Do not add any of the following until a recorded decision supports it:
 
 - product packaging, release automation, or product CI;
 - a new runtime dependency, downloaded artifact, or network call at runtime;
-- any change to the official Java extension, its proxy, or its work directory
-  beyond the allowlisted bridge commands;
-- a reduced or self-managed JDT fallback, which D002 and D003 exclude;
+- any read, write, discovery, or protocol dependency on another extension's
+  private work directory, proxy, localhost endpoint, or injected JDT bundle;
+- a private or self-managed JDT fallback; the selected Spring runtime is the
+  official standalone Spring Tools server, not a second JDT LS;
 - replacement or co-ownership of the official Java language, grammar, or query
-  pack, which D003 and D005 exclude from the baseline;
+  pack; D005 and D007 keep ordinary Java editing with the official Java
+  extension;
 - a custom Zed distribution or external dashboard runtime, which D005 does not
   select;
 - promotion of `spikes/` code into production; or
@@ -293,12 +299,15 @@ new exact final PR HEAD before merge.
 
 ## Decision gate
 
-This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
-required official Java extension, rather than a Zed-extension-centered MVP. D003
-accepted the resulting architecture, D004 its stack, and D005 the LSP-first
-stock-Zed capability surfaces with preserved fallbacks. D006 makes official-
-Java admission capability-first and compatibility reporting user-reviewed, so
-product scaffolding and reviewed M4 slices are allowed to proceed.
+This gate is closed. D007 supersedes the private cross-extension runtime
+coordination selected by D002/D003 and the affected portions of D004/D006.
+The product now runs Spring Tools' official standalone Boot language server
+inside its own extension boundary while the official Java extension remains the
+Java editor/runtime owner. D005's LSP-first user-facing delivery policy remains
+in force.
 
-Reopen the gate only if new evidence contradicts the Pivot, and record the
-outcome in a decision document before changing production code.
+Do not reintroduce sibling-workdir discovery, the official Java private proxy,
+the retired bridge bundle, or private `sts.java.*` mappings as a fallback.
+Reopen the gate only if new public Zed integration surfaces or other evidence
+justify a different architecture, and record the outcome before changing the
+production boundary.

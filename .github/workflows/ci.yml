@@ -210,6 +210,9 @@ jobs:
       - name: Repository check tests
         if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true' }}
         run: node --test scripts/test/*.test.mjs
+      - name: Case-insensitive path collisions
+        if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true' }}
+        run: node scripts/check-case-collisions.mjs
       - name: Contributors list is current
         if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true' }}
         run: node scripts/generate-contributors.mjs --check

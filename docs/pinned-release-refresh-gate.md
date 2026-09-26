@@ -5,7 +5,7 @@
   [Execution status](#execution-status)
 - Date: 2026-07-29, last updated 2026-08-01
 - Currently pinned: Spring Tools `5.3.0.RELEASE` /
-  `vscode-spring-boot-2.3.0-RC2.vsix`, pinned 2026-08-01
+  `spring-boot-language-server-standalone-exec.jar`, pinned 2026-08-01
 - Previously pinned: Spring Tools `5.2.0.RELEASE` /
   `vscode-spring-boot-2.2.0-RC1.vsix`
 - Related: [implementation-plan](implementation-plan.md) M6 gap 2;
@@ -29,7 +29,7 @@ pin reaches much further than the download:
 | The capability inventory's derivation — 118 configuration keys, the command set, languages and views | [R011](research/011-vscode-spring-tools-capability-surface.md), [R018](research/018-spring-tools-zed-outcome-parity-audit.md) |
 | Reconciler defaults — 11 categories and 71 problem types, each severity | the server jar's own `problem-types.json` |
 | The absent-key defaults this extension supplies explicitly | `spring_workspace_configuration` in `src/lib.rs` |
-| Launch-argument decisions the VS Code client makes before the server exists | the VSIX's `extension/dist/extension.js` |
+| Launch-argument decisions the VS Code client makes before the server exists | the standalone JAR's `extension/dist/extension.js` |
 | Behavioural asserts a `verified` row rests on, such as the upgrade being patch-only | individual inventory rows |
 | 31 driven gates' evidence | `tmp/*/evidence/`, referenced from inventory rows |
 
@@ -241,7 +241,7 @@ found, in one row, and it costs a click rather than a capability.**
 
 | Stage | Status |
 | --- | --- |
-| Stage 0 — preconditions | **Passed** 2026-08-01. All three: a full VSIX (`vscode-spring-boot-2.3.0-RC2.vsix`, 83,000,863 bytes) on a non-prerelease tag; no other slice in flight; the baseline VSIX under `tmp/s002-artifacts/` hashing to the pinned `SHA256` verbatim. |
+| Stage 0 — preconditions | **Passed** 2026-08-01. All three: a full VSIX (`spring-boot-language-server-standalone-exec.jar`, 83,000,863 bytes) on a non-prerelease tag; no other slice in flight; the baseline VSIX under `tmp/s002-artifacts/` hashing to the pinned `SHA256` verbatim. |
 | Stage 1 — mechanical re-pin | **Passed** 2026-08-01 as its own commit (`fa11beb`). A cold profile downloads, verifies and installs the release, and the running server is the 2.3.0 jar — reachable only through the fail-closed `SERVER_JAR` guard. Corrected this document's own two-file claim to four. |
 | Stage 2 — source re-audit | **Complete** 2026-08-01 — [R021](research/021-spring-tools-5.3.0-refresh-audit.md). |
 | Stage 3 — driven gates | **Tier A and Tier B complete.** All five Tier A gates pass (`tmp/refresh-530-gates-20260801/evidence/`). Every mapped Tier B row was then driven (`tmp/residual-tierb-20260801/evidence/`): all pass byte-identically except remote connect. Tier C recorded as not re-run. |

@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 55
+- Inventory version: 56
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`.
   **The product pin moved to `5.3.0.RELEASE` / `2.3.0` on 2026-08-01, and the
   derivation survives the move unchanged**: the 118 configuration keys are
@@ -15,7 +15,7 @@
   [COMPATIBILITY](../COMPATIBILITY.md#spring-tools-530-refresh-evidence); every
   other row's evidence is `5.2.0.RELEASE` and is untested against the new
   release, which is not the same statement as failing.
-- Last updated: 2026-08-01
+- Last updated: 2026-09-25
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -36,6 +36,44 @@
   Temurin JDK 25.0.3
 - Build systems in this inventory: Maven throughout; Gradle 9.5.1 for the rows
   the 2026-07-29 Gradle gate covers
+
+## D007 standalone migration overlay
+
+The per-row states below preserve the **historical evidence baseline** collected
+before D007 unless a row explicitly says it has been revalidated on the
+standalone runtime. They are not, by themselves, release-facing proof for the
+2026-09-25 standalone architecture.
+
+For #159 and the Registry release gate, apply this overlay:
+
+- **Unaffected by the retired private Java transport:** capabilities served by
+  Zed or the official Java extension directly (for example ordinary Java
+  references/implementations and other explicitly Zed-native equivalents) keep
+  their prior evidence.
+- **Standalone Spring project/index dependent:** properties/YAML project-aware
+  intelligence, Spring-aware Java completion, Spring Java diagnostics/quick
+  fixes, Spring Data, SpEL, Spring-specific navigation/references, executable
+  Boot-project discovery, structure/Modulith, and other rows whose prior proof
+  depended on JDT-delivered classpath/project state require fresh D007 evidence
+  before their historical `verified` state can be used as a release claim.
+- **Redesigned callback:** executable Boot-project discovery no longer depends on
+  the official Java transport for `sts/project/gav`; the coordinator preserves
+  result cardinality with null GAV enrichment. This requires runtime revalidation
+  of the user outcome, not the old callback path.
+- **Known D007 reduction:** Spring XML Java package/type value completion depends
+  on `sts/javaCodeComplete`. No public Zed cross-language-server request surface
+  can provide the official Java server's completion data, so the coordinator
+  returns an empty list. That sub-capability is `blocked-zed-api` under D007
+  even though the broader XML support row retains historical evidence for
+  scanning, diagnostics, property completion, and hyperlinks.
+- **Evidence boundary:** the six-platform standalone runtime smoke is automated
+  headless evidence. It does not promote affected rows to release-facing
+  `verified`; exact-final-HEAD Zed development-extension validation is still
+  required.
+
+This overlay is temporary release-accounting structure, not a second state
+system. After the D007 manual validation is complete, affected rows must be
+updated individually and this overlay can be reduced to historical context.
 
 This is the auditable list behind the goal of capability parity with VS Code
 Spring Tools. Every user-visible capability carries exactly one state. A
@@ -1038,7 +1076,7 @@ verified structure-navigation fallback.
 | Cron completion and validation | `verified` | Verified 2026-07-21 on the same tuple; cron inlay hints were already verified separately. *Completion*: a caret inside the existing `@Scheduled(cron = "0 0 * * * *")` returned 24 proposals from `CronExpressionCompletionProvider` (`0 0 * * * *`, `0 */5 * * * *`, `0 0 0 * * SAT,SUN`, `0 0 0 ? * MON#1`, …) while jdtls returned zero for the same position, so the result is Spring-attributed. *Validation*: `JdtCronReconciler` published `severity: 1`, `code: SYNTAX`, `source: vscode-spring-boot`, message `CRON: mismatched input '<EOF>' expecting WS` on the fixture's deliberate five-field expression, with the valid six-field expression in `GreetingSchedule` publishing an empty diagnostic list as the control. The reconciler visits any `NormalAnnotation` carrying a cron attribute rather than the registered bean set, which is why the broken expression can live on an unregistered class and leave the fixture bootable. Embedded cron semantic highlighting is **not** part of this row — see the **Embedded language syntax highlighting** row, which records why no semantic-token route exists on this tuple. Evidence: `tmp/ws2-language-intelligence-20260721/evidence/trace-cron-completion.log`. |
 | Boot project info | `verified` | Verified 2026-07-26 on macOS 26.5.x arm64, Zed 1.12.0, official Java 6.8.23, Spring Tools 5.2.0, against a four-module Maven fixture pinning Boot 4.0.6 / 3.5.5 / 3.3.5 / 2.7.18 in one worktree. The workspace-wide half was already `verified` separately: the synthetic `zed-spring-tools.configure-boot-run` Code Action consumes `sts/spring-boot/executableBootProjects` records to generate reviewable run/debug configuration, and the 2026-07-19 driven run confirmed the real `mainClass` reached the generated `.zed/debug.json`. This row is the **per-file** half, which had only ever been advertised and forwarded. `sts/spring-boot/bootProjectInfo` has **no caller in the pinned VS Code client** — `grep -ra` over the whole extension matches only Spring's own `WorkspaceBootExecutableProjects` — so the contract was read from that class rather than mirrored from upstream UI: it takes `arguments[0]` as a **bare string** document URI (`getAsString()` into a `TextDocumentIdentifier`, not the object wrapper `executableBootProjects` callers use) and answers `BootProjectInfo {name, uri, mainClass, buildTool, springBootVersion, javaVersion}`, where `mainClass` is the type of the project's `@SpringBootApplication` bean. Three of those fields — `buildTool`, `springBootVersion`, `javaVersion` — appear in no other Spring result this extension consumes, which is why this earns its own `source` Code Action instead of folding into the run/debug flow. *Observed*: on `boot-3-5-5`, `This file belongs to project boot-3-5-5 — main class dev.zed.spring.OssEndedApplication · maven build · Spring Boot 3.5.5 · Java 21.0.11 · at boot-3-5-5`; the same action on `boot-2-7-18` and `boot-4-0-6` resolved each module's own record and Boot version, so per-file resolution is real and not a workspace-wide answer. `javaVersion` reports the project classpath's JRE (21.0.11), not the profile's jdtls `java_home` (25.0.3-tem). The notice is a `window/showMessageRequest` with one dismissal action rather than a toast, because a `window/showMessage` auto-dismisses in Zed and several fields are meant to be read off the screen. **Two findings the driven run corrected.** (1) A field Spring cannot resolve is omitted, not rendered as "unknown": `boot-2-7-18` returned no `javaVersion` and its notice carries no `Java` clause. (2) An *unresolved* project does **not** produce the `null` this row first assumed — `getBootProjectInfo` hands the `orElse(null)` project straight to `mapToBootProjectInfo`, which dereferences it, so Spring throws. The first build reported that as `Spring Tools rejected an internal callback`, the coordinator's fixed string for every Spring error, which both misdescribed the failure and discarded the server's own message. `#settlePending` now carries Spring's bounded error text alongside the unchanged generic message, and the action treats a Spring error as the same user situation as `null`, appending what the server actually said. `null` therefore remains reachable only for a resolved project with no `@SpringBootApplication` bean or a record the server could not build. **Gradle covered 2026-07-29** by the [Gradle axis](gradle-axis-resolution.md) gate: on `tests/fixtures/spring-boot-gradle` the same action answered `This file belongs to project zed-spring-tools-fixture-gradle-worktree — main class dev.zed.spring.fixture.FixtureApplication · **gradle build** · Spring Boot 3.5.0 · Java 21.0.11 · at ..`, so `buildTool` is a real field and not a constant, and `springBootVersion` was read from the Gradle build rather than a pom. Evidence: `tmp/gradle-axis-20260729/evidence/`. **Not covered**: the `null` return itself (every absence observed came through the error path; contract tests cover its rendering), and desktop tuples other than macOS arm64. Evidence: `tmp/boot-project-info-20260726/evidence/`. |
 | Executable Boot projects discovery | `verified` | A synthetic `source` Code Action on Java files invokes `sts/spring-boot/executableBootProjects` (its `sts/project/gav` callback routes through the official Java transport), presents a bounded `window/showMessageRequest` selection (single project skips the prompt; `All projects` covers overflow beyond eight), and generates merge-safe `.zed/tasks.json`/`.zed/debug.json`. Driven first on 2026-07-19 (macOS arm64, Zed 1.11.3, official Java 6.8.21, JDK 25, fixture `spring-boot-basic`): the LSP trace showed the injected action, the user-selected command produced correct `.zed/tasks.json`/`.zed/debug.json` for the discovered project, and the confirmation notice reported one entry each. The 2026-07-22 Maven multi-project gate on macOS 26.5.2 then returned `service-a` and `service-b`, displayed both plus `All projects`, and generated one task/debug pair for each selected module with the correct worktree-relative `cwd`. **Gradle covered 2026-07-29**: discovery returned the Gradle project and, being the only one, skipped the prompt as designed, then generated the `./gradlew bootRun` entries described in the *Run / debug a Boot application* row. Evidence: `tmp/run-debug-gates-20260722/evidence/` and `tmp/gradle-axis-20260729/evidence/`. |
-| Spring XML config support | `verified` | XML already reaches the server via the `xml` language id (the pom inlay route). The master switch `boot-java.support-spring-xml-config.on` is genuinely opt-in — false-when-absent on the server (`isSpringXMLSupportEnabled`) and in VS Code's schema — so it is not defaulted on. The extension supplies the three sub-settings that read off/empty when absent while VS Code defaults them on: `content-assist` and `hyperlinks` (`enabled != null && …`, schema `true`) and `scan-folders` (empty folder list when absent, schema `"src/main"`), so a user who sets `on: true` gets a functional feature instead of an inert one. Contract-tested in `src/lib.rs`. Driven on 2026-07-22 (macOS arm64, Zed 1.11.3, jdtls 1.60.0, JDK 25, sweetppro/zed-xml): with only `on: true` set by the user, the `didChangeConfiguration` trace carried all four keys, `beans.xml` opened with `languageId: xml`, and every gate fired — SpEL reconcile diagnostic (`JAVA_SPEL_EXPRESSION_SYNTAX`, proves `on`), 1 XML file scanned / 1 bean symbol indexed (proves `scan-folders`), `class=`/property-name completion (proves `content-assist`), and property→`Greeting.java` definition (proves `hyperlinks`). A failing reconciler is disabled independently rather than weakening other Spring features. Evidence: `tmp/xml-config-driven-20260722/evidence/`. |
+| Spring XML config support | `verified` | **Historical pre-D007 evidence for the broad XML outcome; D007 release accounting excludes Java package/type value completion, which is `blocked-zed-api` until Zed exposes a public cross-language-server completion route.** XML already reaches the server via the `xml` language id (the pom inlay route). The master switch `boot-java.support-spring-xml-config.on` is genuinely opt-in — false-when-absent on the server (`isSpringXMLSupportEnabled`) and in VS Code's schema — so it is not defaulted on. The extension supplies the three sub-settings that read off/empty when absent while VS Code defaults them on: `content-assist` and `hyperlinks` (`enabled != null && …`, schema `true`) and `scan-folders` (empty folder list when absent, schema `"src/main"`), so a user who sets `on: true` gets a functional feature instead of an inert one. Contract-tested in `src/lib.rs`. Driven on 2026-07-22 (macOS arm64, Zed 1.11.3, jdtls 1.60.0, JDK 25, sweetppro/zed-xml): with only `on: true` set by the user, the `didChangeConfiguration` trace carried all four keys, `beans.xml` opened with `languageId: xml`, and every gate fired — SpEL reconcile diagnostic (`JAVA_SPEL_EXPRESSION_SYNTAX`, proves `on`), 1 XML file scanned / 1 bean symbol indexed (proves `scan-folders`), `class=`/property-name completion (proves `content-assist`), and property→`Greeting.java` definition (proves `hyperlinks`). A failing reconciler is disabled independently rather than weakening other Spring features. Evidence: `tmp/xml-config-driven-20260722/evidence/`. |
 
 ## Workstream 3 — live application data
 
