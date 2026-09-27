@@ -41,18 +41,44 @@ test("a renamed required producer is rejected", () => {
   edit(root, ".github/workflows/ci.yml", "  rust:\n", "  rust:\n    name: Rust renamed\n");
   const result = run(root);
   assert.equal(result.code, 1, result.output);
-  assert.match(result.output, /emits `Rust renamed`, expected required context `rust`/);
+  assert.match(result.output, /component `rust` emits `Rust renamed`, expected `rust`/);
 });
 
 test("pull_request_target is rejected for merge-gate contexts", () => {
   const root = fixture();
   const path = join(root, ".github/merge-gate-policy.json");
   const policy = JSON.parse(readFileSync(path, "utf8"));
-  policy.contexts.find((entry) => entry.context === "rust").trigger = "pull_request_target";
+  policy.contexts.find((entry) => entry.context === "Merge Gate").trigger = "pull_request_target";
   writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /requires unprivileged `pull_request`/);
+});
+
+test("Merge Gate cannot omit a required component", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "needs: [rust, coordinator, review, workflow-security]",
+    "needs: [rust, coordinator, workflow-security]",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /aggregate `Merge Gate` needs/);
+});
+
+test("Merge Gate must use exact always condition", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "if: ${{ always() }}",
+    "if: ${{ success() }}",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /must use exact `if: always\(\)`/);
 });
 
 test("a path filter on a required workflow is rejected", () => {
