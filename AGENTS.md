@@ -237,6 +237,22 @@ or another premise of the reviewed revision, invalidate the affected evidence.
 Re-run the relevant targeted validation and repository-required checks on the
 new exact final PR HEAD before merge.
 
+## Documentation-only CI fast path
+
+A pull request may use the documentation-only fast path only when every changed
+file is one of `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `SECURITY.md`,
+`CODE_OF_CONDUCT.md`, `COMPATIBILITY.md`, `LIMITATIONS.md`, or Markdown
+under `docs/**`. The rule is syntactic: mixed, empty, unreadable, or unlisted
+change sets fall back to full validation.
+
+The required `rust` and `coordinator` jobs must still exist and report
+success; only their product/toolchain work may be skipped. `workflow-security`
+and Dependency Review still run. `CONTRIBUTORS.md` and
+`THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
+derive and validate them. Platform Validation may omit the same bounded
+documentation-only changes because it is advisory rather than a required
+context.
+
 ## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
