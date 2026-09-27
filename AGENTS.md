@@ -245,9 +245,11 @@ file is one of `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `SECURITY.md`,
 under `docs/**`. The rule is syntactic: mixed, empty, unreadable, or unlisted
 change sets fall back to full validation.
 
-The required `rust` and `coordinator` jobs must still exist and report
-success; only their product/toolchain work may be skipped. `workflow-security`
-and Dependency Review still run. `CONTRIBUTORS.md` and
+The `rust` and `coordinator` component jobs must still exist and report
+success; only their product/toolchain work may be skipped. `review`
+(Dependency Review) and `workflow-security` still run. The live ruleset
+requires one `Merge Gate`, which fails unless all four components succeed on
+the exact pull-request revision. `CONTRIBUTORS.md` and
 `THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
 derive and validate them. ## Change discipline
 

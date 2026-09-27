@@ -125,6 +125,8 @@ function scanWorkflow(file, text) {
         name: keyAt("name"),
         timeout: keyAt("timeout-minutes"),
         condition: keyAt("if"),
+        needs: keyAt("needs"),
+        continueOnError: keyAt("continue-on-error"),
         matrix: body.some((line) => /^\s*matrix:/.test(line.code)),
       });
     });
@@ -233,6 +235,27 @@ const EXPECTED_DOCS_ONLY_EXACT_PATHS = new Set([
   "LIMITATIONS.md",
 ]);
 const EXPECTED_DOCS_ONLY_PATTERN = "^docs/.*[.]md$";
+
+function emittedContext(job) {
+  return job.name
+    ? job.name.code.replace(/^\s*name:\s*/, "").trim().replace(/^["']|["']$/g, "")
+    : job.id;
+}
+
+function needsOf(job) {
+  if (!job.needs) return new Set();
+  const value = job.needs.code.replace(/^\s*needs:\s*/, "").trim();
+  if (value.startsWith("[") && value.endsWith("]")) {
+    return new Set(
+      value
+        .slice(1, -1)
+        .split(",")
+        .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean),
+    );
+  }
+  return new Set([value.replace(/^["']|["']$/g, "")]);
+}
 
 function stepBlocks(job) {
   const candidates = job.body
@@ -361,18 +384,63 @@ for (const entry of contexts) {
   claimed.add(`${entry.workflow}#${entry.job}`);
 
   if (entry.class === "required" || entry.class === "staged") {
-    const explicitName = job.name
-      ? job.name.code.replace(/^\s*name:\s*/, "").trim().replace(/^["']|["']$/g, "")
-      : job.id;
+    const explicitName = emittedContext(job);
     if (explicitName !== entry.context) {
       fail(`${entry.workflow}: job \`${job.id}\` emits \`${explicitName}\`, expected required context \`${entry.context}\`.`);
     }
     if (job.matrix) {
       fail(`${entry.workflow}: job \`${job.id}\` is a matrix job, so it emits one context per leg rather than \`${entry.context}\`. It cannot be ${entry.class}.`);
     }
-    if (job.condition) {
+    if (job.continueOnError) {
+      fail(`${entry.workflow}: job \`${job.id}\` sets continue-on-error; a ${entry.class} context must fail closed.`);
+    }
+
+    const components = entry.components ?? [];
+    if (components.length > 0) {
+      const expectedNeeds = new Set(components.map((component) => component.job));
+      const actualNeeds = needsOf(job);
+      if (
+        expectedNeeds.size !== actualNeeds.size ||
+        [...expectedNeeds].some((value) => !actualNeeds.has(value))
+      ) {
+        fail(
+          `${entry.workflow}: aggregate \`${entry.context}\` needs ${JSON.stringify([...actualNeeds].sort())}, expected ${JSON.stringify([...expectedNeeds].sort())}.`,
+        );
+      }
+
+      const conditionValue = job.condition
+        ? job.condition.code.replace(/^\s*if:\s*/, "").trim()
+        : "";
+      if (!["${{ always() }}", "always()"].includes(conditionValue)) {
+        fail(`${entry.workflow}: aggregate \`${entry.context}\` must use exact \`if: always()\`; got ${JSON.stringify(conditionValue)}.`);
+      }
+
+      for (const component of components) {
+        const componentJob = workflow.jobs.get(component.job);
+        const where = `${entry.workflow}: component \`${component.job}\``;
+        if (!componentJob) {
+          fail(`${where} required by \`${entry.context}\` is missing.`);
+          continue;
+        }
+        claimed.add(`${entry.workflow}#${component.job}`);
+        const componentName = emittedContext(componentJob);
+        if (componentName !== component.name) {
+          fail(`${where} emits \`${componentName}\`, expected \`${component.name}\`.`);
+        }
+        if (componentJob.matrix) {
+          fail(`${where} is a matrix job; aggregate components must produce one stable result.`);
+        }
+        if (componentJob.condition) {
+          fail(`${where} carries a job-level \`if:\` and can disappear before \`${entry.context}\` evaluates it.`);
+        }
+        if (componentJob.continueOnError) {
+          fail(`${where} sets continue-on-error and can hide a failing component.`);
+        }
+      }
+    } else if (job.condition) {
       fail(`${entry.workflow}: job \`${job.id}\` carries a job-level \`if:\`, so it can be skipped while reporting success. A ${entry.class} context must run unconditionally.`);
     }
+
     const trigger = entry.trigger ?? "pull_request";
     if (!["pull_request", "pull_request_target"].includes(trigger)) {
       fail(`${POLICY_FILE} gives \`${entry.context}\` unsupported PR trigger \`${trigger}\`.`);
