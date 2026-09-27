@@ -212,56 +212,24 @@ mechanical.
   currently resolves that trailer to the `codex` account; update the model label
   when the active Codex model changes.
 
-## Failure classification before remediation
+## Failure handling before remediation
 
 A failing capability observation, integration test, evidence gate, workflow
-check, or other red signal is an **observation**, not a patch target. Before a
-non-trivial remediation, classify the observed failure as exactly one of:
+check, or other red signal is an observation, not a patch target. Establish the
+root cause far enough to justify the owning layer before changing local
+implementation, tests, capability evidence, workflow policy, upstream-version
+assumptions, or the execution environment.
 
-- `implementation defect` — local extension/coordinator/bridge/protocol code
-  violates an accepted product, capability, or lifecycle contract;
-- `test defect` — a fixture, harness, oracle, scripted profile, assertion, or
-  verification procedure is wrong for the intended contract;
-- `evidence defect` — capability/runtime evidence capture, host-tuple
-  attribution, provenance, freshness, parsing, or proof construction is wrong
-  or insufficient;
-- `workflow-policy drift` — CI, repository metadata/hardening policy,
-  checked-in governance, or live repository settings have diverged;
-- `environment failure` — Zed/official-Java/Spring runtime availability,
-  host/JDK/toolchain, runner, network, or another external execution condition
-  caused the failure;
-- `UNKNOWN` — available evidence does not justify any of the five classes.
+UNKNOWN, UNVERIFIED, and INSUFFICIENT EVIDENCE remain fail-closed where the
+unresolved point is material to the proposed remediation or merge judgment.
+Do not rewrite a failed capability observation as local success, invent
+unsupported local behavior to mask an upstream limitation, weaken a valid
+test/evidence requirement, or relax repository policy merely to obtain green.
 
-Project-specific subtypes may refine the canonical class. An upstream Zed,
-official-Java, or Spring capability limitation is a root-cause finding, not
-automatically a local implementation defect. Classify it as
-`environment failure / upstream capability` only after evidence proves the
-capability is externally unavailable and the accepted local contract already
-accounts for that limitation or fallback. Otherwise keep the responsibility
-`UNKNOWN` until implementation, harness, capability evidence, workflow, and
-host/toolchain causes are separated.
-
-`UNKNOWN`, `UNVERIFIED`, and `INSUFFICIENT EVIDENCE` remain fail-closed.
-Classification is itself a proof obligation. Preserve at least:
-
-```text
-Observed:
-Classification:
-Basis:
-Root cause:
-Remediation:
-Proof:
-```
-
-The `Basis` must justify the selected owner and identify plausible
-alternatives that were rejected or remain unresolved. Do not rewrite a failed
-capability observation as local success, and do not "fix" an upstream
-limitation by inventing unsupported local behavior.
-
-A deterministic/reproducible failure does not become an
-`environment failure` merely because a rerun later passes. Never weaken a
-valid test, capability-evidence requirement, host-tuple proof, workflow check,
-or repository policy merely to obtain green.
+A deterministic/reproducible failure should be fixed rather than hidden by
+reruns. A suspected transient, runner, network, toolchain, or upstream
+environment failure may be rerun only when available evidence makes that
+hypothesis credible.
 
 If remediation changes local implementation, test/harness/oracle,
 capability-evidence method, upstream-version/toolchain premise, workflow/policy,
