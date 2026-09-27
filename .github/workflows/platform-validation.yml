@@ -3,15 +3,6 @@ name: Platform Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "AGENTS.md"
-      - "SECURITY.md"
-      - "CODE_OF_CONDUCT.md"
-      - "COMPATIBILITY.md"
-      - "LIMITATIONS.md"
-      - "docs/**/*.md"
   workflow_dispatch:
 
 permissions:
