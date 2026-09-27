@@ -63,6 +63,43 @@ test("a path filter on a required workflow is rejected", () => {
   assert.match(result.output, /filters its `pull_request` trigger/);
 });
 
+test("docs-only allowlist cannot include generated repository documents", () => {
+  const root = fixture();
+  const path = join(root, ".github/merge-gate-policy.json");
+  const policy = JSON.parse(readFileSync(path, "utf8"));
+  policy.docs_only_fast_path.exact_paths.push("CONTRIBUTORS.md");
+  writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /docs-only exact allowlist drifted/);
+});
+
+test("docs-only workflow scope cannot broaden beyond the accepted paths", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    '                or . == "LIMITATIONS.md"\n                or test("^docs/.*[.]md$")',
+    '                or . == "LIMITATIONS.md"\n                or . == ".github/workflows/ci.yml"\n                or test("^docs/.*[.]md$")',
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /docs-only exact allowlist drifted/);
+});
+
+test("docs-only full-validation guard cannot disappear", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "if: ${{ steps.scope.outputs.docs_only != 'true' && github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}",
+    "if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /lost the docs-only full-validation guard/);
+});
+
 test("a mutable action ref is rejected", () => {
   const root = fixture();
   edit(root, ".github/workflows/ci.yml", "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7");

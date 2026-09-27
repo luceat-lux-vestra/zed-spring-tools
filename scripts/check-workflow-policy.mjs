@@ -223,6 +223,129 @@ if (!existsSync(policyPath)) {
 const policy = JSON.parse(readFileSync(policyPath, "utf8"));
 const contexts = policy.contexts ?? [];
 
+const EXPECTED_DOCS_ONLY_EXACT_PATHS = new Set([
+  "README.md",
+  "CONTRIBUTING.md",
+  "AGENTS.md",
+  "SECURITY.md",
+  "CODE_OF_CONDUCT.md",
+  "COMPATIBILITY.md",
+  "LIMITATIONS.md",
+]);
+const EXPECTED_DOCS_ONLY_PATTERN = "^docs/.*[.]md$";
+
+function stepBlocks(job) {
+  const candidates = job.body
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => /^\s+-\s+(name|uses):\s*\S/.test(line.code));
+  if (candidates.length === 0) return [];
+  const stepIndent = Math.min(...candidates.map(({ line }) => indentOf(line.code)));
+  const headers = candidates.filter(({ line }) => indentOf(line.code) === stepIndent);
+  return headers.map((header, position) => {
+    const end = position + 1 < headers.length ? headers[position + 1].index : job.body.length;
+    const lines = job.body.slice(header.index, end);
+    const headerText = header.line.code.trim();
+    const nameMatch = headerText.match(/^- name:\s*(.+)$/);
+    const usesMatch = headerText.match(/^- uses:\s*(.+)$/);
+    const condition = lines.find(
+      (line) => indentOf(line.code) === stepIndent + 2 && line.code.trim().startsWith("if:"),
+    );
+    return {
+      label: (nameMatch?.[1] ?? usesMatch?.[1] ?? headerText).replace(/^["']|["']$/g, ""),
+      lines,
+      condition,
+    };
+  });
+}
+
+function checkDocsOnlyFastPath() {
+  const config = policy.docs_only_fast_path;
+  if (!config) {
+    fail(`${POLICY_FILE} declares no docs_only_fast_path policy.`);
+    return;
+  }
+  if (config.workflow !== "ci.yml") {
+    fail(`${POLICY_FILE} docs_only_fast_path must be owned by ci.yml.`);
+    return;
+  }
+
+  const configuredPaths = new Set(config.exact_paths ?? []);
+  if (
+    configuredPaths.size !== EXPECTED_DOCS_ONLY_EXACT_PATHS.size ||
+    [...EXPECTED_DOCS_ONLY_EXACT_PATHS].some((value) => !configuredPaths.has(value))
+  ) {
+    fail(`${POLICY_FILE} docs-only exact allowlist drifted: ${JSON.stringify([...configuredPaths].sort())}.`);
+  }
+  if (config.docs_pattern !== EXPECTED_DOCS_ONLY_PATTERN) {
+    fail(`${POLICY_FILE} docs-only pattern drifted to ${JSON.stringify(config.docs_pattern)}.`);
+  }
+  for (const generated of ["CONTRIBUTORS.md", "THIRD_PARTY_NOTICES.md"]) {
+    if (configuredPaths.has(generated)) {
+      fail(`${POLICY_FILE} docs-only allowlist includes generated document ${generated}; coordinator validation must remain mandatory.`);
+    }
+  }
+
+  const workflow = workflows.get(config.workflow);
+  if (!workflow) {
+    fail(`${POLICY_FILE} docs-only workflow ${config.workflow} is missing.`);
+    return;
+  }
+
+  for (const jobId of config.jobs ?? []) {
+    const job = workflow.jobs.get(jobId);
+    if (!job) {
+      fail(`${POLICY_FILE} docs-only job ${jobId} is missing from ${config.workflow}.`);
+      continue;
+    }
+    const steps = stepBlocks(job);
+    const detector = steps.find((step) => step.label === "Detect documentation-only scope");
+    const fastPath = steps.find((step) => step.label === "Documentation-only fast path");
+    if (!detector || !fastPath) {
+      fail(`${config.workflow}: job ${jobId} must contain the docs-only detector and fast-path step.`);
+      continue;
+    }
+
+    const detectorText = detector.lines.map((line) => line.code).join("\n");
+    const observedPaths = new Set(
+      [...detectorText.matchAll(/(?:^|\n)\s*(?:or\s+)?\.\s*==\s*"([^"]+)"/g)].map((match) => match[1]),
+    );
+    if (
+      observedPaths.size !== EXPECTED_DOCS_ONLY_EXACT_PATHS.size ||
+      [...EXPECTED_DOCS_ONLY_EXACT_PATHS].some((value) => !observedPaths.has(value))
+    ) {
+      fail(`${config.workflow}: job ${jobId} docs-only exact allowlist drifted: ${JSON.stringify([...observedPaths].sort())}.`);
+    }
+    if (!detectorText.includes(`test("${EXPECTED_DOCS_ONLY_PATTERN}")`)) {
+      fail(`${config.workflow}: job ${jobId} docs-only docs/** matcher drifted.`);
+    }
+    for (const fragment of [
+      "gh api --paginate --slurp",
+      "Could not establish the changed-file set; using full validation.",
+      "Changed-file set is empty; using full validation.",
+      'echo "docs_only=false" >> "$GITHUB_OUTPUT"',
+    ]) {
+      if (!detectorText.includes(fragment)) {
+        fail(`${config.workflow}: job ${jobId} docs-only detector lost fail-closed fragment ${JSON.stringify(fragment)}.`);
+      }
+    }
+
+    const fastCondition = fastPath.condition?.code ?? "";
+    if (!fastCondition.includes("steps.scope.outputs.docs_only == 'true'")) {
+      fail(`${config.workflow}: job ${jobId} documentation-only success step lost its exact scope guard.`);
+    }
+
+    for (const step of steps) {
+      if (step === detector || step === fastPath) continue;
+      const condition = step.condition?.code ?? "";
+      if (!condition.includes("steps.scope.outputs.docs_only != 'true'")) {
+        fail(`${config.workflow}: job ${jobId} step ${JSON.stringify(step.label)} lost the docs-only full-validation guard.`);
+      }
+    }
+  }
+}
+
+checkDocsOnlyFastPath();
+
 const claimed = new Set();
 for (const entry of contexts) {
   const workflow = workflows.get(entry.workflow);
