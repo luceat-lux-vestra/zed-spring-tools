@@ -4,7 +4,9 @@ Owning issue: #128
 
 This pass re-evaluates the repository's existing hardening against current external GitHub/OpenSSF guidance and actual repository operation. Existing required CI, Dependency Review, CodeQL, actionlint/zizmor, live drift, and staged platform-gate controls remain authoritative unless this document identifies a concrete gap.
 
-> **2026-09-28 CI scope update.** Required `rust` and `coordinator` contexts now retain their jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `workflow-security` and Dependency Review remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
+> **2026-09-28 CI scope update.** `rust` and `coordinator` remain authoritative component jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `review` (Dependency Review) and `workflow-security` remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
+>
+> **2026-09-28 required-gate aggregation.** The live merge contract is collapsed to one fail-closed `Merge Gate` context. It depends directly on `rust`, `coordinator`, `review`, and `workflow-security` and fails unless every component concludes successfully. Platform Validation and CodeQL keep their existing staged/advisory roles.
 
 > **Post-rollout proof protocol.** A documentation-only proof PR must keep the `rust` and `coordinator` required jobs present and successful while their product/toolchain steps are skipped, and must still pass `workflow-security` and Dependency Review on the same exact PR HEAD.
 
