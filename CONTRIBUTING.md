@@ -50,6 +50,16 @@ correct change is welcome; the final commit body gets written at merge.
 document, a spike, or a decision, the sections below apply in full. A typo fix, a
 small bug fix, or a documentation correction does not need a spike plan.
 
+## Documentation-only validation
+
+A narrowly bounded documentation-only pull request avoids Rust/coordinator
+product build and toolchain work when every changed file is an accepted root
+document or Markdown under `docs/**`. The required job contexts still appear,
+while workflow-security and Dependency Review continue to run. Mixed or
+unrecognized paths fall back to the full gate. Generated
+`CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are not eligible for this
+shortcut because CI validates them against repository state.
+
 ## Branching
 
 The project follows GitHub Flow, and `main` is protected: it accepts no direct
