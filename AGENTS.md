@@ -249,11 +249,7 @@ The required `rust` and `coordinator` jobs must still exist and report
 success; only their product/toolchain work may be skipped. `workflow-security`
 and Dependency Review still run. `CONTRIBUTORS.md` and
 `THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
-derive and validate them. Platform Validation may omit the same bounded
-documentation-only changes because it is advisory rather than a required
-context.
-
-## Change discipline
+derive and validate them. ## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
 - Do not perform unrelated refactors or dependency upgrades.
