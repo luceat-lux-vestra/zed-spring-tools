@@ -20,10 +20,10 @@ concurrency:
 # Dependabot moves both together. `scripts/check-workflow-policy.mjs` fails this
 # workflow if a mutable ref ever comes back.
 #
-# `rust` and `coordinator` are required merge contexts. Their job ids are the
-# context names, so renaming a job — or giving one a `name:` — silently removes
-# a required check. `.github/merge-gate-policy.json` records that contract and
-# the policy check enforces it.
+# `rust`, `coordinator`, `review`, and `workflow-security` are the
+# authoritative components behind one required `Merge Gate`. The policy file
+# records the exact component set so removing, renaming, or bypassing one cannot
+# silently weaken the live merge contract.
 jobs:
   rust:
     runs-on: ubuntu-latest
@@ -369,3 +369,49 @@ jobs:
       - name: Issue metadata policy
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node --test scripts/test-issue-metadata.mjs
+
+
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        with:
+          fail-on-severity: moderate
+
+  merge-gate:
+    name: Merge Gate
+    needs: [rust, coordinator, review, workflow-security]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every merge-gate component to succeed
+        env:
+          RUST_RESULT: ${{ needs.rust.result }}
+          COORDINATOR_RESULT: ${{ needs.coordinator.result }}
+          REVIEW_RESULT: ${{ needs.review.result }}
+          WORKFLOW_SECURITY_RESULT: ${{ needs['workflow-security'].result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for entry in \
+            "rust=$RUST_RESULT" \
+            "coordinator=$COORDINATOR_RESULT" \
+            "review=$REVIEW_RESULT" \
+            "workflow-security=$WORKFLOW_SECURITY_RESULT"
+          do
+            name="${entry%%=*}"
+            result="${entry#*=}"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name concluded '$result'; Merge Gate remains closed."
+              failed=1
+            fi
+          done
+          exit "$failed"
