@@ -52,33 +52,33 @@
   },
   "contexts": [
     {
-      "context": "rust",
+      "context": "Merge Gate",
       "class": "required",
       "workflow": "ci.yml",
-      "job": "rust",
-      "proves": "The extension crate formats, passes clippy with warnings denied, passes `cargo test --locked`, and builds for `wasm32-wasip2` — the target the extension registry ships. It does not prove anything about Spring Tools behaviour."
-    },
-    {
-      "context": "coordinator",
-      "class": "required",
-      "workflow": "ci.yml",
-      "job": "coordinator",
-      "proves": "Coordinator and repository-check tests pass, and the derivable records — contributors list, third-party notices, Spring Tools pin inventory — match the tree they describe."
-    },
-    {
-      "context": "review",
-      "class": "required",
-      "workflow": "dependency-review.yml",
-      "job": "review",
-      "proves": "The dependency diff this pull request introduces carries no known advisory at moderate or above. Scoped to the diff only; the standing graph is Dependabot's."
-    },
-    {
-      "context": "workflow-security",
-      "class": "required",
-      "workflow": "ci.yml",
-      "job": "workflow-security",
-      "proves": "actionlint, zizmor and this policy check all pass, so no workflow carries a mutable action ref, a missing timeout, an unsafe `pull_request_target` checkout, or a context that has drifted from this file.",
-      "promotion_evidence": "Observed passing on ordinary pull requests and merged `main`; authoritative live audit run 34118039906 on exact `main` d07834ddf9a10bee23e6868ba610f18bf21d77c3 confirmed repository settings and the pre-promotion live ruleset matched this policy before the required-context migration."
+      "job": "merge-gate",
+      "components": [
+        {
+          "job": "rust",
+          "name": "rust",
+          "proves": "The extension crate formats, passes clippy with warnings denied, passes `cargo test --locked`, and builds for `wasm32-wasip2` — the target the extension registry ships. It does not prove anything about Spring Tools behaviour."
+        },
+        {
+          "job": "coordinator",
+          "name": "coordinator",
+          "proves": "Coordinator and repository-check tests pass, and the derivable records — contributors list, third-party notices, Spring Tools pin inventory — match the tree they describe."
+        },
+        {
+          "job": "review",
+          "name": "review",
+          "proves": "The dependency diff this pull request introduces carries no known advisory at moderate or above. Scoped to the diff only; the standing graph is Dependabot's."
+        },
+        {
+          "job": "workflow-security",
+          "name": "workflow-security",
+          "proves": "actionlint, zizmor and this policy check all pass, so no workflow carries a mutable action ref, a missing timeout, an unsafe `pull_request_target` checkout, or a context that has drifted from this file."
+        }
+      ],
+      "proves": "All authoritative merge components for the exact pull-request revision completed successfully; failed, cancelled, skipped, or missing component results keep the gate closed."
     },
     {
       "context": "platform",
