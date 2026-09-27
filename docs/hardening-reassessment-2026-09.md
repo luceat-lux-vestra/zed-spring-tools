@@ -6,6 +6,8 @@ This pass re-evaluates the repository's existing hardening against current exter
 
 > **2026-09-28 CI scope update.** Required `rust` and `coordinator` contexts now retain their jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `workflow-security` and Dependency Review remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
 
+> **Post-rollout proof protocol.** A documentation-only proof PR must keep the `rust` and `coordinator` required jobs present and successful while their product/toolchain steps are skipped, and must still pass `workflow-security` and Dependency Review on the same exact PR HEAD.
+
 ## Confirmed findings
 
 ### GAP — API/direct issue metadata
