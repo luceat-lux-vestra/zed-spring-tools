@@ -4,7 +4,7 @@ Owning issue: #128
 
 This pass re-evaluates the repository's existing hardening against current external GitHub/OpenSSF guidance and actual repository operation. Existing required CI, Dependency Review, CodeQL, actionlint/zizmor, live drift, and staged platform-gate controls remain authoritative unless this document identifies a concrete gap.
 
-> **2026-09-28 CI scope update.** Required `rust` and `coordinator` contexts now retain their jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `workflow-security` and Dependency Review remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs. Advisory Platform Validation skips the same bounded documentation-only changes.
+> **2026-09-28 CI scope update.** Required `rust` and `coordinator` contexts now retain their jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `workflow-security` and Dependency Review remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
 
 ## Confirmed findings
 
