@@ -49,8 +49,8 @@ It performs the following bounded sequence:
 5. requires coordinator evidence that this cold launch actually produced `textDocument/didOpen` for the exact Properties URI, then requires coordinator startup and a positive `spring/index/updated`;
 6. invokes completion on that launch-target editor and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
 7. stops the completion process, then launches another fresh foreground Zed process for the same fixture with the fixture root plus the absolute `FixtureApplication.java` target;
-8. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the merged response contains `Spring Boot: Configure run/debug for a project…`;
-9. dispatches the exact returned Code Action index through D007's `editor::ConfirmCodeAction { item_ix }` binding, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
+8. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the Spring provider response contains `Spring Boot: Configure run/debug for a project…` with the exact `zed-spring-tools.configure-boot-run` command and the exact Java request URI argument;
+9. closes the mixed Code Actions menu and dispatches that registered command once through Zed's public LSP command selector, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
 10. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
 11. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
 12. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
@@ -79,14 +79,20 @@ isolated process. File identity is supplied as a CLI launch target when that exa
 coordinator still proves the resulting LSP request URI/position, so an incorrect
 picker result cannot silently satisfy the gate. Completion is dispatched directly
 through the isolated keymap rather than reopening the command palette, so palette
-focus cannot masquerade as editor focus. The Code Actions popover is treated as a
-selection list, not a searchable input. The isolated profile needs D007-only bindings only for dev-extension installation, completion, Code Actions, and indexed `editor::ConfirmCodeAction` actions. File navigation has no D007 key binding. The exact Properties or Java target is passed on the command line that creates a fresh foreground Zed process, and exact `didOpen` is required before editor interaction continues.
-The harness waits for coordinator evidence that the configure action exists and
-uses the exact returned item index. If the menu has not been materialized yet,
-Zed's `ConfirmCodeAction` handler returns `None`, so bounded retries are
-safe no-ops instead of editor text input. It never types the action title, and
-the Java source digest must remain unchanged. Screenshot-only evidence is never
-promoted to PASS. If a phase throws, the harness
+focus cannot masquerade as editor focus. The Code Actions popover is used only to
+provoke and prove the provider response. Its item index is deliberately not used:
+Zed prepends local runnables/tasks and merges actions from multiple language
+servers before assigning visible menu indices, so a provider-local response index
+is not a stable `ConfirmCodeAction` index. The isolated profile needs D007-only
+bindings for dev-extension installation, completion, Code Actions, and Zed's
+public LSP command selector. File navigation has no D007 key binding. The exact
+Properties or Java target is passed on the command line that creates a fresh
+foreground Zed process, and exact `didOpen` is required before editor interaction
+continues. The harness requires the exact configure action title, command ID, and
+request-URI argument, closes the mixed menu, filters the public LSP command
+selector by the unique command ID, confirms it once, and then requires coordinator
+command evidence. The Java source digest must remain unchanged. Screenshot-only
+evidence is never promoted to PASS. If a phase throws, the harness
 records `evidence/gate-failure.json` with the exact phase before cleanup. A
 cleanup problem is recorded separately and never replaces the primary failure.
 
@@ -241,11 +247,11 @@ the file itself. The standalone Spring project model requires a directory root,
 so the coordinator keeps an explicit fail-closed guard for that unsupported
 case instead of walking to an inferred parent directory.
 
-D007 no longer relies on a secondary `--existing` or `--add` CLI request for
-fixture-file focus. Each fixture's one foreground launch opens only the directory
-root; subsequent exact-file navigation stays inside that isolated Zed process
-through File Finder's public absolute-path resolver, D007-only key bindings, and
-protocol evidence.
+D007 does not rely on a secondary `--existing` or `--add` CLI request for
+fixture-file focus. Each completion or run/debug phase starts a fresh foreground
+Zed process with exactly two launch targets: the fixture directory and the exact
+Properties or Java file. Protocol evidence must then prove the corresponding
+`didOpen`; File Finder is not part of the control path.
 
 
 ### Durable execution status
