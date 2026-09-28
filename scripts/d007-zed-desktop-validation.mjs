@@ -3412,6 +3412,28 @@ function selfTest() {
       "D007 DAP readiness must require a new JDWP process for the exact staged worktree and main class",
     );
 
+    const sandboxProfile = loopbackOnlySandboxProfile();
+    assert.match(sandboxProfile, /\(deny network-outbound\)/);
+    assert.match(
+      sandboxProfile,
+      /\(allow network-outbound \(remote ip "localhost:\*"\)\)/,
+    );
+
+    const fakeArtifactRoot = path.join(scratch, "own-work");
+    const fakeArtifactDir = path.join(fakeArtifactRoot, "spring-tools", "test");
+    fs.mkdirSync(fakeArtifactDir, { recursive: true });
+    const fakeArtifact = path.join(fakeArtifactDir, "standalone.jar");
+    fs.writeFileSync(fakeArtifact, Buffer.from("0123456789abcdef"));
+    assert.deepEqual(
+      findFilesNamed(fakeArtifactRoot, "standalone.jar", 4),
+      [fakeArtifact],
+    );
+    const fakeArtifactSize = fs.statSync(fakeArtifact).size;
+    const fakeArtifactDigest = sha256File(fakeArtifact);
+    corruptFileByte(fakeArtifact);
+    assert.equal(fs.statSync(fakeArtifact).size, fakeArtifactSize);
+    assert.notEqual(sha256File(fakeArtifact), fakeArtifactDigest);
+
     const primaryFailure = new Error("primary failure");
     writeGateFailure(manifest, "self-test-primary", primaryFailure);
     const recordedFailure = JSON.parse(
