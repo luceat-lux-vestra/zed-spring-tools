@@ -164,11 +164,6 @@ function d007Keymap() {
     "ctrl-cmd-alt-i": "zed::InstallDevExtension",
     "ctrl-cmd-alt-v": "file_finder::Toggle",
   };
-  const fileFinderBindings = {
-    "ctrl-cmd-alt-f": "file_finder::OpenWithoutDismiss",
-    "ctrl-cmd-alt-q": "menu::Confirm",
-  };
-
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
     "ctrl-cmd-alt-z": "editor::ShowCompletions",
@@ -181,10 +176,6 @@ function d007Keymap() {
   });
   return [
     { context: "Workspace", bindings: workspaceBindings },
-    {
-      context: "FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)",
-      bindings: fileFinderBindings,
-    },
     { context: "Editor", bindings: editorBindings },
   ];
 }
@@ -452,7 +443,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       configureBootRunIndex: offer.configureBootRunIndex,
       codeActionAttempts,
       targetRelativePath: javaRelative,
-      targeting: "file-finder-absolute-path-probed-open",
+      targeting: "file-finder-relative-path-native-confirm",
       status: "PASS",
     }, null, 2) + "\n",
     { mode: 0o600 },
@@ -480,7 +471,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       sourceHead: manifest.sourceHead,
       fixture: fixtureKind,
       relativePath: javaRelative,
-      targeting: "file-finder-absolute-path-probed-open",
+      targeting: "file-finder-relative-path-native-confirm",
       sourceDigestBefore,
       sourceDigestAfter,
       status: "PASS",
@@ -573,11 +564,7 @@ function openFixtureFileMacos(
   const hasPosition = row !== null || column !== null;
   if (hasPosition) {
     assert.equal(Number.isInteger(row) && row > 0, true, "File Finder row must be a positive integer");
-    assert.equal(
-      Number.isInteger(column) && column > 0,
-      true,
-      "File Finder column must be a positive integer",
-    );
+    assert.equal(Number.isInteger(column) && column > 0, true, "File Finder column must be a positive integer");
   }
   assert.equal(
     Number.isInteger(timeoutMs) && timeoutMs >= 5_000 && timeoutMs <= 120_000,
@@ -585,7 +572,7 @@ function openFixtureFileMacos(
     "File Finder open timeout must be bounded",
   );
 
-  const targetQuery = hasPosition ? `${target}:${row}:${column}` : target;
+  const targetQuery = hasPosition ? `${relativePath}:${row}:${column}` : relativePath;
   const appleScript = [
     `set targetQuery to "${escapeAppleScript(targetQuery)}"`,
     "set previousClipboard to the clipboard",
@@ -595,9 +582,10 @@ function openFixtureFileMacos(
     '  tell application "System Events"',
     '    tell process "Zed" to set frontmost to true',
     '    keystroke "v" using {control down, command down, option down}',
-    "    delay 0.6",
+    "    delay 0.5",
     '    keystroke "a" using {command down}',
     '    keystroke "v" using {command down}',
+    "    key code 36",
     "  end tell",
     "  delay 0.2",
     "  set the clipboard to previousClipboard",
@@ -619,7 +607,7 @@ function openFixtureFileMacos(
         targetUri,
         targetQuery,
         requestedPosition: hasPosition ? { row, column } : null,
-        targeting: "file-finder-absolute-path-probed-open",
+        targeting: "file-finder-relative-path-native-confirm",
         status: "query-automation-failed",
         exitCode: result.status,
         stderr: bounded(result.stderr),
@@ -633,61 +621,17 @@ function openFixtureFileMacos(
   }
 
   const started = Date.now();
-  let attempts = 0;
   let documentOpened = false;
   while (Date.now() - started < timeoutMs) {
-    attempts += 1;
-    sendD007ActionKeyMacos(
-      manifest,
-      "f",
-      `${evidenceName}-open-without-dismiss-${attempts}`,
+    const events = protocolEvidenceEvents(
+      fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
     );
-    const probeDeadline = Math.min(started + timeoutMs, Date.now() + 1_000);
-    do {
-      const events = protocolEvidenceEvents(
-        fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
-      );
-      documentOpened = events.some(
-        (event) => event.event === "document-open" && event.uri === targetUri,
-      );
-      if (documentOpened) break;
-      sleepMs(100);
-    } while (Date.now() < probeDeadline);
+    documentOpened = events.some(
+      (event) => event.event === "document-open" && event.uri === targetUri,
+    );
     if (documentOpened) break;
+    sleepMs(100);
   }
-
-  if (!documentOpened) {
-    cancelTransientUiMacos(manifest, `${evidenceName}-cancel-file-finder`);
-    fs.writeFileSync(
-      path.join(manifest.evidence, `${evidenceName}-file-target.json`),
-      JSON.stringify({
-        sourceHead: manifest.sourceHead,
-        fixture: fixtureKind,
-        relativePath,
-        absolutePath: target,
-        targetUri,
-        targetQuery,
-        requestedPosition: hasPosition ? { row, column } : null,
-        targeting: "file-finder-absolute-path-probed-open",
-        attempts,
-        classification: "file-finder-target-not-opened",
-        status: "FAIL",
-        protocolTail: fs.existsSync(protocolFile)
-          ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
-          : "",
-      }, null, 2) + "\n",
-      { mode: 0o600 },
-    );
-    throw new Error(
-      `${fixtureKind} File Finder never opened exact target ${relativePath} after ${attempts} bounded probes`,
-    );
-  }
-
-  sendD007ActionKeyMacos(
-    manifest,
-    "q",
-    `${evidenceName}-focus-confirm`,
-  );
 
   fs.writeFileSync(
     path.join(manifest.evidence, `${evidenceName}-file-target.json`),
@@ -699,19 +643,28 @@ function openFixtureFileMacos(
       targetUri,
       targetQuery,
       requestedPosition: hasPosition ? { row, column } : null,
-      targeting: "file-finder-absolute-path-probed-open",
-      openProbeAction: "file_finder::OpenWithoutDismiss",
-      focusAction: "menu::Confirm",
-      attempts,
-      exactDidOpenObserved: true,
-      status: "PASS",
+      targeting: "file-finder-relative-path-native-confirm",
+      confirmAction: "native menu::Confirm via Enter",
+      exactDidOpenObserved: documentOpened,
+      status: documentOpened ? "PASS" : "FAIL",
+      protocolTail: !documentOpened && fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : undefined,
     }, null, 2) + "\n",
     { mode: 0o600 },
   );
+
+  if (!documentOpened) {
+    cancelTransientUiMacos(manifest, `${evidenceName}-cancel-file-finder`);
+    throw new Error(
+      `${fixtureKind} File Finder native confirm did not open exact target ${relativePath}`,
+    );
+  }
+
   return {
     targetUri,
-    attempts,
-    targeting: "file-finder-absolute-path-probed-open",
+    attempts: 1,
+    targeting: "file-finder-relative-path-native-confirm",
   };
 }
 
@@ -1167,7 +1120,7 @@ function waitForSpringCompletion(
           readinessAttempts: targetReadiness.attempts,
           targetRelativePath: expectedRelativePath,
           targetUri: expectedRequest.uri,
-          targeting: "file-finder-absolute-path-probed-open",
+          targeting: "file-finder-relative-path-native-confirm",
           requestedFileFinderPosition: { row: 1, column: 4 },
           ...observation,
           status: "PASS",
@@ -1204,7 +1157,7 @@ function waitForSpringCompletion(
       readinessAttempts: targetReadiness.attempts,
       targetRelativePath: expectedRelativePath,
       targetUri: expectedRequest.uri,
-      targeting: "file-finder-absolute-path-probed-open",
+      targeting: "file-finder-relative-path-native-confirm",
       requestedFileFinderPosition: { row: 1, column: 4 },
       classification,
       ...finalObservation,
@@ -1842,20 +1795,11 @@ function selfTest() {
       stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
       "file_finder::Toggle",
     );
-    assert.equal(
-      stagedKeymap[1].context,
-      "FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)",
-    );
-    assert.equal(
-      stagedKeymap[1].bindings["ctrl-cmd-alt-f"],
-      "file_finder::OpenWithoutDismiss",
-    );
-    assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-q"], "menu::Confirm");
-    assert.equal(stagedKeymap[2].context, "Editor");
-    assert.equal(stagedKeymap[2].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
-    assert.equal(stagedKeymap[2].bindings["ctrl-cmd-alt-z"], "editor::ShowCompletions");
+    assert.equal(stagedKeymap[1].context, "Editor");
+    assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
+    assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-z"], "editor::ShowCompletions");
     assert.deepEqual(
-      stagedKeymap[2].bindings["ctrl-cmd-alt-0"],
+      stagedKeymap[1].bindings["ctrl-cmd-alt-0"],
       ["editor::ConfirmCodeAction", { item_ix: 0 }],
     );
     assert.equal(d007ConfirmKey(25), "p");
@@ -1879,17 +1823,11 @@ function selfTest() {
       true,
       "D007 launch evidence must record the single-foreground control plane",
     );
+    const retiredFileFinderProbeBinding = ['"ctrl-cmd-alt-f": "', "file_finder::OpenWithoutDismiss", '"'].join("");
     assert.equal(
-      harnessSource.includes('"file_finder::OpenWithoutDismiss"'),
-      true,
-      "D007 exact-file opening must probe asynchronous File Finder matches safely",
-    );
-    assert.equal(
-      harnessSource.includes(
-        '"FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)"',
-      ),
-      true,
-      "D007 File Finder actions must bind where the picker input actually owns focus",
+      harnessSource.includes(retiredFileFinderProbeBinding),
+      false,
+      "D007 exact-file opening must not depend on a custom File Finder probe binding",
     );
     assert.equal(
       harnessSource.includes('"zed::InstallDevExtension"'),
@@ -1903,9 +1841,9 @@ function selfTest() {
       "D007 dev-extension installation must not depend on command-palette search",
     );
     assert.equal(
-      harnessSource.includes('targeting: "file-finder-absolute-path-probed-open"'),
+      harnessSource.includes('targeting: "file-finder-relative-path-native-confirm"'),
       true,
-      "D007 exact-file opening must use File Finder absolute-path resolution",
+      "D007 exact-file opening must use project-relative File Finder queries and native Picker confirmation",
     );
     assert.equal(fs.existsSync(path.join(manifest.profile, "extensions", "work", "java")), false,
       "D007 staging must not copy the Java extension work directory");

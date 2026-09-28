@@ -46,9 +46,9 @@ It performs the following bounded sequence:
 2. records the current shared `~/Library/Logs/Zed/Zed.log` byte boundary;
 3. launches the Maven fixture through **one foreground macOS Zed CLI process** bound to the exact staged `--user-data-dir`; that launch opens only the fixture root, avoiding any dependence on multi-path tab ordering;
 4. waits until the new launch process group contains a live Zed app process bound to that isolated profile, removes any ignored stale root `extension.wasm`, dispatches Zed's public `zed::InstallDevExtension` action directly, then drives its `OpenPathPrompt` with the exact repository directory and requires Zed itself to build/register the exact checkout;
-5. after that first launch, never invokes a second macOS Zed CLI to focus a file. The isolated D007 keymap opens Zed's public `file_finder::Toggle`, and the harness pastes the exact absolute fixture path so File Finder takes its explicit absolute-path resolver rather than fuzzy relative-path ranking;
-6. because File Finder search is asynchronous, the harness does not send a blind Enter after a fixed delay. It repeatedly dispatches public `file_finder::OpenWithoutDismiss`, which is a safe no-op while no match exists; once coordinator evidence proves `textDocument/didOpen` for the exact target URI, one public `menu::Confirm` focuses that already-proven selected editor and dismisses the picker;
-7. for `application-d007.properties:1:4`, the gate then requires coordinator startup and a positive `spring/index/updated`, invokes completion on the already-proven editor, and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
+5. after that first launch, never invokes a second macOS Zed CLI to focus a file. The isolated D007 keymap opens Zed's public `file_finder::Toggle`, and the harness enters the exact project-relative `path:row:column` target;
+6. File Finder selection uses Zed's native Enter → `menu::Confirm` Picker path. Upstream Picker defers confirmation while match computation is in flight (`confirm_on_update`), so D007 does not emulate readiness with fixed sleeps or a custom FileFinder action; coordinator evidence must then prove `textDocument/didOpen` for the exact target URI;
+7. for `application-d007.properties:1:4`, the gate then requires coordinator startup and a positive `spring/index/updated`, invokes completion on that proven editor, and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
 8. opens `src/main/java/dev/zed/spring/fixture/FixtureApplication.java` through File Finder, toggles Code Actions, and accepts the editor only when the merged response contains `Spring Boot: Configure run/debug for a project…`;
 9. dispatches the exact returned Code Action index through D007's `editor::ConfirmCodeAction { item_ix }` binding, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
 10. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
@@ -76,15 +76,13 @@ Zed CLI invocations after the foreground fixture launch: upstream macOS CLI
 requests are delivered through LaunchServices and a later `--user-data-dir`
 argument is not a reliable routing key for selecting the already-running
 isolated process. File identity is therefore selected inside that exact Zed process through the
-public `file_finder::Toggle` action with the exact absolute fixture path. The
+public `file_finder::Toggle` action with the exact project-relative fixture path. The
 coordinator still proves the resulting LSP request URI/position, so an incorrect
 picker result cannot silently satisfy the gate. Completion is dispatched directly
 through the isolated keymap rather than reopening the command palette, so palette
 focus cannot masquerade as editor focus. The Code Actions popover is treated as a
-selection list, not a searchable input. The isolated profile gets D007-only bindings for `file_finder::Toggle`,
-`file_finder::OpenWithoutDismiss`, `menu::Confirm`, `editor::ShowCompletions`,
-`editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions. File Finder-specific bindings use the same nested focus context as upstream Zed (`FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)`), because the searchable input owns focus inside `Picker > Editor` rather than on the FileFinder root itself.
-The Properties picker query is the exact absolute fixture path plus `:1:4`, so the public File Finder action owns both exact-file selection and cursor placement. `OpenWithoutDismiss` is retried only while the picker remains focused; exact `didOpen` proves that its selected match really opened before the single `menu::Confirm` transfers focus to that editor. The gate does not send completion until that exact URI and a positive Spring index update are observed.
+selection list, not a searchable input. The isolated profile gets D007-only bindings for `file_finder::Toggle`, `editor::ShowCompletions`, `editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions. File Finder selection deliberately stays on Zed's native Picker key path rather than adding a custom FileFinder-context probe or confirm binding.
+The Properties picker query is the exact project-relative fixture path plus `:1:4`, so File Finder owns both exact-file selection and cursor placement. Native Picker confirmation waits for an in-flight match update before confirming; the gate then requires exact `didOpen` and a positive Spring index update before completion.
 The harness waits for coordinator evidence that the configure action exists and
 uses the exact returned item index. If the menu has not been materialized yet,
 Zed's `ConfirmCodeAction` handler returns `None`, so bounded retries are
