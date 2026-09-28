@@ -2195,11 +2195,26 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
       automaticConnection: pass("coordinator automatically connected one matching local Boot process"),
     };
   } catch (error) {
+    const protocolFile = path.join(
+      worktree,
+      ".d007",
+      "coordinator-protocol.jsonl",
+    );
+    const protocolTail = fs.existsSync(protocolFile)
+      ? fs.readFileSync(protocolFile, "utf8").split(/\r?\n/).filter(Boolean).slice(-40).join(" | ")
+      : "";
+    const coordinatorTail = typeof coordinator?.stderrTail === "function"
+      ? coordinator.stderrTail().split(/\r?\n/).slice(-80).join(" | ")
+      : "";
     throw new Error(
       "standalone live regression failed: " +
         (error instanceof Error ? error.message : String(error)) +
-        "; appTail=" +
-        appLog.split(/\r?\n/).slice(-80).join(" | "),
+        "; coordinatorTail=" + boundedCompletionText(coordinatorTail, 12000) +
+        "; protocolTail=" + boundedCompletionText(protocolTail, 12000) +
+        "; appTail=" + boundedCompletionText(
+          appLog.split(/\r?\n/).slice(-80).join(" | "),
+          12000,
+        ),
     );
   } finally {
     if (automaticCoordinator?.client) {
@@ -2249,6 +2264,7 @@ async function startCoordinatorRegressionClient({
     env: {
       ...process.env,
       JAVA_HOME: javaHome,
+      ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1",
       PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
     },
   });
