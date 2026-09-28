@@ -500,8 +500,13 @@ function runStandaloneCapabilityRegression(manifest, javaHome) {
   );
   if (result.error) throw result.error;
   if (result.status !== 0) {
+    let inner = null;
+    try {
+      const failedEvidence = JSON.parse(fs.readFileSync(evidenceFile, "utf8"));
+      inner = failedEvidence?.error ?? null;
+    } catch {}
     throw new Error(
-      `standalone capability regression failed with exit ${result.status}; inspect ${evidenceFile} and ${logFile}`,
+      `standalone capability regression failed with exit ${result.status}${inner ? `: ${inner}` : ""}; inspect ${evidenceFile} and ${logFile}`,
     );
   }
   requireFile(evidenceFile, "standalone capability regression evidence");
