@@ -128,8 +128,8 @@ class LspClient {
       this.serverRequests.push(message.method);
       let result = null;
       if (message.method === "workspace/configuration") {
-        result = (message.params?.items ?? []).map(() =>
-          structuredClone(this.configuration)
+        result = (message.params?.items ?? []).map((item) =>
+          configurationValue(this.configuration, item?.section)
         );
       } else if (message.method === "workspace/workspaceFolders") {
         result = this.workspaceFolders;
@@ -249,6 +249,24 @@ async function main() {
   const worktree = path.join(runRoot, "fixture");
   const jar = path.join(runRoot, pin.asset);
   fs.cpSync(FIXTURE, worktree, { recursive: true });
+  const factoriesFile = path.join(
+    worktree,
+    "src",
+    "main",
+    "resources",
+    "META-INF",
+    "spring.factories",
+  );
+  fs.appendFileSync(
+    factoriesFile,
+    [
+      "",
+      "# D007 standalone-only negative control: Boot 3 rejects this legacy key.",
+      "org.springframework.boot.autoconfigure.EnableAutoConfiguration=\\",
+      "  dev.zed.spring.fixture.GreetingStartupListener",
+      "",
+    ].join("\n"),
+  );
 
   const evidence = {
     schemaVersion: 1,
@@ -273,6 +291,8 @@ async function main() {
     await downloadPinnedArtifact(pin, jar);
     assert.equal(fs.statSync(jar).size, pin.size);
     assert.equal(sha256(jar), pin.sha256);
+
+    evidence.checks.fixtureCompile = compileFixture(worktree, javaHome);
 
     const configuration = structuredClone(DEFAULT_CONFIGURATION);
     configuration["boot-java"].common = {
@@ -365,6 +385,13 @@ async function main() {
       INDEX_TIMEOUT_MS,
     );
     evidence.checks.indexReady = pass("spring/index/updated affectedProjects > 0");
+
+    for (const file of files) {
+      client.notify("textDocument/didChange", {
+        textDocument: { uri: uri(file), version: 2 },
+        contentChanges: [{ text: file.text }],
+      });
+    }
 
     const executableProjects = await waitForExecutableProject(client);
     const executable = executableProjects.find(
@@ -639,6 +666,60 @@ async function main() {
   } finally {
     fs.rmSync(runRoot, { recursive: true, force: true });
   }
+}
+
+function configurationValue(configuration, section) {
+  if (typeof section !== "string" || section.length === 0) {
+    return structuredClone(configuration);
+  }
+  let value = configuration;
+  for (const segment of section.split(".")) {
+    if (
+      value === null ||
+      typeof value !== "object" ||
+      !Object.hasOwn(value, segment)
+    ) {
+      return null;
+    }
+    value = value[segment];
+  }
+  return structuredClone(value);
+}
+
+function compileFixture(worktree, javaHome) {
+  const result = spawnSync(
+    "mvn",
+    ["-q", "-DskipTests", "compile"],
+    {
+      cwd: worktree,
+      encoding: "utf8",
+      shell: false,
+      timeout: 240_000,
+      maxBuffer: 16 * 1024 * 1024,
+      env: {
+        ...process.env,
+        JAVA_HOME: javaHome,
+        PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+      },
+    },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `rich fixture Maven compile failed: ${String(result.stderr ?? "").slice(-8000)}`,
+    );
+  }
+  return pass("mvn -DskipTests compile", {
+    generatedConfigurationMetadata: fs.existsSync(
+      path.join(
+        worktree,
+        "target",
+        "classes",
+        "META-INF",
+        "spring-configuration-metadata.json",
+      ),
+    ),
+  });
 }
 
 function fixtureFiles(worktree) {
