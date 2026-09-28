@@ -276,6 +276,57 @@ async function main() {
       "",
     ].join("\n"),
   );
+  const pomFile = path.join(worktree, "pom.xml");
+  const pomText = fs.readFileSync(pomFile, "utf8");
+  assert.match(pomText, /<\/dependencies>/);
+  fs.writeFileSync(
+    pomFile,
+    pomText.replace(
+      "</dependencies>",
+      [
+        "        <dependency>",
+        "            <groupId>org.springframework.ai</groupId>",
+        "            <artifactId>spring-ai-model</artifactId>",
+        "            <version>1.0.0</version>",
+        "        </dependency>",
+        "    </dependencies>",
+      ].join("\n"),
+    ),
+  );
+  const aiToolsFile = path.join(
+    worktree,
+    "src",
+    "main",
+    "java",
+    "dev",
+    "zed",
+    "spring",
+    "fixture",
+    "AiTools.java",
+  );
+  fs.writeFileSync(
+    aiToolsFile,
+    [
+      "package dev.zed.spring.fixture;",
+      "",
+      "import org.springframework.ai.tool.annotation.Tool;",
+      "import org.springframework.stereotype.Component;",
+      "",
+      "@Component",
+      "public class AiTools {",
+      "    @Tool",
+      "    public String currentWeather() { return \"sunny\"; }",
+      "",
+      "    @Tool(description = \"short weather\")",
+      "    public String forecast() { return \"sunny\"; }",
+      "",
+      "    @Tool(description = \"Get a detailed weather forecast for the requested location\")",
+      "    public String detailedWeather() { return \"sunny\"; }",
+      "}",
+      "",
+    ].join("\n"),
+  );
+
   const resources = path.join(worktree, "src", "main", "resources");
   const propertiesFile = path.join(resources, "application.properties");
   fs.appendFileSync(
@@ -471,6 +522,7 @@ async function main() {
     const factories = fileBy(files, "spring.factories");
     const xml = fileBy(files, "beans.xml");
     const pom = fileBy(files, "pom.xml");
+    const aiTools = fileBy(files, "AiTools.java");
 
     const propsCompletion = completionItems(await client.request(
       "textDocument/completion",
@@ -907,6 +959,55 @@ async function main() {
     evidence.checks.javaSpringQuickFix = pass(
       "Spring Java quick fix command",
       { count: javaCodeActions.length },
+    );
+
+    const aiDiagnostics = await waitForDiagnostics(
+      client,
+      uri(aiTools),
+      (diagnostics) => {
+        const codes = new Set(
+          diagnostics.map((diagnostic) => String(diagnostic.code ?? "")),
+        );
+        return codes.has("SPRING_AI_TOOL_MISSING_DESCRIPTION") &&
+          codes.has("SPRING_AI_TOOL_DESCRIPTION_TOO_SHORT");
+      },
+      "Spring AI @Tool diagnostics",
+    );
+    const aiCodes = new Set(
+      aiDiagnostics.map((diagnostic) => String(diagnostic.code ?? "")),
+    );
+    assert.equal(aiCodes.has("SPRING_AI_TOOL_MISSING_DESCRIPTION"), true);
+    assert.equal(aiCodes.has("SPRING_AI_TOOL_DESCRIPTION_TOO_SHORT"), true);
+    assert.equal(
+      aiDiagnostics.some((diagnostic) =>
+        rangeContainsNeedle(
+          aiTools.text,
+          diagnostic.range,
+          "detailedWeather",
+        )
+      ),
+      false,
+      "a sufficiently described @Tool method must remain the negative control",
+    );
+
+    const aiStructure = await client.request("workspace/executeCommand", {
+      command: "sts/spring-boot/structure",
+      arguments: [{ updateMetadata: true }],
+    }, 90_000);
+    const aiStructureText = JSON.stringify(aiStructure);
+    for (const method of ["currentWeather", "forecast", "detailedWeather"]) {
+      assert.equal(
+        aiStructureText.includes(method),
+        true,
+        `Spring AI structure must index ${method}`,
+      );
+    }
+    evidence.checks.springAi = pass(
+      "Spring AI diagnostics and @Tool structure indexing",
+      {
+        diagnosticCodes: [...aiCodes].sort(),
+        indexedMethods: ["currentWeather", "forecast", "detailedWeather"],
+      },
     );
 
     const workspaceSymbols = await client.request("workspace/symbol", {
@@ -1784,6 +1885,7 @@ function fixtureFiles(worktree) {
     ["src/main/java/dev/zed/spring/fixture/SpelSample.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/DataQuerySample.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/CronSyntaxSample.java", "java"],
+    ["src/main/java/dev/zed/spring/fixture/AiTools.java", "java"],
   ];
   return specs.map(([relative, languageId]) => {
     const absolute = path.join(worktree, relative);
@@ -1826,6 +1928,19 @@ function offsetPosition(text, offset, label) {
     line: lines.length - 1,
     character: lines.at(-1).length,
   };
+}
+
+function rangeContainsNeedle(text, range, needle) {
+  if (!range?.start || !range?.end) return false;
+  const lines = text.split("\n");
+  const startOffset = lines
+    .slice(0, range.start.line)
+    .reduce((sum, line) => sum + line.length + 1, 0) + range.start.character;
+  const endOffset = lines
+    .slice(0, range.end.line)
+    .reduce((sum, line) => sum + line.length + 1, 0) + range.end.character;
+  const needleIndex = text.indexOf(needle);
+  return needleIndex >= startOffset && needleIndex <= endOffset;
 }
 
 function fullRange(text) {
