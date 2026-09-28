@@ -11,6 +11,7 @@ const desktopHarnessFile = path.join(root, "scripts", "d007-zed-desktop-validati
 const standaloneRegressionFile = path.join(root, "scripts", "d007-standalone-capability-regression.mjs");
 const basicPropertiesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.properties");
 const basicYamlFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.yaml");
+const extensionManifestFile = path.join(root, "extension.toml");
 
 const STATES = new Set([
   "verified",
@@ -223,5 +224,27 @@ test("D007 completion probes target the actual incomplete fixture lines", () => 
   assert.equal(
     regression.includes('positionAtExactLineEnd(yaml.text, "ser")'),
     true,
+  );
+});
+
+
+test("D007 fixture language ids match the production Spring server mapping", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const extensionManifest = fs.readFileSync(extensionManifestFile, "utf8");
+
+  assert.equal(
+    extensionManifest.includes('YAML = "spring-boot-properties-yaml"'),
+    true,
+    "production YAML mapping must remain explicit",
+  );
+  assert.equal(
+    regression.includes('["src/main/resources/application.yaml", "spring-boot-properties-yaml"]'),
+    true,
+    "standalone regression must send the same YAML language id as production",
+  );
+  assert.equal(
+    regression.includes('["src/main/resources/application.yaml", "spring-boot-yaml"]'),
+    false,
+    "retired harness-only YAML id must not reappear",
   );
 });
