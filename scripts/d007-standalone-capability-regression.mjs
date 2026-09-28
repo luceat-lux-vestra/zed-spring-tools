@@ -545,15 +545,43 @@ async function main() {
 
     if (process.env.D007_SPRING_CONDITION_PROBE === "1") {
       await sleep(1_000);
+      const versionEvidence = () => stderr
+        .split(/\r?\n/)
+        .filter((line) =>
+          /BootVersionValidationConfig|bootVersionValidationScheduler|reconcile-only-opened-docs|LanguageServerHarness|Started Boot Version reconciler|validating Spring Boot version|Failed validating Spring Project version/i.test(line)
+        )
+        .slice(-120);
       if (!stderr.includes("Started Boot Version reconciler")) {
-        const conditionEvidence = stderr
-          .split(/\r?\n/)
-          .filter((line) =>
-            /BootVersionValidationConfig|bootVersionValidationScheduler|reconcile-only-opened-docs|LanguageServerHarness|Started Boot Version reconciler/i.test(line)
-          )
-          .slice(-80);
         throw new Error(
-          `Boot Version scheduler did not initialize; conditionEvidence=${JSON.stringify(conditionEvidence)}`,
+          `Boot Version scheduler did not initialize; conditionEvidence=${JSON.stringify(versionEvidence())}`,
+        );
+      }
+
+      const metadataDeadline = Date.now() + 10_000;
+      while (versionMetadataServer.requests.length === 0 && Date.now() < metadataDeadline) {
+        await sleep(250);
+      }
+      if (versionMetadataServer.requests.length === 0) {
+        throw new Error(
+          `Boot Version scheduler initialized but made no metadata request; versionEvidence=${JSON.stringify(versionEvidence())}`,
+        );
+      }
+
+      const pomProbe = fileBy(files, "pom.xml");
+      const diagnosticDeadline = Date.now() + 10_000;
+      while (Date.now() < diagnosticDeadline) {
+        const diagnostics = client.diagnostics.get(uri(pomProbe)) ?? [];
+        if (diagnostics.some((diagnostic) =>
+          String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+        )) break;
+        await sleep(250);
+      }
+      const pomDiagnostics = client.diagnostics.get(uri(pomProbe)) ?? [];
+      if (!pomDiagnostics.some((diagnostic) =>
+        String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+      )) {
+        throw new Error(
+          `Version metadata was requested but patch diagnostic did not publish; metadataRequests=${JSON.stringify(versionMetadataServer.requests)}; latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(pomDiagnostics))}; versionEvidence=${JSON.stringify(versionEvidence())}`,
         );
       }
     }
