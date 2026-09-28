@@ -629,3 +629,27 @@ test("D007 live fixture launches with production live-data VM arguments", () => 
   );
 });
 
+test("D007 client records window showMessage notifications for notices and error-popup evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  const notificationBranch = regression.slice(
+    regression.indexOf('if (typeof message.method === "string") {'),
+    regression.indexOf('if (message.method === "textDocument/publishDiagnostics")'),
+  );
+  assert.equal(
+    notificationBranch.includes('message.method === "window/showMessage"'),
+    true,
+    "notification-form window/showMessage must be retained in windowMessages",
+  );
+  assert.equal(
+    notificationBranch.includes("this.windowMessages.push({"),
+    true,
+    "refresh notices and notification-form error popups must be observable by D007",
+  );
+  assert.equal(
+    regression.includes("evidence.unexpectedWindowErrors = client.windowMessages.filter("),
+    true,
+    "the strengthened windowMessages stream must feed the existing error-popup gate",
+  );
+});
+
