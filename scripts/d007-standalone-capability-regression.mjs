@@ -79,6 +79,7 @@ class LspClient {
     this.serverRequests = [];
     this.notifications = [];
     this.diagnostics = new Map();
+    this.diagnosticHistory = new Map();
     this.windowMessages = [];
     this.registrations = [];
     this.workspaceEdits = [];
@@ -196,7 +197,15 @@ class LspClient {
       if (message.method === "textDocument/publishDiagnostics") {
         const uri = message.params?.uri;
         if (typeof uri === "string") {
-          this.diagnostics.set(uri, message.params?.diagnostics ?? []);
+          const diagnostics = message.params?.diagnostics ?? [];
+          this.diagnostics.set(uri, diagnostics);
+          const history = this.diagnosticHistory.get(uri) ?? [];
+          history.push({
+            receivedAt: Date.now(),
+            diagnostics: boundedDiagnosticSummary(diagnostics),
+          });
+          if (history.length > 8) history.shift();
+          this.diagnosticHistory.set(uri, history);
         }
       }
       if (
@@ -2718,6 +2727,16 @@ function completionItems(result) {
   return [];
 }
 
+function boundedDiagnosticSummary(diagnostics) {
+  return diagnostics.slice(0, 12).map((diagnostic) => ({
+    code: boundedCompletionText(diagnostic?.code),
+    source: boundedCompletionText(diagnostic?.source),
+    severity: diagnostic?.severity ?? null,
+    message: boundedCompletionText(diagnostic?.message, 240),
+    range: diagnostic?.range ?? null,
+  }));
+}
+
 function boundedCompletionText(value, limit = 160) {
   if (value == null) return null;
   const text = String(value);
@@ -2795,12 +2814,19 @@ function locationUris(result) {
 }
 
 async function waitForDiagnostics(client, targetUri, predicate, label) {
-  await waitFor(
-    () => predicate(client.diagnostics.get(targetUri) ?? []),
-    label,
-    INDEX_TIMEOUT_MS,
+  const deadline = Date.now() + INDEX_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const diagnostics = client.diagnostics.get(targetUri) ?? [];
+    if (predicate(diagnostics)) return diagnostics;
+    await sleep(POLL_MS);
+  }
+  const latest = client.diagnostics.get(targetUri) ?? [];
+  const history = client.diagnosticHistory.get(targetUri) ?? [];
+  throw new Error(
+    `timed out waiting for ${label} after ${INDEX_TIMEOUT_MS}ms; ` +
+      `latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(latest))}; ` +
+      `diagnosticHistory=${JSON.stringify(history)}`,
   );
-  return client.diagnostics.get(targetUri) ?? [];
 }
 
 async function waitForExecutableProject(client) {
