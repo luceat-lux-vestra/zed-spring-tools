@@ -1958,6 +1958,30 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
       true,
     );
 
+    const liveMappings = await waitForLiveRequestMappings(
+      client,
+      localDescriptor.processKey,
+      "/greeting",
+      60_000,
+    );
+    assert.equal(
+      JSON.stringify(liveMappings).includes("dev.zed.spring.fixture.GreetingController"),
+      true,
+      "live /greeting mapping must identify GreetingController before source matching",
+    );
+
+    // Hover and CodeLens are derived from the same RequestMappingHoverProvider
+    // source/runtime match. Prove Hover first so a later lens failure isolates
+    // sts/highlight/client merging rather than live-data or source matching.
+    const liveHover = await waitForLiveHover(
+      client,
+      controller,
+      appPort,
+      60_000,
+    );
+    assert.match(liveHover, /Process \[/);
+    assert.match(liveHover, new RegExp(":" + appPort + "/greeting"));
+
     const liveLens = await waitForLiveUrlCodeLens(
       client,
       controller,
@@ -1967,15 +1991,6 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
     const liveUrl = liveLens.command.arguments?.[0]?.url;
     assert.equal(typeof liveUrl, "string");
     assert.match(liveUrl, new RegExp(":" + appPort + "/greeting"));
-
-    const liveHover = await waitForLiveHover(
-      client,
-      controller,
-      appPort,
-      60_000,
-    );
-    assert.match(liveHover, /Process \[/);
-    assert.match(liveHover, new RegExp(":" + appPort + "/greeting"));
 
     const liveDocument = path.join(worktree, ".zed", "spring-live.md");
     await client.request(
@@ -2326,6 +2341,40 @@ async function waitForLiveProcessDescriptor(client, predicate, label) {
   throw new Error(label + " not found; descriptors=" + JSON.stringify(last).slice(0, 3000));
 }
 
+async function waitForLiveRequestMappings(
+  client,
+  processKey,
+  pathNeedle,
+  timeoutMs,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let lastMappings = [];
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      const result = await client.request(
+        "workspace/executeCommand",
+        {
+          command: "sts/livedata/get",
+          arguments: [{ processKey, endpoint: "mappings" }],
+        },
+        30_000,
+      );
+      lastMappings = Array.isArray(result) ? result : [];
+      if (JSON.stringify(lastMappings).includes(pathNeedle)) return lastMappings;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(750);
+  }
+  throw new Error(
+    "live request mappings did not include " + pathNeedle +
+      "; count=" + lastMappings.length +
+      "; lastMappings=" + boundedCompletionText(JSON.stringify(lastMappings), 4000) +
+      "; lastError=" + boundedCompletionText(lastError, 1000),
+  );
+}
+
 async function waitForNotificationAfter(
   client,
   start,
@@ -2349,24 +2398,27 @@ async function waitForNotificationAfter(
 async function waitForLiveUrlCodeLens(client, controller, port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   const targetUri = pathToFileURL(controller.path).href;
+  let last = [];
   while (Date.now() < deadline) {
     const result = await client.request(
       "textDocument/codeLens",
       { textDocument: { uri: targetUri } },
       30_000,
     );
-    if (Array.isArray(result)) {
-      const found = result.find((lens) => {
-        const argument = lens?.command?.arguments?.[0];
-        return lens?.command?.command === "zed-spring-tools.explain-code-lens" &&
-          argument?.kind === "url" &&
-          String(argument?.url ?? "").includes(":" + port + "/greeting");
-      });
-      if (found) return found;
-    }
+    last = Array.isArray(result) ? result : [];
+    const found = last.find((lens) => {
+      const argument = lens?.command?.arguments?.[0];
+      return lens?.command?.command === "zed-spring-tools.explain-code-lens" &&
+        argument?.kind === "url" &&
+        String(argument?.url ?? "").includes(":" + port + "/greeting");
+    });
+    if (found) return found;
     await sleep(750);
   }
-  throw new Error("live URL CodeLens did not appear");
+  throw new Error(
+    "live URL CodeLens did not appear; lastCodeLenses=" +
+      boundedCompletionText(JSON.stringify(last), 4000),
+  );
 }
 
 async function waitForLiveHover(client, controller, port, timeoutMs) {
