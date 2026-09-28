@@ -359,7 +359,7 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
           ? "PASS"
           : "FAIL"
         : "MISSING",
-    status: results.every(
+    architectureSmokeStatus: results.every(
       (entry) =>
         entry.debugConfig === "PASS" &&
         entry.runTask === "PASS" &&
@@ -377,14 +377,28 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
       ).status === "pass"
       ? "PASS"
       : "FAIL_OR_REVIEW_REQUIRED",
+    status: null,
   };
+  outcome.status =
+    outcome.architectureSmokeStatus === "PASS" &&
+    outcome.releaseAcceptance === "PASS"
+      ? "PASS"
+      : outcome.architectureSmokeStatus !== "PASS"
+        ? "FAIL_OR_REVIEW_REQUIRED"
+        : "PENDING_CAPABILITY_ACCEPTANCE";
   fs.writeFileSync(path.join(manifest.evidence, "desktop-gate.json"), JSON.stringify(outcome, null, 2) + "\n", { mode: 0o600 });
   process.stdout.write(JSON.stringify(outcome, null, 2) + "\n");
   recordRunFinal(
     manifest,
-    outcome.status === "PASS" ? "PASS" : "FAIL",
+    outcome.status === "PASS" ? "PASS" : outcome.status,
     "complete",
-    outcome.status === "PASS" ? null : new Error("desktop gate requires review"),
+    outcome.status === "PASS"
+      ? null
+      : new Error(
+          outcome.status === "PENDING_CAPABILITY_ACCEPTANCE"
+            ? "architecture smoke passed but D007 capability acceptance is incomplete"
+            : "desktop gate requires review",
+        ),
   );
 }
 
