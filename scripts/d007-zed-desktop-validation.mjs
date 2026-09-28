@@ -1979,10 +1979,17 @@ function selfTest() {
       true,
       "D007 must persist phase/final execution logs independently of terminal lifetime",
     );
+    const recursivePhaseCall = ["setPhase", "(nextPhase);"].join("");
+    const directPhaseAssignment = ["phase = ", "nextPhase;"].join("");
     assert.equal(
-      harnessSource.includes("setPhase(nextPhase);"),
+      harnessSource.includes(recursivePhaseCall),
       false,
-      "D007 phase logger must assign phase rather than recursively calling itself",
+      "D007 phase logger must not recursively call itself",
+    );
+    assert.equal(
+      harnessSource.includes(directPhaseAssignment),
+      true,
+      "D007 phase logger must directly assign the next phase",
     );
     assert.equal(
       harnessSource.includes('path.join(manifest.evidence, "run-status.json")'),
