@@ -16,6 +16,7 @@ const basicPomFixture = path.join(root, "tests", "fixtures", "spring-boot-basic"
 const greetingRepositoryFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "GreetingRepository.java");
 const spelFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "SpelSample.java");
 const namedQueriesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "META-INF", "jpa-named-queries.properties");
+const codeLensProbeFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "CodeLensProbeController.java");
 
 const STATES = new Set([
   "verified",
@@ -405,6 +406,33 @@ test("D007 named-query fixture uses the proven HQL syntax failure and requires p
     regression.includes('String(diagnostic.code ?? "") === "HQL_SYNTAX"'),
     true,
     "standalone acceptance must prove project-aware HQL reconciliation for the spring-data-jpa fixture",
+  );
+});
+
+test("D007 static CodeLens acceptance targets an authentic isolated WebConfig provider", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const probe = fs.readFileSync(codeLensProbeFixture, "utf8");
+
+  assert.equal(
+    probe.includes("HandlerTypePredicate.forAssignableType(CodeLensProbeController.class)"),
+    true,
+    "CodeLens path-prefix configuration must target only the dedicated probe controller",
+  );
+  assert.equal(
+    probe.includes('configurer.addPathPrefix(') && probe.includes('"/d007"'),
+    true,
+    "probe must expose a WebConfig path-prefix index element",
+  );
+  assert.equal(
+    regression.includes('fileBy(files, "CodeLensProbeController.java")'),
+    true,
+    "standalone regression must request CodeLens on the dedicated provider target",
+  );
+  assert.equal(
+    regression.includes('lens?.command?.command === "vscode.open"') &&
+      regression.includes('includes("Path Prefix: /d007")'),
+    true,
+    "acceptance must require the actual WebConfig lens command and path-prefix title",
   );
 });
 
