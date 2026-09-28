@@ -225,7 +225,9 @@ success; only their product/toolchain work may be skipped. `review`
 requires one `Merge Gate`, which fails unless all four components succeed on
 the exact pull-request revision. `CONTRIBUTORS.md` and
 `THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
-derive and validate them. ## Change discipline
+derive and validate them.
+
+## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
 - Do not perform unrelated refactors or dependency upgrades.
@@ -263,14 +265,3 @@ architecture authority.
 Any replacement architecture must be recorded in a decision document and must
 reconcile capability evidence, compatibility/limitations, release gating, and
 the exact Registry candidate before the decision gate can close again.
-
-
-This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
-required official Java extension, rather than a Zed-extension-centered MVP. D003
-accepted the resulting architecture, D004 its stack, and D005 the LSP-first
-stock-Zed capability surfaces with preserved fallbacks. D006 makes official-
-Java admission capability-first and compatibility reporting user-reviewed, so
-product scaffolding and reviewed M4 slices are allowed to proceed.
-
-Reopen the gate only if new evidence contradicts the Pivot, and record the
-outcome in a decision document before changing production code.
