@@ -38,6 +38,16 @@ jobs:
           node scripts/d007-standalone-capability-regression.mjs \
             "tmp/d007-standalone-${GITHUB_SHA}.json" \
             "$JAVA_HOME"
+      - name: Print D007 standalone evidence
+        if: ${{ always() }}
+        run: |
+          evidence="tmp/d007-standalone-${GITHUB_SHA}.json"
+          if [ -f "$evidence" ]; then
+            cat "$evidence"
+          else
+            echo "No standalone evidence file produced"
+          fi
+
       - name: Upload D007 standalone evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
