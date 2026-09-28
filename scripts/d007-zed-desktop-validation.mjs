@@ -156,15 +156,13 @@ function d007CodeActionIndexKeys() {
   ];
 }
 
-function d007TabKeys() {
-  return ["q", "r", "s", "w"];
-}
+
+
 
 function d007Keymap() {
-  const workspaceBindings = {};
-  d007TabKeys().forEach((key, index) => {
-    workspaceBindings[`ctrl-cmd-alt-${key}`] = ["pane::ActivateItem", index];
-  });
+  const workspaceBindings = {
+    "ctrl-cmd-alt-v": "file_finder::Toggle",
+  };
 
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
@@ -196,12 +194,7 @@ function d007ConfirmKey(itemIx) {
   return keys[itemIx];
 }
 
-function d007TabKey(index) {
-  const keys = d007TabKeys();
-  assert.equal(Number.isInteger(index), true, "tab index must be an integer");
-  assert.ok(index >= 0 && index < keys.length, `tab index ${index} exceeds the D007 tab range`);
-  return keys[index];
-}
+
 
 function settings(jdk) {
   return {
@@ -378,6 +371,7 @@ function driveFixtureMacos(root, fixtureKind, sharedLog, sharedStart) {
   return evidence;
 }
 
+
 function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
   const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
   const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
@@ -385,21 +379,26 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
   const sourceDigestBefore = sha256File(javaFile);
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
 
+  openFixtureFileMacos(
+    manifest,
+    fixtureKind,
+    javaRelative,
+    `${evidenceName}-open-java`,
+  );
+
   let offer;
-  let selectedTabIndex = null;
-  for (let tabIndex = 0; tabIndex < d007TabKeys().length; tabIndex += 1) {
-    sendD007ActionKeyMacos(
-      manifest,
-      d007TabKey(tabIndex),
-      `${evidenceName}-tab-${tabIndex}`,
-    );
+  let codeActionAttempts = 0;
+  const maxCodeActionAttempts = 3;
+  while (offer === undefined && codeActionAttempts < maxCodeActionAttempts) {
+    codeActionAttempts += 1;
     const protocolStart = fileSize(protocolFile);
     sendD007ActionKeyMacos(
       manifest,
       "x",
-      `${evidenceName}-toggle-code-actions-${tabIndex}`,
+      `${evidenceName}-toggle-code-actions-${codeActionAttempts}`,
     );
 
+    let sawResponse = false;
     const deadline = Date.now() + 7_500;
     do {
       const events = protocolEvidenceEvents(readFileDelta(protocolFile, protocolStart));
@@ -409,19 +408,27 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
           event.configureBootRunPresent === true,
       );
       if (offer !== undefined) break;
-      if (events.some((event) => event.event === "code-action-response")) break;
+      if (events.some((event) => event.event === "code-action-response")) {
+        sawResponse = true;
+        break;
+      }
       sleepMs(200);
     } while (Date.now() < deadline);
 
-    if (offer !== undefined) {
-      selectedTabIndex = tabIndex;
-      break;
+    if (offer === undefined) {
+      cancelTransientUiMacos(
+        manifest,
+        `${evidenceName}-cancel-code-actions-${codeActionAttempts}`,
+      );
+      if (sawResponse && codeActionAttempts === maxCodeActionAttempts) break;
+      sleepMs(500);
     }
-    cancelTransientUiMacos(manifest, `${evidenceName}-cancel-tab-${tabIndex}`);
   }
 
-  if (offer === undefined || selectedTabIndex === null) {
-    throw new Error(`${fixtureKind} configure run/debug Code Action was not found in any staged editor tab`);
+  if (offer === undefined) {
+    throw new Error(
+      `${fixtureKind} configure run/debug Code Action was not found after exact Java file targeting`,
+    );
   }
 
   assert.equal(
@@ -438,7 +445,9 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       observedAt: new Date().toISOString(),
       itemCount: offer.itemCount,
       configureBootRunIndex: offer.configureBootRunIndex,
-      selectedTabIndex,
+      codeActionAttempts,
+      targetRelativePath: javaRelative,
+      targeting: "file-finder-exact-relative-path",
       status: "PASS",
     }, null, 2) + "\n",
     { mode: 0o600 },
@@ -466,7 +475,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       sourceHead: manifest.sourceHead,
       fixture: fixtureKind,
       relativePath: javaRelative,
-      selectedTabIndex,
+      targeting: "file-finder-exact-relative-path",
       sourceDigestBefore,
       sourceDigestAfter,
       status: "PASS",
@@ -544,6 +553,57 @@ function sendD007ActionKeyMacos(manifest, key, evidenceName) {
   runOsa(script, evidenceName, manifest.evidence);
 }
 
+function openFixtureFileMacos(manifest, fixtureKind, relativePath, evidenceName) {
+  assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
+  const target = path.join(manifest.worktrees[fixtureKind], relativePath);
+  requireFile(target, `${fixtureKind} exact file target`);
+
+  const appleScript = [
+    `set targetPath to "${escapeAppleScript(relativePath)}"`,
+    "set previousClipboard to the clipboard",
+    "try",
+    "  set the clipboard to targetPath",
+    '  tell application "Zed" to activate',
+    '  tell application "System Events"',
+    '    tell process "Zed" to set frontmost to true',
+    '    keystroke "v" using {control down, command down, option down}',
+    "    delay 0.6",
+    '    keystroke "a" using {command down}',
+    '    keystroke "v" using {command down}',
+    "    delay 0.8",
+    "    key code 36",
+    "  end tell",
+    "  delay 0.6",
+    "  set the clipboard to previousClipboard",
+    "on error errorMessage number errorNumber",
+    "  set the clipboard to previousClipboard",
+    "  error errorMessage number errorNumber",
+    "end try",
+  ].join("\n");
+
+  const result = spawnSync("osascript", ["-e", appleScript], { encoding: "utf8" });
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${evidenceName}-file-target.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      relativePath,
+      absolutePath: target,
+      targeting: "file-finder-exact-relative-path",
+      action: "file_finder::Toggle",
+      status: result.status === 0 ? "automation-issued" : "failed",
+      exitCode: result.status,
+      stderr: bounded(result.stderr),
+      stdout: bounded(result.stdout),
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `${fixtureKind} exact-file targeting failed for ${relativePath}; inspect ${evidenceName}-file-target.json`,
+    );
+  }
+}
 
 function validateGeneratedRunDebug(fixtureKind, debugFile, tasksFile) {
   const debug = JSON.parse(fs.readFileSync(debugFile, "utf8"));
@@ -752,6 +812,7 @@ function protocolEvidenceEvents(text) {
   return events;
 }
 
+
 function waitForSpringCompletion(
   manifest,
   sharedLog,
@@ -764,9 +825,10 @@ function waitForSpringCompletion(
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
   const started = Date.now();
   let attempts = 0;
+  const expectedRelativePath = "src/main/resources/application-d007.properties";
   const expectedPath = path.join(
     manifest.worktrees[fixtureKind],
-    "src/main/resources/application-d007.properties",
+    expectedRelativePath,
   );
   const expectedRequest = {
     uri: pathToFileURL(expectedPath).href,
@@ -784,140 +846,150 @@ function waitForSpringCompletion(
     itemCount: null,
     serverPortObserved: false,
   };
-  let selectedTabIndex = null;
   let text = "";
 
-  for (let tabIndex = 0; tabIndex < d007TabKeys().length && Date.now() - started < timeoutMs; tabIndex += 1) {
-    sendD007ActionKeyMacos(
+  openFixtureFileMacos(
+    manifest,
+    fixtureKind,
+    expectedRelativePath,
+    `${fixtureKind}-completion-open-properties`,
+  );
+  sendD007ActionKeyMacos(
+    manifest,
+    "y",
+    `${fixtureKind}-completion-end-of-line`,
+  );
+
+  for (
+    let localAttempt = 0;
+    localAttempt < maxAttempts && Date.now() - started < timeoutMs;
+    localAttempt += 1
+  ) {
+    attempts += 1;
+    const protocolStart = fileSize(protocolFile);
+    triggerCompletionMacos(
       manifest,
-      d007TabKey(tabIndex),
-      `${fixtureKind}-completion-tab-${tabIndex}`,
-    );
-    sendD007ActionKeyMacos(
-      manifest,
-      "y",
-      `${fixtureKind}-completion-end-of-line-${tabIndex}`,
+      fixtureKind,
+      `${fixtureKind}-completion-attempt-${localAttempt + 1}`,
     );
 
-    for (let localAttempt = 0; localAttempt < maxAttempts && Date.now() - started < timeoutMs; localAttempt += 1) {
-      attempts += 1;
-      const protocolStart = fileSize(protocolFile);
-      triggerCompletionMacos(
-        manifest,
-        fixtureKind,
-        `${fixtureKind}-completion-tab-${tabIndex}-attempt-${localAttempt + 1}`,
-      );
+    let observation = {
+      requestObserved: false,
+      expectedRequestObserved: false,
+      requestUri: null,
+      requestLine: null,
+      requestCharacter: null,
+      responseObserved: false,
+      expectedResponseObserved: false,
+      itemCount: null,
+      serverPortObserved: false,
+    };
+    const requestDeadline = Math.min(started + timeoutMs, Date.now() + 20_000);
+    do {
+      text = readFileDelta(protocolFile, protocolStart);
+      observation = completionObservation(text, expectedRequest);
+      if (observation.requestObserved) break;
+      sleepMs(250);
+    } while (Date.now() < requestDeadline);
 
-      let observation = {
-        requestObserved: false,
-        expectedRequestObserved: false,
-        requestUri: null,
-        requestLine: null,
-        requestCharacter: null,
-        responseObserved: false,
-        itemCount: null,
-        serverPortObserved: false,
-      };
-      const requestDeadline = Math.min(started + timeoutMs, Date.now() + 20_000);
-      do {
-        text = readFileDelta(protocolFile, protocolStart);
-        observation = completionObservation(text, expectedRequest);
-        if (observation.requestObserved) break;
-        sleepMs(250);
-      } while (Date.now() < requestDeadline);
-
-      if (!observation.requestObserved) {
-        cancelTransientUiMacos(manifest, `${fixtureKind}-completion-cancel-${tabIndex}-${localAttempt + 1}`);
-        continue;
-      }
-
-      const responseDeadline = Math.min(started + timeoutMs, Date.now() + 30_000);
-      do {
-        text = readFileDelta(protocolFile, protocolStart);
-        observation = completionObservation(text, expectedRequest);
-        if (observation.expectedResponseObserved || observation.responseObserved) break;
-        sleepMs(250);
-      } while (Date.now() < responseDeadline);
-
-      finalObservation = {
-        requestObserved: finalObservation.requestObserved || observation.requestObserved,
-        expectedRequestObserved:
-          finalObservation.expectedRequestObserved || observation.expectedRequestObserved,
-        requestUri: observation.requestUri ?? finalObservation.requestUri,
-        requestLine: observation.requestLine ?? finalObservation.requestLine,
-        requestCharacter:
-          observation.requestCharacter ?? finalObservation.requestCharacter,
-        responseObserved: finalObservation.responseObserved || observation.responseObserved,
-        expectedResponseObserved:
-          finalObservation.expectedResponseObserved || observation.expectedResponseObserved,
-        itemCount: observation.itemCount ?? finalObservation.itemCount,
-        serverPortObserved:
-          finalObservation.serverPortObserved || observation.serverPortObserved,
-      };
-
-      if (
-        observation.expectedRequestObserved &&
-        observation.expectedResponseObserved &&
-        observation.serverPortObserved
-      ) {
-        selectedTabIndex = tabIndex;
-        let coordinatorStarted = false;
-        let indexReady = false;
-        const readinessDeadline = Math.min(started + timeoutMs, Date.now() + 60_000);
-        do {
-          const allEvents = protocolEvidenceEvents(
-            fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
-          );
-          coordinatorStarted = allEvents.some((event) => event.event === "coordinator-start");
-          indexReady = allEvents.some(
-            (event) =>
-              event.event === "spring-index-updated" &&
-              Number.isInteger(event.affectedProjectCount) &&
-              event.affectedProjectCount > 0,
-          );
-          if (coordinatorStarted && indexReady) break;
-          sleepMs(250);
-        } while (Date.now() < readinessDeadline);
-        if (!coordinatorStarted || !indexReady) {
-          throw new Error(
-            `${fixtureKind} completion succeeded but coordinator/index readiness was not proven`,
-          );
-        }
-
-        fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-runtime-ready.json`), JSON.stringify({
-          sourceHead: manifest.sourceHead,
-          fixture: fixtureKind,
-          observedAt: new Date().toISOString(),
-          requiredEvidence: ["coordinator-start"],
-          selectedTabIndex,
-          status: "PASS",
-        }, null, 2) + "\n", { mode: 0o600 });
-        fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-index-ready.json`), JSON.stringify({
-          sourceHead: manifest.sourceHead,
-          fixture: fixtureKind,
-          observedAt: new Date().toISOString(),
-          requiredEvidence: ["spring-index-updated affectedProjectCount>0"],
-          selectedTabIndex,
-          status: "PASS",
-        }, null, 2) + "\n", { mode: 0o600 });
-        fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`), JSON.stringify({
-          sourceHead: manifest.sourceHead,
-          fixture: fixtureKind,
-          observedAt: new Date().toISOString(),
-          attempts,
-          selectedTabIndex,
-          ...observation,
-          status: "PASS",
-        }, null, 2) + "\n", { mode: 0o600 });
-        return selectedTabIndex;
-      }
-
+    if (!observation.requestObserved) {
       cancelTransientUiMacos(
         manifest,
-        `${fixtureKind}-completion-cancel-${tabIndex}-${localAttempt + 1}`,
+        `${fixtureKind}-completion-cancel-${localAttempt + 1}`,
       );
-      if (observation.responseObserved) break;
+      continue;
     }
+
+    const responseDeadline = Math.min(started + timeoutMs, Date.now() + 30_000);
+    do {
+      text = readFileDelta(protocolFile, protocolStart);
+      observation = completionObservation(text, expectedRequest);
+      if (observation.expectedResponseObserved || observation.responseObserved) break;
+      sleepMs(250);
+    } while (Date.now() < responseDeadline);
+
+    finalObservation = {
+      requestObserved: finalObservation.requestObserved || observation.requestObserved,
+      expectedRequestObserved:
+        finalObservation.expectedRequestObserved || observation.expectedRequestObserved,
+      requestUri: observation.requestUri ?? finalObservation.requestUri,
+      requestLine: observation.requestLine ?? finalObservation.requestLine,
+      requestCharacter:
+        observation.requestCharacter ?? finalObservation.requestCharacter,
+      responseObserved: finalObservation.responseObserved || observation.responseObserved,
+      expectedResponseObserved:
+        finalObservation.expectedResponseObserved || observation.expectedResponseObserved,
+      itemCount: observation.itemCount ?? finalObservation.itemCount,
+      serverPortObserved:
+        finalObservation.serverPortObserved || observation.serverPortObserved,
+    };
+
+    if (
+      observation.expectedRequestObserved &&
+      observation.expectedResponseObserved &&
+      observation.serverPortObserved
+    ) {
+      let coordinatorStarted = false;
+      let indexReady = false;
+      const readinessDeadline = Math.min(started + timeoutMs, Date.now() + 60_000);
+      do {
+        const allEvents = protocolEvidenceEvents(
+          fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
+        );
+        coordinatorStarted = allEvents.some((event) => event.event === "coordinator-start");
+        indexReady = allEvents.some(
+          (event) =>
+            event.event === "spring-index-updated" &&
+            Number.isInteger(event.affectedProjectCount) &&
+            event.affectedProjectCount > 0,
+        );
+        if (coordinatorStarted && indexReady) break;
+        sleepMs(250);
+      } while (Date.now() < readinessDeadline);
+      if (!coordinatorStarted || !indexReady) {
+        throw new Error(
+          `${fixtureKind} completion succeeded but coordinator/index readiness was not proven`,
+        );
+      }
+
+      const targetEvidence = {
+        targetRelativePath: expectedRelativePath,
+        targeting: "file-finder-exact-relative-path",
+      };
+      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-runtime-ready.json`), JSON.stringify({
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        requiredEvidence: ["coordinator-start"],
+        ...targetEvidence,
+        status: "PASS",
+      }, null, 2) + "\n", { mode: 0o600 });
+      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-index-ready.json`), JSON.stringify({
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        requiredEvidence: ["spring-index-updated affectedProjectCount>0"],
+        ...targetEvidence,
+        status: "PASS",
+      }, null, 2) + "\n", { mode: 0o600 });
+      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`), JSON.stringify({
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        attempts,
+        ...targetEvidence,
+        ...observation,
+        status: "PASS",
+      }, null, 2) + "\n", { mode: 0o600 });
+      return expectedRelativePath;
+    }
+
+    cancelTransientUiMacos(
+      manifest,
+      `${fixtureKind}-completion-cancel-${localAttempt + 1}`,
+    );
+    if (observation.requestObserved && !observation.expectedRequestObserved) break;
+    if (observation.responseObserved) break;
   }
 
   const classification = !finalObservation.requestObserved
@@ -934,7 +1006,8 @@ function waitForSpringCompletion(
     fixture: fixtureKind,
     observedAt: new Date().toISOString(),
     attempts,
-    selectedTabIndex,
+    targetRelativePath: expectedRelativePath,
+    targeting: "file-finder-exact-relative-path",
     classification,
     ...finalObservation,
     protocolTail: fs.existsSync(protocolFile)
@@ -942,7 +1015,7 @@ function waitForSpringCompletion(
       : "",
   }, null, 2) + "\n", { mode: 0o600 });
   throw new Error(
-    `${fixtureKind} Spring completion failed after ${attempts} tab-scoped attempts: ${classification}`,
+    `${fixtureKind} Spring completion failed after ${attempts} exact-file attempts: ${classification}`,
   );
 }
 
@@ -1188,6 +1261,7 @@ function sleepMs(ms) {
   Atomics.wait(new Int32Array(sab), 0, 0, ms);
 }
 
+
 function launchMacos(root, fixtureKind, zedCli) {
   assert.equal(process.platform, "darwin", "macOS launch is required");
   assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
@@ -1200,21 +1274,7 @@ function launchMacos(root, fixtureKind, zedCli) {
   const logPath = path.join(manifest.evidence, `zed-${fixtureKind}-foreground.log`);
   const logStartOffset = fileSize(logPath);
   const fd = fs.openSync(logPath, "a", 0o600);
-  const javaTarget = path.join(
-    manifest.worktrees[fixtureKind],
-    "src/main/java/dev/zed/spring/fixture/FixtureApplication.java",
-  );
-  const propertiesTarget = path.join(
-    manifest.worktrees[fixtureKind],
-    "src/main/resources/application-d007.properties",
-  );
-  requireFile(javaTarget, `${fixtureKind} Java launch target`);
-  requireFile(propertiesTarget, `${fixtureKind} Properties launch target`);
-  const launchTargets = [
-    manifest.worktrees[fixtureKind],
-    javaTarget,
-    `${propertiesTarget}:1:4`,
-  ];
+  const launchTargets = [manifest.worktrees[fixtureKind]];
   const child = spawn(cli, [
     "--foreground",
     "--user-data-dir",
@@ -1243,7 +1303,7 @@ function launchMacos(root, fixtureKind, zedCli) {
     userDataDir: manifest.profile,
     worktree: manifest.worktrees[fixtureKind],
     launchTargets,
-    controlPlane: "single-foreground-cli",
+    controlPlane: "single-foreground-cli-root-only",
     logPath,
     logStartOffset,
   }, null, 2) + "\n", { mode: 0o600 });
@@ -1512,9 +1572,9 @@ function selfTest() {
     assert.equal(stagedSettings.lsp.jdtls.settings.check_updates, "once");
     const stagedKeymap = JSON.parse(fs.readFileSync(path.join(manifest.profile, "config", "keymap.json"), "utf8"));
     assert.equal(stagedKeymap[0].context, "Workspace");
-    assert.deepEqual(
-      stagedKeymap[0].bindings["ctrl-cmd-alt-q"],
-      ["pane::ActivateItem", 0],
+    assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
+      "file_finder::Toggle",
     );
     assert.equal(stagedKeymap[1].context, "Editor");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
@@ -1529,10 +1589,14 @@ function selfTest() {
     );
     assert.equal(d007ConfirmKey(25), "p");
     assert.throws(() => d007ConfirmKey(26), /exceeds the D007 keymap range/);
-    assert.equal(d007TabKey(0), "q");
-    assert.equal(d007TabKey(3), "w");
-    assert.throws(() => d007TabKey(4), /exceeds the D007 tab range/);
+
     const harnessSource = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+    const retiredPaneAction = ["pane", "ActivateItem"].join("::");
+    assert.equal(
+      harnessSource.includes(retiredPaneAction),
+      false,
+      "D007 must not guess editor identity through pane indices",
+    );
     const retiredFocusHelper = ["openFixture", "FileWithCli"].join("");
     assert.equal(
       harnessSource.includes(`function ${retiredFocusHelper}`),
@@ -1540,7 +1604,7 @@ function selfTest() {
       "D007 must not use a secondary macOS Zed CLI invocation for file focus",
     );
     assert.equal(
-      harnessSource.includes('controlPlane: "single-foreground-cli"'),
+      harnessSource.includes('controlPlane: "single-foreground-cli-root-only"'),
       true,
       "D007 launch evidence must record the single-foreground control plane",
     );
