@@ -1,6 +1,6 @@
 # Capability inventory
 
-- Inventory version: 56
+- Inventory version: 57
 - Derived from: Spring Tools `5.2.0.RELEASE` / `vscode-spring-boot` `2.2.0`.
   **The product pin moved to `5.3.0.RELEASE` / `2.3.0` on 2026-08-01, and the
   derivation survives the move unchanged**: the 118 configuration keys are
@@ -15,7 +15,7 @@
   [COMPATIBILITY](../COMPATIBILITY.md#spring-tools-530-refresh-evidence); every
   other row's evidence is `5.2.0.RELEASE` and is untested against the new
   release, which is not the same statement as failing.
-- Last updated: 2026-09-25
+- Last updated: 2026-09-28
 - Evidence: [R011](research/011-vscode-spring-tools-capability-surface.md),
   [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md),
@@ -70,10 +70,21 @@ For #159 and the Registry release gate, apply this overlay:
   headless evidence. It does not promote affected rows to release-facing
   `verified`; exact-final-HEAD Zed development-extension validation is still
   required.
+- **Machine-readable acceptance accounting:** every one of the 59 rows is
+  mirrored in [`protocol/d007-capability-acceptance.json`](../protocol/d007-capability-acceptance.json).
+  A row classified `retained-requires-standalone-evidence` or
+  `redesigned-requires-evidence` carries `currentClaim: pending-d007` until
+  exact-candidate evidence closes its assigned group. Historical prose below
+  cannot override that pending state.
+- **Two-layer gate:** the repository-owned standalone capability regression
+  directly drives the real pinned server against the rich fixture; the isolated
+  Zed desktop gate separately proves Java/Spring coexistence, Maven/Gradle
+  completion and run/debug generation, executes the generated Boot run tasks,
+  and rejects Spring error-level popup evidence.
 
 This overlay is temporary release-accounting structure, not a second state
-system. After the D007 manual validation is complete, affected rows must be
-updated individually and this overlay can be reduced to historical context.
+system. After the D007 acceptance matrix is fully resolved, affected rows must
+be updated individually and this overlay can be reduced to historical context.
 
 This is the auditable list behind the goal of capability parity with VS Code
 Spring Tools. Every user-visible capability carries exactly one state. A
@@ -103,9 +114,12 @@ The inventory records evidence state. The delivery plan separately records the
 preferred route and the preserved baseline/fallback for every capability. A
 selected route or planning-confidence score does not change a state here.
 
-## Summary
+## Historical pre-D007 state summary
 
-59 capabilities tracked.
+59 capabilities tracked. The counts below describe the row states and their
+historical evidence baseline. They are **not** the current standalone
+release-facing count while the D007 acceptance matrix contains
+`pending-d007` rows.
 
 | State | Count |
 | --- | --- |
