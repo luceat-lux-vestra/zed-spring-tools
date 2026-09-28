@@ -1,8 +1,12 @@
 # Hardening Reassessment — 2026-09-20
 
-Owning issue: #128
+- Status: **Completed point-in-time reassessment**
+- Owning issue: #128 — completed 2026-09-21
+- Implementation: PR #129, squash merge `dd707488abc565aa4575dc91b480fa3c33deefd5`
 
-This pass re-evaluates the repository's existing hardening against current external GitHub/OpenSSF guidance and actual repository operation. Existing required CI, Dependency Review, CodeQL, actionlint/zizmor, live drift, and staged platform-gate controls remain authoritative unless this document identifies a concrete gap.
+This document records the September hardening reassessment and later bounded
+CI-policy updates. It is historical evidence, not a live backlog. Current merge
+authority is `.github/merge-gate-policy.json` plus the live `main` ruleset.
 
 > **2026-09-28 CI scope update.** `rust` and `coordinator` remain authoritative component jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `review` (Dependency Review) and `workflow-security` remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
 >
@@ -32,7 +36,11 @@ The checked-in/live merge policy is squash-only with merge commits and rebase-me
 
 ### PASS — dependency admission and workflow security
 
-Dependency Review is already a required context. actionlint, zizmor, SHA pinning, job timeouts, and context reconciliation are already required through `workflow-security`. No second hardening framework is added.
+At reassessment close, Dependency Review and `workflow-security` were required
+merge authorities. After the 2026-09-28 aggregation, they are authoritative
+components of the single required `Merge Gate`: `review` owns Dependency
+Review, while `workflow-security` owns actionlint, zizmor, SHA pinning, job
+timeouts, and policy reconciliation. No second hardening framework is added.
 
 ### PASS — CodeQL authority
 
@@ -44,12 +52,21 @@ CodeQL remains advisory because its PR trigger intentionally ignores documentati
 
 The existing `platform-gate` classification remains staged. This reassessment does not promote it merely because other hardening work is occurring; its own ordinary-PR/merged-main reliability proof and live ruleset promotion contract remain separate.
 
-## Exit criteria
+## Closure evidence
 
-- exact final PR HEAD passes current required contexts;
-- `workflow-security` accepts the new issue automation and its tests;
-- a dry-run backfill is reviewed before live issue mutation;
-- live repository/ruleset/actions policy remains consistent with `.github/merge-gate-policy.json`;
-- merged-main checks are read back before closing the reassessment.
+Issue #128 closed only after PR #129 was squash-merged and the exact merged-main
+revision was read back. The recorded closure evidence includes:
+
+- squash merge `dd707488abc565aa4575dc91b480fa3c33deefd5`;
+- successful final-PR Dependency Review, Labeler, CI, Platform Validation, and
+  CodeQL;
+- successful merged-main CI run `35502404556`, Platform Validation run
+  `35502404583`, and CodeQL run `35502404552`;
+- live issue-metadata reconciliation proof; and
+- fresh merge-setting readback showing squash enabled with merge/rebase disabled.
+
+The 2026-09-28 documentation-only fast path and required-gate aggregation are
+later policy updates layered onto that completed reassessment. Their current
+authority is the merge-gate policy and live ruleset, not this dated document.
 
 `UNKNOWN`, `UNVERIFIED`, and `INSUFFICIENT EVIDENCE` remain FAIL for claimed controls.

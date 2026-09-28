@@ -2,76 +2,40 @@
 
 ## Current phase
 
-Local technical feasibility, the basic end-to-end PoC, and the D004 product
-scaffold are complete. Amended D002 records a Pivot to a required official-Java
-companion with a versioned Java/Spring coordination boundary and no reduced
-managed-JDT fallback. S012 proved the unmodified bridge and visible completion
-but was Refuted on cleanup; S013 then supported the exact removal contract.
-D003-D006 are Accepted. D005 selects stock-Zed LSP-first capability delivery
-with opt-in generated Structure/Live documents while preserving the existing
-per-capability routes as fallbacks; Java language/query replacement is excluded
-from the baseline. R014's final latest-upstream audit found no better stock-Zed
-architecture. S015 found a usable live JDT/Spring Document Symbols merge but was
-Refuted because restart cached Spring-only results before JDT's later dynamic
-registration. Project Symbols remains the fallback. S016 then Supported official
-Java 6.8.23 coordination, product cleanup, warm-cache startup, and the normal-
-profile Maven main runnable on macOS arm64/JDK 25. R016 found that Zed's
-`read:user` GitHub sign-in cannot authorize extension-created issues. D006
-therefore selects capability-first optimistic official-Java compatibility and a
-user-reviewed prefilled issue report on actual contract failure. R018 then
-re-audited Spring Boot Tools and the wider VS Code extension pack by developer
-outcome, correcting the pinned package's configuration count from 18 to 118 and
-separating standard Spring CodeLens from custom live `sts/highlight`. Adapters
-for both paths exist and are contract-tested. A driven Boot/JMX run then
-verified authentic endpoint, bean and injection live lenses, click-selected
-ranges, the explanatory fallback, and composed Spring/JDT native Hover. The
-five standard-provider families were then observed in the showcase after its
-`CL-2` target and `CL-3` marker were corrected. R019 records the resulting
-boundary: AI Agent state/dispatch and file-finder sort-last are unavailable to
-the product. The AI notices now state that boundary and send no prompt or source
-to AI. Data AOT `CL-4d` now pre-resolves Spring's authentic target, rewrites it
-to a Zed location command, and passed its one-click ignored-`target/` runtime
-gate. The `CL-4a`/`CL-4e` AOT build route is also verified: real Zed created the
-reviewable task, `task: spawn` exposed Maven's successful terminal output and
-generated the authentic repository JSON, and refresh rewrote the task without
-starting a build. The compatibility-failure notification now keeps a bounded
-Markdown link visible and a driven click opened a title/body-prefilled GitHub
-composer without submitting it. `CL-7c` also passed against a connected Boot
-3.5.5/JMX process:
-the commandless `@Value` range became a visible Hover lens and native Hover
-returned the environment value `37` plus its `systemEnvironment` source. The
-explicit local-process, metrics, logger, and show/hide/refresh-equivalent slices
-are verified on that Boot/JMX tuple. Default-off automatic local connection is
-also verified there: a real Zed Java-debug run connected the one matching
-project, delivered live data, honored manual disconnect without reconnecting,
-and cleaned up on debug stop and Zed exit. Contract coverage retains
-single-project identity admission and fail-closed ambiguity. The release-pin
-cleanup remains ancillary to this branch.
+The historical M1-M6 implementation program is complete. `docs/implementation-plan.md`
+is a milestone record, not the current roadmap. Current work is the Registry-first
+distribution and v1.0 program owned by release Epic #108 and
+`docs/preview-release-gate.md`.
 
-The M2 exit gate closed on macOS arm64/JDK 25: a driven clean install, restart,
-and uninstall cycle reproduced real Spring Boot property completions, executed
-the authentic bridge removal, left no owned process or route, and kept
-credentials and classpaths out of the logs. M3 published the repository at
-<https://github.com/luceat-lux-vestra/zed-spring-tools> under Apache-2.0, so
-development is now public. M4's capability-parity program closed on 2026-07-26
-with an empty `implemented` column, and the current work is M5 platform
-validation. Spike code remains excluded from production.
+Current `main` still contains the D002-D006 private Java/Spring coordination
+architecture. The 2026-09-25 publishing-policy audit opened #159 as a release
+blocker because that production path reads another extension's private work
+directory/proxy boundary. That finding blocks Registry refresh/release claims;
+it does not retroactively erase historical capability evidence. Draft PR #160 is
+a candidate remediation and is not current authority until it merges with its
+required evidence.
+
+The external Registry contribution zed-industries/extensions#6875 remains open,
+`extension.toml` remains at `0.1.0`, and #112/#113 remain the release-lifecycle
+and v1.0 promotion tasks. Do not claim Registry publication or v1.0 before those
+gates actually pass. Spike code remains excluded from production.
 
 ## Product goal and delivery strategy
 
-- The long-term product goal is capability parity with VS Code Spring Tools.
-  Track every user-visible capability and either reproduce it in Zed, provide an
-  equivalent Zed-native workflow, or retain a documented blocker and upstream
-  dependency. The goal does not require pixel-identical VS Code UI.
-- Complete a source-separated, installable basic product PoC on the available
-  macOS arm64 host before the initial public GitHub source release. The existing
-  disposable spike PoC does not satisfy this product gate by itself.
-- Develop in public after that local PoC and expand capability coverage
-  incrementally. An experimental public repository or preview must state the
-  exact tested host and must not imply unverified support.
-- Keep the extension package installable by design on every Zed-supported
-  desktop platform. Runtime validation and supported-platform claims may follow
-  after the initial local PoC and public source release.
+- The product goal remains Spring-development outcome parity with VS Code Spring
+  Tools where Zed exposes a sound delivery surface. Pixel-identical VS Code UI is
+  not required.
+- Capability state and support claims are evidence-scoped. The capability
+  inventory, compatibility matrix, limitations, pinned-runtime evidence, and
+  current release gate are the maintained authorities.
+- The repository is already public and the M1-M6 implementation program is
+  historical. New work should advance an explicit current issue/track, not
+  recreate completed milestone work.
+- Current release work is intentionally narrow: resolve #159, obtain accepted
+  Registry publication, drive #112 through the real Registry lifecycle, and
+  promote release claims through #113 only when exact evidence supports them.
+- Platform-aware code or CI does not by itself broaden support. Untested runtime
+  tuples remain unverified until driven evidence exists.
 
 ## Allowed work
 
@@ -81,20 +45,26 @@ validation. Spike code remains excluded from production.
 - Add minimal disposable code under `spikes/` only when a written spike plan
   identifies the hypothesis and success criteria.
 - Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
-  `scripts/`, and `tests/` within the boundary that D002-D006 fix,
-  following the reviewed implementation plan's current milestone.
+  `scripts/`, and `tests/` only within the current reviewed architecture and
+  the scope of an owning issue/decision. `docs/implementation-plan.md` is
+  historical; do not use it as an active milestone authority.
 - Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-D002-D006 have settled the architecture, implementation language, build system,
-bridge/coordinator module boundary, and stock-Zed capability-delivery strategy.
-Do not add any of the following until a recorded decision supports it:
+D002-D006 remain the checked-in architecture on current `main`, but #159 has
+reopened the release/publishing boundary for the private Java transport. Do not
+treat draft remediation as merged authority, and do not expand a release-blocked
+private surface while that decision is unresolved.
 
-- product packaging, release automation, or product CI;
-- a new runtime dependency, downloaded artifact, or network call at runtime;
-- any change to the official Java extension, its proxy, or its work directory
-  beyond the allowlisted bridge commands;
+Do not add any of the following until a recorded current issue/decision supports it:
+
+- a new packaging/distribution/release-automation path outside release Epic #108,
+  the current release gate, and existing reviewed workflows;
+- a new runtime dependency, downloaded artifact, or network call beyond the
+  existing pinned Spring Tools acquisition boundary;
+- new dependence on the official Java extension's private proxy/work directory,
+  or expansion of the current allowlisted bridge route while #159 is open;
 - a reduced or self-managed JDT fallback, which D002 and D003 exclude;
 - replacement or co-ownership of the official Java language, grammar, or query
   pack, which D003 and D005 exclude from the baseline;
@@ -179,11 +149,13 @@ mechanical.
   `docs/d004-product-stack-build-and-packaging`.
 - Keep a branch scoped to one investigation, experiment, decision, or reviewed
   implementation slice, and keep it short-lived.
-- Open a pull request and merge with rebase, or squash when the branch's
-  intermediate commits are not worth keeping. Merge commits are disabled.
-  Approvals are not required, because a solo owner cannot approve their own pull
-  request; the pull request exists as the review and future CI surface.
-- Release branches are out of scope until M6 defines preview releases.
+- Open a pull request for every change and merge by squash only. Rebase-merge
+  and merge commits are disabled by repository policy. Intermediate branch
+  commits may still be rewritten during development.
+- Approvals are not required, because a solo owner cannot approve their own pull
+  request; the pull request remains the review and CI surface.
+- Release work follows Epic #108 and the current release gate. Do not invent a
+  release-branch policy merely because the historical M6 milestone is complete.
 
 ## Issue and pull-request metadata
 
@@ -198,13 +170,15 @@ mechanical.
   `documentation`, and the remaining general labels for ordinary triage.
 - Assign an issue only when someone owns its next action. A pull-request author
   already owns that pull request, so do not add a redundant assignee by default.
-- Put delivery work in the active implementation milestone. Pure repository
-  hygiene may have no milestone. Create future milestones only when that phase
-  becomes active, and do not invent due dates without an actual commitment.
-- The implementation plan and capability inventory remain the roadmap during
-  solo work, so do not duplicate them in a GitHub Project. Revisit Projects
-  when multiple contributors or a durable concurrent backlog needs a status
-  board.
+- Put work in the milestone that actually owns its current delivery horizon.
+  Release work uses the native `Registry publication & v1.0 readiness`
+  milestone where applicable; pure repository hygiene may have no milestone.
+  Do not invent due dates without an actual commitment.
+- `docs/implementation-plan.md` is historical. Current ownership comes from the
+  capability/compatibility authorities plus the active GitHub Epic/Track/Task
+  hierarchy. Do not create a duplicate status board merely to mirror those
+  sources; revisit GitHub Projects only when a durable concurrent backlog needs
+  one.
 - The maintainer checks metadata before merge. Historical pull requests do not
   need a complete retroactive relabeling.
 - Keep the responsible human as the Git author. For material Codex assistance,
@@ -251,7 +225,9 @@ success; only their product/toolchain work may be skipped. `review`
 requires one `Merge Gate`, which fails unless all four components succeed on
 the exact pull-request revision. `CONTRIBUTORS.md` and
 `THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
-derive and validate them. ## Change discipline
+derive and validate them.
+
+## Change discipline
 
 - Keep each task scoped to one investigation or experiment.
 - Do not perform unrelated refactors or dependency upgrades.
@@ -275,12 +251,17 @@ derive and validate them. ## Change discipline
 
 ## Decision gate
 
-This gate is closed. D002 recorded **Pivot**: a bridge and coordinator around the
-required official Java extension, rather than a Zed-extension-centered MVP. D003
-accepted the resulting architecture, D004 its stack, and D005 the LSP-first
-stock-Zed capability surfaces with preserved fallbacks. D006 makes official-
-Java admission capability-first and compatibility reporting user-reviewed, so
-product scaffolding and reviewed M4 slices are allowed to proceed.
+The original D002-D006 architecture remains the checked-in production boundary
+on current `main`, but the release/publishing decision is no longer closed:
+#159 records evidence that the private cross-extension Java transport is not an
+acceptable Registry-release boundary under this project's fail-closed policy.
 
-Reopen the gate only if new evidence contradicts the Pivot, and record the
-outcome in a decision document before changing production code.
+Until a replacement decision/remediation is merged and revalidated, preserve the
+current runtime for reproducibility but do not broaden the private transport,
+present it as Registry-compliant, refresh the upstream Registry pointer, or
+promote release claims. Draft PR #160 is remediation work, not current
+architecture authority.
+
+Any replacement architecture must be recorded in a decision document and must
+reconcile capability evidence, compatibility/limitations, release gating, and
+the exact Registry candidate before the decision gate can close again.

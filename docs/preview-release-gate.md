@@ -1,7 +1,7 @@
 # Release gate and registry lifecycle
 
 - Status: Current release policy
-- Updated: 2026-09-04
+- Updated: 2026-09-28
 - Authoritative release tracker: [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108)
 - Native release milestone: `Registry publication & v1.0 readiness`
 - Related: [capability inventory](capability-inventory.md),
@@ -34,9 +34,14 @@ The release program uses GitHub's native planning surfaces for different jobs:
   milestone while they are non-blocking validation work;
 - #113 is release-blocked by #112 and should use the native GitHub issue
   dependency relationship in addition to prose references;
-- #112 remains externally blocked until
+- #159 is the current repository-side release blocker: the submitted Registry
+  candidate must not be refreshed or promoted until the private
+  cross-extension Java transport is removed or replaced by an accepted public
+  boundary with exact-candidate evidence.
+- #112 remains externally blocked until #159 is resolved, the refreshed
   [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875)
-  is merged and the extension is actually visible through the Zed Registry.
+  candidate is accepted, and the extension is actually visible through the Zed
+  Registry.
 
 Do not add an arbitrary milestone due date. Add one only when there is a real
 external or project delivery commitment that the repository can cite.
@@ -51,14 +56,17 @@ platform validation may remain open independently.
 
 The current path is intentionally narrow:
 
-1. Keep the already submitted Zed Registry version at `0.1.0` until the first
-   Registry publication completes.
-2. Verify a fresh install through the **real Zed Registry path**, including
-   first-run artifact acquisition and the official Java/Spring coordinator
-   lifecycle.
-3. Fix and re-run the bounded gate if that install reveals a release-blocking
+1. Resolve #159 on an exact candidate and reconcile the affected capability,
+   compatibility, limitation, and architecture evidence. A draft remediation is
+   not release evidence.
+2. Keep the submitted Zed Registry version at `0.1.0`; only after #159 closes
+   may the upstream Registry contribution be refreshed for renewed review.
+3. After actual Registry publication, verify a fresh install through the
+   **real Zed Registry path**, including first-run artifact acquisition and the
+   maintained Java/Spring runtime boundary.
+4. Fix and re-run the bounded gate if that install reveals a release-blocking
    defect.
-4. If the Registry lifecycle succeeds and release-facing claims still match the
+5. If the Registry lifecycle succeeds and release-facing claims still match the
    evidence, the next intentional release may be `1.0.0`.
 
 There is no requirement to manufacture `0.1.1`, `0.1.2`, and similar preview
@@ -80,8 +88,11 @@ Spring Tools distribution.
 
 The initial registry submission is
 [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875).
-Until that submission is merged and installable from the Registry, the supported
-installation path for testing remains a Zed development extension checkout.
+It remains open. Current repository issue #159 blocks refreshing that submission
+to a new candidate until the publishing-boundary remediation and exact-candidate
+evidence pass. Until an accepted submission is actually installable from the
+Registry, the supported installation path for testing remains a Zed development
+extension checkout.
 
 `extension.toml` is the Registry-visible extension version. A release operation
 must keep source commit, registry pointer/version, release notes, and any Git tag
@@ -159,8 +170,9 @@ The bounded lifecycle gate covers at least:
 - uninstall and owned-process/resource cleanup; and
 - actionable failure behavior rather than partial startup.
 
-For the initial publication this work is tracked by #112 under release Epic
-#108.
+For the initial publication, #159 must first clear the repository-side
+publishing boundary. The real Registry lifecycle is then tracked by #112 under
+release Epic #108.
 
 ### 7. Rollback and withdrawal
 
