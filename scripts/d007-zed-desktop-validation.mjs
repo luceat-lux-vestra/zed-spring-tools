@@ -162,7 +162,6 @@ function d007CodeActionIndexKeys() {
 function d007Keymap() {
   const workspaceBindings = {
     "ctrl-cmd-alt-i": "zed::InstallDevExtension",
-    "ctrl-cmd-alt-v": "file_finder::Toggle",
   };
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
@@ -222,19 +221,15 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   const manifest = stage(javaProfile, root, javaHome);
   const sharedLog = path.join(os.homedir(), "Library", "Logs", "Zed", "Zed.log");
   const sharedStart = fileSize(sharedLog);
-  fs.writeFileSync(path.join(manifest.evidence, "shared-zed-log-boundary.json"), JSON.stringify({
-    path: sharedLog,
-    byteOffset: sharedStart,
-    recordedAt: new Date().toISOString(),
-  }, null, 2) + "\n", { mode: 0o600 });
 
   const results = [];
-  let phase = "maven-launch";
+  let phase = "maven-install-launch";
   let primaryError;
   try {
-    launchMacos(root, "maven");
-    phase = "maven-zed-readiness";
+    launchMacos(root, "maven", { role: "install" });
+    phase = "maven-install-zed-readiness";
     waitForZedReady(manifest, "maven", 45_000);
+
     phase = "dev-extension-install";
     if (manualDevInstall) {
       process.stdout.write(
@@ -258,21 +253,42 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     } else {
       installDevExtensionMacos(root);
     }
+
     phase = "dev-extension-readiness";
     waitForDevExtensionInstalled(manifest, manualDevInstall ? 600_000 : 180_000);
-    phase = "maven-interaction";
-    results.push(driveFixtureMacos(root, "maven", sharedLog, sharedStart));
-    phase = "maven-shutdown";
+    phase = "maven-install-shutdown";
     stopAndWaitZed(root, manifest, 10_000, 5_000);
 
-    phase = "gradle-launch";
-    launchMacos(root, "gradle");
-    phase = "gradle-zed-readiness";
-    waitForZedReady(manifest, "gradle", 45_000);
-    phase = "gradle-interaction";
-    results.push(driveFixtureMacos(root, "gradle", sharedLog, sharedStart));
-    phase = "gradle-shutdown";
-    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    for (const fixtureKind of ["maven", "gradle"]) {
+      const propertiesRelative = "src/main/resources/application-d007.properties";
+      const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+
+      phase = `${fixtureKind}-completion-launch`;
+      launchMacos(root, fixtureKind, {
+        role: "completion",
+        relativeTarget: propertiesRelative,
+        row: 1,
+        column: 4,
+      });
+      phase = `${fixtureKind}-completion-zed-readiness`;
+      waitForZedReady(manifest, fixtureKind, 45_000);
+      phase = `${fixtureKind}-completion-interaction`;
+      runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart);
+      phase = `${fixtureKind}-completion-shutdown`;
+      stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+      phase = `${fixtureKind}-run-debug-launch`;
+      launchMacos(root, fixtureKind, {
+        role: "run-debug",
+        relativeTarget: javaRelative,
+      });
+      phase = `${fixtureKind}-run-debug-zed-readiness`;
+      waitForZedReady(manifest, fixtureKind, 45_000);
+      phase = `${fixtureKind}-run-debug-interaction`;
+      results.push(runDebugPhaseMacos(root, fixtureKind));
+      phase = `${fixtureKind}-run-debug-shutdown`;
+      stopAndWaitZed(root, manifest, 10_000, 5_000);
+    }
   } catch (error) {
     primaryError = error;
     writeGateFailure(manifest, phase, error);
@@ -316,9 +332,8 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   process.stdout.write(JSON.stringify(outcome, null, 2) + "\n");
 }
 
-function driveFixtureMacos(root, fixtureKind, sharedLog, sharedStart) {
+function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
   const manifest = readManifest(root);
-  const probeRelative = "src/main/resources/application-d007.properties";
   const completionBaseline = runtimeSnapshot(manifest, sharedLog, sharedStart);
   waitForSpringCompletion(
     manifest,
@@ -330,9 +345,14 @@ function driveFixtureMacos(root, fixtureKind, sharedLog, sharedStart) {
     3,
   );
   captureScreen(path.join(manifest.evidence, `${fixtureKind}-completion.png`));
+}
 
+function runDebugPhaseMacos(root, fixtureKind) {
+  const manifest = readManifest(root);
+  const probeRelative = "src/main/resources/application-d007.properties";
   const debugFile = path.join(manifest.worktrees[fixtureKind], ".zed", "debug.json");
   const tasksFile = path.join(manifest.worktrees[fixtureKind], ".zed", "tasks.json");
+
   triggerRunDebugMacos(manifest, fixtureKind, `${fixtureKind}-run-debug-1`);
   waitForFileWithRetry(
     debugFile,
@@ -367,7 +387,6 @@ function driveFixtureMacos(root, fixtureKind, sharedLog, sharedStart) {
   return evidence;
 }
 
-
 function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
   const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
   const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
@@ -375,11 +394,12 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
   const sourceDigestBefore = sha256File(javaFile);
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
 
-  openFixtureFileMacos(
+  waitForLaunchTargetDocumentOpen(
     manifest,
     fixtureKind,
     javaRelative,
-    `${evidenceName}-open-java`,
+    45_000,
+    `${evidenceName}-java`,
   );
 
   let offer;
@@ -443,7 +463,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       configureBootRunIndex: offer.configureBootRunIndex,
       codeActionAttempts,
       targetRelativePath: javaRelative,
-      targeting: "file-finder-relative-path-native-confirm",
+      targeting: "fresh-foreground-cli-launch-target",
       status: "PASS",
     }, null, 2) + "\n",
     { mode: 0o600 },
@@ -471,7 +491,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       sourceHead: manifest.sourceHead,
       fixture: fixtureKind,
       relativePath: javaRelative,
-      targeting: "file-finder-relative-path-native-confirm",
+      targeting: "fresh-foreground-cli-launch-target",
       sourceDigestBefore,
       sourceDigestAfter,
       status: "PASS",
@@ -549,123 +569,61 @@ function sendD007ActionKeyMacos(manifest, key, evidenceName) {
   runOsa(script, evidenceName, manifest.evidence);
 }
 
-function openFixtureFileMacos(
+function waitForLaunchTargetDocumentOpen(
   manifest,
   fixtureKind,
   relativePath,
+  timeoutMs,
   evidenceName,
-  { row = null, column = null, timeoutMs = 45_000 } = {},
 ) {
-  assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
   const target = path.join(manifest.worktrees[fixtureKind], relativePath);
-  requireFile(target, `${fixtureKind} exact file target`);
+  requireFile(target, `${fixtureKind} launch target`);
   const targetUri = pathToFileURL(target).href;
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
-  const hasPosition = row !== null || column !== null;
-  if (hasPosition) {
-    assert.equal(Number.isInteger(row) && row > 0, true, "File Finder row must be a positive integer");
-    assert.equal(Number.isInteger(column) && column > 0, true, "File Finder column must be a positive integer");
-  }
-  assert.equal(
-    Number.isInteger(timeoutMs) && timeoutMs >= 5_000 && timeoutMs <= 120_000,
-    true,
-    "File Finder open timeout must be bounded",
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
   );
 
-  const targetQuery = hasPosition ? `${relativePath}:${row}:${column}` : relativePath;
-  const appleScript = [
-    `set targetQuery to "${escapeAppleScript(targetQuery)}"`,
-    "set previousClipboard to the clipboard",
-    "try",
-    "  set the clipboard to targetQuery",
-    '  tell application "Zed" to activate',
-    '  tell application "System Events"',
-    '    tell process "Zed" to set frontmost to true',
-    '    keystroke "v" using {control down, command down, option down}',
-    "    delay 0.5",
-    '    keystroke "a" using {command down}',
-    '    keystroke "v" using {command down}',
-    "    key code 36",
-    "  end tell",
-    "  delay 0.2",
-    "  set the clipboard to previousClipboard",
-    "on error errorMessage number errorNumber",
-    "  set the clipboard to previousClipboard",
-    "  error errorMessage number errorNumber",
-    "end try",
-  ].join("\n");
-
-  const result = spawnSync("osascript", ["-e", appleScript], { encoding: "utf8" });
-  if (result.status !== 0) {
-    fs.writeFileSync(
-      path.join(manifest.evidence, `${evidenceName}-file-target.json`),
-      JSON.stringify({
-        sourceHead: manifest.sourceHead,
-        fixture: fixtureKind,
-        relativePath,
-        absolutePath: target,
-        targetUri,
-        targetQuery,
-        requestedPosition: hasPosition ? { row, column } : null,
-        targeting: "file-finder-relative-path-native-confirm",
-        status: "query-automation-failed",
-        exitCode: result.status,
-        stderr: bounded(result.stderr),
-        stdout: bounded(result.stdout),
-      }, null, 2) + "\n",
-      { mode: 0o600 },
-    );
-    throw new Error(
-      `${fixtureKind} File Finder query automation failed for ${targetQuery}; inspect ${evidenceName}-file-target.json`,
-    );
-  }
-
   const started = Date.now();
-  let documentOpened = false;
+  let opened = false;
   while (Date.now() - started < timeoutMs) {
     const events = protocolEvidenceEvents(
       fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
     );
-    documentOpened = events.some(
+    opened = events.some(
       (event) => event.event === "document-open" && event.uri === targetUri,
     );
-    if (documentOpened) break;
+    if (opened) break;
     sleepMs(100);
   }
 
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    role: processRecord.role,
+    relativePath,
+    absolutePath: target,
+    targetUri,
+    launchTargets: processRecord.launchTargets,
+    targeting: "fresh-foreground-cli-launch-target",
+    exactDidOpenObserved: opened,
+    status: opened ? "PASS" : "FAIL",
+    protocolTail: !opened && fs.existsSync(protocolFile)
+      ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+      : undefined,
+  };
   fs.writeFileSync(
-    path.join(manifest.evidence, `${evidenceName}-file-target.json`),
-    JSON.stringify({
-      sourceHead: manifest.sourceHead,
-      fixture: fixtureKind,
-      relativePath,
-      absolutePath: target,
-      targetUri,
-      targetQuery,
-      requestedPosition: hasPosition ? { row, column } : null,
-      targeting: "file-finder-relative-path-native-confirm",
-      confirmAction: "native menu::Confirm via Enter",
-      exactDidOpenObserved: documentOpened,
-      status: documentOpened ? "PASS" : "FAIL",
-      protocolTail: !documentOpened && fs.existsSync(protocolFile)
-        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
-        : undefined,
-    }, null, 2) + "\n",
+    path.join(manifest.evidence, `${evidenceName}-launch-target.json`),
+    JSON.stringify(evidence, null, 2) + "\n",
     { mode: 0o600 },
   );
 
-  if (!documentOpened) {
-    cancelTransientUiMacos(manifest, `${evidenceName}-cancel-file-finder`);
+  if (!opened) {
     throw new Error(
-      `${fixtureKind} File Finder native confirm did not open exact target ${relativePath}`,
+      `${fixtureKind} fresh Zed launch did not open exact target ${relativePath}`,
     );
   }
-
-  return {
-    targetUri,
-    attempts: 1,
-    targeting: "file-finder-relative-path-native-confirm",
-  };
+  return { targetUri, targeting: "fresh-foreground-cli-launch-target", attempts: 1 };
 }
 
 function validateGeneratedRunDebug(fixtureKind, debugFile, tasksFile) {
@@ -757,7 +715,10 @@ function findIsolatedZedProcess(psOutput, record) {
 function waitForDevExtensionInstalled(manifest, timeoutMs) {
   const indexFile = path.join(manifest.profile, "extensions", "index.json");
   const wasmFile = path.join(repository, "extension.wasm");
-  const foreground = path.join(manifest.evidence, "zed-maven-foreground.log");
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  const foreground = processRecord.logPath;
   try {
     waitUntil(
       () => devExtensionReady(indexFile, wasmFile),
@@ -791,7 +752,7 @@ function waitForDevExtensionInstalled(manifest, timeoutMs) {
       { mode: 0o600 },
     );
     throw new Error(
-      `${errorText(error)}; wasmExists=${state.wasmExists}, wasmSize=${state.wasmSize}, indexRegistered=${state.indexRegistered}; inspect evidence/dev-extension-readiness-failure.json and zed-maven-foreground.log`,
+      `${errorText(error)}; wasmExists=${state.wasmExists}, wasmSize=${state.wasmSize}, indexRegistered=${state.indexRegistered}; inspect evidence/dev-extension-readiness-failure.json and the install foreground log`,
       { cause: error },
     );
   }
@@ -900,16 +861,12 @@ function waitForSpringTargetReadyMacos(
   started,
   timeoutMs,
 ) {
-  const openEvidence = openFixtureFileMacos(
+  const launchEvidence = waitForLaunchTargetDocumentOpen(
     manifest,
     fixtureKind,
     expectedRelativePath,
+    Math.min(45_000, timeoutMs),
     `${fixtureKind}-completion-target`,
-    {
-      row: 1,
-      column: 4,
-      timeoutMs: Math.min(45_000, timeoutMs),
-    },
   );
 
   let readiness = springTargetReadiness(
@@ -928,9 +885,8 @@ function waitForSpringTargetReadyMacos(
       const targetEvidence = {
         targetRelativePath: expectedRelativePath,
         targetUri: expectedUri,
-        targeting: openEvidence.targeting,
-        requestedFileFinderPosition: { row: 1, column: 4 },
-        fileOpenProbeAttempts: openEvidence.attempts,
+        targeting: launchEvidence.targeting,
+        requestedLaunchPosition: { row: 1, column: 4 },
         targetDocumentOpened: true,
       };
       fs.writeFileSync(
@@ -957,7 +913,7 @@ function waitForSpringTargetReadyMacos(
         }, null, 2) + "\n",
         { mode: 0o600 },
       );
-      return { attempts: openEvidence.attempts, ...readiness };
+      return { attempts: 1, ...readiness };
     }
     sleepMs(250);
   } while (Date.now() < readinessDeadline);
@@ -973,11 +929,10 @@ function waitForSpringTargetReadyMacos(
       sourceHead: manifest.sourceHead,
       fixture: fixtureKind,
       observedAt: new Date().toISOString(),
-      fileOpenProbeAttempts: openEvidence.attempts,
       targetRelativePath: expectedRelativePath,
       targetUri: expectedUri,
-      requestedFileFinderPosition: { row: 1, column: 4 },
-      targeting: openEvidence.targeting,
+      requestedLaunchPosition: { row: 1, column: 4 },
+      targeting: launchEvidence.targeting,
       classification,
       ...readiness,
       protocolTail: fs.existsSync(protocolFile)
@@ -987,7 +942,7 @@ function waitForSpringTargetReadyMacos(
     { mode: 0o600 },
   );
   throw new Error(
-    `${fixtureKind} Spring target opened but runtime readiness was not proven: ${classification}`,
+    `${fixtureKind} launch target opened but runtime readiness was not proven: ${classification}`,
   );
 }
 
@@ -1120,8 +1075,8 @@ function waitForSpringCompletion(
           readinessAttempts: targetReadiness.attempts,
           targetRelativePath: expectedRelativePath,
           targetUri: expectedRequest.uri,
-          targeting: "file-finder-relative-path-native-confirm",
-          requestedFileFinderPosition: { row: 1, column: 4 },
+          targeting: "fresh-foreground-cli-launch-target",
+          requestedLaunchPosition: { row: 1, column: 4 },
           ...observation,
           status: "PASS",
         }, null, 2) + "\n",
@@ -1157,8 +1112,8 @@ function waitForSpringCompletion(
       readinessAttempts: targetReadiness.attempts,
       targetRelativePath: expectedRelativePath,
       targetUri: expectedRequest.uri,
-      targeting: "file-finder-relative-path-native-confirm",
-      requestedFileFinderPosition: { row: 1, column: 4 },
+      targeting: "fresh-foreground-cli-launch-target",
+      requestedLaunchPosition: { row: 1, column: 4 },
       classification,
       ...finalObservation,
       protocolTail: fs.existsSync(protocolFile)
@@ -1415,7 +1370,11 @@ function sleepMs(ms) {
 }
 
 
-function launchMacos(root, fixtureKind, zedCli) {
+function launchMacos(
+  root,
+  fixtureKind,
+  { role = "root", relativeTarget = null, row = null, column = null, zedCli = null } = {},
+) {
   assert.equal(process.platform, "darwin", "macOS launch is required");
   assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
   const manifest = readManifest(root);
@@ -1424,10 +1383,27 @@ function launchMacos(root, fixtureKind, zedCli) {
 
   const cli = zedCli ?? "/Applications/Zed.app/Contents/MacOS/cli";
   requireFile(cli, "Zed CLI");
-  const logPath = path.join(manifest.evidence, `zed-${fixtureKind}-foreground.log`);
+  const logPath = path.join(manifest.evidence, `zed-${fixtureKind}-${role}-foreground.log`);
   const logStartOffset = fileSize(logPath);
   const fd = fs.openSync(logPath, "a", 0o600);
-  const launchTargets = [manifest.worktrees[fixtureKind]];
+
+  const worktree = manifest.worktrees[fixtureKind];
+  const launchTargets = [worktree];
+  let target = null;
+  let targetArgument = null;
+  if (relativeTarget !== null) {
+    target = path.join(worktree, relativeTarget);
+    requireFile(target, `${fixtureKind} ${role} launch target`);
+    if (row !== null || column !== null) {
+      assert.equal(Number.isInteger(row) && row > 0, true, "launch row must be a positive integer");
+      assert.equal(Number.isInteger(column) && column > 0, true, "launch column must be a positive integer");
+      targetArgument = `${target}:${row}:${column}`;
+    } else {
+      targetArgument = target;
+    }
+    launchTargets.push(targetArgument);
+  }
+
   const child = spawn(cli, [
     "--foreground",
     "--user-data-dir",
@@ -1450,17 +1426,24 @@ function launchMacos(root, fixtureKind, zedCli) {
   fs.writeFileSync(path.join(manifest.evidence, "zed-process.json"), JSON.stringify({
     sourceHead: manifest.sourceHead,
     fixture: fixtureKind,
+    role,
     pid: child.pid,
     launchedAt: new Date().toISOString(),
     cli,
     userDataDir: manifest.profile,
-    worktree: manifest.worktrees[fixtureKind],
+    worktree,
+    relativeTarget,
+    target,
+    targetArgument,
+    requestedPosition: relativeTarget !== null && row !== null ? { row, column } : null,
     launchTargets,
-    controlPlane: "single-foreground-cli-root-only",
+    controlPlane: "fresh-foreground-cli-per-phase",
     logPath,
     logStartOffset,
   }, null, 2) + "\n", { mode: 0o600 });
-  process.stdout.write(`Launched isolated Zed pid ${child.pid} for ${fixtureKind}; log: ${logPath}\n`);
+  process.stdout.write(
+    `Launched isolated Zed pid ${child.pid} for ${fixtureKind}/${role}; targets: ${launchTargets.join(" | ")}; log: ${logPath}\n`,
+  );
 }
 
 function stopMacos(root, signal = "SIGTERM") {
@@ -1501,7 +1484,10 @@ function installDevExtensionMacos(root) {
   const staleWasmRemoved = fs.existsSync(wasmFile);
   fs.rmSync(wasmFile, { force: true });
 
-  const foreground = path.join(manifest.evidence, "zed-maven-foreground.log");
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  const foreground = processRecord.logPath;
   const foregroundStart = fileSize(foreground);
   const sharedLog = path.join(os.homedir(), "Library", "Logs", "Zed", "Zed.log");
   const sharedStart = fileSize(sharedLog);
@@ -1793,7 +1779,7 @@ function selfTest() {
     );
     assert.equal(
       stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
-      "file_finder::Toggle",
+      undefined,
     );
     assert.equal(stagedKeymap[1].context, "Editor");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
@@ -1819,15 +1805,18 @@ function selfTest() {
       "D007 must not use a secondary macOS Zed CLI invocation for file focus",
     );
     assert.equal(
-      harnessSource.includes('controlPlane: "single-foreground-cli-root-only"'),
+      harnessSource.includes('controlPlane: "fresh-foreground-cli-per-phase"'),
       true,
-      "D007 launch evidence must record the single-foreground control plane",
+      "D007 launch evidence must record the fresh per-phase foreground control plane",
     );
-    const retiredFileFinderProbeBinding = ['"ctrl-cmd-alt-f": "', "file_finder::OpenWithoutDismiss", '"'].join("");
     assert.equal(
-      harnessSource.includes(retiredFileFinderProbeBinding),
+      d007Keymap().some((entry) =>
+        Object.values(entry.bindings).some((binding) =>
+          JSON.stringify(binding).includes("file_finder")
+        )
+      ),
       false,
-      "D007 exact-file opening must not depend on a custom File Finder probe binding",
+      "D007 target navigation must not depend on File Finder",
     );
     assert.equal(
       harnessSource.includes('"zed::InstallDevExtension"'),
@@ -1841,9 +1830,9 @@ function selfTest() {
       "D007 dev-extension installation must not depend on command-palette search",
     );
     assert.equal(
-      harnessSource.includes('targeting: "file-finder-relative-path-native-confirm"'),
+      harnessSource.includes('targeting: "fresh-foreground-cli-launch-target"'),
       true,
-      "D007 exact-file opening must use project-relative File Finder queries and native Picker confirmation",
+      "D007 exact-file targeting must use a fresh foreground CLI launch target",
     );
     assert.equal(fs.existsSync(path.join(manifest.profile, "extensions", "work", "java")), false,
       "D007 staging must not copy the Java extension work directory");

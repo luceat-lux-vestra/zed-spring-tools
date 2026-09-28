@@ -44,15 +44,15 @@ It performs the following bounded sequence:
 
 1. stages a fresh isolated profile and both build-tool fixtures;
 2. records the current shared `~/Library/Logs/Zed/Zed.log` byte boundary;
-3. launches the Maven fixture through **one foreground macOS Zed CLI process** bound to the exact staged `--user-data-dir`; that launch opens only the fixture root, avoiding any dependence on multi-path tab ordering;
-4. waits until the new launch process group contains a live Zed app process bound to that isolated profile, removes any ignored stale root `extension.wasm`, dispatches Zed's public `zed::InstallDevExtension` action directly, then drives its `OpenPathPrompt` with the exact repository directory and requires Zed itself to build/register the exact checkout;
-5. after that first launch, never invokes a second macOS Zed CLI to focus a file. The isolated D007 keymap opens Zed's public `file_finder::Toggle`, and the harness enters the exact project-relative `path:row:column` target;
-6. File Finder selection uses Zed's native Enter → `menu::Confirm` Picker path. Upstream Picker defers confirmation while match computation is in flight (`confirm_on_update`), so D007 does not emulate readiness with fixed sleeps or a custom FileFinder action; coordinator evidence must then prove `textDocument/didOpen` for the exact target URI;
-7. for `application-d007.properties:1:4`, the gate then requires coordinator startup and a positive `spring/index/updated`, invokes completion on that proven editor, and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
-8. opens `src/main/java/dev/zed/spring/fixture/FixtureApplication.java` through File Finder, toggles Code Actions, and accepts the editor only when the merged response contains `Spring Boot: Configure run/debug for a project…`;
+3. launches a root-only Maven foreground Zed process bound to the exact staged `--user-data-dir`, installs/registers the dev extension, then stops that process;
+4. for each Maven/Gradle fixture, launches a **fresh foreground Zed process** with exactly two CLI targets: the fixture root and the absolute `application-d007.properties:1:4` target. No File Finder or secondary CLI request is used;
+5. requires coordinator evidence that this cold launch actually produced `textDocument/didOpen` for the exact Properties URI, then requires coordinator startup and a positive `spring/index/updated`;
+6. invokes completion on that launch-target editor and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
+7. stops the completion process, then launches another fresh foreground Zed process for the same fixture with the fixture root plus the absolute `FixtureApplication.java` target;
+8. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the merged response contains `Spring Boot: Configure run/debug for a project…`;
 9. dispatches the exact returned Code Action index through D007's `editor::ConfirmCodeAction { item_ix }` binding, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
 10. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
-11. stops the Maven isolated process group with bounded `SIGTERM`/optional `SIGKILL`, then repeats the same **single-foreground-process + public exact-file navigation** gate independently for the Gradle fixture;
+11. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
 12. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
 
 A final `PASS` requires both Maven and Gradle run/debug configuration
@@ -75,14 +75,12 @@ tail. The gate never loops indefinitely. It intentionally avoids secondary macOS
 Zed CLI invocations after the foreground fixture launch: upstream macOS CLI
 requests are delivered through LaunchServices and a later `--user-data-dir`
 argument is not a reliable routing key for selecting the already-running
-isolated process. File identity is therefore selected inside that exact Zed process through the
-public `file_finder::Toggle` action with the exact project-relative fixture path. The
+isolated process. File identity is supplied as a CLI launch target when that exact isolated Zed process is created. The
 coordinator still proves the resulting LSP request URI/position, so an incorrect
 picker result cannot silently satisfy the gate. Completion is dispatched directly
 through the isolated keymap rather than reopening the command palette, so palette
 focus cannot masquerade as editor focus. The Code Actions popover is treated as a
-selection list, not a searchable input. The isolated profile gets D007-only bindings for `file_finder::Toggle`, `editor::ShowCompletions`, `editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions. File Finder selection deliberately stays on Zed's native Picker key path rather than adding a custom FileFinder-context probe or confirm binding.
-The Properties picker query is the exact project-relative fixture path plus `:1:4`, so File Finder owns both exact-file selection and cursor placement. Native Picker confirmation waits for an in-flight match update before confirming; the gate then requires exact `didOpen` and a positive Spring index update before completion.
+selection list, not a searchable input. The isolated profile needs D007-only bindings only for dev-extension installation, completion, Code Actions, and indexed `editor::ConfirmCodeAction` actions. File navigation has no D007 key binding. The exact Properties or Java target is passed on the command line that creates a fresh foreground Zed process, and exact `didOpen` is required before editor interaction continues.
 The harness waits for coordinator evidence that the configure action exists and
 uses the exact returned item index. If the menu has not been materialized yet,
 Zed's `ConfirmCodeAction` handler returns `None`, so bounded retries are
