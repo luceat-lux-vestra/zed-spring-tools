@@ -1604,6 +1604,27 @@ async function runEmbeddedMcpRegression(
       INDEX_TIMEOUT_MS,
     );
 
+    // The top-level standalone regression re-reconciles open documents once the
+    // project index is ready. Do the same here before claiming anything about
+    // MCP/LSP coexistence, then establish a pre-MCP completion baseline.
+    client.notify("textDocument/didChange", {
+      textDocument: {
+        uri: pathToFileURL(propertiesFile).href,
+        version: 2,
+      },
+      contentChanges: [{ text: fs.readFileSync(propertiesFile, "utf8") }],
+    });
+    const baselineCompletionResult = await waitForCompletion(
+      client,
+      pathToFileURL(propertiesFile).href,
+      { line: 0, character: 3 },
+      (items) => items.some((item) =>
+        String(item?.label ?? item?.insertText ?? "").includes("server.port")
+      ),
+      "LSP server.port completion before MCP requests",
+    );
+    assert.equal(baselineCompletionResult.items.length > 0, true);
+
     let ports = [];
     await waitFor(
       () => {
@@ -1697,6 +1718,7 @@ async function runEmbeddedMcpRegression(
       "LSP server.port completion after MCP requests",
     );
     const completion = completionResult.items;
+    assert.equal(completion.length > 0, true);
 
     await client.request("shutdown", null);
     client.notify("exit", null);
@@ -1705,7 +1727,10 @@ async function runEmbeddedMcpRegression(
       endpoint,
       toolCount: toolList.length,
       projectListCalled: true,
+      lspCompletionBeforeMcp: true,
       lspCompletionAfterMcp: true,
+      baselineCompletionCount: baselineCompletionResult.items.length,
+      afterMcpCompletionCount: completion.length,
     });
   } catch (error) {
     throw new Error(
