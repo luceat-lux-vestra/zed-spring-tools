@@ -1829,9 +1829,7 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
     properties.replace("server.port=8080", "server.port=0") +
       [
         "",
-        "# D007 live-data runtime controls.",
-        "spring.jmx.enabled=true",
-        "management.endpoints.jmx.exposure.include=*",
+        "# D007 live-data runtime controls not supplied by the generated launch args.",
         "management.endpoints.web.exposure.include=*",
         "management.endpoint.health.show-details=always",
         "",
@@ -1840,7 +1838,19 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
   compileFixture(worktree, javaHome);
 
   let appLog = "";
-  const app = spawn("mvn", ["spring-boot:run"], {
+  const liveLaunchVmArgs = [
+    "-Dspring.jmx.enabled=true",
+    "-Dmanagement.endpoints.jmx.exposure.include=*",
+    "-Dspring.application.admin.enabled=true",
+    "-Dspring.boot.project.name=zed-spring-tools-fixture",
+  ];
+  const app = spawn(
+    "mvn",
+    [
+      "spring-boot:run",
+      "-Dspring-boot.run.jvmArguments=" + liveLaunchVmArgs.join(" "),
+    ],
+    {
     cwd: worktree,
     detached: true,
     shell: false,
@@ -1850,7 +1860,8 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
       PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
     },
     stdio: ["ignore", "pipe", "pipe"],
-  });
+    },
+  );
   for (const stream of [app.stdout, app.stderr]) {
     stream.on("data", (chunk) => {
       appLog = (appLog + chunk.toString("utf8")).slice(-1024 * 1024);
