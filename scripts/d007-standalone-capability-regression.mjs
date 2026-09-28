@@ -879,15 +879,19 @@ async function main() {
     const namedQueryDiagnostics = await waitForDiagnostics(
       client,
       uri(namedQueries),
-      (diagnostics) => diagnostics.some((diagnostic) =>
-        /JPQL_SYNTAX|mismatched|syntax/i.test(
-          `${diagnostic.code ?? ""} ${diagnostic.message ?? ""}`,
-        )
+      (diagnostics) => diagnostics.some(
+        (diagnostic) => String(diagnostic.code ?? "") === "HQL_SYNTAX",
       ),
       "named-query diagnostics",
     );
-    evidence.checks.jpaNamedQueryDiagnostics = pass("jpa-query-properties diagnostics", {
+    const namedQuerySyntaxDiagnostic = namedQueryDiagnostics.find(
+      (diagnostic) => String(diagnostic.code ?? "") === "HQL_SYNTAX",
+    );
+    assert.ok(namedQuerySyntaxDiagnostic);
+    evidence.checks.jpaNamedQueryDiagnostics = pass("jpa-query-properties project-aware HQL diagnostics", {
       count: namedQueryDiagnostics.length,
+      code: String(namedQuerySyntaxDiagnostic.code),
+      message: boundedCompletionText(namedQuerySyntaxDiagnostic.message, 240),
     });
 
     const inlayHints = await client.request("textDocument/inlayHint", {
