@@ -83,7 +83,7 @@ through the isolated keymap rather than reopening the command palette, so palett
 focus cannot masquerade as editor focus. The Code Actions popover is treated as a
 selection list, not a searchable input. The isolated profile gets D007-only bindings for `file_finder::Toggle`,
 `file_finder::OpenWithoutDismiss`, `menu::Confirm`, `editor::ShowCompletions`,
-`editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions.
+`editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions. File Finder-specific bindings use the same nested focus context as upstream Zed (`FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)`), because the searchable input owns focus inside `Picker > Editor` rather than on the FileFinder root itself.
 The Properties picker query is the exact absolute fixture path plus `:1:4`, so the public File Finder action owns both exact-file selection and cursor placement. `OpenWithoutDismiss` is retried only while the picker remains focused; exact `didOpen` proves that its selected match really opened before the single `menu::Confirm` transfers focus to that editor. The gate does not send completion until that exact URI and a positive Spring index update are observed.
 The harness waits for coordinator evidence that the configure action exists and
 uses the exact returned item index. If the menu has not been materialized yet,

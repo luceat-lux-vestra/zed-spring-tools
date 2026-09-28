@@ -181,7 +181,10 @@ function d007Keymap() {
   });
   return [
     { context: "Workspace", bindings: workspaceBindings },
-    { context: "FileFinder", bindings: fileFinderBindings },
+    {
+      context: "FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)",
+      bindings: fileFinderBindings,
+    },
     { context: "Editor", bindings: editorBindings },
   ];
 }
@@ -1839,7 +1842,10 @@ function selfTest() {
       stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
       "file_finder::Toggle",
     );
-    assert.equal(stagedKeymap[1].context, "FileFinder");
+    assert.equal(
+      stagedKeymap[1].context,
+      "FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)",
+    );
     assert.equal(
       stagedKeymap[1].bindings["ctrl-cmd-alt-f"],
       "file_finder::OpenWithoutDismiss",
@@ -1877,6 +1883,13 @@ function selfTest() {
       harnessSource.includes('"file_finder::OpenWithoutDismiss"'),
       true,
       "D007 exact-file opening must probe asynchronous File Finder matches safely",
+    );
+    assert.equal(
+      harnessSource.includes(
+        '"FileFinder || (FileFinder > Picker > Editor) || (FileFinder > Picker > menu)"',
+      ),
+      true,
+      "D007 File Finder actions must bind where the picker input actually owns focus",
     );
     assert.equal(
       harnessSource.includes('"zed::InstallDevExtension"'),
