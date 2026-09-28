@@ -547,3 +547,27 @@ test("D007 live regression proves mappings and Hover before merged live CodeLens
   );
 });
 
+test("D007 live regression records gated Spring highlight protocol evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const coordinator = fs.readFileSync(path.join(root, "coordinator", "src", "main.mjs"), "utf8");
+
+  assert.equal(
+    regression.includes('ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1"'),
+    true,
+    "live coordinator child must enable the existing D007-only protocol evidence channel",
+  );
+  assert.equal(
+    coordinator.includes('event: "spring-highlight"') &&
+      coordinator.includes("codeLensCount: codeLenses.length"),
+    true,
+    "D007 protocol evidence must record whether Spring emitted live highlight lenses",
+  );
+  assert.equal(
+    regression.includes('".d007",') &&
+      regression.includes('"coordinator-protocol.jsonl"') &&
+      regression.includes("protocolTail="),
+    true,
+    "live regression failures must surface bounded coordinator protocol evidence",
+  );
+});
+
