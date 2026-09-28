@@ -553,7 +553,7 @@ async function main() {
     const yamlCompletionResult = await waitForCompletion(
       client,
       uri(yaml),
-      positionAfter(yaml.text, "ser"),
+      positionAtExactLineEnd(yaml.text, "ser"),
       (items) => items.length > 0,
       "YAML completion after standalone reindex",
     );
