@@ -107,19 +107,20 @@ candidate. A green CI run alone is not sufficient.
 ### 1. Capability inventory
 
 [`capability-inventory.md`](capability-inventory.md) is authoritative for the
-capability state counts and per-row evidence. Release-facing prose must agree
-with it. As of inventory version 55 the current summary is:
+per-row historical evidence, while
+[`protocol/d007-capability-acceptance.json`](../protocol/d007-capability-acceptance.json)
+is the fail-closed overlay for the standalone migration. As of inventory version
+57 the 59 historical row states remain 48 `verified`, 3
+`blocked-zed-api`, 6 `zed-native-equivalent`, and 2 `not-pursued`, but
+those numbers are **not a current standalone release-facing verified count**.
 
-- 59 tracked
-- 48 `verified`
-- 0 `implemented`
-- 0 `planned`
-- 3 `blocked-zed-api`
-- 0 `blocked-upstream`
-- 6 `zed-native-equivalent`
-- 2 `not-pursued`
+For #159, any matrix row whose `currentClaim` is `pending-d007` blocks release
+acceptance until exact-final-candidate evidence closes its assigned group or the
+capability is explicitly narrowed/reclassified. A desktop architecture-smoke
+PASS cannot promote those rows by itself.
 
-A capability is never promoted merely because code exists.
+A capability is never promoted merely because code exists or because a
+historical tuple passed under the retired Java-transport architecture.
 
 ### 2. Compatibility claims
 
@@ -166,6 +167,9 @@ The bounded lifecycle gate covers at least:
 - first-run pinned Spring Tools acquisition and checksum verification;
 - official Java/coordinator handshake;
 - representative Spring completion and diagnostics;
+- no unexpected Spring error-level window messages during acceptance probes;
+- actual execution of generated Maven/Gradle Boot run tasks where the release
+  claims that generated workflow;
 - restart and warm cached/offline startup;
 - uninstall and owned-process/resource cleanup; and
 - actionable failure behavior rather than partial startup.
