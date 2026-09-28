@@ -149,44 +149,19 @@ function stage(javaProfile, root, javaHome) {
   return manifest;
 }
 
-function d007CodeActionIndexKeys() {
-  return [
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
-  ];
-}
-
-
-
-
 function d007Keymap() {
   const workspaceBindings = {
     "ctrl-cmd-alt-i": "zed::InstallDevExtension",
+    "ctrl-cmd-alt-r": "lsp_command_selector::Toggle",
   };
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
     "ctrl-cmd-alt-z": "editor::ShowCompletions",
   };
-  d007CodeActionIndexKeys().forEach((key, itemIx) => {
-    editorBindings[`ctrl-cmd-alt-${key}`] = [
-      "editor::ConfirmCodeAction",
-      { item_ix: itemIx },
-    ];
-  });
   return [
     { context: "Workspace", bindings: workspaceBindings },
     { context: "Editor", bindings: editorBindings },
   ];
-}
-
-function d007ConfirmKey(itemIx) {
-  const keys = d007CodeActionIndexKeys();
-  assert.equal(Number.isInteger(itemIx), true, "Code Action index must be an integer");
-  assert.ok(
-    itemIx >= 0 && itemIx < keys.length,
-    `Code Action index ${itemIx} exceeds the D007 keymap range`,
-  );
-  return keys[itemIx];
 }
 
 
@@ -465,9 +440,18 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
   assert.equal(
     Number.isInteger(offer.configureBootRunIndex),
     true,
-    "configure run/debug Code Action must have an integer item index",
+    "configure run/debug Code Action must have an integer provider response index",
   );
-  d007ConfirmKey(offer.configureBootRunIndex);
+  assert.equal(
+    offer.configureBootRunCommand,
+    "zed-spring-tools.configure-boot-run",
+    "configure run/debug Code Action must carry the exact coordinator command",
+  );
+  assert.equal(
+    offer.configureBootRunArgumentUriMatchesRequest,
+    true,
+    "configure run/debug Code Action must target the exact Java request URI",
+  );
   fs.writeFileSync(
     path.join(manifest.evidence, `${fixtureKind}-configure-code-action-ready.json`),
     JSON.stringify({
@@ -475,7 +459,10 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
       fixture: fixtureKind,
       observedAt: new Date().toISOString(),
       itemCount: offer.itemCount,
-      configureBootRunIndex: offer.configureBootRunIndex,
+      providerConfigureBootRunIndex: offer.configureBootRunIndex,
+      configureBootRunCommand: offer.configureBootRunCommand,
+      configureBootRunArgumentUriMatchesRequest:
+        offer.configureBootRunArgumentUriMatchesRequest,
       codeActionAttempts,
       targetRelativePath: javaRelative,
       targeting: "fresh-foreground-cli-launch-target",
@@ -483,6 +470,19 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
     }, null, 2) + "\n",
     { mode: 0o600 },
   );
+
+  // Zed's Code Actions menu prepends local runnables/tasks and can merge actions
+  // from multiple language servers. The coordinator's response index therefore
+  // is not a stable editor::ConfirmCodeAction item_ix. We have already proven
+  // that the exact action payload is surfaced; close that mixed menu, then
+  // execute the same registered command through Zed's public LSP command
+  // selector, whose identity is the command string rather than a transient menu
+  // position.
+  cancelTransientUiMacos(
+    manifest,
+    `${evidenceName}-cancel-code-actions-after-evidence`,
+  );
+  sleepMs(250);
 
   const commandBaseline = fileSize(protocolFile);
   dispatchConfigureBootRunMacos(
@@ -524,41 +524,52 @@ function dispatchConfigureBootRunMacos(
   timeoutMs,
 ) {
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
-  const confirmKey = d007ConfirmKey(offer.configureBootRunIndex);
+  sendD007ActionKeyMacos(
+    manifest,
+    "r",
+    `${evidenceName}-toggle-lsp-command-selector`,
+  );
+  sleepMs(250);
+
+  const command = offer.configureBootRunCommand;
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    `  keystroke "${escapeAppleScript(command)}"`,
+    '  key code 36',
+    'end tell',
+  ].join("\n");
+  runOsa(
+    script,
+    `${evidenceName}-execute-lsp-command-selector`,
+    manifest.evidence,
+  );
+
   const started = Date.now();
-  let attempts = 0;
   while (Date.now() - started < timeoutMs) {
-    attempts += 1;
-    sendD007ActionKeyMacos(
-      manifest,
-      confirmKey,
-      `${evidenceName}-confirm-code-action-${attempts}`,
-    );
-    const deadline = Math.min(started + timeoutMs, Date.now() + 750);
-    do {
-      const events = protocolEvidenceEvents(readFileDelta(protocolFile, protocolStart));
-      if (events.some((event) => event.event === "configure-boot-run-command")) {
-        fs.writeFileSync(
-          path.join(manifest.evidence, `${evidenceName}-selection.json`),
-          JSON.stringify({
-            sourceHead: manifest.sourceHead,
-            fixture: fixtureKind,
-            selectedAt: new Date().toISOString(),
-            selection: "d007-keymap-confirm-code-action",
-            attempts,
-            coordinatorItemCount: offer.itemCount,
-            coordinatorConfigureBootRunIndex: offer.configureBootRunIndex,
-            status: "PASS",
-          }, null, 2) + "\n",
-          { mode: 0o600 },
-        );
-        return;
-      }
-      sleepMs(100);
-    } while (Date.now() < deadline);
+    const events = protocolEvidenceEvents(readFileDelta(protocolFile, protocolStart));
+    if (events.some((event) => event.event === "configure-boot-run-command")) {
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${evidenceName}-selection.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          selectedAt: new Date().toISOString(),
+          selection: "zed-public-lsp-command-selector",
+          command,
+          coordinatorItemCount: offer.itemCount,
+          providerConfigureBootRunIndex: offer.configureBootRunIndex,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      return;
+    }
+    sleepMs(100);
   }
   throw new Error(
-    `${fixtureKind} configure run/debug command was not dispatched after ${attempts} safe ConfirmCodeAction attempts`,
+    `${fixtureKind} configure run/debug command was not dispatched through Zed's public LSP command selector`,
   );
 }
 
@@ -1943,18 +1954,23 @@ function selfTest() {
       "zed::InstallDevExtension",
     );
     assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-r"],
+      "lsp_command_selector::Toggle",
+    );
+    assert.equal(
       stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
       undefined,
     );
     assert.equal(stagedKeymap[1].context, "Editor");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-z"], "editor::ShowCompletions");
-    assert.deepEqual(
-      stagedKeymap[1].bindings["ctrl-cmd-alt-0"],
-      ["editor::ConfirmCodeAction", { item_ix: 0 }],
+    assert.equal(
+      Object.values(stagedKeymap[1].bindings).some((binding) =>
+        JSON.stringify(binding).includes("editor::ConfirmCodeAction")
+      ),
+      false,
+      "D007 must not confuse a provider-local Code Action index with Zed's merged menu index",
     );
-    assert.equal(d007ConfirmKey(25), "p");
-    assert.throws(() => d007ConfirmKey(26), /exceeds the D007 keymap range/);
 
     const harnessSource = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
     const retiredPaneAction = ["pane", "ActivateItem"].join("::");
@@ -2009,6 +2025,16 @@ function selfTest() {
       harnessSource.includes('"zed::InstallDevExtension"'),
       true,
       "D007 dev-extension installation must dispatch the public action directly",
+    );
+    assert.equal(
+      harnessSource.includes('"lsp_command_selector::Toggle"'),
+      true,
+      "D007 run/debug dispatch must use Zed's public LSP command selector",
+    );
+    assert.equal(
+      harnessSource.includes('"editor::ConfirmCodeAction"'),
+      false,
+      "D007 must not select Code Actions by a provider-local response index",
     );
     const retiredInstallPaletteLiteral = ['set installAction to ', '"zed: install dev extension"'].join("");
     assert.equal(
