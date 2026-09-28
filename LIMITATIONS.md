@@ -152,8 +152,14 @@ exact submitted commit.
   `vmArgs`, `args`, and `env` slots. The official Java 6.8.21 debug helper uses an
   HTTP `localhost` callback, so a system HTTP proxy must bypass `localhost` and
   `127.0.0.1`; otherwise main-class resolution times out before launch. The
-  isolated-profile DAP helper path remains an S016 caveat. Maven multi-project
-  selection is verified. **Gradle is verified too, as of 2026-07-29**: the action
+  isolated-profile DAP helper path remains an S016 caveat in the historical
+  evidence. D007 now adds an exact-candidate regression that starts the generated
+  base Maven Java configuration through Zed's public `debugger::Start` picker,
+  requires a new JVM for the exact staged worktree/main class with JDWP enabled,
+  then requires `debugger::Stop` to terminate it. That standalone-era DAP claim
+  remains pending until the final candidate emits `desktop-dap-regression.json`
+  with `debugLaunch: PASS`. Maven multi-project selection is verified.
+  **Gradle is verified too, as of 2026-07-29**: the action
   generated `./gradlew bootRun` with the profile forwarded as
   `--args=--spring.profiles.active=<p>`, and both the base and `dev` commands
   were run verbatim and served `GET /greeting`, the `dev` one on the port its
@@ -250,10 +256,12 @@ exact submitted commit.
   testing, but it is no longer a product initialization requirement.
 - A first-use download hang was reproducibly observed in 2026-07 on the old VSIX
   acquisition path. D007 downloads a different artifact from Spring's CDN, so
-  that observation is not automatically a current defect. First-install,
-  restart, offline, corrupt-cache repair, and cleanup behavior for the standalone
-  artifact remain release-gate items until exact-final-HEAD Zed validation is
-  recorded.
+  that observation is not automatically a current defect. The exact-HEAD D007
+  harness now drives the standalone path through warm-cache offline startup,
+  first-install offline failure/recovery, checksum-corruption offline
+  failure/recovery, and partial-staging cleanup. Those remain release-blocking
+  until the final candidate produces `standalone-offline-regression.json` with
+  `offlineLifecycle: PASS`; historical VSIX evidence is not substituted.
 - The extension checks its configured Java executable before starting Spring
   Tools and requires JDK 21 or newer. The former "missing/incompatible official
   Java route" diagnostic and structural provider-schema check were part of the
@@ -283,13 +291,17 @@ exact submitted commit.
   SHA-256 are pinned in `protocol/spring-artifacts.json`; activation rejects a
   mismatched file. The project does not mirror or repackage the artifact.
 - The detailed 2026-07 offline gate was run against the retired VSIX/JDT bridge
-  installation path. Its fail-closed principles remain requirements, but its
-  result is not standalone evidence. The standalone path must still prove:
-  first-install offline failure without a usable partial artifact, warm-cache
-  startup without re-download, checksum rejection/repair behavior, and clean
-  recovery after network access returns. Network-dependent Spring version/support
-  diagnostics are also revalidated separately rather than assumed from the old
-  gate.
+  installation path. Its result is not standalone evidence. The current D007
+  gate therefore applies a loopback-only macOS sandbox to the isolated Zed
+  process and proves the direct-JAR lifecycle instead: a validated warm cache
+  still supplies authentic `server.port` completion with external network
+  denied; a missing artifact fails closed without starting the coordinator or
+  leaving a usable/partial download and recovers when network access returns; a
+  same-size checksum-corrupted artifact also fails closed offline without being
+  replaced by unverified bytes, then is re-downloaded to the pinned SHA-256
+  online. Network-dependent Spring version/support diagnostics are revalidated
+  separately rather than assumed from the old gate. This claim becomes current
+  only when the exact final candidate records that D007 evidence.
 - SSH remote development and WSL-hosted remote projects are not in the initial
   product scope.
 
