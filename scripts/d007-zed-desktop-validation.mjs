@@ -315,6 +315,9 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     runDesktopDapRegressionMacos(root, "maven", 180_000);
     setPhase("maven-dap-shutdown");
     stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+    setPhase("standalone-offline-regression");
+    runStandaloneOfflineRegressionMacos(root, "maven", 180_000);
   } catch (error) {
     primaryError = error;
     writeGateFailure(manifest, phase, error);
@@ -525,6 +528,334 @@ function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
     3,
   );
   captureScreen(path.join(manifest.evidence, `${fixtureKind}-completion.png`));
+}
+
+function runStandaloneOfflineRegressionMacos(
+  root,
+  fixtureKind,
+  timeoutMs,
+) {
+  assert.equal(process.platform, "darwin", "offline desktop gate is macOS-only");
+  const manifest = readManifest(root);
+  const pin = springArtifactPin();
+  const artifact = locateInstalledSpringArtifact(manifest, pin);
+  assert.equal(fs.statSync(artifact).size, pin.size);
+  assert.equal(sha256File(artifact), pin.sha256);
+
+  const sandboxProfile = loopbackOnlySandboxProfile();
+  const denialProbe = spawnSync(
+    "/usr/bin/sandbox-exec",
+    [
+      "-p",
+      sandboxProfile,
+      "/usr/bin/curl",
+      "--silent",
+      "--show-error",
+      "--connect-timeout",
+      "3",
+      "https://example.com/",
+    ],
+    { encoding: "utf8", timeout: 8_000 },
+  );
+  assert.notEqual(
+    denialProbe.status,
+    0,
+    "offline sandbox must deny a real non-loopback outbound connection",
+  );
+
+  const propertiesRelative = "src/main/resources/application-d007.properties";
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+
+  let warmLaunchStarted = false;
+  let corruptLaunchStarted = false;
+  let repairLaunchStarted = false;
+  try {
+    const warmProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-warm",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    warmLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const warm = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      warmProtocolStart,
+      timeoutMs,
+      "offline-warm",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    warmLaunchStarted = false;
+
+    const originalDigest = sha256File(artifact);
+    corruptFileByte(artifact);
+    const corruptDigest = sha256File(artifact);
+    assert.notEqual(corruptDigest, originalDigest);
+    assert.equal(fs.statSync(artifact).size, pin.size);
+
+    const corruptProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-corrupt",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    corruptLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const corruptRecord = JSON.parse(
+      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+    );
+    const failure = waitForOfflineDownloadFailure(
+      corruptRecord.logPath,
+      corruptRecord.logStartOffset,
+      pin.tag,
+      60_000,
+    );
+    const corruptProtocolDelta = readFileDelta(protocolFile, corruptProtocolStart);
+    assert.equal(
+      protocolEvidenceEvents(corruptProtocolDelta)
+        .some((event) => event.event === "coordinator-start"),
+      false,
+      "corrupt standalone artifact must not enter a reduced coordinator mode offline",
+    );
+    assert.equal(
+      sha256File(artifact),
+      corruptDigest,
+      "failed offline repair must not replace the corrupt installation with unverified bytes",
+    );
+    assert.equal(
+      fs.existsSync(artifact + ".download"),
+      false,
+      "failed standalone download must not leave a partial staging artifact",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    corruptLaunchStarted = false;
+
+    const repairProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-repair-online",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "normal",
+    });
+    repairLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const repair = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      repairProtocolStart,
+      timeoutMs,
+      "offline-repair-online",
+    );
+    assert.equal(fs.statSync(artifact).size, pin.size);
+    assert.equal(
+      sha256File(artifact),
+      pin.sha256,
+      "online recovery must restore the exact pinned standalone checksum",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    repairLaunchStarted = false;
+
+    const evidence = {
+      sourceHead: manifest.sourceHead,
+      observedAt: new Date().toISOString(),
+      checks: {
+        offlineLifecycle: {
+          status: "PASS",
+          networkDenialProbe: "PASS",
+          warmCachedStartup: warm.status,
+          corruptOfflineFailClosed: "PASS",
+          corruptFailureMarker: failure.marker,
+          partialDownloadAbsent: true,
+          onlineRepair: repair.status,
+          repairedPinnedChecksum: true,
+        },
+      },
+      status: "PASS",
+    };
+    fs.writeFileSync(
+      path.join(manifest.evidence, "standalone-offline-regression.json"),
+      JSON.stringify(evidence, null, 2) + "\n",
+      { mode: 0o600 },
+    );
+    return evidence;
+  } finally {
+    if (warmLaunchStarted || corruptLaunchStarted || repairLaunchStarted) {
+      ensureZedStopped(root, manifest, 5_000, 5_000);
+    }
+  }
+}
+
+function springArtifactPin() {
+  const file = path.join(repository, "protocol", "spring-artifacts.json");
+  requireFile(file, "Spring artifact pin manifest");
+  const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+  const pin = manifest.springTools;
+  assert.equal(pin?.mode, "standalone");
+  assert.equal(typeof pin?.asset, "string");
+  assert.equal(Number.isInteger(pin?.size), true);
+  assert.match(pin?.sha256 ?? "", /^[0-9a-f]{64}$/);
+  assert.equal(typeof pin?.tag, "string");
+  return pin;
+}
+
+function locateInstalledSpringArtifact(manifest, pin) {
+  const ownWorkRoot = path.join(
+    manifest.profile,
+    "extensions",
+    "work",
+    "spring-tools",
+  );
+  requireDirectory(ownWorkRoot, "spring-tools own extension work directory");
+  const matches = findFilesNamed(ownWorkRoot, pin.asset, 6);
+  assert.equal(
+    matches.length,
+    1,
+    "exactly one pinned standalone artifact must exist in spring-tools own work directory",
+  );
+  return matches[0];
+}
+
+function findFilesNamed(directory, name, depth) {
+  if (depth < 0 || !fs.existsSync(directory)) return [];
+  const matches = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isFile() && entry.name === name) {
+      matches.push(absolute);
+    } else if (entry.isDirectory()) {
+      matches.push(...findFilesNamed(absolute, name, depth - 1));
+    }
+  }
+  return matches;
+}
+
+function corruptFileByte(file) {
+  const fd = fs.openSync(file, "r+");
+  try {
+    const size = fs.fstatSync(fd).size;
+    assert.equal(size > 0, true, "artifact selected for corruption must be non-empty");
+    const offset = Math.floor(size / 2);
+    const byte = Buffer.alloc(1);
+    fs.readSync(fd, byte, 0, 1, offset);
+    byte[0] ^= 0xff;
+    fs.writeSync(fd, byte, 0, 1, offset);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function loopbackOnlySandboxProfile() {
+  return [
+    "(version 1)",
+    "(allow default)",
+    "(deny network-outbound)",
+    '(allow network-bind (local ip "localhost:*"))',
+    '(allow network-inbound (local ip "localhost:*"))',
+    '(allow network-outbound (remote ip "localhost:*"))',
+  ].join("\n");
+}
+
+function waitForFreshSpringCompletionMacos(
+  manifest,
+  fixtureKind,
+  relativePath,
+  protocolStart,
+  timeoutMs,
+  evidenceName,
+) {
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const target = path.join(manifest.worktrees[fixtureKind], relativePath);
+  const targetUri = pathToFileURL(target).href;
+  const started = Date.now();
+
+  let readiness = {
+    coordinatorStarted: false,
+    targetDocumentOpened: false,
+    indexReady: false,
+  };
+  waitUntil(
+    () => {
+      readiness = springTargetReadiness(
+        readFileDelta(protocolFile, protocolStart),
+        targetUri,
+      );
+      return readiness.coordinatorStarted &&
+        readiness.targetDocumentOpened &&
+        readiness.indexReady;
+    },
+    evidenceName + " fresh Spring runtime readiness",
+    Math.min(timeoutMs, 120_000),
+  );
+
+  const completionStart = fileSize(protocolFile);
+  triggerCompletionMacos(
+    manifest,
+    fixtureKind,
+    evidenceName + "-completion",
+  );
+  const expectedRequest = { uri: targetUri, line: 0, character: 3 };
+  let observation;
+  waitUntil(
+    () => {
+      observation = completionObservation(
+        readFileDelta(protocolFile, completionStart),
+        expectedRequest,
+      );
+      return observation.expectedRequestObserved &&
+        observation.expectedResponseObserved &&
+        observation.serverPortObserved;
+    },
+    evidenceName + " exact server.port completion",
+    Math.min(timeoutMs, 60_000),
+  );
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    targetRelativePath: relativePath,
+    targetUri,
+    readiness,
+    completion: observation,
+    networkPolicy: JSON.parse(
+      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+    ).networkPolicy,
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, evidenceName + "-completion.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
+}
+
+function waitForOfflineDownloadFailure(logFile, start, tag, timeoutMs) {
+  const markers = [
+    "download pinned Spring Tools " + tag,
+    "Failed to run spring-tools",
+    "Operation not permitted",
+  ];
+  let marker = null;
+  waitUntil(
+    () => {
+      const text = readFileDelta(logFile, start);
+      marker = markers.find((candidate) => text.includes(candidate)) ?? null;
+      return marker !== null;
+    },
+    "fail-closed standalone download error under outbound network denial",
+    timeoutMs,
+  );
+  return { marker };
 }
 
 function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
@@ -2140,7 +2471,14 @@ function sleepMs(ms) {
 function launchMacos(
   root,
   fixtureKind,
-  { role = "root", relativeTarget = null, row = null, column = null, zedCli = null } = {},
+  {
+    role = "root",
+    relativeTarget = null,
+    row = null,
+    column = null,
+    zedCli = null,
+    networkPolicy = "normal",
+  } = {},
 ) {
   assert.equal(process.platform, "darwin", "macOS launch is required");
   assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
@@ -2171,12 +2509,25 @@ function launchMacos(
     launchTargets.push(targetArgument);
   }
 
-  const child = spawn(cli, [
+  assert.ok(
+    ["normal", "loopback-only"].includes(networkPolicy),
+    "network policy must be normal or loopback-only",
+  );
+  const cliArgs = [
     "--foreground",
     "--user-data-dir",
     manifest.profile,
     ...launchTargets,
-  ], {
+  ];
+  const executable = networkPolicy === "loopback-only"
+    ? "/usr/bin/sandbox-exec"
+    : cli;
+  if (networkPolicy === "loopback-only") requireFile(executable, "sandbox-exec");
+  const launchArgs = networkPolicy === "loopback-only"
+    ? ["-p", loopbackOnlySandboxProfile(), cli, ...cliArgs]
+    : cliArgs;
+
+  const child = spawn(executable, launchArgs, {
     detached: true,
     stdio: ["ignore", fd, fd],
     env: {
@@ -2205,6 +2556,7 @@ function launchMacos(
     requestedPosition: relativeTarget !== null && row !== null ? { row, column } : null,
     launchTargets,
     controlPlane: "fresh-foreground-cli-per-phase",
+    networkPolicy,
     logPath,
     logStartOffset,
   }, null, 2) + "\n", { mode: 0o600 });
