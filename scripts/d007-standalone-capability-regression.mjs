@@ -1170,6 +1170,13 @@ async function main() {
       runRoot,
     );
 
+    const liveChecks = await runStandaloneLiveRegression(
+      jar,
+      javaHome,
+      runRoot,
+    );
+    Object.assign(evidence.checks, liveChecks);
+
     const modulith = await runModulithRegression(
       pin,
       jar,
@@ -1658,6 +1665,637 @@ function parseMcpPayload(payload) {
     }
   }
   throw new Error("MCP response contained no JSON-RPC payload");
+}
+
+
+async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
+  assert.notEqual(
+    process.platform,
+    "win32",
+    "D007 standalone live regression currently requires POSIX process groups",
+  );
+  const worktree = path.join(runRoot, "live-fixture");
+  fs.cpSync(FIXTURE, worktree, { recursive: true });
+
+  const pomFile = path.join(worktree, "pom.xml");
+  const pom = fs.readFileSync(pomFile, "utf8");
+  assert.match(pom, /<\/dependencies>/);
+  fs.writeFileSync(
+    pomFile,
+    pom.replace(
+      "</dependencies>",
+      [
+        "        <dependency>",
+        "            <groupId>org.springframework.boot</groupId>",
+        "            <artifactId>spring-boot-starter-actuator</artifactId>",
+        "        </dependency>",
+        "    </dependencies>",
+      ].join("\n"),
+    ),
+  );
+  const propertiesFile = path.join(
+    worktree,
+    "src",
+    "main",
+    "resources",
+    "application.properties",
+  );
+  const properties = fs.readFileSync(propertiesFile, "utf8");
+  fs.writeFileSync(
+    propertiesFile,
+    properties.replace("server.port=8080", "server.port=0") +
+      [
+        "",
+        "# D007 live-data runtime controls.",
+        "spring.jmx.enabled=true",
+        "management.endpoints.jmx.exposure.include=*",
+        "management.endpoints.web.exposure.include=*",
+        "management.endpoint.health.show-details=always",
+        "",
+      ].join("\n"),
+  );
+  compileFixture(worktree, javaHome);
+
+  let appLog = "";
+  const app = spawn("mvn", ["spring-boot:run"], {
+    cwd: worktree,
+    detached: true,
+    shell: false,
+    env: {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  for (const stream of [app.stdout, app.stderr]) {
+    stream.on("data", (chunk) => {
+      appLog = (appLog + chunk.toString("utf8")).slice(-1024 * 1024);
+    });
+  }
+
+  let coordinator = null;
+  let automaticCoordinator = null;
+  try {
+    await waitFor(
+      () =>
+        /Started FixtureApplication/.test(appLog) &&
+        /Tomcat started on port \d+/.test(appLog),
+      "live fixture Boot application",
+      180_000,
+    );
+    const portMatch = /Tomcat started on port (\d+)/.exec(appLog);
+    assert.ok(portMatch);
+    const appPort = Number(portMatch[1]);
+    assert.equal(Number.isInteger(appPort) && appPort > 0, true);
+
+    const configuration = structuredClone(DEFAULT_CONFIGURATION);
+    configuration["boot-java"]["live-information"] = {
+      ...(configuration["boot-java"]["live-information"] ?? {}),
+      "all-local-java-processes": true,
+    };
+
+    let promptMode = "none";
+    const responder = (message) => {
+      const actions = message.params?.actions ?? [];
+      const titles = actions.map((action) => String(action?.title ?? ""));
+      let selected = null;
+      if (promptMode === "connect-local") {
+        selected = titles.find((title) => title.startsWith("Connect — "));
+      } else if (promptMode === "refresh-local") {
+        selected = titles.find((title) => title.startsWith("Refresh — "));
+      } else if (promptMode === "disconnect-local") {
+        selected = titles.find((title) => title.startsWith("Disconnect — "));
+      } else if (promptMode === "connect-remote") {
+        selected = titles.find(
+          (title) => title.startsWith("Connect — ") && title.includes("d007-remote"),
+        );
+      } else if (promptMode === "logger") {
+        if (/Select a logger/.test(String(message.params?.message ?? ""))) {
+          selected = titles.find((title) => title.startsWith("ROOT — "));
+        } else if (/Select a configured level/.test(String(message.params?.message ?? ""))) {
+          selected = titles.find((title) => title === "DEBUG");
+        } else if (/Set logger/.test(String(message.params?.message ?? ""))) {
+          selected = titles.find((title) => title === "Apply DEBUG");
+        }
+      }
+      return selected === null ? null : { title: selected };
+    };
+
+    ({ child: coordinator, client: coordinator.client } =
+      await startCoordinatorRegressionClient({
+        jar,
+        javaHome,
+        worktree,
+        configuration,
+        automaticLiveConnection: false,
+        responder,
+      }));
+    const client = coordinator.client;
+    const controller = liveControllerFile(worktree);
+    await openLiveController(client, controller);
+    await waitForSpringIndex(client, "live coordinator Spring index");
+
+    const localDescriptor = await waitForLiveProcessDescriptor(
+      client,
+      (entry) =>
+        entry?.action === "sts/livedata/connect" &&
+        (
+          entry?.projectName === "zed-spring-tools-fixture" ||
+          /FixtureApplication|zed-spring-tools-fixture/.test(String(entry?.label ?? ""))
+        ),
+      "local Boot process descriptor",
+    );
+    assert.equal(typeof localDescriptor.processKey, "string");
+
+    promptMode = "connect-local";
+    const notificationStart = client.notifications.length;
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.manage-live-process", arguments: [] },
+    );
+    const localConnected = await waitForNotificationAfter(
+      client,
+      notificationStart,
+      "sts/liveprocess/connected",
+      (message) => message.params?.processKey === localDescriptor.processKey,
+      "local live-process connected notification",
+      60_000,
+    );
+    assert.equal(localConnected.params?.type, "local");
+
+    const connected = await client.request(
+      "workspace/executeCommand",
+      { command: "sts/livedata/listConnected", arguments: [] },
+      30_000,
+    );
+    assert.equal(
+      Array.isArray(connected) &&
+        connected.some((entry) => entry?.processKey === localDescriptor.processKey),
+      true,
+    );
+
+    const liveLens = await waitForLiveUrlCodeLens(
+      client,
+      controller,
+      appPort,
+      60_000,
+    );
+    const liveUrl = liveLens.command.arguments?.[0]?.url;
+    assert.equal(typeof liveUrl, "string");
+    assert.match(liveUrl, new RegExp(":" + appPort + "/greeting"));
+
+    const liveHover = await waitForLiveHover(
+      client,
+      controller,
+      appPort,
+      60_000,
+    );
+    assert.match(liveHover, /Process \[/);
+    assert.match(liveHover, new RegExp(":" + appPort + "/greeting"));
+
+    const liveDocument = path.join(worktree, ".zed", "spring-live.md");
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.generate-live-metrics-document", arguments: [] },
+    );
+    await waitFor(
+      () => {
+        if (!fs.existsSync(liveDocument)) return false;
+        const content = fs.readFileSync(liveDocument, "utf8");
+        return /Live metrics|Metrics/i.test(content) && /Loggers/i.test(content);
+      },
+      "generated authentic Live data document",
+      90_000,
+    );
+    const liveDocumentText = fs.readFileSync(liveDocument, "utf8");
+    assert.match(liveDocumentText, /jvm\.|memory|heap/i);
+    assert.match(liveDocumentText, /ROOT/);
+
+    promptMode = "logger";
+    const loggerNotificationStart = client.notifications.length;
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.configure-live-log-level", arguments: [] },
+    );
+    await waitForNotificationAfter(
+      client,
+      loggerNotificationStart,
+      "sts/liveprocess/loglevel/updated",
+      () => true,
+      "live logger level update",
+      60_000,
+    );
+    const loggerState = await client.request(
+      "workspace/executeCommand",
+      {
+        command: "sts/livedata/getLoggers",
+        arguments: [
+          {
+            processKey: localDescriptor.processKey,
+            processName: localConnected.params?.processName,
+            type: "local",
+            pid: localConnected.params?.pid,
+          },
+          { endpoint: "loggers" },
+        ],
+      },
+      30_000,
+    );
+    assert.equal(
+      loggerState?.loggers?.loggers?.ROOT?.configuredLevel === "DEBUG" ||
+        loggerState?.loggers?.loggers?.ROOT?.effectiveLevel === "DEBUG",
+      true,
+      "ROOT logger must reflect the requested DEBUG level",
+    );
+
+    promptMode = "refresh-local";
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.manage-live-process", arguments: [] },
+    );
+    await waitForWindowMessage(
+      client,
+      /Refreshed live data|Requested live-data refresh/i,
+      "live refresh notice",
+      30_000,
+    );
+
+    promptMode = "disconnect-local";
+    const disconnectStart = client.notifications.length;
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.manage-live-process", arguments: [] },
+    );
+    await waitForNotificationAfter(
+      client,
+      disconnectStart,
+      "sts/liveprocess/disconnected",
+      (message) => message.params?.processKey === localDescriptor.processKey,
+      "local live-process disconnected notification",
+      60_000,
+    );
+
+    const remoteUrl = "http://127.0.0.1:" + appPort + "/actuator";
+    configuration["boot-java"]["remote-apps"] = [{
+      jmxurl: remoteUrl,
+      processName: "d007-remote",
+      projectName: "zed-spring-tools-fixture",
+      manualConnect: true,
+      keepChecking: false,
+    }];
+    client.configuration = configuration;
+    client.notify("workspace/didChangeConfiguration", { settings: configuration });
+    const remoteDescriptor = await waitForLiveProcessDescriptor(
+      client,
+      (entry) =>
+        entry?.action === "sts/livedata/connect" &&
+        entry?.processKey === remoteUrl,
+      "remote Boot process descriptor",
+    );
+    assert.match(String(remoteDescriptor.label ?? ""), /d007-remote|127\.0\.0\.1/);
+
+    promptMode = "connect-remote";
+    const remoteStart = client.notifications.length;
+    await client.request(
+      "workspace/executeCommand",
+      { command: "zed-spring-tools.manage-live-process", arguments: [] },
+    );
+    const remoteConnected = await waitForNotificationAfter(
+      client,
+      remoteStart,
+      "sts/liveprocess/connected",
+      (message) => message.params?.processKey === remoteUrl,
+      "remote live-process connected notification",
+      60_000,
+    );
+    assert.equal(remoteConnected.params?.type, "remote");
+    const remoteLoggers = await client.request(
+      "workspace/executeCommand",
+      {
+        command: "sts/livedata/getLoggers",
+        arguments: [
+          {
+            processKey: remoteUrl,
+            processName: remoteConnected.params?.processName,
+            type: "remote",
+          },
+          { endpoint: "loggers" },
+        ],
+      },
+      30_000,
+    );
+    assert.equal(
+      Object.keys(remoteLoggers?.loggers?.loggers ?? {}).length > 0,
+      true,
+      "remote HTTP Actuator connection must expose loggers",
+    );
+
+    configuration["boot-java"]["remote-apps"] = [];
+    client.configuration = configuration;
+    const remoteDisconnectStart = client.notifications.length;
+    client.notify("workspace/didChangeConfiguration", { settings: configuration });
+    await waitForNotificationAfter(
+      client,
+      remoteDisconnectStart,
+      "sts/liveprocess/disconnected",
+      (message) => message.params?.processKey === remoteUrl,
+      "remote configuration disconnect notification",
+      60_000,
+    );
+
+    await shutdownRegressionClient(coordinator);
+
+    const automatic = await startCoordinatorRegressionClient({
+      jar,
+      javaHome,
+      worktree,
+      configuration,
+      automaticLiveConnection: true,
+      responder: () => null,
+    });
+    automaticCoordinator = automatic.child;
+    automaticCoordinator.client = automatic.client;
+    const automaticClient = automatic.client;
+    await openLiveController(automaticClient, controller);
+    const automaticStart = automaticClient.notifications.length;
+    await waitForSpringIndex(
+      automaticClient,
+      "automatic live coordinator Spring index",
+    );
+    const automaticConnected = await waitForNotificationAfter(
+      automaticClient,
+      automaticStart,
+      "sts/liveprocess/connected",
+      (message) =>
+        message.params?.type === "local" &&
+        message.params?.processKey !== remoteUrl,
+      "automatic local live-process connection",
+      90_000,
+    );
+    assert.equal(automaticConnected.params?.type, "local");
+
+    return {
+      localConnect: pass("actual local Boot process connected and disconnected", {
+        processKeyObserved: true,
+      }),
+      liveCodeLens: pass("live request-mapping CodeLens reached coordinator", {
+        url: liveUrl,
+      }),
+      liveHover: pass("live request-mapping Hover includes process and URL"),
+      openBootAppUrl: pass("live request-mapping CodeLens exposes running app URL", {
+        url: liveUrl,
+      }),
+      metrics: pass("authentic live metrics rendered into owned Live document"),
+      loggers: pass("authentic ROOT logger level changed and confirmed", {
+        configuredLevel: "DEBUG",
+      }),
+      showHideRefresh: pass("explicit refresh and disconnect completed"),
+      remoteConnect: pass("declared HTTP Actuator target connected through 5.3 manual route", {
+        endpoint: remoteUrl,
+      }),
+      automaticConnection: pass("coordinator automatically connected one matching local Boot process"),
+    };
+  } catch (error) {
+    throw new Error(
+      "standalone live regression failed: " +
+        (error instanceof Error ? error.message : String(error)) +
+        "; appTail=" +
+        appLog.split(/\r?\n/).slice(-80).join(" | "),
+    );
+  } finally {
+    if (automaticCoordinator?.client) {
+      await shutdownRegressionClient(automaticCoordinator).catch(() => {});
+    } else if (automaticCoordinator !== null) {
+      stopProcessGroup(automaticCoordinator);
+    }
+    if (coordinator?.client) {
+      await shutdownRegressionClient(coordinator).catch(() => {});
+    } else if (coordinator !== null) {
+      stopProcessGroup(coordinator);
+    }
+    stopProcessGroup(app);
+  }
+}
+
+async function startCoordinatorRegressionClient({
+  jar,
+  javaHome,
+  worktree,
+  configuration,
+  automaticLiveConnection,
+  responder,
+}) {
+  const java = path.join(
+    javaHome,
+    "bin",
+    process.platform === "win32" ? "java.exe" : "java",
+  );
+  const coordinatorScript = path.join(ROOT, "coordinator", "src", "main.mjs");
+  const args = [
+    coordinatorScript,
+    "--worktree", worktree,
+    "--java", java,
+    "--spring-server", jar,
+    "--spring-home", path.dirname(jar),
+    "--host-os", process.platform === "darwin" ? "macos" : "linux",
+    "--extension-version", "d007-live-regression",
+    "--automatic-live-connection", automaticLiveConnection ? "true" : "false",
+    "--mcp-server-port", "off",
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: worktree,
+    detached: true,
+    shell: false,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr = (stderr + chunk.toString("utf8")).slice(-512 * 1024);
+  });
+  const workspaceUri = directoryUri(worktree);
+  const client = new LspClient(
+    child,
+    [{ uri: workspaceUri, name: "zed-spring-tools-fixture" }],
+    configuration,
+    responder,
+  );
+  child.client = client;
+  child.stderrTail = () => stderr;
+
+  const initialize = await client.request("initialize", {
+    processId: process.pid,
+    clientInfo: { name: "zed-spring-tools-d007-live", version: "1" },
+    rootUri: workspaceUri,
+    workspaceFolders: [{ uri: workspaceUri, name: "zed-spring-tools-fixture" }],
+    capabilities: standardClientCapabilities(),
+    initializationOptions: {},
+  }, 60_000);
+  assert.ok(initialize?.capabilities);
+  client.notify("initialized", {});
+  client.notify("workspace/didChangeConfiguration", { settings: configuration });
+  return { child, client };
+}
+
+function liveControllerFile(worktree) {
+  const file = path.join(
+    worktree,
+    "src",
+    "main",
+    "java",
+    "dev",
+    "zed",
+    "spring",
+    "fixture",
+    "GreetingController.java",
+  );
+  return {
+    path: file,
+    text: fs.readFileSync(file, "utf8"),
+    languageId: "java",
+  };
+}
+
+async function openLiveController(client, controller) {
+  client.notify("textDocument/didOpen", {
+    textDocument: {
+      uri: pathToFileURL(controller.path).href,
+      languageId: "java",
+      version: 1,
+      text: controller.text,
+    },
+  });
+}
+
+async function waitForSpringIndex(client, label) {
+  await waitFor(
+    () => client.notifications.some(
+      (message) =>
+        message.method === "spring/index/updated" &&
+        Array.isArray(message.params?.affectedProjects) &&
+        message.params.affectedProjects.length > 0,
+    ),
+    label,
+    INDEX_TIMEOUT_MS,
+  );
+}
+
+async function waitForLiveProcessDescriptor(client, predicate, label) {
+  const deadline = Date.now() + 90_000;
+  let last = [];
+  while (Date.now() < deadline) {
+    last = await client.request(
+      "workspace/executeCommand",
+      { command: "sts/livedata/listProcesses", arguments: [] },
+      30_000,
+    );
+    if (Array.isArray(last)) {
+      const found = last.find(predicate);
+      if (found) return found;
+    }
+    await sleep(1000);
+  }
+  throw new Error(label + " not found; descriptors=" + JSON.stringify(last).slice(0, 3000));
+}
+
+async function waitForNotificationAfter(
+  client,
+  start,
+  method,
+  predicate,
+  label,
+  timeoutMs,
+) {
+  await waitFor(
+    () => client.notifications
+      .slice(start)
+      .some((message) => message.method === method && predicate(message)),
+    label,
+    timeoutMs,
+  );
+  return client.notifications
+    .slice(start)
+    .find((message) => message.method === method && predicate(message));
+}
+
+async function waitForLiveUrlCodeLens(client, controller, port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const targetUri = pathToFileURL(controller.path).href;
+  while (Date.now() < deadline) {
+    const result = await client.request(
+      "textDocument/codeLens",
+      { textDocument: { uri: targetUri } },
+      30_000,
+    );
+    if (Array.isArray(result)) {
+      const found = result.find((lens) => {
+        const argument = lens?.command?.arguments?.[0];
+        return lens?.command?.command === "zed-spring-tools.explain-code-lens" &&
+          argument?.kind === "url" &&
+          String(argument?.url ?? "").includes(":" + port + "/greeting");
+      });
+      if (found) return found;
+    }
+    await sleep(750);
+  }
+  throw new Error("live URL CodeLens did not appear");
+}
+
+async function waitForLiveHover(client, controller, port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const targetUri = pathToFileURL(controller.path).href;
+  const positions = [
+    positionInside(controller.text, '"/greeting"', 3),
+    positionInside(controller.text, "GetMapping", 3),
+    positionInside(controller.text, "greeting()", 3),
+  ];
+  while (Date.now() < deadline) {
+    for (const position of positions) {
+      const hover = await client.request(
+        "textDocument/hover",
+        { textDocument: { uri: targetUri }, position },
+        30_000,
+      );
+      const text = JSON.stringify(hover ?? {});
+      if (text.includes("Process [") && text.includes(":" + port + "/greeting")) {
+        return text;
+      }
+    }
+    await sleep(750);
+  }
+  throw new Error("live request-mapping Hover did not include process and URL");
+}
+
+async function waitForWindowMessage(client, pattern, label, timeoutMs) {
+  await waitFor(
+    () => client.windowMessages.some((entry) => pattern.test(entry.message ?? "")),
+    label,
+    timeoutMs,
+  );
+}
+
+async function shutdownRegressionClient(child) {
+  if (!child?.client) return;
+  try {
+    await child.client.request("shutdown", null, 10_000);
+    child.client.notify("exit", null);
+  } catch {}
+  await sleep(250);
+  stopProcessGroup(child);
+}
+
+function stopProcessGroup(child) {
+  if (!child || child.exitCode !== null) return;
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
 }
 
 async function runModulithRegression(pin, jar, javaHome, runRoot) {
