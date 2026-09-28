@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "decision": "D007",
-  "sourceInventoryVersion": 56,
+  "sourceInventoryVersion": 57,
   "policy": "Every tracked user outcome is classified. Any pending-d007 row blocks #159 release acceptance until its named evidence group passes on the exact final candidate or the row is explicitly narrowed or reclassified.",
   "entries": [
     {
