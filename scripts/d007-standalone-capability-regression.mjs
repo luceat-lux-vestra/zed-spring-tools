@@ -535,28 +535,33 @@ async function main() {
     const pom = fileBy(files, "pom.xml");
     const aiTools = fileBy(files, "AiTools.java");
 
-    const propsCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(props) },
-        position: positionAfter(props.text, "ser"),
-      },
-    ));
-    assert.equal(
-      propsCompletion.some((item) => String(item?.label ?? "").includes("server.port")),
-      true,
+    const propsCompletionResult = await waitForCompletion(
+      client,
+      uri(props),
+      positionAfter(props.text, "ser"),
+      (items) => items.some((item) =>
+        String(item?.label ?? "").includes("server.port")
+      ),
+      "server.port properties completion after standalone reindex",
     );
-    evidence.checks.propertiesCompletion = pass("server.port completion");
+    const propsCompletion = propsCompletionResult.items;
+    evidence.checks.propertiesCompletion = pass("server.port completion", {
+      count: propsCompletion.length,
+      attempts: propsCompletionResult.attempts,
+    });
 
-    const yamlCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(yaml) },
-        position: positionAfter(yaml.text, "ser"),
-      },
-    ));
-    assert.equal(yamlCompletion.length > 0, true);
-    evidence.checks.yamlCompletion = pass("YAML completion", { count: yamlCompletion.length });
+    const yamlCompletionResult = await waitForCompletion(
+      client,
+      uri(yaml),
+      positionAfter(yaml.text, "ser"),
+      (items) => items.length > 0,
+      "YAML completion after standalone reindex",
+    );
+    const yamlCompletion = yamlCompletionResult.items;
+    evidence.checks.yamlCompletion = pass("YAML completion", {
+      count: yamlCompletion.length,
+      attempts: yamlCompletionResult.attempts,
+    });
 
     const hover = await client.request("textDocument/hover", {
       textDocument: { uri: uri(props) },
@@ -706,19 +711,16 @@ async function main() {
       xmlDefinitionUris.some((value) => value.endsWith("/GreetingProperties.java")),
       true,
     );
-    const xmlPropertyCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(xml) },
-        position: positionInside(xml.text, 'name="salutation"', 'name="'.length + 2),
-      },
-    ));
-    assert.equal(
-      xmlPropertyCompletion.some((item) =>
+    const xmlPropertyCompletionResult = await waitForCompletion(
+      client,
+      uri(xml),
+      positionInside(xml.text, 'name="salutation"', 'name="'.length + 2),
+      (items) => items.some((item) =>
         String(item?.label ?? item?.insertText ?? "").includes("salutation")
       ),
-      true,
+      "Spring XML property completion",
     );
+    const xmlPropertyCompletion = xmlPropertyCompletionResult.items;
     evidence.checks.xmlCore = pass(
       "XML reconcile + property completion + hyperlink without private Java transport",
       {
@@ -728,41 +730,43 @@ async function main() {
       },
     );
 
-    const scopeCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(configurationJava) },
-        position: positionInside(configurationJava.text, '"singleton"', 2),
-      },
-    ));
-    assert.equal(
-      scopeCompletion.some((item) => String(item?.label ?? "").toLowerCase().includes("singleton")),
-      true,
+    const scopeCompletionResult = await waitForCompletion(
+      client,
+      uri(configurationJava),
+      positionInside(configurationJava.text, '"singleton"', 2),
+      (items) => items.some((item) =>
+        String(item?.label ?? "").toLowerCase().includes("singleton")
+      ),
+      "@Scope completion",
     );
+    const scopeCompletion = scopeCompletionResult.items;
     evidence.checks.springJavaCompletion = pass("@Scope completion");
 
-    const qualifierCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(injection) },
-        position: positionInside(injection.text, '"greetingPrefix"', 5),
-      },
-    ));
-    assert.equal(qualifierCompletion.length > 0, true);
+    const qualifierCompletionResult = await waitForCompletion(
+      client,
+      uri(injection),
+      positionInside(injection.text, '"greetingPrefix"', 5),
+      (items) => items.length > 0,
+      "@Qualifier completion",
+    );
+    const qualifierCompletion = qualifierCompletionResult.items;
     evidence.checks.springIndexCompletion = pass("@Qualifier completion", {
       count: qualifierCompletion.length,
     });
 
-    const requestMappingTemplates = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(controller) },
-        position: positionAfter(
-          controller.text,
-          "public class GreetingController {",
-        ),
-      },
-    ));
+    const requestMappingResult = await waitForCompletion(
+      client,
+      uri(controller),
+      positionAfter(
+        controller.text,
+        "public class GreetingController {",
+      ),
+      (items) => items.some((item) =>
+        /GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))
+      ),
+      "request-mapping snippet completion",
+    );
+    const requestMappingTemplates = requestMappingResult.items;
     const getMappingTemplate = requestMappingTemplates.find((item) =>
       /GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))
     );
@@ -773,14 +777,14 @@ async function main() {
       { count: requestMappingTemplates.length },
     );
 
-    const derivedQueryCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(repositoryJava) },
-        position: positionAfter(repositoryJava.text, "findByMessageAnd"),
-      },
-    ));
-    assert.equal(derivedQueryCompletion.length > 0, true);
+    const derivedQueryResult = await waitForCompletion(
+      client,
+      uri(repositoryJava),
+      positionAfter(repositoryJava.text, "findByMessageAnd"),
+      (items) => items.length > 0,
+      "derived-query completion",
+    );
+    const derivedQueryCompletion = derivedQueryResult.items;
     evidence.checks.springDataCompletion = pass("derived-query completion", {
       count: derivedQueryCompletion.length,
     });
@@ -824,14 +828,14 @@ async function main() {
       count: cronDiagnostics.length,
     });
 
-    const cronCompletion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: uri(cron) },
-        position: positionInside(cron.text, "0 0 * * *", 3),
-      },
-    ));
-    assert.equal(cronCompletion.length > 0, true);
+    const cronCompletionResult = await waitForCompletion(
+      client,
+      uri(cron),
+      positionInside(cron.text, "0 0 * * *", 3),
+      (items) => items.length > 0,
+      "cron completion",
+    );
+    const cronCompletion = cronCompletionResult.items;
     evidence.checks.cronCompletion = pass("cron completion", {
       count: cronCompletion.length,
     });
@@ -1585,20 +1589,16 @@ async function runEmbeddedMcpRegression(
       "getProjectList must return a usable MCP tool result",
     );
 
-    const completion = completionItems(await client.request(
-      "textDocument/completion",
-      {
-        textDocument: { uri: pathToFileURL(propertiesFile).href },
-        position: { line: 0, character: 3 },
-      },
-    ));
-    assert.equal(
-      completion.some((item) =>
+    const completionResult = await waitForCompletion(
+      client,
+      pathToFileURL(propertiesFile).href,
+      { line: 0, character: 3 },
+      (items) => items.some((item) =>
         String(item?.label ?? item?.insertText ?? "").includes("server.port")
       ),
-      true,
-      "LSP must remain usable after MCP requests",
+      "LSP server.port completion after MCP requests",
     );
+    const completion = completionResult.items;
 
     await client.request("shutdown", null);
     client.notify("exit", null);
@@ -2636,6 +2636,37 @@ function completionItems(result) {
   if (Array.isArray(result)) return result;
   if (Array.isArray(result?.items)) return result.items;
   return [];
+}
+
+async function waitForCompletion(
+  client,
+  targetUri,
+  position,
+  predicate,
+  label,
+  timeoutMs = 30_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let attempts = 0;
+  let lastItems = [];
+  do {
+    attempts += 1;
+    lastItems = completionItems(await client.request(
+      "textDocument/completion",
+      {
+        textDocument: { uri: targetUri },
+        position,
+      },
+    ));
+    if (predicate(lastItems)) {
+      return { items: lastItems, attempts };
+    }
+    await sleep(POLL_MS);
+  } while (Date.now() < deadline);
+
+  throw new Error(
+    `${label} did not become ready after ${attempts} bounded completion requests; lastItemCount=${lastItems.length}`,
+  );
 }
 
 function locationUris(result) {
