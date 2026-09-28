@@ -541,6 +541,7 @@ async function main() {
     const dataQuery = fileBy(files, "DataQuerySample.java");
     const cron = fileBy(files, "CronSyntaxSample.java");
     const controller = fileBy(files, "GreetingController.java");
+    const codeLensProbe = fileBy(files, "CodeLensProbeController.java");
     const namedQueries = fileBy(files, "jpa-named-queries.properties");
     const factories = fileBy(files, "spring.factories");
     const xml = fileBy(files, "beans.xml");
@@ -981,10 +982,23 @@ async function main() {
     });
 
     const codeLenses = await client.request("textDocument/codeLens", {
-      textDocument: { uri: uri(controller) },
+      textDocument: { uri: uri(codeLensProbe) },
     });
-    assert.equal(Array.isArray(codeLenses) && codeLenses.length > 0, true);
-    evidence.checks.codeLens = pass("Spring CodeLens", { count: codeLenses.length });
+    const webConfigCodeLens = Array.isArray(codeLenses)
+      ? codeLenses.find((lens) =>
+          lens?.command?.command === "vscode.open" &&
+          String(lens?.command?.title ?? "").includes("Path Prefix: /d007")
+        )
+      : null;
+    assert.ok(
+      webConfigCodeLens,
+      `static WebConfig CodeLens missing: ${JSON.stringify(codeLenses ?? [])}`,
+    );
+    evidence.checks.codeLens = pass("static WebConfig CodeLens on isolated controller", {
+      count: codeLenses.length,
+      title: String(webConfigCodeLens.command.title),
+      command: String(webConfigCodeLens.command.command),
+    });
 
     const configurationDiagnostics = await waitForDiagnostics(
       client,
@@ -2581,6 +2595,7 @@ function fixtureFiles(worktree) {
     ["src/main/resources/beans.xml", "xml"],
     ["src/main/java/dev/zed/spring/fixture/FixtureApplication.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingController.java", "java"],
+    ["src/main/java/dev/zed/spring/fixture/CodeLensProbeController.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingConfiguration.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingInjection.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingRepository.java", "java"],
