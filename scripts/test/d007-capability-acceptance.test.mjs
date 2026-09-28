@@ -571,3 +571,25 @@ test("D007 live regression records gated Spring highlight protocol evidence", ()
   );
 });
 
+test("D007 live Hover probe targets the exact GetMapping annotation", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("'    @GetMapping(\"/greeting\")'") &&
+      regression.includes('"GetMapping",') &&
+      regression.includes("positionInExactLine("),
+    true,
+    "live Hover must target the exact request-mapping annotation identifier",
+  );
+  assert.equal(
+    regression.includes('positionInside(controller.text, "GetMapping", 3)'),
+    false,
+    "live Hover must not resolve the first GetMapping occurrence, which is the import",
+  );
+  assert.equal(
+    regression.includes("lastHover="),
+    true,
+    "live Hover failures must preserve the bounded final payload",
+  );
+});
+
