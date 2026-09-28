@@ -124,12 +124,27 @@ inside this extension's own work directory.
    pass without weakening their gates;
 4. capability inventory and limitations distinguish current standalone evidence
    from historical JDT/bridge evidence;
-5. before Maven/Gradle feature probes begin, the isolated D007 gate proves both
-   the official JDT LS and the standalone Spring Tools server have materialized
-   into live processes, with Spring coordinator/document/index readiness also
-   established, without reading the Java extension's private runtime paths; and
-6. the exact source commit intended for Registry submission is loaded and
-   exercised as a Zed dev extension through the isolated D007 desktop gate in
+5. every tracked capability is accounted for in
+   [`protocol/d007-capability-acceptance.json`](../../protocol/d007-capability-acceptance.json);
+   a historical `verified` state is not a current standalone release claim while
+   that row remains `pending-d007`;
+6. the repository-owned standalone regression drives the real pinned server
+   against the rich Spring Boot fixture and revalidates representative
+   project/index-dependent properties, Java, SpEL, Spring Data, cron,
+   navigation, structure, and Boot-project outcomes without the retired Java
+   transport;
+7. before Maven/Gradle desktop feature probes begin, the isolated D007 gate
+   proves both the official JDT LS and the standalone Spring Tools server have
+   materialized into live processes, with Spring coordinator/document/index
+   readiness also established, without reading the Java extension's private
+   runtime paths;
+8. any Spring-originated error-level window message fails the desktop gate
+   rather than allowing a visible error popup to coexist with PASS;
+9. generated Maven and Gradle Boot run tasks are executed and must actually
+   start the fixture application, rather than being accepted from JSON shape
+   alone; and
+10. the exact source commit intended for Registry submission is loaded and
+   exercised as a Zed dev extension through the isolated D007 acceptance gate in
    [`docs/d007-zed-desktop-validation.md`](../d007-zed-desktop-validation.md).
 
 The six-platform CI matrix is headless portability/runtime evidence. It is not a
