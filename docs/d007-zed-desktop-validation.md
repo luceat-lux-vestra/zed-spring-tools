@@ -45,15 +45,17 @@ It performs the following bounded sequence:
 1. stages a fresh isolated profile and both build-tool fixtures;
 2. records the current shared `~/Library/Logs/Zed/Zed.log` byte boundary;
 3. launches a root-only Maven foreground Zed process bound to the exact staged `--user-data-dir` and starts dev-extension installation. Installation is not considered persisted until a fresh non-empty `extension.wasm`, a `dev: true` `spring-tools` index entry, and an `installed/spring-tools` symlink resolving to the exact candidate checkout all exist;
-4. then, for each Maven/Gradle fixture, launches a **fresh foreground Zed process** with exactly two CLI targets: the fixture root and the absolute `application-d007.properties:1:4` target. This first cold launch is the actual extension-activation proof: exact coordinator/document/index evidence must appear before completion validation continues. No File Finder or secondary CLI request is used;
-5. requires coordinator evidence that this cold launch actually produced `textDocument/didOpen` for the exact Properties URI, then requires coordinator startup and a positive `spring/index/updated`;
-6. invokes completion on that launch-target editor and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
-7. stops the completion process, then launches another fresh foreground Zed process for the same fixture with the fixture root plus the absolute `FixtureApplication.java` target;
-8. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the Spring provider response contains `Spring Boot: Configure run/debug for a project…` with the exact `zed-spring-tools.configure-boot-run` command and the exact Java request URI argument;
-9. closes the mixed Code Actions menu and dispatches that registered command once through Zed's public LSP command selector, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
-10. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
-11. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
-12. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
+4. stops that installation process, then starts a dedicated **language-server preflight** cold launch on the Maven Java fixture. Functional validation is blocked until the isolated Zed process group contains both a live JDT LS process and the standalone Spring Boot LS process, while coordinator evidence also proves exact Java `didOpen`, coordinator startup, and a positive `spring/index/updated`. The process matcher is used only as a runtime-readiness oracle and does not read or persist either extension's private install path;
+5. stops the preflight process. Only after that barrier has passed does the harness begin Maven/Gradle feature validation, ensuring JDT LS and standalone Spring Tools have already finished materializing into runnable servers;
+6. for each Maven/Gradle fixture, launches a **fresh foreground Zed process** with exactly two CLI targets: the fixture root and the absolute `application-d007.properties:1:4` target. Exact coordinator/document/index evidence must appear before completion validation continues. No File Finder or secondary CLI request is used;
+7. requires coordinator evidence that this cold launch actually produced `textDocument/didOpen` for the exact Properties URI, then requires coordinator startup and a positive `spring/index/updated`;
+8. invokes completion on that launch-target editor and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
+9. stops the completion process, then launches another fresh foreground Zed process for the same fixture with the fixture root plus the absolute `FixtureApplication.java` target;
+10. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the Spring provider response contains `Spring Boot: Configure run/debug for a project…` with the exact `zed-spring-tools.configure-boot-run` command and the exact Java request URI argument;
+11. closes the mixed Code Actions menu and dispatches that registered command once through Zed's public LSP command selector, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
+12. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
+13. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
+14. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
 
 A final `PASS` requires both Maven and Gradle run/debug configuration
 generation, the expected Java launch entry and build-tool run task for each fixture,
@@ -103,7 +105,11 @@ for release acceptance.
 The harness intentionally reuses only the **installed official Java extension**
 from a known local Zed profile. It never copies or reads that extension's
 `extensions/work/java` directory, proxy routes, helper binaries, or other
-private runtime state.
+private runtime state. JDT LS download/materialization readiness is proven
+indirectly and fail-closed: the dedicated preflight requires a live JDT LS
+process in the isolated Zed process group before any Maven/Gradle feature probe
+is allowed to start. The evidence records only the PID/signature classification,
+not the private runtime path.
 
 ## 1. Stage a fresh isolated profile
 
