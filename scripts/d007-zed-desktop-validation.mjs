@@ -875,7 +875,8 @@ function languageServerProcessReadiness(psOutput, expectedPgid) {
     }
     if (
       springToolsPid === null &&
-      command.includes("spring-boot-language-server-standalone-exec.jar")
+      command.includes("spring-boot-language-server") &&
+      command.includes("standalone-exec.jar")
     ) {
       springToolsPid = Number(pidText);
     }
@@ -889,7 +890,7 @@ function languageServerProcessReadiness(psOutput, expectedPgid) {
     springTools: {
       observed: springToolsPid !== null,
       pid: springToolsPid,
-      signature: "spring-boot-language-server-standalone-exec.jar",
+      signature: "spring-boot-language-server + standalone-exec.jar",
     },
   };
 }
@@ -2469,9 +2470,13 @@ function selfTest() {
       "the CLI launcher alone must not satisfy Zed app readiness",
     );
 
+    const fakeSpringToolsAsset = [
+      "spring-boot-language-server",
+      "standalone-exec.jar",
+    ].join("-");
     const fakeLanguageServers = [
       "  5001  4242 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /opaque/equinox.jar",
-      "  5002  4242 S /jdk/bin/java -jar /opaque/spring-boot-language-server-standalone-exec.jar",
+      `  5002  4242 S /jdk/bin/java -jar /opaque/${fakeSpringToolsAsset}`,
       "  5003  9999 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /other/equinox.jar",
     ].join("\n");
     assert.deepEqual(
@@ -2485,7 +2490,7 @@ function selfTest() {
         springTools: {
           observed: true,
           pid: 5002,
-          signature: "spring-boot-language-server-standalone-exec.jar",
+          signature: "spring-boot-language-server + standalone-exec.jar",
         },
       },
       "D007 preflight must prove both language servers in the isolated Zed process group without recording private install paths",
