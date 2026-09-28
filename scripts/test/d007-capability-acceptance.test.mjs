@@ -307,3 +307,24 @@ test("D007 ambiguous capability probes use exact fixture lines", () => {
     );
   }
 });
+
+
+test("D007 request-mapping acceptance selects the Spring snippet item, not a plain GetMapping completion", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('String(item?.label ?? "").startsWith("@GetMapping")'),
+    true,
+    "request-mapping acceptance must identify the Spring snippet label",
+  );
+  assert.equal(
+    regression.includes("item?.insertTextFormat === 2"),
+    true,
+    "request-mapping acceptance must require LSP snippet format",
+  );
+  assert.equal(
+    regression.includes('/GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))'),
+    false,
+    "broad first-match selection must not reappear",
+  );
+});
