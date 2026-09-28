@@ -322,12 +322,16 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   const summary = summarize(root);
   const outcome = {
     sourceHead: manifest.sourceHead,
+    gateScope: "architecture-smoke",
+    releaseAcceptance: summary.releaseAcceptance,
     fixtures: results,
     privateBoundary: summary.privateBoundary,
     completionEvidence: summary.completionEvidence,
+    unexpectedRuntimeErrorEvidence: summary.unexpectedRuntimeErrorEvidence,
     status: results.every((entry) => entry.debugConfig === "PASS" && entry.runTask === "PASS") &&
       summary.privateBoundary === "PASS" &&
-      summary.completionEvidence === "PASS"
+      summary.completionEvidence === "PASS" &&
+      summary.unexpectedRuntimeErrorEvidence === "PASS"
       ? "PASS"
       : "FAIL_OR_REVIEW_REQUIRED",
   };
@@ -1913,13 +1917,38 @@ function summarize(root) {
       entry.responseObserved === true &&
       entry.serverPortObserved === true,
   ) ? "PASS" : "REVIEW_REQUIRED";
+  const springWindowMessages = [];
+  for (const fixtureKind of ["maven", "gradle"]) {
+    const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+    const events = protocolEvidenceEvents(
+      fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
+    );
+    for (const event of events) {
+      if (event.event !== "spring-window-message") continue;
+      springWindowMessages.push({
+        fixture: fixtureKind,
+        method: event.method ?? null,
+        type: Number.isInteger(event.type) ? event.type : null,
+        severity: event.severity ?? "unknown",
+      });
+    }
+  }
+  const unexpectedSpringWindowErrors = springWindowMessages.filter(
+    (entry) => entry.severity === "error" || entry.type === 1,
+  );
   const result = {
     sourceHead: manifest.sourceHead,
+    gateScope: "architecture-smoke",
+    releaseAcceptance: "PENDING_CAPABILITY_REGRESSION",
     evidenceFiles: files.map((file) => path.relative(manifest.evidence, file)),
     forbiddenPrivateBoundaryMarkersObserved: forbidden,
     privateBoundary: forbidden.length === 0 ? "PASS" : "FAIL",
     completionFixtures,
     completionEvidence,
+    springWindowMessages,
+    unexpectedSpringWindowErrors,
+    unexpectedRuntimeErrorEvidence:
+      unexpectedSpringWindowErrors.length === 0 ? "PASS" : "FAIL",
   };
   fs.writeFileSync(path.join(manifest.evidence, "summary.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
   return result;
