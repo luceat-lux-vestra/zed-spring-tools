@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -678,7 +678,9 @@ function uri(file) {
 }
 
 function positionAfter(text, needle) {
-  return offsetPosition(text, text.indexOf(needle) + needle.length, needle);
+  const index = text.indexOf(needle);
+  assert.notEqual(index, -1, `needle not found: ${needle}`);
+  return offsetPosition(text, index + needle.length, needle);
 }
 
 function positionInside(text, needle, offset) {
@@ -790,22 +792,18 @@ function writeEvidence(destination, value) {
 }
 
 function gitHead() {
-  const head = fs.readFileSync(path.join(ROOT, ".git", "HEAD"), "utf8").trim();
-  if (!head.startsWith("ref: ")) {
-    assert.match(head, /^[0-9a-f]{40}$/);
-    return head;
+  const result = spawnSync(
+    "git",
+    ["-C", ROOT, "rev-parse", "HEAD"],
+    { encoding: "utf8", shell: false },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`git rev-parse HEAD failed: ${String(result.stderr ?? "").trim()}`);
   }
-  const ref = head.slice(5);
-  const loose = path.join(ROOT, ".git", ref);
-  if (fs.existsSync(loose)) {
-    const value = fs.readFileSync(loose, "utf8").trim();
-    assert.match(value, /^[0-9a-f]{40}$/);
-    return value;
-  }
-  const packed = fs.readFileSync(path.join(ROOT, ".git", "packed-refs"), "utf8");
-  const line = packed.split("\n").find((entry) => entry.endsWith(` ${ref}`));
-  if (!line) throw new Error(`cannot resolve git ref ${ref}`);
-  return line.split(" ")[0];
+  const head = result.stdout.trim();
+  assert.match(head, /^[0-9a-f]{40}$/);
+  return head;
 }
 
 function sleep(ms) {
