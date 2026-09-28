@@ -441,6 +441,9 @@ async function main() {
     };
 
     const args = springArguments(jar, worktree, null);
+    if (process.env.D007_SPRING_CONDITION_PROBE === "1") {
+      args.push("--debug");
+    }
     const java = path.join(
       javaHome,
       "bin",
@@ -539,6 +542,21 @@ async function main() {
     evidence.checks.postIndexConfigurationReplay = pass(
       "initial workspace configuration replayed after standalone index readiness",
     );
+
+    if (process.env.D007_SPRING_CONDITION_PROBE === "1") {
+      await sleep(1_000);
+      if (!stderr.includes("Started Boot Version reconciler")) {
+        const conditionEvidence = stderr
+          .split(/\r?\n/)
+          .filter((line) =>
+            /BootVersionValidationConfig|bootVersionValidationScheduler|reconcile-only-opened-docs|LanguageServerHarness|Started Boot Version reconciler/i.test(line)
+          )
+          .slice(-80);
+        throw new Error(
+          `Boot Version scheduler did not initialize; conditionEvidence=${JSON.stringify(conditionEvidence)}`,
+        );
+      }
+    }
 
     for (const file of files) {
       client.notify("textDocument/didChange", {
