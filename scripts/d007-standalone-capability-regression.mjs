@@ -1404,16 +1404,21 @@ function compileFixture(worktree, javaHome) {
       `rich fixture Maven compile failed: ${String(result.stderr ?? "").slice(-8000)}`,
     );
   }
+  const generatedMetadata = path.join(
+    worktree,
+    "target",
+    "classes",
+    "META-INF",
+    "spring-configuration-metadata.json",
+  );
+  assert.equal(
+    fs.existsSync(generatedMetadata),
+    true,
+    "fixture compile must generate spring-configuration-metadata.json before project-property capability checks",
+  );
   return pass("mvn -DskipTests compile", {
-    generatedConfigurationMetadata: fs.existsSync(
-      path.join(
-        worktree,
-        "target",
-        "classes",
-        "META-INF",
-        "spring-configuration-metadata.json",
-      ),
-    ),
+    generatedConfigurationMetadata: true,
+    generatedMetadata,
   });
 }
 
