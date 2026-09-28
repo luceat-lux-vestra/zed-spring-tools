@@ -196,6 +196,58 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   assert.deepEqual(zedWrites, [request]);
 });
 
+test("D007 evidence records Spring window-message severity without persisting message text", async () => {
+  const zedWrites = [];
+  const evidence = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    protocolEvidence: (entry) => evidence.push(entry),
+  });
+
+  const errorPopup = {
+    jsonrpc: "2.0",
+    method: "window/showMessage",
+    params: {
+      type: 1,
+      message: "sensitive project path /tmp/project must not reach D007 evidence",
+    },
+  };
+  await coordinator.handleSpringMessage(errorPopup);
+
+  const warningPrompt = {
+    jsonrpc: "2.0",
+    id: "warning-prompt",
+    method: "window/showMessageRequest",
+    params: {
+      type: 2,
+      message: "warning detail must also stay out of D007 evidence",
+      actions: [{ title: "Close" }],
+    },
+  };
+  await coordinator.handleSpringMessage(warningPrompt);
+
+  assert.deepEqual(zedWrites, [errorPopup, warningPrompt]);
+  assert.deepEqual(evidence, [
+    {
+      event: "spring-window-message",
+      method: "window/showMessage",
+      type: 1,
+      severity: "error",
+    },
+    {
+      event: "spring-window-message",
+      method: "window/showMessageRequest",
+      type: 2,
+      severity: "warning",
+    },
+  ]);
+  assert.equal(JSON.stringify(evidence).includes("/tmp/project"), false);
+  assert.equal(JSON.stringify(evidence).includes("warning detail"), false);
+});
+
 test("Spring initialize advertises the coordinator-owned commands", async () => {
   const zedWrites = [];
   const coordinator = new Coordinator({
