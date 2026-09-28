@@ -565,7 +565,12 @@ async function main() {
 
     const hover = await client.request("textDocument/hover", {
       textDocument: { uri: uri(props) },
-      position: positionInside(props.text, "server.port", 3),
+      position: positionInExactLine(
+        props.text,
+        "server.port=8080",
+        "server.port",
+        3,
+      ),
     });
     assert.ok(hover);
     evidence.checks.propertyHover = pass("server.port hover");
@@ -584,7 +589,12 @@ async function main() {
 
     const propertyDefinition = await client.request("textDocument/definition", {
       textDocument: { uri: uri(props) },
-      position: positionInside(props.text, "fixture.greeting.salutation", 12),
+      position: positionInExactLine(
+        props.text,
+        "fixture.greeting.salutation=hi",
+        "fixture.greeting.salutation",
+        12,
+      ),
     });
     const propertyDefinitionUris = locationUris(propertyDefinition);
     assert.equal(
@@ -780,7 +790,12 @@ async function main() {
     const derivedQueryResult = await waitForCompletion(
       client,
       uri(repositoryJava),
-      positionAfter(repositoryJava.text, "findByMessageAnd"),
+      positionInExactLine(
+        repositoryJava.text,
+        "    List<Greeting> findByMessageAndId(String message, Long id);",
+        "findByMessageAnd",
+        "findByMessageAnd".length,
+      ),
       (items) => items.length > 0,
       "derived-query completion",
     );
@@ -886,7 +901,12 @@ async function main() {
 
     const definition = await client.request("textDocument/definition", {
       textDocument: { uri: uri(spel) },
-      position: positionInside(spel.text, "greetingPrefix", 3),
+      position: positionInExactLine(
+        spel.text,
+        '    @Value("#{@greetingPrefix}")',
+        "greetingPrefix",
+        3,
+      ),
     });
     const definitionUris = locationUris(definition);
     assert.equal(
@@ -2589,6 +2609,29 @@ function positionInside(text, needle, offset) {
   const index = text.indexOf(needle);
   assert.notEqual(index, -1, `needle not found: ${needle}`);
   return offsetPosition(text, index + offset, needle);
+}
+
+function positionInExactLine(text, expectedLine, needle, offsetWithinNeedle) {
+  const lines = text.split("\n");
+  const matches = [];
+  for (let line = 0; line < lines.length; line += 1) {
+    if (lines[line] === expectedLine) matches.push(line);
+  }
+  assert.equal(
+    matches.length,
+    1,
+    `expected exactly one line equal to ${JSON.stringify(expectedLine)}, found ${matches.length}`,
+  );
+  const characterStart = expectedLine.indexOf(needle);
+  assert.notEqual(
+    characterStart,
+    -1,
+    `needle ${JSON.stringify(needle)} not found in exact line ${JSON.stringify(expectedLine)}`,
+  );
+  return {
+    line: matches[0],
+    character: characterStart + offsetWithinNeedle,
+  };
 }
 
 function offsetPosition(text, offset, label) {
