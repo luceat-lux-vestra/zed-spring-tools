@@ -41,6 +41,7 @@ const DEFAULT_CONFIGURATION = {
       "all-local-java-processes": true,
     },
     "support-spring-xml-config": {
+      on: true,
       "content-assist": true,
       hyperlinks: true,
       "scan-folders": "src/main",
@@ -267,6 +268,21 @@ async function main() {
       "",
     ].join("\n"),
   );
+  const xmlFile = path.join(worktree, "src", "main", "resources", "beans.xml");
+  fs.writeFileSync(
+    xmlFile,
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<beans xmlns="http://www.springframework.org/schema/beans"',
+      '       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
+      '       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">',
+      '  <bean id="greetingPropertiesXml" class="dev.zed.spring.fixture.GreetingProperties">',
+      '    <property name="salutation" value="#{1 + }"/>',
+      '  </bean>',
+      '</beans>',
+      '',
+    ].join("\n"),
+  );
 
   const evidence = {
     schemaVersion: 1,
@@ -414,6 +430,7 @@ async function main() {
     const controller = fileBy(files, "GreetingController.java");
     const namedQueries = fileBy(files, "jpa-named-queries.properties");
     const factories = fileBy(files, "spring.factories");
+    const xml = fileBy(files, "beans.xml");
 
     const propsCompletion = completionItems(await client.request(
       "textDocument/completion",
@@ -482,6 +499,47 @@ async function main() {
     evidence.checks.springFactories = pass(
       "spring-factories language reached standalone project model",
       { count: factoriesDiagnostics.length },
+    );
+
+    const xmlDiagnostics = await waitForDiagnostics(
+      client,
+      uri(xml),
+      (diagnostics) => diagnostics.some((diagnostic) =>
+        /SPEL:|JAVA_SPEL_EXPRESSION_SYNTAX/i.test(
+          `${diagnostic.code ?? ""} ${diagnostic.message ?? ""}`,
+        )
+      ),
+      "Spring XML SpEL diagnostic",
+    );
+    const xmlDefinition = await client.request("textDocument/definition", {
+      textDocument: { uri: uri(xml) },
+      position: positionInside(xml.text, 'name="salutation"', 'name="'.length + 3),
+    });
+    const xmlDefinitionUris = locationUris(xmlDefinition);
+    assert.equal(
+      xmlDefinitionUris.some((value) => value.endsWith("/GreetingProperties.java")),
+      true,
+    );
+    const xmlPropertyCompletion = completionItems(await client.request(
+      "textDocument/completion",
+      {
+        textDocument: { uri: uri(xml) },
+        position: positionInside(xml.text, 'name="salutation"', 'name="'.length + 2),
+      },
+    ));
+    assert.equal(
+      xmlPropertyCompletion.some((item) =>
+        String(item?.label ?? item?.insertText ?? "").includes("salutation")
+      ),
+      true,
+    );
+    evidence.checks.xmlCore = pass(
+      "XML reconcile + property completion + hyperlink without private Java transport",
+      {
+        diagnosticCount: xmlDiagnostics.length,
+        definitionCount: xmlDefinitionUris.length,
+        completionCount: xmlPropertyCompletion.length,
+      },
     );
 
     const scopeCompletion = completionItems(await client.request(
@@ -773,7 +831,11 @@ async function main() {
     );
     assert.deepEqual(evidence.forbiddenPrivateCallbacks, []);
     assert.equal(client.serverRequests.includes("sts/project/gav"), true);
-    assert.equal(client.serverRequests.includes("sts/javaCodeComplete"), false);
+    assert.equal(
+      client.serverRequests.includes("sts/javaCodeComplete"),
+      false,
+      "D007 XML core acceptance must not silently depend on blocked Java package/type completion",
+    );
 
     evidence.unexpectedWindowErrors = client.windowMessages.filter(
       (message) => message.type === 1,
@@ -867,6 +929,7 @@ function fixtureFiles(worktree) {
     ["src/main/resources/application.yaml", "spring-boot-yaml"],
     ["src/main/resources/META-INF/jpa-named-queries.properties", "jpa-query-properties"],
     ["src/main/resources/META-INF/spring.factories", "spring-factories"],
+    ["src/main/resources/beans.xml", "xml"],
     ["src/main/java/dev/zed/spring/fixture/FixtureApplication.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingController.java", "java"],
     ["src/main/java/dev/zed/spring/fixture/GreetingConfiguration.java", "java"],
