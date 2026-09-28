@@ -950,26 +950,47 @@ test("configure run/debug dispatch emits bounded D007 protocol evidence", async 
   await coordinator.close();
 });
 
-test("code-action evidence identifies the configure run/debug action without payload logging", () => {
+test("code-action evidence identifies the exact configure run/debug command payload", () => {
+  const uri = "file:///tmp/project/FixtureApplication.java";
   assert.deepEqual(
     codeActionResultEvidence([
       { title: "Existing quick fix" },
-      { title: "Spring Boot: Configure run/debug for a project…" },
+      {
+        title: "Spring Boot: Configure run/debug for a project…",
+        command: {
+          command: "zed-spring-tools.configure-boot-run",
+          arguments: [{ uri }],
+        },
+      },
       { title: "Spring Boot: Show this file's Boot project info" },
-    ]),
+    ], uri),
     {
       itemCount: 3,
       configureBootRunPresent: true,
       configureBootRunIndex: 1,
+      configureBootRunCommand: "zed-spring-tools.configure-boot-run",
+      configureBootRunArgumentUriMatchesRequest: true,
     },
   );
   assert.deepEqual(
-    codeActionResultEvidence([{ title: "Existing quick fix" }]),
+    codeActionResultEvidence([{ title: "Existing quick fix" }], uri),
     {
       itemCount: 1,
       configureBootRunPresent: false,
       configureBootRunIndex: null,
+      configureBootRunCommand: null,
+      configureBootRunArgumentUriMatchesRequest: false,
     },
+  );
+  assert.equal(
+    codeActionResultEvidence([{
+      title: "Spring Boot: Configure run/debug for a project…",
+      command: {
+        command: "zed-spring-tools.configure-boot-run",
+        arguments: [{ uri: "file:///wrong.java" }],
+      },
+    }], uri).configureBootRunArgumentUriMatchesRequest,
+    false,
   );
 });
 
