@@ -2045,10 +2045,30 @@ function selfTest() {
 
     const fakeIndex = path.join(scratch, "dev-extension-index.json");
     const fakeWasm = path.join(scratch, "extension.wasm");
-    fs.writeFileSync(fakeIndex, JSON.stringify({ extensions: { "spring-tools": {} } }));
-    assert.equal(devExtensionReady(fakeIndex, fakeWasm), false, "registration without a fresh WASM must not be ready");
+    const fakeLink = path.join(scratch, "spring-tools-link");
+    fs.writeFileSync(
+      fakeIndex,
+      JSON.stringify({
+        extensions: {
+          "spring-tools": {
+            dev: true,
+            manifest: { id: "spring-tools", version: "0.0.0-dev" },
+          },
+        },
+      }),
+    );
+    fs.symlinkSync(repository, fakeLink, "dir");
+    assert.equal(
+      devExtensionPersisted(manifest, fakeIndex, fakeLink, fakeWasm, readinessLog),
+      false,
+      "dev registration and exact source symlink without a fresh WASM must not be persisted",
+    );
     fs.writeFileSync(fakeWasm, "wasm");
-    assert.equal(devExtensionReady(fakeIndex, fakeWasm), true, "registered extension with non-empty WASM is ready");
+    assert.equal(
+      devExtensionPersisted(manifest, fakeIndex, fakeLink, fakeWasm, readinessLog),
+      true,
+      "dev extension persistence requires index + exact source symlink + non-empty WASM",
+    );
 
     assert.deepEqual(
       completionObservation("no completion evidence"),
