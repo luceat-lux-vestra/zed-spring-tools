@@ -65,6 +65,18 @@ test("D007 classifies every tracked capability exactly once", () => {
         "pending-d007",
         `${entry.capability} must not reuse historical evidence as a current standalone claim`,
       );
+      assert.equal(
+        Array.isArray(entry.requiredEvidence) && entry.requiredEvidence.length > 0,
+        true,
+        `${entry.capability} must name exact D007 evidence`,
+      );
+      assert.equal(
+        entry.requiredEvidence.some((requirement) =>
+          requirement?.source === "unmapped-d007-evidence"
+        ),
+        false,
+        `${entry.capability} must not use an unmapped D007 evidence placeholder`,
+      );
     }
     if (entry.classification === "existing-blocker") {
       assert.equal(entry.currentClaim, entry.historicalState);
@@ -86,9 +98,9 @@ test("D007 explicitly classifies the private-Java dependent redesigns", () => {
     "Spring XML config support",
     "Embedded Spring Tools MCP server",
     "Start Spring Boot Language Server on demand",
-    "Java type resolution for the server",
-    "Classpath listening",
-    "Missing / incompatible Java diagnostic",
+    "Spring Java type/index resolution",
+    "Spring project/index synchronization",
+    "Spring runtime Java requirement diagnostic",
   ]) {
     assert.equal(
       byCapability.get(capability)?.classification,
@@ -97,6 +109,15 @@ test("D007 explicitly classifies the private-Java dependent redesigns", () => {
     );
     assert.equal(byCapability.get(capability)?.currentClaim, "pending-d007");
   }
+
+  assert.equal(
+    byCapability.get("References and implementations")?.classification,
+    "unaffected",
+  );
+  assert.equal(
+    byCapability.get("References and implementations")?.currentClaim,
+    "verified",
+  );
 
   assert.equal(
     byCapability.get("Spring-specific document highlights")?.currentClaim,
