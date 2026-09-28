@@ -258,6 +258,9 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     setPhase("language-server-preflight-shutdown");
     stopAndWaitZed(root, manifest, 10_000, 5_000);
 
+    setPhase("standalone-capability-regression");
+    runStandaloneCapabilityRegression(manifest, javaHome);
+
     for (const fixtureKind of ["maven", "gradle"]) {
       const propertiesRelative = "src/main/resources/application-d007.properties";
       const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
@@ -328,10 +331,28 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     privateBoundary: summary.privateBoundary,
     completionEvidence: summary.completionEvidence,
     unexpectedRuntimeErrorEvidence: summary.unexpectedRuntimeErrorEvidence,
+    standaloneCapabilityRegression:
+      fs.existsSync(path.join(manifest.evidence, "standalone-capability-regression.json"))
+        ? JSON.parse(
+            fs.readFileSync(
+              path.join(manifest.evidence, "standalone-capability-regression.json"),
+              "utf8",
+            ),
+          ).status === "pass"
+          ? "PASS"
+          : "FAIL"
+        : "MISSING",
     status: results.every((entry) => entry.debugConfig === "PASS" && entry.runTask === "PASS") &&
       summary.privateBoundary === "PASS" &&
       summary.completionEvidence === "PASS" &&
-      summary.unexpectedRuntimeErrorEvidence === "PASS"
+      summary.unexpectedRuntimeErrorEvidence === "PASS" &&
+      fs.existsSync(path.join(manifest.evidence, "standalone-capability-regression.json")) &&
+      JSON.parse(
+        fs.readFileSync(
+          path.join(manifest.evidence, "standalone-capability-regression.json"),
+          "utf8",
+        ),
+      ).status === "pass"
       ? "PASS"
       : "FAIL_OR_REVIEW_REQUIRED",
   };
@@ -343,6 +364,61 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     "complete",
     outcome.status === "PASS" ? null : new Error("desktop gate requires review"),
   );
+}
+
+function runStandaloneCapabilityRegression(manifest, javaHome) {
+  const script = path.join(
+    repository,
+    "scripts",
+    "d007-standalone-capability-regression.mjs",
+  );
+  requireFile(script, "D007 standalone capability regression runner");
+  const evidenceFile = path.join(
+    manifest.evidence,
+    "standalone-capability-regression.json",
+  );
+  const logFile = path.join(
+    manifest.evidence,
+    "standalone-capability-regression.log",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, evidenceFile, javaHome],
+    {
+      cwd: repository,
+      encoding: "utf8",
+      shell: false,
+      timeout: 12 * 60_000,
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
+  fs.writeFileSync(
+    logFile,
+    [
+      `exitCode=${result.status}`,
+      `signal=${result.signal ?? ""}`,
+      "--- stdout ---",
+      result.stdout ?? "",
+      "--- stderr ---",
+      result.stderr ?? "",
+    ].join("\n"),
+    { mode: 0o600 },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `standalone capability regression failed with exit ${result.status}; inspect ${evidenceFile} and ${logFile}`,
+    );
+  }
+  requireFile(evidenceFile, "standalone capability regression evidence");
+  const evidence = JSON.parse(fs.readFileSync(evidenceFile, "utf8"));
+  assert.equal(
+    evidence.sourceHead,
+    manifest.sourceHead,
+    "standalone capability regression must bind the staged exact HEAD",
+  );
+  assert.equal(evidence.status, "pass");
+  return evidence;
 }
 
 function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
