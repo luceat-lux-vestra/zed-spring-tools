@@ -13,7 +13,7 @@
 
 Zed Spring Tools brings Spring-aware editing, navigation, diagnostics, quick fixes, live-application integration, and selected Spring tooling into Zed while working alongside the required official Java extension.
 
-> **Distribution status:** the extension is not published in the Zed Registry yet. The current supported testing path is a local Zed development extension checkout. The initial Registry submission is tracked in [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875).
+> **Distribution status:** the extension is not published in the Zed Registry yet. The current supported testing path is a local Zed development extension checkout. The initial Registry submission is tracked in [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875), and repository issue [#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159) currently blocks refreshing/promoting that candidate until the publishing-boundary remediation is proven on an exact final candidate.
 
 ## What works today
 
@@ -101,9 +101,10 @@ Capability delivery for the declared scope is complete; current work is focused 
 
 The release path is tracked by [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108):
 
-1. publish the existing `0.1.0` Registry submission;
-2. exercise the real Registry install / first-run / restart / offline / uninstall lifecycle;
-3. promote release claims only when that path has evidence.
+1. resolve the current publishing-boundary blocker in [#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159) without treating draft remediation as release evidence;
+2. refresh and obtain publication of the existing `0.1.0` Registry submission;
+3. exercise the real Registry install / first-run / restart / offline / uninstall lifecycle in #112;
+4. promote release claims through #113 only when that path has evidence.
 
 No public release is claimed before the Registry lifecycle actually succeeds.
 
