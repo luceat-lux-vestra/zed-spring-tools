@@ -772,19 +772,28 @@ async function main() {
         "public class GreetingController {",
       ),
       (items) => items.some((item) =>
-        /GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))
+        String(item?.label ?? "").startsWith("@GetMapping") &&
+        item?.insertTextFormat === 2
       ),
-      "request-mapping snippet completion",
+      "Spring @GetMapping request-mapping snippet completion",
     );
     const requestMappingTemplates = requestMappingResult.items;
     const getMappingTemplate = requestMappingTemplates.find((item) =>
-      /GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))
+      String(item?.label ?? "").startsWith("@GetMapping") &&
+      item?.insertTextFormat === 2
     );
-    assert.ok(getMappingTemplate);
-    assert.equal(getMappingTemplate.insertTextFormat, 2);
+    assert.ok(
+      getMappingTemplate,
+      "Spring @GetMapping snippet item with insertTextFormat=2 must be present",
+    );
     evidence.checks.requestMappingTemplates = pass(
-      "request-mapping snippet completion with snippet format",
-      { count: requestMappingTemplates.length },
+      "Spring @GetMapping request-mapping snippet completion",
+      {
+        count: requestMappingTemplates.length,
+        attempts: requestMappingResult.attempts,
+        label: getMappingTemplate.label,
+        insertTextFormat: getMappingTemplate.insertTextFormat,
+      },
     );
 
     const derivedQueryResult = await waitForCompletion(
