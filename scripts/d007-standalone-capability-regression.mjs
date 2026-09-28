@@ -198,15 +198,16 @@ class LspClient {
       if (message.method === "textDocument/publishDiagnostics") {
         const uri = message.params?.uri;
         if (typeof uri === "string") {
+          const diagnosticUri = canonicalDocumentUri(uri);
           const diagnostics = message.params?.diagnostics ?? [];
-          this.diagnostics.set(uri, diagnostics);
-          const history = this.diagnosticHistory.get(uri) ?? [];
+          this.diagnostics.set(diagnosticUri, diagnostics);
+          const history = this.diagnosticHistory.get(diagnosticUri) ?? [];
           history.push({
             receivedAt: Date.now(),
             diagnostics: boundedDiagnosticSummary(diagnostics),
           });
           if (history.length > 8) history.shift();
-          this.diagnosticHistory.set(uri, history);
+          this.diagnosticHistory.set(diagnosticUri, history);
         }
       }
       if (
@@ -441,9 +442,6 @@ async function main() {
     };
 
     const args = springArguments(jar, worktree, null);
-    if (process.env.D007_SPRING_CONDITION_PROBE === "1") {
-      args.push("--debug");
-    }
     const java = path.join(
       javaHome,
       "bin",
@@ -532,59 +530,6 @@ async function main() {
       INDEX_TIMEOUT_MS,
     );
     evidence.checks.indexReady = pass("spring/index/updated affectedProjects > 0");
-
-    // The production coordinator replays the latest initial configuration once
-    // after the first completed standalone index. The direct D007 client bypasses
-    // that coordinator, so model the same lifecycle correction explicitly here.
-    client.notify("workspace/didChangeConfiguration", {
-      settings: structuredClone(configuration),
-    });
-    evidence.checks.postIndexConfigurationReplay = pass(
-      "initial workspace configuration replayed after standalone index readiness",
-    );
-
-    if (process.env.D007_SPRING_CONDITION_PROBE === "1") {
-      await sleep(1_000);
-      const versionEvidence = () => stderr
-        .split(/\r?\n/)
-        .filter((line) =>
-          /BootVersionValidationConfig|bootVersionValidationScheduler|reconcile-only-opened-docs|LanguageServerHarness|Started Boot Version reconciler|validating Spring Boot version|Failed validating Spring Project version/i.test(line)
-        )
-        .slice(-120);
-      if (!stderr.includes("Started Boot Version reconciler")) {
-        throw new Error(
-          `Boot Version scheduler did not initialize; conditionEvidence=${JSON.stringify(versionEvidence())}`,
-        );
-      }
-
-      const metadataDeadline = Date.now() + 10_000;
-      while (versionMetadataServer.requests.length === 0 && Date.now() < metadataDeadline) {
-        await sleep(250);
-      }
-      if (versionMetadataServer.requests.length === 0) {
-        throw new Error(
-          `Boot Version scheduler initialized but made no metadata request; versionEvidence=${JSON.stringify(versionEvidence())}`,
-        );
-      }
-
-      const pomProbe = fileBy(files, "pom.xml");
-      const diagnosticDeadline = Date.now() + 10_000;
-      while (Date.now() < diagnosticDeadline) {
-        const diagnostics = client.diagnostics.get(uri(pomProbe)) ?? [];
-        if (diagnostics.some((diagnostic) =>
-          String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
-        )) break;
-        await sleep(250);
-      }
-      const pomDiagnostics = client.diagnostics.get(uri(pomProbe)) ?? [];
-      if (!pomDiagnostics.some((diagnostic) =>
-        String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
-      )) {
-        throw new Error(
-          `Version metadata was requested but patch diagnostic did not publish; metadataRequests=${JSON.stringify(versionMetadataServer.requests)}; latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(pomDiagnostics))}; versionEvidence=${JSON.stringify(versionEvidence())}`,
-        );
-      }
-    }
 
     for (const file of files) {
       client.notify("textDocument/didChange", {
@@ -1198,12 +1143,18 @@ async function main() {
       client,
       uri(pom),
       (diagnostics) => diagnostics.some((diagnostic) =>
-        String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+        String(diagnostic.code ?? "") === "BOOT_VERSION_VALIDATION_CODE" &&
+        /Newer patch version of Spring Boot available: 3\.5\.6/.test(
+          String(diagnostic.message ?? ""),
+        )
       ),
       "Spring Boot patch/version validation diagnostic",
     );
     const patchDiagnostic = versionDiagnostics.find((diagnostic) =>
-      String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+      String(diagnostic.code ?? "") === "BOOT_VERSION_VALIDATION_CODE" &&
+      /Newer patch version of Spring Boot available: 3\.5\.6/.test(
+        String(diagnostic.message ?? ""),
+      )
     );
     assert.ok(patchDiagnostic);
     assert.match(
@@ -2708,6 +2659,19 @@ function uri(file) {
   return pathToFileURL(file.path).href;
 }
 
+function canonicalDocumentUri(value) {
+  if (typeof value !== "string") return value;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "file:") {
+      return pathToFileURL(fileURLToPath(parsed)).href;
+    }
+  } catch {
+    // Preserve non-URI protocol values as-is; only file URIs need canonicalization.
+  }
+  return value;
+}
+
 function positionAfter(text, needle) {
   const index = text.indexOf(needle);
   assert.notEqual(index, -1, `needle not found: ${needle}`);
@@ -2916,14 +2880,15 @@ function locationUris(result) {
 }
 
 async function waitForDiagnostics(client, targetUri, predicate, label) {
+  const diagnosticUri = canonicalDocumentUri(targetUri);
   const deadline = Date.now() + INDEX_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const diagnostics = client.diagnostics.get(targetUri) ?? [];
+    const diagnostics = client.diagnostics.get(diagnosticUri) ?? [];
     if (predicate(diagnostics)) return diagnostics;
     await sleep(POLL_MS);
   }
-  const latest = client.diagnostics.get(targetUri) ?? [];
-  const history = client.diagnosticHistory.get(targetUri) ?? [];
+  const latest = client.diagnostics.get(diagnosticUri) ?? [];
+  const history = client.diagnosticHistory.get(diagnosticUri) ?? [];
   throw new Error(
     `timed out waiting for ${label} after ${INDEX_TIMEOUT_MS}ms; ` +
       `latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(latest))}; ` +
