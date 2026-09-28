@@ -456,7 +456,10 @@ async function main() {
         textDocument: {
           synchronization: { dynamicRegistration: true },
           publishDiagnostics: {},
-          completion: { dynamicRegistration: true },
+          completion: {
+            dynamicRegistration: true,
+            completionItem: { snippetSupport: true },
+          },
           hover: { dynamicRegistration: true },
           definition: { dynamicRegistration: true },
           references: { dynamicRegistration: true },
@@ -2533,7 +2536,10 @@ function standardClientCapabilities() {
     textDocument: {
       synchronization: { dynamicRegistration: true },
       publishDiagnostics: {},
-      completion: { dynamicRegistration: true },
+      completion: {
+        dynamicRegistration: true,
+        completionItem: { snippetSupport: true },
+      },
       hover: { dynamicRegistration: true },
       definition: { dynamicRegistration: true },
       references: { dynamicRegistration: true },
@@ -2712,6 +2718,42 @@ function completionItems(result) {
   return [];
 }
 
+function boundedCompletionText(value, limit = 160) {
+  if (value == null) return null;
+  const text = String(value);
+  return text.length <= limit ? text : `${text.slice(0, limit)}…`;
+}
+
+function completionDataMarker(data) {
+  if (data == null) return null;
+  if (
+    typeof data === "string" ||
+    typeof data === "number" ||
+    typeof data === "boolean"
+  ) {
+    return boundedCompletionText(data);
+  }
+  if (Array.isArray(data)) {
+    return { type: "array", length: data.length };
+  }
+  if (typeof data === "object") {
+    return { type: "object", keys: Object.keys(data).slice(0, 8) };
+  }
+  return { type: typeof data };
+}
+
+function boundedCompletionItemSummary(items) {
+  return items.slice(0, 8).map((item) => ({
+    label: boundedCompletionText(item?.label),
+    kind: item?.kind ?? null,
+    insertText: boundedCompletionText(item?.insertText),
+    insertTextFormat: item?.insertTextFormat ?? null,
+    textEditNewText: boundedCompletionText(item?.textEdit?.newText),
+    detail: boundedCompletionText(item?.detail),
+    data: completionDataMarker(item?.data),
+  }));
+}
+
 async function waitForCompletion(
   client,
   targetUri,
@@ -2739,7 +2781,7 @@ async function waitForCompletion(
   } while (Date.now() < deadline);
 
   throw new Error(
-    `${label} did not become ready after ${attempts} bounded completion requests; lastItemCount=${lastItems.length}`,
+    `${label} did not become ready after ${attempts} bounded completion requests; lastItemCount=${lastItems.length}; lastItemSummary=${JSON.stringify(boundedCompletionItemSummary(lastItems))}`,
   );
 }
 
