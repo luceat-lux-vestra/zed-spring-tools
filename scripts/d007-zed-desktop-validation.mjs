@@ -473,7 +473,7 @@ function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
 
   // Zed's Code Actions menu prepends local runnables/tasks and can merge actions
   // from multiple language servers. The coordinator's response index therefore
-  // is not a stable editor::ConfirmCodeAction item_ix. We have already proven
+  // is not a stable merged Code Actions menu item index. We have already proven
   // that the exact action payload is surfaced; close that mixed menu, then
   // execute the same registered command through Zed's public LSP command
   // selector, whose identity is the command string rather than a transient menu
@@ -2031,8 +2031,9 @@ function selfTest() {
       true,
       "D007 run/debug dispatch must use Zed's public LSP command selector",
     );
+    const retiredConfirmCodeAction = ["editor", "ConfirmCodeAction"].join("::");
     assert.equal(
-      harnessSource.includes('"editor::ConfirmCodeAction"'),
+      harnessSource.includes(retiredConfirmCodeAction),
       false,
       "D007 must not select Code Actions by a provider-local response index",
     );
