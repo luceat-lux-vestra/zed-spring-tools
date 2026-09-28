@@ -278,12 +278,6 @@ export class Coordinator {
     this.automaticLivePollTimer = undefined;
     this.automaticLiveTask = undefined;
     this.automaticLivePollFailureLogged = false;
-    // Standalone 5.3 discovers Maven/Gradle projects during Spring context
-    // refresh, before LSP initialized handlers install project/config listeners.
-    // Preserve the latest initial configuration so the first completed Spring
-    // index can replay it once after those listeners are definitely live.
-    this.latestInitialConfiguration = undefined;
-    this.initialSpringIndexSeen = false;
     this.initialized = false;
     this.sequence = 0;
     this.sessionId = randomUUID();
@@ -303,13 +297,6 @@ export class Coordinator {
 
   observeZedMessage(message) {
     this.#observeAutomaticLiveConfiguration(message);
-    if (
-      message?.method === "workspace/didChangeConfiguration" &&
-      message.id === undefined &&
-      !this.initialSpringIndexSeen
-    ) {
-      this.latestInitialConfiguration = structuredClone(message);
-    }
     if (message?.method === "textDocument/inlayHint" && message.id !== undefined) {
       const uri = message.params?.textDocument?.uri;
       this.inlayHintRequests.set(idKey(message.id), {
@@ -510,14 +497,6 @@ export class Coordinator {
         Array.isArray(message.params?.affectedProjects) &&
         message.params.affectedProjects.length > 0
       ) {
-        if (!this.initialSpringIndexSeen) {
-          this.initialSpringIndexSeen = true;
-          if (this.latestInitialConfiguration !== undefined) {
-            this.sendSpring(encodeLsp(this.latestInitialConfiguration));
-            this.logger("Replayed initial Spring configuration after standalone index readiness");
-            this.latestInitialConfiguration = undefined;
-          }
-        }
         this.automaticLiveProjectNames.clear();
         this.inlayRefreshPending = true;
         this.#invalidateGeneratedTargets();
