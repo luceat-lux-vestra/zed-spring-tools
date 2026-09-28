@@ -637,8 +637,8 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-modulith-regression",
-          "check": "metadataRefresh"
+          "source": "standalone-capability-regression",
+          "check": "modulithMetadataRefresh"
         }
       ]
     },
@@ -651,8 +651,16 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-modulith-regression",
-          "check": "projects"
+          "source": "standalone-capability-regression",
+          "check": "modulithProjects"
+        },
+        {
+          "source": "standalone-capability-regression",
+          "check": "modulithViolation"
+        },
+        {
+          "source": "standalone-capability-regression",
+          "check": "modulithStructure"
         }
       ]
     },
