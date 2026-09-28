@@ -519,3 +519,31 @@ test("D007 MCP coexistence completion probes track the exact ser fixture line", 
   );
 });
 
+test("D007 live regression proves mappings and Hover before merged live CodeLens", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  const mappingsIndex = regression.indexOf("const liveMappings = await waitForLiveRequestMappings(");
+  const hoverIndex = regression.indexOf("const liveHover = await waitForLiveHover(");
+  const lensIndex = regression.indexOf("const liveLens = await waitForLiveUrlCodeLens(");
+  assert.equal(mappingsIndex >= 0, true, "live mappings must be established");
+  assert.equal(hoverIndex > mappingsIndex, true, "source matching Hover must follow authentic mappings");
+  assert.equal(lensIndex > hoverIndex, true, "merged live CodeLens must be checked after Hover");
+
+  assert.equal(
+    regression.includes('command: "sts/livedata/get"') &&
+      regression.includes('arguments: [{ processKey, endpoint: "mappings" }]'),
+    true,
+    "live mapping evidence must use Spring Tools public sts/livedata/get contract",
+  );
+  assert.equal(
+    regression.includes("live /greeting mapping must identify GreetingController before source matching"),
+    true,
+    "live mapping evidence must bind the runtime mapping to the fixture controller",
+  );
+  assert.equal(
+    regression.includes("lastCodeLenses="),
+    true,
+    "live CodeLens timeout must preserve a bounded final result for diagnosis",
+  );
+});
+
