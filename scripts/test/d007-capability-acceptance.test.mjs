@@ -479,3 +479,26 @@ test("D007 version validation uses deterministic loopback metadata and the Sprin
   );
 });
 
+test("D007 MCP coexistence establishes completion before and after tool calls", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("LSP server.port completion before MCP requests") &&
+      regression.includes("LSP server.port completion after MCP requests"),
+    true,
+    "MCP coexistence must compare an indexed pre-MCP completion baseline with the post-MCP result",
+  );
+  assert.equal(
+    regression.includes('textDocument: {\n        uri: pathToFileURL(propertiesFile).href,\n        version: 2') &&
+      regression.includes('contentChanges: [{ text: fs.readFileSync(propertiesFile, "utf8") }]'),
+    true,
+    "the MCP sub-run must re-reconcile the open properties buffer after project index readiness",
+  );
+  assert.equal(
+    regression.includes("lspCompletionBeforeMcp: true") &&
+      regression.includes("lspCompletionAfterMcp: true"),
+    true,
+    "MCP evidence must preserve both sides of the coexistence comparison",
+  );
+});
+
