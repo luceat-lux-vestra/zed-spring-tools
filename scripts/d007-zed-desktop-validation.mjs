@@ -2270,6 +2270,34 @@ function selfTest() {
     fs.appendFileSync(path.join(manifest.evidence, "runtime.log"), "java/proxy forbidden\n");
     assert.equal(summarize(root).privateBoundary, "FAIL");
 
+    const popupProtocol = coordinatorProtocolFile(manifest, "maven");
+    fs.mkdirSync(path.dirname(popupProtocol), { recursive: true });
+    fs.writeFileSync(
+      popupProtocol,
+      [
+        JSON.stringify({
+          event: "spring-window-message",
+          method: "window/showMessage",
+          type: 1,
+          severity: "error",
+        }),
+        JSON.stringify({
+          event: "spring-window-message",
+          method: "window/showMessageRequest",
+          type: 3,
+          severity: "info",
+        }),
+      ].join("\n") + "\n",
+    );
+    const popupSummary = summarize(root);
+    assert.equal(
+      popupSummary.unexpectedRuntimeErrorEvidence,
+      "FAIL",
+      "D007 must not pass when Spring emits an error popup",
+    );
+    assert.equal(popupSummary.unexpectedSpringWindowErrors.length, 1);
+    fs.rmSync(popupProtocol, { force: true });
+
     const readinessLog = path.join(manifest.evidence, "readiness.log");
     fs.writeFileSync(readinessLog, "old-log\n");
     const readinessRecord = {
