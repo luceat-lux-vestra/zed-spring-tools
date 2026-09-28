@@ -530,6 +530,16 @@ async function main() {
     );
     evidence.checks.indexReady = pass("spring/index/updated affectedProjects > 0");
 
+    // The production coordinator replays the latest initial configuration once
+    // after the first completed standalone index. The direct D007 client bypasses
+    // that coordinator, so model the same lifecycle correction explicitly here.
+    client.notify("workspace/didChangeConfiguration", {
+      settings: structuredClone(configuration),
+    });
+    evidence.checks.postIndexConfigurationReplay = pass(
+      "initial workspace configuration replayed after standalone index readiness",
+    );
+
     for (const file of files) {
       client.notify("textDocument/didChange", {
         textDocument: { uri: uri(file), version: 2 },
