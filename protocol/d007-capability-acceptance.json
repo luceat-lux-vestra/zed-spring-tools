@@ -80,10 +80,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "properties-and-resource-languages",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "Revalidate on the exact-head standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-secondary-workflows",
+          "source": "standalone-capability-regression",
           "check": "sharedPropertiesMetadataReload"
         }
       ]
@@ -94,10 +94,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "properties-and-resource-languages",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "Revalidate on the exact-head standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-secondary-workflows",
+          "source": "standalone-capability-regression",
           "check": "propertiesToYaml"
         }
       ]
@@ -108,10 +108,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "properties-and-resource-languages",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "Revalidate on the exact-head standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-secondary-workflows",
+          "source": "standalone-capability-regression",
           "check": "yamlToProperties"
         }
       ]
@@ -584,10 +584,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "boot-project-and-execution",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "Revalidate on the exact-head standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-secondary-workflows",
+          "source": "standalone-capability-regression",
           "check": "buildTaskExecution"
         }
       ]
