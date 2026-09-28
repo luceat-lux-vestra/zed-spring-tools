@@ -450,9 +450,16 @@ test("D007 version validation uses deterministic loopback metadata and the Sprin
     "version validation must force the deterministic Spring projects provider path",
   );
   assert.equal(
-    regression.includes("initial workspace configuration replayed after standalone index readiness"),
+    regression.includes('String(diagnostic.code ?? "") === "BOOT_VERSION_VALIDATION_CODE"') &&
+      regression.includes("Newer patch version of Spring Boot available: 3\\.5\\.6"),
     true,
-    "direct D007 must model the coordinator's one-shot post-index configuration replay",
+    "5.3 version acceptance must use Spring's generic version code plus the exact patch message",
+  );
+  assert.equal(
+    regression.includes("canonicalDocumentUri(uri)") &&
+      regression.includes("canonicalDocumentUri(targetUri)"),
+    true,
+    "published Java file:/ URIs and Node file:/// target URIs must share one diagnostic key",
   );
   assert.equal(
     regression.includes('version: "3.5.6"') &&
