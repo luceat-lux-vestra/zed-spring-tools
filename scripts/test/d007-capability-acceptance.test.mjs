@@ -593,3 +593,39 @@ test("D007 live Hover probe targets the exact GetMapping annotation", () => {
   );
 });
 
+test("D007 live fixture launches with production live-data VM arguments", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const coordinator = fs.readFileSync(path.join(root, "coordinator", "src", "main.mjs"), "utf8");
+
+  const requiredArgs = [
+    "-Dspring.jmx.enabled=true",
+    "-Dmanagement.endpoints.jmx.exposure.include=*",
+    "-Dspring.application.admin.enabled=true",
+    "-Dspring.boot.project.name=zed-spring-tools-fixture",
+  ];
+  for (const arg of requiredArgs) {
+    assert.equal(
+      regression.includes(JSON.stringify(arg)),
+      true,
+      `live fixture must launch with production argument ${arg}`,
+    );
+  }
+  assert.equal(
+    regression.includes(
+      '"-Dspring-boot.run.jvmArguments=" + liveLaunchVmArgs.join(" ")',
+    ),
+    true,
+    "Maven live fixture must pass those values as child-JVM arguments, not Maven-only properties",
+  );
+  assert.equal(
+    coordinator.includes('"-Dspring.application.admin.enabled=true"'),
+    true,
+    "production generated debug configuration must retain the admin MBean argument",
+  );
+  assert.equal(
+    regression.includes('"spring.application.admin.enabled=true",'),
+    false,
+    "admin enablement must not be hidden in fixture application.properties; the proof is launch parity",
+  );
+});
+
