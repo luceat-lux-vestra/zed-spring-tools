@@ -82,9 +82,15 @@ For #159 and the Registry release gate, apply this overlay:
   completion and run/debug generation, executes the generated Boot run tasks,
   and rejects Spring error-level popup evidence.
 
-This overlay is temporary release-accounting structure, not a second state
-system. After the D007 acceptance matrix is fully resolved, affected rows must
-be updated individually and this overlay can be reduced to historical context.
+This overlay is release-accounting structure, not a second state system. The
+source-controlled matrix defines the evidence obligation for each affected row;
+the exact-HEAD D007 run materializes those obligations into
+`d007-capability-acceptance-summary.json`. Do **not** edit capability states merely
+to record that run after it passes: changing repository source would create a new
+HEAD and invalidate the evidence it was meant to record. The accepted exact-HEAD
+summary is instead attached to the PR/issue release record. A later source change
+to the matrix or row classification creates a new candidate and therefore
+requires a new exact-HEAD run.
 
 This is the auditable list behind the goal of capability parity with VS Code
 Spring Tools. Every user-visible capability carries exactly one state. A
