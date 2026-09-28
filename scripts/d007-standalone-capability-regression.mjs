@@ -1221,7 +1221,7 @@ async function main() {
       "Spring Boot patch upgrade must edit the exact pom.xml to the advertised target version",
     );
     evidence.checks.bootUpgrade = pass(
-      "sts/upgrade/spring-boot-patch produced an accepted pom.xml workspace edit",
+      "sts/upgrade/spring-boot produced an accepted patch-version pom.xml workspace edit",
       {
         targetVersion,
         workspaceEditCount: upgradeEdits.length,
