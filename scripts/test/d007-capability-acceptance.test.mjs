@@ -15,6 +15,7 @@ const extensionManifestFile = path.join(root, "extension.toml");
 const basicPomFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "pom.xml");
 const greetingRepositoryFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "GreetingRepository.java");
 const spelFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "SpelSample.java");
+const namedQueriesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "META-INF", "jpa-named-queries.properties");
 
 const STATES = new Set([
   "verified",
@@ -383,6 +384,27 @@ test("D007 diagnostic waits retain bounded latest and history evidence on failur
     regression.includes("if (history.length > 8) history.shift()"),
     true,
     "diagnostic history must remain bounded",
+  );
+});
+
+test("D007 named-query fixture uses the proven HQL syntax failure and requires project-aware HQL diagnostics", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const namedQueries = fs.readFileSync(namedQueriesFixture, "utf8");
+
+  assert.equal(
+    namedQueries.includes("Greeting.broken=select g from Greeting g where"),
+    true,
+    "named-query fixture must use the same trailing-where syntax failure already proven by the Java HQL probe",
+  );
+  assert.equal(
+    namedQueries.includes("select g form Greeting g"),
+    false,
+    "the unverified form-typo fixture must not return",
+  );
+  assert.equal(
+    regression.includes('String(diagnostic.code ?? "") === "HQL_SYNTAX"'),
+    true,
+    "standalone acceptance must prove project-aware HQL reconciliation for the spring-data-jpa fixture",
   );
 });
 
