@@ -28,8 +28,19 @@ exact submitted commit.
   the injected bridge must be revalidated before it is release-facing
   `verified` on the standalone architecture. Rows whose outcome is independent
   of that boundary retain their historical evidence with the exact release/tuple
-  named. See the [capability inventory](docs/capability-inventory.md) for the
-  migration status rather than relying on the old aggregate count.
+  named. See the [capability inventory](docs/capability-inventory.md) and the
+  machine-readable
+  [D007 acceptance matrix](protocol/d007-capability-acceptance.json) rather than
+  relying on the old aggregate count. A matrix row with
+  `currentClaim: pending-d007` is explicitly **not** a current support claim.
+- D007 acceptance now separates direct standalone-server regression from Zed
+  desktop integration. The direct regression re-drives the rich Spring Boot
+  fixture; the desktop layer proves JDTLS/standalone coexistence, Maven/Gradle
+  editor flows and generated configuration. It also executes the exact generated
+  Maven/Gradle Boot run tasks. Any Spring-originated error-level window message
+  makes that run fail; a visible Spring error popup is never compatible with a
+  passing acceptance result. This still does not turn an untested matrix row
+  into `verified`.
 - **Embedded query highlighting needs one Zed setting that no extension can set
   for you.** The JPQL, HQL, SQL and SpEL text inside a `@Query` or `@Value` is
   highlighted by Spring's LSP semantic tokens, and Zed's `semantic_tokens`
