@@ -231,7 +231,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "liveCodeLens"
         }
       ]
@@ -439,7 +439,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "localConnect"
         }
       ]
@@ -453,7 +453,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "remoteConnect"
         }
       ]
@@ -467,7 +467,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "liveHover"
         }
       ]
@@ -481,7 +481,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "showHideRefresh"
         }
       ]
@@ -495,7 +495,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "metrics"
         }
       ]
@@ -509,7 +509,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "loggers"
         }
       ]
@@ -523,7 +523,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-live-regression",
+          "source": "standalone-capability-regression",
           "check": "automaticConnection"
         }
       ]
@@ -601,7 +601,7 @@
       "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
       "requiredEvidence": [
         {
-          "source": "standalone-secondary-workflows",
+          "source": "standalone-capability-regression",
           "check": "openBootAppUrl"
         }
       ]
