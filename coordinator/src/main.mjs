@@ -3710,6 +3710,26 @@ export async function run(arguments_, dependencies = {}) {
               : 0,
           });
         }
+        if (d007EvidenceFile !== null && message?.method === SPRING_HIGHLIGHT) {
+          const codeLenses = Array.isArray(message.params?.codeLenses)
+            ? message.params.codeLenses
+            : [];
+          appendD007ProtocolEvidence(d007EvidenceFile, {
+            event: "spring-highlight",
+            uri: typeof message.params?.doc?.uri === "string"
+              ? message.params.doc.uri
+              : null,
+            version: Number.isInteger(message.params?.doc?.version)
+              ? message.params.doc.version
+              : null,
+            codeLensCount: codeLenses.length,
+            commands: codeLenses.slice(0, 8).map((lens) =>
+              typeof lens?.command?.command === "string"
+                ? lens.command.command
+                : null
+            ),
+          });
+        }
         const key = responseKey(message);
         const completionRequest = key === null ? undefined : completionRequests.get(key);
         if (key !== null && completionRequest !== undefined) {
