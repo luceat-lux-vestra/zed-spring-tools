@@ -12,6 +12,7 @@ const standaloneRegressionFile = path.join(root, "scripts", "d007-standalone-cap
 const basicPropertiesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.properties");
 const basicYamlFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.yaml");
 const extensionManifestFile = path.join(root, "extension.toml");
+const basicPomFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "pom.xml");
 
 const STATES = new Set([
   "verified",
@@ -246,5 +247,22 @@ test("D007 fixture language ids match the production Spring server mapping", () 
     regression.includes('["src/main/resources/application.yaml", "spring-boot-yaml"]'),
     false,
     "retired harness-only YAML id must not reappear",
+  );
+});
+
+
+test("D007 fixture explicitly enables configuration metadata processing on JDK 23+", () => {
+  const pom = fs.readFileSync(basicPomFixture, "utf8");
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    pom.includes("org.springframework.boot.configurationprocessor.ConfigurationMetadataAnnotationProcessor"),
+    true,
+    "fixture must explicitly list the Spring Boot configuration metadata processor",
+  );
+  assert.equal(
+    regression.includes("fixture compile must generate spring-configuration-metadata.json before project-property capability checks"),
+    true,
+    "standalone regression must fail at compile time if project metadata was not generated",
   );
 });
