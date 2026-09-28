@@ -8,6 +8,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const inventoryFile = path.join(root, "docs", "capability-inventory.md");
 const matrixFile = path.join(root, "protocol", "d007-capability-acceptance.json");
 const desktopHarnessFile = path.join(root, "scripts", "d007-zed-desktop-validation.mjs");
+const standaloneRegressionFile = path.join(root, "scripts", "d007-standalone-capability-regression.mjs");
+const basicPropertiesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.properties");
+const basicYamlFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.yaml");
 
 const STATES = new Set([
   "verified",
@@ -185,4 +188,40 @@ test("D007 evidence sources are all produced by the exact-head desktop harness",
       `D007 matrix source ${source} must have a concrete evidence producer`,
     );
   }
+});
+
+
+test("D007 completion probes target the actual incomplete fixture lines", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const properties = fs.readFileSync(basicPropertiesFixture, "utf8");
+  const yaml = fs.readFileSync(basicYamlFixture, "utf8");
+
+  assert.equal(
+    properties.split("\n").filter((line) => line === "ser").length,
+    1,
+    "properties fixture must contain exactly one incomplete ser probe line",
+  );
+  assert.equal(
+    yaml.split("\n").filter((line) => line === "ser").length,
+    1,
+    "YAML fixture must contain exactly one incomplete ser probe line",
+  );
+  assert.equal(
+    regression.includes('positionAfter(props.text, "ser")'),
+    false,
+    "properties completion must not use first-substring lookup because the fixture comments also contain ser",
+  );
+  assert.equal(
+    regression.includes('positionAfter(yaml.text, "ser")'),
+    false,
+    "YAML completion should use the same exact-line targeting contract",
+  );
+  assert.equal(
+    regression.includes('positionAtExactLineEnd(props.text, "ser")'),
+    true,
+  );
+  assert.equal(
+    regression.includes('positionAtExactLineEnd(yaml.text, "ser")'),
+    true,
+  );
 });
