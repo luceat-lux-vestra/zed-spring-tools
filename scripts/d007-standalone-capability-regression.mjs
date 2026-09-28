@@ -538,7 +538,7 @@ async function main() {
     const propsCompletionResult = await waitForCompletion(
       client,
       uri(props),
-      positionAfter(props.text, "ser"),
+      positionAtExactLineEnd(props.text, "ser"),
       (items) => items.some((item) =>
         String(item?.label ?? "").includes("server.port")
       ),
@@ -2561,6 +2561,23 @@ function positionAfter(text, needle) {
   const index = text.indexOf(needle);
   assert.notEqual(index, -1, `needle not found: ${needle}`);
   return offsetPosition(text, index + needle.length, needle);
+}
+
+function positionAtExactLineEnd(text, expectedLine) {
+  const lines = text.split("\n");
+  const matches = [];
+  for (let line = 0; line < lines.length; line += 1) {
+    if (lines[line] === expectedLine) matches.push(line);
+  }
+  assert.deepEqual(
+    matches.length,
+    1,
+    `expected exactly one line equal to ${JSON.stringify(expectedLine)}, found ${matches.length}`,
+  );
+  return {
+    line: matches[0],
+    character: expectedLine.length,
+  };
 }
 
 function positionInside(text, needle, offset) {
