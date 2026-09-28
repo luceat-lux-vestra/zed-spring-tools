@@ -9,10 +9,14 @@ capability.
 
 ## Before proposing a change
 
-Read `AGENTS.md`, the accepted decisions in `docs/decisions/`, and the reviewed
-`docs/implementation-plan.md`. D002, D003, and D004 fix the architecture, the
-official-Java boundary, and the production stack; a change that departs from
-them needs a decision document first.
+Read `AGENTS.md`, the accepted decisions in `docs/decisions/`, and the
+maintained authority for the work you are changing. `docs/implementation-plan.md`
+is a historical M1-M6 milestone record, not the current roadmap. Current
+capability/support truth lives in the capability inventory, compatibility and
+limitations documents; release work is owned by Epic #108 and the current
+release gate. D002-D006 remain the checked-in architecture on current `main`,
+while #159 explicitly reopens the Registry publishing boundary for the private
+Java transport.
 
 Keep a contribution to one investigation, experiment, decision, or reviewed
 implementation slice. Open an issue before broad architecture, packaging,
@@ -89,12 +93,14 @@ information.
   labels such as `bug` and `documentation` cover ordinary triage.
 - An assignee means that person owns the next action. Pull-request authors are
   not assigned redundantly.
-- Work advancing the implementation plan belongs to its active milestone. A
-  future milestone is created when that phase starts, without a speculative due
-  date.
-- The implementation plan and capability inventory are the roadmap during solo
-  M4 work. A GitHub Project will be introduced only when multiple contributors
-  or a durable concurrent backlog makes a separate status board useful.
+- Work belongs to the milestone that actually owns its current delivery
+  horizon. Release work uses the native `Registry publication & v1.0 readiness`
+  milestone where applicable; repository hygiene may have no milestone. Do not
+  invent a due date without a real commitment.
+- The implementation plan is historical. Current work is owned by the
+  capability/compatibility authorities plus the active GitHub Epic/Track/Task
+  hierarchy. A GitHub Project should be added only when a durable concurrent
+  backlog needs a separate status board, not to duplicate those sources.
 - The maintainer applies or corrects metadata before merge; contributors do not
   need repository triage permission to submit a complete change.
 - Pull-request `area:*`, `research`, `decision`, `spike`, and `documentation`
