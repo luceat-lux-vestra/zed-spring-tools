@@ -30,6 +30,7 @@ jobs:
       - name: Validate D007 harness contracts
         run: |
           node --test \
+            coordinator/test/coordinator.test.mjs \
             scripts/test/d007-standalone-capability-regression.test.mjs \
             scripts/test/d007-capability-acceptance.test.mjs
       - name: Run D007 standalone regression
