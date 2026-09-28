@@ -153,6 +153,8 @@ function d007Keymap() {
   const workspaceBindings = {
     "ctrl-cmd-alt-i": "zed::InstallDevExtension",
     "ctrl-cmd-alt-r": "lsp_command_selector::Toggle",
+    "ctrl-cmd-alt-d": "debugger::Start",
+    "ctrl-cmd-alt-s": "debugger::Stop",
   };
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
@@ -299,6 +301,20 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
       );
       results.push(fixtureResult);
     }
+
+    const dapJavaRelative =
+      "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+    setPhase("maven-dap-launch");
+    launchMacos(root, "maven", {
+      role: "dap",
+      relativeTarget: dapJavaRelative,
+    });
+    setPhase("maven-dap-zed-readiness");
+    waitForZedReady(manifest, "maven", 45_000);
+    setPhase("maven-dap-interaction");
+    runDesktopDapRegressionMacos(root, "maven", 180_000);
+    setPhase("maven-dap-shutdown");
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
   } catch (error) {
     primaryError = error;
     writeGateFailure(manifest, phase, error);
@@ -509,6 +525,196 @@ function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
     3,
   );
   captureScreen(path.join(manifest.evidence, `${fixtureKind}-completion.png`));
+}
+
+function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
+  const manifest = readManifest(root);
+  const worktree = manifest.worktrees[fixtureKind];
+  const debugFile = path.join(worktree, ".zed", "debug.json");
+  requireFile(debugFile, fixtureKind + " generated debug config");
+  const configs = JSON.parse(fs.readFileSync(debugFile, "utf8"));
+  assert.equal(Array.isArray(configs), true, ".zed/debug.json must contain an array");
+  const config = configs.find((entry) =>
+    entry?.adapter === "Java" &&
+    entry?.request === "launch" &&
+    entry?.mainClass === "dev.zed.spring.fixture.FixtureApplication" &&
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools): ") &&
+    entry.label.endsWith(" (debug)")
+  );
+  assert.ok(config, fixtureKind + " base Spring Boot Java debug config must exist");
+
+  const before = new Set(
+    javaDebugProcessCandidates(
+      processSnapshot(),
+      worktree,
+      config.mainClass,
+    ).map((entry) => entry.pid),
+  );
+
+  sendD007ActionKeyMacos(
+    manifest,
+    "d",
+    fixtureKind + "-dap-start-action",
+  );
+  sleepMs(900);
+  typeD007PickerQueryMacos(
+    manifest,
+    config.label,
+    fixtureKind + "-dap-debug-config-query",
+  );
+  sleepMs(900);
+
+  const started = Date.now();
+  let attempts = 0;
+  let observed;
+  while (Date.now() - started < timeoutMs) {
+    if (attempts < 3) {
+      attempts += 1;
+      confirmD007PickerMacos(
+        manifest,
+        fixtureKind + "-dap-confirm-" + attempts,
+      );
+    }
+    const attemptDeadline = Math.min(started + timeoutMs, Date.now() + 20_000);
+    while (Date.now() < attemptDeadline) {
+      observed = javaDebugProcessCandidates(
+        processSnapshot(),
+        worktree,
+        config.mainClass,
+      ).find((entry) => !before.has(entry.pid));
+      if (observed !== undefined) break;
+      sleepMs(250);
+    }
+    if (observed !== undefined) break;
+  }
+
+  if (observed === undefined) {
+    captureScreen(path.join(manifest.evidence, fixtureKind + "-dap-failure.png"));
+    throw new Error(
+      fixtureKind +
+        " generated Java debug configuration did not launch a new JDWP application process",
+    );
+  }
+
+  captureScreen(path.join(manifest.evidence, fixtureKind + "-dap-running.png"));
+  sendD007ActionKeyMacos(
+    manifest,
+    "s",
+    fixtureKind + "-dap-stop-action",
+  );
+  waitUntil(
+    () => !processPidIsLive(observed.pid),
+    fixtureKind + " debuggee shutdown after debugger::Stop",
+    30_000,
+  );
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    checks: {
+      debugLaunch: {
+        status: "PASS",
+        adapter: config.adapter,
+        request: config.request,
+        mainClass: config.mainClass,
+        generatedLabel: config.label,
+        newDebuggeePid: observed.pid,
+        jdwpObserved: observed.jdwpObserved,
+        exactWorktreeObserved: observed.exactWorktreeObserved,
+        pickerConfirmAttempts: attempts,
+        stoppedViaPublicDebuggerAction: true,
+      },
+    },
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, "desktop-dap-regression.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
+}
+
+function processSnapshot() {
+  const result = spawnSync(
+    "/bin/ps",
+    ["-axo", "pid=,ppid=,pgid=,stat=,command="],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    throw new Error("ps failed while checking debug process: " + bounded(result.stderr));
+  }
+  return result.stdout;
+}
+
+function javaDebugProcessCandidates(psOutput, worktree, mainClass) {
+  const candidates = [];
+  for (const line of String(psOutput).split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const [, pidText, ppidText, pgidText, state, command] = match;
+    if (state.startsWith("Z")) continue;
+    const mainClassObserved = command.includes(mainClass);
+    const exactWorktreeObserved = command.includes(worktree);
+    const jdwpObserved =
+      command.includes("-agentlib:jdwp=") ||
+      command.includes("-agentpath:") && command.includes("jdwp");
+    if (!mainClassObserved || !exactWorktreeObserved || !jdwpObserved) continue;
+    candidates.push({
+      pid: Number(pidText),
+      ppid: Number(ppidText),
+      pgid: Number(pgidText),
+      jdwpObserved,
+      exactWorktreeObserved,
+    });
+  }
+  return candidates;
+}
+
+function processPidIsLive(pid) {
+  const result = spawnSync(
+    "/bin/ps",
+    ["-p", String(pid), "-o", "stat="],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) return false;
+  const state = String(result.stdout).trim();
+  return state.length > 0 && !state.startsWith("Z");
+}
+
+function typeD007PickerQueryMacos(manifest, query, evidenceName) {
+  const script = [
+    `set queryText to "${escapeAppleScript(query)}"`,
+    "set previousClipboard to the clipboard",
+    "try",
+    "  set the clipboard to queryText",
+    '  tell application "Zed" to activate',
+    '  tell application "System Events"',
+    '    tell process "Zed" to set frontmost to true',
+    '    keystroke "a" using {command down}',
+    '    keystroke "v" using {command down}',
+    "  end tell",
+    "  delay 0.2",
+    "  set the clipboard to previousClipboard",
+    "on error errorMessage number errorNumber",
+    "  set the clipboard to previousClipboard",
+    "  error errorMessage number errorNumber",
+    "end try",
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
+}
+
+function confirmD007PickerMacos(manifest, evidenceName) {
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    '  key code 36',
+    'end tell',
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
 }
 
 function runDebugPhaseMacos(root, fixtureKind) {
