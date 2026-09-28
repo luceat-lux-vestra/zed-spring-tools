@@ -502,3 +502,20 @@ test("D007 MCP coexistence establishes completion before and after tool calls", 
   );
 });
 
+test("D007 MCP coexistence completion probes track the exact ser fixture line", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('{ line: 0, character: 3 }'),
+    false,
+    "MCP completion must not use the stale top-of-file coordinate after fixture comments were added",
+  );
+  const exactMcpProbe =
+    'positionAtExactLineEnd(fs.readFileSync(propertiesFile, "utf8"), "ser")';
+  assert.equal(
+    regression.split(exactMcpProbe).length - 1,
+    2,
+    "both pre-MCP and post-MCP completion probes must target the exact incomplete ser line",
+  );
+});
+
