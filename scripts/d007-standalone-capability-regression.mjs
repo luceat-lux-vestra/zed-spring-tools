@@ -2440,26 +2440,32 @@ async function waitForLiveUrlCodeLens(client, controller, port, timeoutMs) {
 async function waitForLiveHover(client, controller, port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   const targetUri = pathToFileURL(controller.path).href;
-  const positions = [
-    positionInside(controller.text, '"/greeting"', 3),
-    positionInside(controller.text, "GetMapping", 3),
-    positionInside(controller.text, "greeting()", 3),
-  ];
+  const position = positionInExactLine(
+    controller.text,
+    '    @GetMapping("/greeting")',
+    "GetMapping",
+    3,
+  );
+  let lastHover = "{}";
   while (Date.now() < deadline) {
-    for (const position of positions) {
-      const hover = await client.request(
-        "textDocument/hover",
-        { textDocument: { uri: targetUri }, position },
-        30_000,
-      );
-      const text = JSON.stringify(hover ?? {});
-      if (text.includes("Process [") && text.includes(":" + port + "/greeting")) {
-        return text;
-      }
+    const hover = await client.request(
+      "textDocument/hover",
+      { textDocument: { uri: targetUri }, position },
+      30_000,
+    );
+    lastHover = JSON.stringify(hover ?? {});
+    if (
+      lastHover.includes("Process [") &&
+      lastHover.includes(":" + port + "/greeting")
+    ) {
+      return lastHover;
     }
     await sleep(750);
   }
-  throw new Error("live request-mapping Hover did not include process and URL");
+  throw new Error(
+    "live request-mapping Hover did not include process and URL; lastHover=" +
+      boundedCompletionText(lastHover, 4000),
+  );
 }
 
 async function waitForWindowMessage(client, pattern, label, timeoutMs) {
