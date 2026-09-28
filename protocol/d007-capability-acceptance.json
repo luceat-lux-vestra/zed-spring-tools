@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 1,
+  "decision": "D007",
+  "sourceInventoryVersion": 56,
+  "policy": "Every tracked user outcome is classified. Any pending-d007 row blocks #159 release acceptance until its named evidence group passes on the exact final candidate or the row is explicitly narrowed or reclassified.",
+  "entries": [
+    {
+      "capability": "Property key/value completion in `.properties`",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Property completion in `.yaml`",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Hover documentation on properties",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Property validation / diagnostics",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Navigation from a property to its definition",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Shared properties metadata reload",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Convert `.properties` to `.yaml`",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Convert `.yaml` to `.properties`",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "`spring-factories` language support",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "`jpa-query-properties` language support",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "properties-and-resource-languages",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Completion prefix elision",
+      "historicalState": "not-pursued",
+      "classification": "not-pursued",
+      "currentClaim": "not-pursued",
+      "evidenceGroup": "other",
+      "reason": "Out of declared product scope; no D007 regression claim required."
+    },
+    {
+      "capability": "Document symbols",
+      "historicalState": "zed-native-equivalent",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "other",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Workspace symbols (Spring symbols)",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Request mapping navigation",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Bean navigation",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Static Spring CodeLens",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Live-data highlight CodeLens",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Inlay hints (including cron)",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Code actions / quick fixes",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "References and implementations",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Source authorship and change history",
+      "historicalState": "zed-native-equivalent",
+      "classification": "unaffected",
+      "currentClaim": "zed-native-equivalent",
+      "evidenceGroup": "other",
+      "reason": "Outcome is owned by Zed and does not depend on the retired Java transport or standalone Spring project model."
+    },
+    {
+      "capability": "Spring-specific references",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring-specific document highlights",
+      "historicalState": "blocked-zed-api",
+      "classification": "existing-blocker",
+      "currentClaim": "blocked-zed-api",
+      "evidenceGroup": "other",
+      "reason": "Existing blocker remains explicit; D007 must not claim this capability."
+    },
+    {
+      "capability": "Spring-aware Java completion",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring Java request-mapping templates",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "SpEL language intelligence",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring Data query intelligence",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Cron completion and validation",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Boot project info",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Executable Boot projects discovery",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Spring XML config support",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-xml",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Connect / disconnect to a local Boot process",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "other",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Remote connect",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Live hover data",
+      "historicalState": "zed-native-equivalent",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Show / hide / refresh live data",
+      "historicalState": "zed-native-equivalent",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Metrics",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Loggers and log levels",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Automatic connection",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "live-application-data",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Browse / navigate the Spring logical structure",
+      "historicalState": "zed-native-equivalent",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "structure-and-modulith",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Structure refresh / grouping",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "structure-and-modulith",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Run / debug a Boot application",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Maven goal / Gradle build",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Open Boot app page URL",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring Boot upgrade",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Inlay-hint label commands (pom \"Upgrade to the Latest Patch\")",
+      "historicalState": "blocked-zed-api",
+      "classification": "existing-blocker",
+      "currentClaim": "blocked-zed-api",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Existing blocker remains explicit; D007 must not claim this capability."
+    },
+    {
+      "capability": "Modulith metadata refresh",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "structure-and-modulith",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Modulith projects",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "structure-and-modulith",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring Initializr",
+      "historicalState": "not-pursued",
+      "classification": "not-pursued",
+      "currentClaim": "not-pursued",
+      "evidenceGroup": "other",
+      "reason": "Out of declared product scope; no D007 regression claim required."
+    },
+    {
+      "capability": "Explain SpEL / queries / AOP (AI assistant)",
+      "historicalState": "blocked-zed-api",
+      "classification": "existing-blocker",
+      "currentClaim": "blocked-zed-api",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Existing blocker remains explicit; D007 must not claim this capability."
+    },
+    {
+      "capability": "Embedded Spring Tools MCP server",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "embedded-mcp",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Start Spring Boot Language Server on demand",
+      "historicalState": "zed-native-equivalent",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "runtime-boundary",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Java type resolution for the server",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "runtime-boundary",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Classpath listening",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "runtime-boundary",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Missing / incompatible Java diagnostic",
+      "historicalState": "verified",
+      "classification": "redesigned-requires-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "runtime-boundary",
+      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof."
+    },
+    {
+      "capability": "Embedded language syntax highlighting",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Java Spring diagnostics and quick fixes",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring Boot version/support validation",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "boot-project-and-execution",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Spring AI annotation diagnostics and indexing",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "spring-java-intelligence",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    },
+    {
+      "capability": "Offline behaviour",
+      "historicalState": "verified",
+      "classification": "retained-requires-standalone-evidence",
+      "currentClaim": "pending-d007",
+      "evidenceGroup": "other",
+      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim."
+    }
+  ]
+}
