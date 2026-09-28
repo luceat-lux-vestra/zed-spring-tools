@@ -328,3 +328,36 @@ test("D007 request-mapping acceptance selects the Spring snippet item, not a pla
     "broad first-match selection must not reappear",
   );
 });
+
+test("D007 standalone completion client advertises snippets and keeps bounded completion failure evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    (regression.match(/completionItem: \\{ snippetSupport: true \\}/g) ?? []).length,
+    2,
+    "both standalone client capability declarations must advertise LSP snippet support",
+  );
+  assert.equal(
+    regression.includes(
+      "lastItemSummary=${JSON.stringify(boundedCompletionItemSummary(lastItems))}",
+    ),
+    true,
+    "completion timeout must retain a bounded summary of the actual returned items",
+  );
+  for (const field of [
+    "label:",
+    "kind:",
+    "insertText:",
+    "insertTextFormat:",
+    "textEditNewText:",
+    "detail:",
+    "data:",
+  ]) {
+    assert.equal(
+      regression.includes(field),
+      true,
+      `bounded completion diagnostics must retain ${field}`,
+    );
+  }
+});
+
