@@ -54,15 +54,20 @@ It performs the following bounded sequence:
 10. requires exact Java `textDocument/didOpen`, toggles Code Actions, and accepts the editor only when the Spring provider response contains `Spring Boot: Configure run/debug for a project…` with the exact `zed-spring-tools.configure-boot-run` command and the exact Java request URI argument;
 11. closes the mixed Code Actions menu and dispatches that registered command once through Zed's public LSP command selector, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
 12. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
-13. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
-14. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
+13. stops Zed and executes both exact generated Boot run tasks outside the editor with collision-free test ports, requiring the fixture application and embedded server to become live before bounded cleanup;
+14. starts a fresh Maven Zed process, invokes public `debugger::Start`, filters the debug picker by the exact generated Spring Boot debug label, and accepts the DAP path only after a new JVM for the exact staged worktree/main class is observed with JDWP enabled; `debugger::Stop` must then terminate that debuggee;
+15. drives the standalone artifact lifecycle under a macOS loopback-only sandbox: a validated warm cache must still provide exact Spring completion offline; an absent artifact must fail closed with no coordinator/partial download and recover after network returns; a checksum-corrupted artifact must likewise fail closed offline and then be restored to the pinned checksum online;
+16. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
+17. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, evaluates the 59-row capability matrix, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
 
 A desktop-smoke `PASS` requires both Maven and Gradle run/debug configuration
-generation, successful execution of each exact generated Boot run task, the
-expected Java launch entry for each fixture, no retired private-boundary marker,
-no Spring error popup evidence, a passing standalone capability-regression
-evidence file on the same source HEAD, and coordinator protocol evidence proving
-the completion request, correlated Spring response, and `server.port` item.
+generation, successful execution of each exact generated Boot run task, an actual
+Java DAP launch from the generated Maven debug configuration, the expected Java
+launch entry for each fixture, the standalone warm/offline/fail-closed/recovery
+lifecycle, no retired private-boundary marker, no Spring error popup evidence, a
+passing standalone capability-regression evidence file on the same source HEAD,
+and coordinator protocol evidence proving the completion request, correlated
+Spring response, and `server.port` item.
 It still does **not** mean every capability row is release-facing verified; the
 D007 capability-accounting matrix remains authoritative for that decision.
 D007 enables this evidence only in the isolated launch environment; the
@@ -111,8 +116,10 @@ The one-shot runner now has two evidence layers on the same exact source HEAD:
    surfaces, workspace symbols, Boot-project discovery/info, and structure;
 2. **isolated Zed architecture/integration smoke** — proves the official Java
    extension/JDT LS and this extension's standalone Spring runtime coexist in a
-   fresh Zed profile, then exercises completion and run/debug generation for
-   Maven and Gradle.
+   fresh Zed profile, exercises completion and run/debug generation for Maven and
+   Gradle, executes both generated Boot run tasks, launches one generated Java
+   debug configuration through Zed's public debugger surface, and drives the
+   standalone artifact's warm/offline/corruption/recovery lifecycle.
 
 The desktop layer is deliberately labelled `architecture-smoke`; it is not
 allowed to promote historical capability claims on its own. The capability
