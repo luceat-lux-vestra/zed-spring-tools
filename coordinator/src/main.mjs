@@ -386,6 +386,28 @@ export class Coordinator {
 
   async handleSpringMessage(message) {
     if (this.closed) return;
+    if (
+      message?.method === "window/showMessage" ||
+      message?.method === "window/showMessageRequest"
+    ) {
+      const type = Number.isInteger(message.params?.type)
+        ? message.params.type
+        : null;
+      this.protocolEvidence({
+        event: "spring-window-message",
+        method: message.method,
+        type,
+        severity: type === 1
+          ? "error"
+          : type === 2
+            ? "warning"
+            : type === 3
+              ? "info"
+              : type === 4
+                ? "log"
+                : "unknown",
+      });
+    }
     const pendingKey = responseKey(message);
     const inlayRequest = pendingKey === null ? undefined : this.inlayHintRequests.get(pendingKey);
     if (inlayRequest !== undefined) {
