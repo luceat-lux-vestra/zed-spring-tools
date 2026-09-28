@@ -63,10 +63,16 @@ const DEFAULT_CONFIGURATION = {
 };
 
 class LspClient {
-  constructor(child, workspaceFolders, configuration) {
+  constructor(
+    child,
+    workspaceFolders,
+    configuration,
+    serverRequestResponder = null,
+  ) {
     this.child = child;
     this.workspaceFolders = workspaceFolders;
     this.configuration = configuration;
+    this.serverRequestResponder = serverRequestResponder;
     this.buffer = Buffer.alloc(0);
     this.pending = new Map();
     this.nextId = 1;
@@ -171,8 +177,13 @@ class LspClient {
         this.windowMessages.push({
           method: message.method,
           type: Number.isInteger(message.params?.type) ? message.params.type : null,
+          message: String(message.params?.message ?? "").slice(0, 500),
         });
-        result = null;
+        result =
+          message.method === "window/showMessageRequest" &&
+          typeof this.serverRequestResponder === "function"
+            ? this.serverRequestResponder(message)
+            : null;
       } else if (message.method === "window/showDocument") {
         result = { success: false };
       }
