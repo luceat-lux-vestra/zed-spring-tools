@@ -436,3 +436,34 @@ test("D007 static CodeLens acceptance targets an authentic isolated WebConfig pr
   );
 });
 
+test("D007 version validation uses deterministic loopback metadata and the Spring Tools 5.3 upgrade command", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("startDeterministicVersionMetadataServer()"),
+    true,
+    "version validation must not depend on mutable live Maven/Spring release metadata",
+  );
+  assert.equal(
+    regression.includes('"use-project-build-file": false'),
+    true,
+    "version validation must force the deterministic Spring projects provider path",
+  );
+  assert.equal(
+    regression.includes('version: "3.5.6"') &&
+      regression.includes('assert.equal(targetVersion, "3.5.6")'),
+    true,
+    "the patch-upgrade target must be fixed by the local metadata fixture",
+  );
+  assert.equal(
+    regression.includes('action?.command?.command === "sts/upgrade/spring-boot"'),
+    true,
+    "5.3 patch diagnostics must use the current SpringBootUpgrade command",
+  );
+  assert.equal(
+    regression.includes('sts/upgrade/spring-boot-patch'),
+    false,
+    "the retired 5.2-era patch command must not reappear",
+  );
+});
+
