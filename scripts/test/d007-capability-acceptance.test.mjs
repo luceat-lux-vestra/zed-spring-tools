@@ -333,7 +333,7 @@ test("D007 standalone completion client advertises snippets and keeps bounded co
   const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
 
   assert.equal(
-    (regression.match(/completionItem: \\{ snippetSupport: true \\}/g) ?? []).length,
+    (regression.match(/completionItem: \{ snippetSupport: true \}/g) ?? []).length,
     2,
     "both standalone client capability declarations must advertise LSP snippet support",
   );
