@@ -470,6 +470,7 @@ async function main() {
     const namedQueries = fileBy(files, "jpa-named-queries.properties");
     const factories = fileBy(files, "spring.factories");
     const xml = fileBy(files, "beans.xml");
+    const pom = fileBy(files, "pom.xml");
 
     const propsCompletion = completionItems(await client.request(
       "textDocument/completion",
@@ -946,6 +947,85 @@ async function main() {
       buildTool: bootInfo.buildTool,
       mainClass: bootInfo.mainClass,
     });
+
+    const versionDiagnostics = await waitForDiagnostics(
+      client,
+      uri(pom),
+      (diagnostics) => diagnostics.some((diagnostic) =>
+        String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+      ),
+      "Spring Boot patch/version validation diagnostic",
+    );
+    const patchDiagnostic = versionDiagnostics.find((diagnostic) =>
+      String(diagnostic.code ?? "").includes("UPDATE_LATEST_PATCH_VERSION")
+    );
+    assert.ok(patchDiagnostic);
+    assert.match(
+      String(patchDiagnostic.message ?? ""),
+      /Newer patch version of Spring Boot available/i,
+    );
+    evidence.checks.versionSupport = pass(
+      "standalone Spring version-validation diagnostic on pom.xml",
+      {
+        code: patchDiagnostic.code,
+        message: patchDiagnostic.message,
+        diagnosticCount: versionDiagnostics.length,
+      },
+    );
+
+    const versionActions = await client.request(
+      "textDocument/codeAction",
+      {
+        textDocument: { uri: uri(pom) },
+        range: patchDiagnostic.range,
+        context: { diagnostics: [patchDiagnostic] },
+      },
+      90_000,
+    );
+    assert.equal(Array.isArray(versionActions), true);
+    const upgradeAction = versionActions.find((action) =>
+      action?.command?.command === "sts/upgrade/spring-boot-patch"
+    );
+    assert.ok(
+      upgradeAction,
+      "patch version diagnostic must expose the standalone Spring Boot upgrade quick fix",
+    );
+    const upgradeArguments = upgradeAction.command.arguments ?? [];
+    assert.equal(upgradeArguments.length >= 2, true);
+    const targetVersion = String(upgradeArguments[1]);
+    assert.match(targetVersion, /^3\.5\.[0-9A-Za-z.+-]+$/);
+
+    const upgradeEditStart = client.workspaceEdits.length;
+    const upgradeResult = await client.request(
+      "workspace/executeCommand",
+      {
+        command: upgradeAction.command.command,
+        arguments: upgradeArguments,
+      },
+      180_000,
+    );
+    assert.equal(
+      upgradeResult,
+      "success",
+      "Spring Boot patch upgrade must report an applied workspace edit",
+    );
+    const upgradeEdits = client.workspaceEdits.slice(upgradeEditStart);
+    const pomUri = uri(pom);
+    const upgradeEdit = upgradeEdits.find((entry) => {
+      const serialized = JSON.stringify(entry);
+      return serialized.includes(pomUri) && serialized.includes(targetVersion);
+    });
+    assert.ok(
+      upgradeEdit,
+      "Spring Boot patch upgrade must edit the exact pom.xml to the advertised target version",
+    );
+    evidence.checks.bootUpgrade = pass(
+      "sts/upgrade/spring-boot-patch produced an accepted pom.xml workspace edit",
+      {
+        targetVersion,
+        workspaceEditCount: upgradeEdits.length,
+      },
+    );
 
     evidence.serverRequests = [...new Set(client.serverRequests)].sort();
     evidence.forbiddenPrivateCallbacks = evidence.serverRequests.filter((method) =>
@@ -1429,6 +1509,7 @@ function standardClientCapabilities() {
 
 function fixtureFiles(worktree) {
   const specs = [
+    ["pom.xml", "xml"],
     ["src/main/resources/application.properties", "spring-boot-properties"],
     ["src/main/resources/application.yaml", "spring-boot-yaml"],
     ["src/main/resources/META-INF/jpa-named-queries.properties", "jpa-query-properties"],
