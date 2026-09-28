@@ -361,3 +361,28 @@ test("D007 standalone completion client advertises snippets and keeps bounded co
   }
 });
 
+test("D007 diagnostic waits retain bounded latest and history evidence on failure", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("this.diagnosticHistory = new Map()"),
+    true,
+    "client must retain bounded publishDiagnostics history per URI",
+  );
+  assert.equal(
+    regression.includes("latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(latest))}"),
+    true,
+    "diagnostic timeout must report the latest bounded diagnostic set",
+  );
+  assert.equal(
+    regression.includes("diagnosticHistory=${JSON.stringify(history)}"),
+    true,
+    "diagnostic timeout must report bounded diagnostic history",
+  );
+  assert.equal(
+    regression.includes("if (history.length > 8) history.shift()"),
+    true,
+    "diagnostic history must remain bounded",
+  );
+});
+
