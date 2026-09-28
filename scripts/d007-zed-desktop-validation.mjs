@@ -3039,6 +3039,27 @@ function selfTest() {
       "D007 preflight must prove both language servers in the isolated Zed process group without recording private install paths",
     );
 
+    const fakeDebugPs = [
+      "  6101  6000  6000 S /jdk/bin/java -agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:5005 -cp /tmp/d007-fixture/target/classes dev.zed.spring.fixture.FixtureApplication",
+      "  6102  6000  6000 S /jdk/bin/java -cp /tmp/d007-fixture/target/classes dev.zed.spring.fixture.FixtureApplication",
+      "  6103  6000  6000 S /jdk/bin/java -agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:5006 -cp /tmp/other/target/classes dev.zed.spring.fixture.FixtureApplication",
+    ].join("\n");
+    assert.deepEqual(
+      javaDebugProcessCandidates(
+        fakeDebugPs,
+        "/tmp/d007-fixture",
+        "dev.zed.spring.fixture.FixtureApplication",
+      ),
+      [{
+        pid: 6101,
+        ppid: 6000,
+        pgid: 6000,
+        jdwpObserved: true,
+        exactWorktreeObserved: true,
+      }],
+      "D007 DAP readiness must require a new JDWP process for the exact staged worktree and main class",
+    );
+
     const primaryFailure = new Error("primary failure");
     writeGateFailure(manifest, "self-test-primary", primaryFailure);
     const recordedFailure = JSON.parse(
