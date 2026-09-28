@@ -225,7 +225,7 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   const results = [];
   let phase = null;
   const setPhase = (nextPhase) => {
-    setPhase(nextPhase);
+    phase = nextPhase;
     recordRunPhase(manifest, phase);
   };
   let primaryError;
@@ -1978,6 +1978,11 @@ function selfTest() {
       harnessSource.includes('path.join(manifest.evidence, "d007-run.log")'),
       true,
       "D007 must persist phase/final execution logs independently of terminal lifetime",
+    );
+    assert.equal(
+      harnessSource.includes("setPhase(nextPhase);"),
+      false,
+      "D007 phase logger must assign phase rather than recursively calling itself",
     );
     assert.equal(
       harnessSource.includes('path.join(manifest.evidence, "run-status.json")'),
