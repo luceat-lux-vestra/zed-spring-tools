@@ -413,6 +413,7 @@ async function main() {
     const cron = fileBy(files, "CronSyntaxSample.java");
     const controller = fileBy(files, "GreetingController.java");
     const namedQueries = fileBy(files, "jpa-named-queries.properties");
+    const factories = fileBy(files, "spring.factories");
 
     const propsCompletion = completionItems(await client.request(
       "textDocument/completion",
@@ -456,6 +457,33 @@ async function main() {
       count: propertyDiagnostics.length,
     });
 
+    const propertyDefinition = await client.request("textDocument/definition", {
+      textDocument: { uri: uri(props) },
+      position: positionInside(props.text, "fixture.greeting.salutation", 12),
+    });
+    const propertyDefinitionUris = locationUris(propertyDefinition);
+    assert.equal(
+      propertyDefinitionUris.some((value) => value.endsWith("/GreetingProperties.java")),
+      true,
+    );
+    evidence.checks.propertyDefinition = pass(
+      "project property definition resolves to GreetingProperties.java",
+      { count: propertyDefinitionUris.length },
+    );
+
+    const factoriesDiagnostics = await waitForDiagnostics(
+      client,
+      uri(factories),
+      (diagnostics) => diagnostics.some((diagnostic) =>
+        String(diagnostic.code ?? "").includes("FACTORIES_KEY_NOT_SUPPORTED")
+      ),
+      "spring.factories project-aware diagnostic",
+    );
+    evidence.checks.springFactories = pass(
+      "spring-factories language reached standalone project model",
+      { count: factoriesDiagnostics.length },
+    );
+
     const scopeCompletion = completionItems(await client.request(
       "textDocument/completion",
       {
@@ -480,6 +508,26 @@ async function main() {
     evidence.checks.springIndexCompletion = pass("@Qualifier completion", {
       count: qualifierCompletion.length,
     });
+
+    const requestMappingTemplates = completionItems(await client.request(
+      "textDocument/completion",
+      {
+        textDocument: { uri: uri(controller) },
+        position: positionAfter(
+          controller.text,
+          "public class GreetingController {",
+        ),
+      },
+    ));
+    const getMappingTemplate = requestMappingTemplates.find((item) =>
+      /GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))
+    );
+    assert.ok(getMappingTemplate);
+    assert.equal(getMappingTemplate.insertTextFormat, 2);
+    evidence.checks.requestMappingTemplates = pass(
+      "request-mapping snippet completion with snippet format",
+      { count: requestMappingTemplates.length },
+    );
 
     const derivedQueryCompletion = completionItems(await client.request(
       "textDocument/completion",
@@ -532,6 +580,18 @@ async function main() {
       count: cronDiagnostics.length,
     });
 
+    const cronCompletion = completionItems(await client.request(
+      "textDocument/completion",
+      {
+        textDocument: { uri: uri(cron) },
+        position: positionInside(cron.text, "0 0 * * *", 3),
+      },
+    ));
+    assert.equal(cronCompletion.length > 0, true);
+    evidence.checks.cronCompletion = pass("cron completion", {
+      count: cronCompletion.length,
+    });
+
     const namedQueryDiagnostics = await waitForDiagnostics(
       client,
       uri(namedQueries),
@@ -555,6 +615,27 @@ async function main() {
       count: inlayHints.length,
     });
 
+    const queryParameterDefinition = await client.request(
+      "textDocument/definition",
+      {
+        textDocument: { uri: uri(dataQuery) },
+        position: positionInside(
+          dataQuery.text,
+          "g.message = ?1 and g.id = ?2",
+          "g.message = ?".length,
+        ),
+      },
+    );
+    const queryParameterUris = locationUris(queryParameterDefinition);
+    assert.equal(
+      queryParameterUris.some((value) => value.endsWith("/DataQuerySample.java")),
+      true,
+    );
+    evidence.checks.springDataNavigation = pass(
+      "Spring Data positional parameter definition",
+      { count: queryParameterUris.length },
+    );
+
     const definition = await client.request("textDocument/definition", {
       textDocument: { uri: uri(spel) },
       position: positionInside(spel.text, "greetingPrefix", 3),
@@ -569,13 +650,41 @@ async function main() {
     });
 
     const references = await client.request("textDocument/references", {
-      textDocument: { uri: uri(configurationJava) },
-      position: positionInside(configurationJava.text, "greetingPrefix()", 4),
-      context: { includeDeclaration: false },
+      textDocument: { uri: uri(injection) },
+      position: positionInside(injection.text, '"greetingPrefix"', 5),
+      context: { includeDeclaration: true },
     });
     assert.equal(Array.isArray(references), true);
-    evidence.checks.springReferences = pass("Spring references request", {
-      count: references.length,
+    const referenceUris = locationUris(references);
+    assert.equal(
+      referenceUris.some((value) => value.endsWith("/GreetingConfiguration.java")),
+      true,
+    );
+    evidence.checks.springReferences = pass(
+      "@Qualifier Spring reference reaches @Bean declaration",
+      { count: referenceUris.length },
+    );
+
+    const semanticTokens = await springSemanticTokens(
+      client,
+      repositoryJava,
+      3,
+    );
+    const springTokenTypeObserved = semanticTokenTypes(semanticTokens).some(
+      (type) => type >= 17,
+    );
+    assert.equal(springTokenTypeObserved, true);
+    evidence.checks.embeddedSemanticTokens = pass(
+      "Spring semantic tokens include Spring-only token type index >= 17",
+      { tokenCount: Math.floor((semanticTokens.data?.length ?? 0) / 5) },
+    );
+
+    const documentSymbols = await client.request("textDocument/documentSymbol", {
+      textDocument: { uri: uri(controller) },
+    });
+    assert.equal(Array.isArray(documentSymbols) && documentSymbols.length > 0, true);
+    evidence.checks.documentSymbols = pass("Spring document symbols", {
+      count: documentSymbols.length,
     });
 
     const codeLenses = await client.request("textDocument/codeLens", {
@@ -584,26 +693,56 @@ async function main() {
     assert.equal(Array.isArray(codeLenses) && codeLenses.length > 0, true);
     evidence.checks.codeLens = pass("Spring CodeLens", { count: codeLenses.length });
 
-    const propertyCodeActions = await client.request("textDocument/codeAction", {
-      textDocument: { uri: uri(props) },
-      range: propertyDiagnostics[0]?.range ?? {
-        start: { line: 0, character: 0 },
-        end: { line: 0, character: 3 },
-      },
-      context: { diagnostics: propertyDiagnostics },
+    const configurationDiagnostics = await waitForDiagnostics(
+      client,
+      uri(configurationJava),
+      (diagnostics) => diagnostics.some((diagnostic) =>
+        /JAVA_PUBLIC_BEAN_METHOD/.test(String(diagnostic.code ?? ""))
+      ),
+      "Java Spring diagnostic with quick fix",
+    );
+    const publicBeanDiagnostic = configurationDiagnostics.find((diagnostic) =>
+      /JAVA_PUBLIC_BEAN_METHOD/.test(String(diagnostic.code ?? ""))
+    );
+    assert.ok(publicBeanDiagnostic);
+    evidence.checks.javaSpringDiagnostics = pass(
+      "JAVA_PUBLIC_BEAN_METHOD diagnostic",
+      { count: configurationDiagnostics.length },
+    );
+
+    const javaCodeActions = await client.request("textDocument/codeAction", {
+      textDocument: { uri: uri(configurationJava) },
+      range: publicBeanDiagnostic.range,
+      context: { diagnostics: [publicBeanDiagnostic] },
     });
-    assert.equal(Array.isArray(propertyCodeActions), true);
-    evidence.checks.codeActions = pass("property code-action request", {
-      count: propertyCodeActions.length,
-    });
+    assert.equal(Array.isArray(javaCodeActions), true);
+    assert.equal(
+      javaCodeActions.some((action) =>
+        action?.command?.command === "sts.vscode-spring-boot.codeAction" ||
+        action?.command === "sts.vscode-spring-boot.codeAction"
+      ),
+      true,
+    );
+    evidence.checks.javaSpringQuickFix = pass(
+      "Spring Java quick fix command",
+      { count: javaCodeActions.length },
+    );
 
     const workspaceSymbols = await client.request("workspace/symbol", {
       query: "greeting",
     });
     assert.equal(Array.isArray(workspaceSymbols) && workspaceSymbols.length > 0, true);
-    evidence.checks.workspaceSymbols = pass("Spring workspace symbols", {
-      count: workspaceSymbols.length,
-    });
+    const workspaceSymbolUris = workspaceSymbols.flatMap((symbol) =>
+      locationUris(symbol?.location ?? symbol)
+    );
+    assert.equal(
+      workspaceSymbolUris.some((value) => value.endsWith("/GreetingController.java")),
+      true,
+    );
+    evidence.checks.workspaceSymbols = pass(
+      "Spring workspace symbols include request mapping source",
+      { count: workspaceSymbols.length },
+    );
 
     const structure = await client.request("workspace/executeCommand", {
       command: "sts/spring-boot/structure",
@@ -786,6 +925,38 @@ function fullRange(text) {
     start: { line: 0, character: 0 },
     end: { line: lines.length - 1, character: lines.at(-1).length },
   };
+}
+
+async function springSemanticTokens(client, file, attempts) {
+  let response = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    response = await client.request("textDocument/semanticTokens/full", {
+      textDocument: { uri: uri(file) },
+    });
+    if (
+      response &&
+      Array.isArray(response.data) &&
+      response.data.length > 0 &&
+      semanticTokenTypes(response).some((type) => type >= 17)
+    ) {
+      return response;
+    }
+    client.notify("textDocument/didChange", {
+      textDocument: { uri: uri(file), version: 2 + attempt },
+      contentChanges: [{ text: file.text }],
+    });
+    await sleep(500);
+  }
+  return response;
+}
+
+function semanticTokenTypes(response) {
+  if (!Array.isArray(response?.data)) return [];
+  const types = [];
+  for (let index = 3; index < response.data.length; index += 5) {
+    types.push(response.data[index]);
+  }
+  return types;
 }
 
 function completionItems(result) {
