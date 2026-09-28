@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { springArguments } from "../coordinator/src/main.mjs";
+import { Coordinator, springArguments } from "../coordinator/src/main.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = path.join(ROOT, "protocol", "spring-artifacts.json");
@@ -75,6 +75,7 @@ class LspClient {
     this.diagnostics = new Map();
     this.windowMessages = [];
     this.registrations = [];
+    this.workspaceEdits = [];
     this.fatalError = null;
 
     child.stdout.on("data", (chunk) => {
@@ -141,7 +142,8 @@ class LspClient {
       } else if (message.method === "workspace/workspaceFolders") {
         result = this.workspaceFolders;
       } else if (message.method === "workspace/applyEdit") {
-        result = { applied: false };
+        this.workspaceEdits.push(structuredClone(message.params ?? {}));
+        result = { applied: true };
       } else if (message.method === "window/workDoneProgress/create") {
         result = null;
       } else if (
@@ -274,7 +276,30 @@ async function main() {
       "",
     ].join("\n"),
   );
-  const xmlFile = path.join(worktree, "src", "main", "resources", "beans.xml");
+  const resources = path.join(worktree, "src", "main", "resources");
+  const propertiesFile = path.join(resources, "application.properties");
+  fs.appendFileSync(
+    propertiesFile,
+    [
+      "",
+      "# D007 shared-metadata reload controls.",
+      "shared.fleet.banner=before-reload",
+      "shared.fleet.footer=after-reload",
+      "",
+    ].join("\n"),
+  );
+  const conversionPropertiesFile = path.join(resources, "conversion-d007.properties");
+  const conversionYamlFile = path.join(resources, "conversion-d007.yaml");
+  fs.writeFileSync(
+    conversionPropertiesFile,
+    "server.port=8081\nspring.application.name=d007-conversion\n",
+  );
+  fs.writeFileSync(
+    conversionYamlFile,
+    "server:\n  port: 8082\nspring:\n  application:\n    name: d007-yaml\n",
+  );
+
+  const xmlFile = path.join(resources, "beans.xml");
   fs.writeFileSync(
     xmlFile,
     [
@@ -317,8 +342,13 @@ async function main() {
     evidence.checks.fixtureCompile = compileFixture(worktree, javaHome);
 
     const configuration = structuredClone(DEFAULT_CONFIGURATION);
+    const sharedMetadataFile = path.join(
+      worktree,
+      "config",
+      "shared-metadata.json",
+    );
     configuration["boot-java"].common = {
-      "properties-metadata": path.join(worktree, "config", "shared-metadata.json"),
+      "properties-metadata": sharedMetadataFile,
     };
 
     const args = springArguments(jar, worktree, null);
@@ -492,6 +522,89 @@ async function main() {
     evidence.checks.propertyDefinition = pass(
       "project property definition resolves to GreetingProperties.java",
       { count: propertyDefinitionUris.length },
+    );
+
+    const sharedBaseline = await waitForDiagnostics(
+      client,
+      uri(props),
+      (diagnostics) => {
+        const messages = diagnostics.map((diagnostic) =>
+          String(diagnostic.message ?? "")
+        );
+        return messages.some((message) => message.includes("shared.fleet.footer")) &&
+          messages.some((message) => /'ser'|\bser\b/.test(message));
+      },
+      "shared metadata negative control plus independent ser diagnostic",
+    );
+    const sharedMetadata = JSON.parse(
+      fs.readFileSync(sharedMetadataFile, "utf8"),
+    );
+    assert.equal(Array.isArray(sharedMetadata.properties), true);
+    sharedMetadata.properties.push({
+      name: "shared.fleet.footer",
+      type: "java.lang.String",
+      description: "Footer text added during D007 reload regression.",
+      defaultValue: "reloaded",
+    });
+    fs.writeFileSync(
+      sharedMetadataFile,
+      JSON.stringify(sharedMetadata, null, 2) + "\n",
+    );
+    const reloadResult = await client.request(
+      "workspace/executeCommand",
+      {
+        command: "sts/common-properties/reload",
+        arguments: [],
+      },
+      90_000,
+    );
+    assert.equal(
+      reloadResult,
+      true,
+      "standalone shared-properties reload must report an actual reload",
+    );
+    client.notify("textDocument/didChange", {
+      textDocument: { uri: uri(props), version: 20 },
+      contentChanges: [{ text: props.text }],
+    });
+    const sharedAfterReload = await waitForDiagnostics(
+      client,
+      uri(props),
+      (diagnostics) => {
+        const messages = diagnostics.map((diagnostic) =>
+          String(diagnostic.message ?? "")
+        );
+        return !messages.some((message) => message.includes("shared.fleet.footer")) &&
+          messages.some((message) => /'ser'|\bser\b/.test(message));
+      },
+      "shared metadata reload with negative control preserved",
+    );
+    evidence.checks.sharedPropertiesMetadataReload = pass(
+      "sts/common-properties/reload updates metadata without clearing unrelated diagnostics",
+      {
+        baselineDiagnosticCount: sharedBaseline.length,
+        afterReloadDiagnosticCount: sharedAfterReload.length,
+      },
+    );
+
+    evidence.checks.propertiesToYaml = await conversionWorkspaceEdit(
+      client,
+      "sts/boot/props-to-yaml",
+      conversionPropertiesFile,
+      path.join(resources, "conversion-d007.yml"),
+      ["server:", "port:", "spring:", "application:", "name:"],
+    );
+    evidence.checks.yamlToProperties = await conversionWorkspaceEdit(
+      client,
+      "sts/boot/yaml-to-props",
+      conversionYamlFile,
+      path.join(resources, "conversion-d007-output.properties"),
+      ["server.port", "spring.application.name", "d007-yaml"],
+    );
+
+    evidence.checks.buildTaskExecution = runGeneratedBuildTaskRegression(
+      worktree,
+      javaHome,
     );
 
     const factoriesDiagnostics = await waitForDiagnostics(
@@ -884,6 +997,108 @@ async function main() {
   } finally {
     fs.rmSync(runRoot, { recursive: true, force: true });
   }
+}
+
+async function conversionWorkspaceEdit(
+  client,
+  command,
+  sourceFile,
+  targetFile,
+  expectedFragments,
+) {
+  const start = client.workspaceEdits.length;
+  const sourceUri = pathToFileURL(sourceFile).href;
+  const targetUri = pathToFileURL(targetFile).href;
+  await client.request(
+    "workspace/executeCommand",
+    {
+      command,
+      arguments: [sourceUri, targetUri, false],
+    },
+    90_000,
+  );
+  const edits = client.workspaceEdits.slice(start);
+  const matching = edits.find((entry) => {
+    const text = JSON.stringify(entry);
+    return text.includes(targetUri);
+  });
+  assert.ok(matching, `${command} must request a workspace edit for the exact target`);
+  const serialized = JSON.stringify(matching);
+  for (const fragment of expectedFragments) {
+    assert.equal(
+      serialized.includes(fragment),
+      true,
+      `${command} workspace edit must contain ${fragment}`,
+    );
+  }
+  return pass(command + " produced an accepted workspace edit", {
+    workspaceEditCount: edits.length,
+    target: path.basename(targetFile),
+  });
+}
+
+function runGeneratedBuildTaskRegression(worktree, javaHome) {
+  const springWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring: (bytes) => springWrites.push(bytes),
+    sendZed: () => {},
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree,
+    reportContext: { hostOs: process.platform === "darwin" ? "macos" : process.platform },
+  });
+  const buildFile = path.join(worktree, "pom.xml");
+  const handled = coordinator.observeZedMessage({
+    jsonrpc: "2.0",
+    id: "d007-build-task",
+    method: "workspace/executeCommand",
+    params: {
+      command: "sts.maven.goal",
+      arguments: [buildFile, "compile"],
+    },
+  });
+  assert.equal(handled, false);
+  assert.deepEqual(
+    springWrites,
+    [],
+    "reviewable Maven build task must not be forwarded to Spring Runtime.exec",
+  );
+
+  const tasksFile = path.join(worktree, ".zed", "tasks.json");
+  assert.equal(fs.existsSync(tasksFile), true);
+  const tasks = JSON.parse(fs.readFileSync(tasksFile, "utf8"));
+  const task = tasks.find((entry) =>
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools) build:") &&
+    Array.isArray(entry.args) &&
+    entry.args.includes("compile")
+  );
+  assert.ok(task, "generated Maven build task must exist");
+  assert.equal(task.cwd, "$ZED_WORKTREE_ROOT");
+  assert.equal(task.command, "mvn");
+  assert.deepEqual(task.args, ["compile"]);
+
+  const result = spawnSync(task.command, task.args, {
+    cwd: worktree,
+    encoding: "utf8",
+    shell: false,
+    timeout: 240_000,
+    maxBuffer: 16 * 1024 * 1024,
+    env: {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `generated Maven build task failed: ${String(result.stderr ?? "").slice(-8000)}`,
+    );
+  }
+  return pass("generated reviewable sts.maven.goal task executed successfully", {
+    command: task.command,
+    args: task.args,
+  });
 }
 
 function configurationValue(configuration, section) {
