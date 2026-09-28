@@ -223,14 +223,19 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   const sharedStart = fileSize(sharedLog);
 
   const results = [];
-  let phase = "maven-install-launch";
+  let phase = null;
+  const setPhase = (nextPhase) => {
+    setPhase(nextPhase);
+    recordRunPhase(manifest, phase);
+  };
   let primaryError;
+  setPhase("maven-install-launch");
   try {
     launchMacos(root, "maven", { role: "install" });
-    phase = "maven-install-zed-readiness";
+    setPhase("maven-install-zed-readiness");
     waitForZedReady(manifest, "maven", 45_000);
 
-    phase = "dev-extension-install";
+    setPhase("dev-extension-install");
     if (manualDevInstall) {
       process.stdout.write(
         [
@@ -254,44 +259,45 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
       installDevExtensionMacos(root);
     }
 
-    phase = "dev-extension-readiness";
+    setPhase("dev-extension-readiness");
     waitForDevExtensionInstalled(manifest, manualDevInstall ? 600_000 : 180_000);
-    phase = "maven-install-shutdown";
+    setPhase("maven-install-shutdown");
     stopAndWaitZed(root, manifest, 10_000, 5_000);
 
     for (const fixtureKind of ["maven", "gradle"]) {
       const propertiesRelative = "src/main/resources/application-d007.properties";
       const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
 
-      phase = `${fixtureKind}-completion-launch`;
+      setPhase(`${fixtureKind}-extension-activation-and-completion-launch`);
       launchMacos(root, fixtureKind, {
         role: "completion",
         relativeTarget: propertiesRelative,
         row: 1,
         column: 4,
       });
-      phase = `${fixtureKind}-completion-zed-readiness`;
+      setPhase(`${fixtureKind}-extension-activation-zed-readiness`);
       waitForZedReady(manifest, fixtureKind, 45_000);
-      phase = `${fixtureKind}-completion-interaction`;
+      setPhase(`${fixtureKind}-extension-activation-and-completion-interaction`);
       runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart);
-      phase = `${fixtureKind}-completion-shutdown`;
+      setPhase(`${fixtureKind}-completion-shutdown`);
       stopAndWaitZed(root, manifest, 10_000, 5_000);
 
-      phase = `${fixtureKind}-run-debug-launch`;
+      setPhase(`${fixtureKind}-run-debug-launch`);
       launchMacos(root, fixtureKind, {
         role: "run-debug",
         relativeTarget: javaRelative,
       });
-      phase = `${fixtureKind}-run-debug-zed-readiness`;
+      setPhase(`${fixtureKind}-run-debug-zed-readiness`);
       waitForZedReady(manifest, fixtureKind, 45_000);
-      phase = `${fixtureKind}-run-debug-interaction`;
+      setPhase(`${fixtureKind}-run-debug-interaction`);
       results.push(runDebugPhaseMacos(root, fixtureKind));
-      phase = `${fixtureKind}-run-debug-shutdown`;
+      setPhase(`${fixtureKind}-run-debug-shutdown`);
       stopAndWaitZed(root, manifest, 10_000, 5_000);
     }
   } catch (error) {
     primaryError = error;
     writeGateFailure(manifest, phase, error);
+    recordRunFinal(manifest, "FAIL", phase, error);
     throw error;
   } finally {
     let cleanupError;
@@ -313,7 +319,10 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
         process.stderr.write(`D007 log-harvest failure after primary ${phase} failure: ${errorText(error)}\n`);
       }
     }
-    if (!primaryError && cleanupError) throw cleanupError;
+    if (!primaryError && cleanupError) {
+      recordRunFinal(manifest, "FAIL", phase ?? "cleanup", cleanupError);
+      throw cleanupError;
+    }
   }
 
   const summary = summarize(root);
@@ -330,6 +339,12 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   };
   fs.writeFileSync(path.join(manifest.evidence, "desktop-gate.json"), JSON.stringify(outcome, null, 2) + "\n", { mode: 0o600 });
   process.stdout.write(JSON.stringify(outcome, null, 2) + "\n");
+  recordRunFinal(
+    manifest,
+    outcome.status === "PASS" ? "PASS" : "FAIL",
+    "complete",
+    outcome.status === "PASS" ? null : new Error("desktop gate requires review"),
+  );
 }
 
 function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
@@ -714,33 +729,44 @@ function findIsolatedZedProcess(psOutput, record) {
 
 function waitForDevExtensionInstalled(manifest, timeoutMs) {
   const indexFile = path.join(manifest.profile, "extensions", "index.json");
+  const installedLink = path.join(
+    manifest.profile,
+    "extensions",
+    "installed",
+    "spring-tools",
+  );
   const wasmFile = path.join(repository, "extension.wasm");
   const processRecord = JSON.parse(
     fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
   );
   const foreground = processRecord.logPath;
+
   try {
     waitUntil(
-      () => devExtensionReady(indexFile, wasmFile),
-      "spring-tools dev extension registration and WASM build",
+      () => devExtensionPersisted(manifest, indexFile, installedLink, wasmFile, foreground),
+      "spring-tools dev extension persisted install state",
       timeoutMs,
       () => {
         const text = fs.existsSync(foreground) ? fs.readFileSync(foreground, "utf8") : "";
         const fatal = [
           "Failed to install dev extension",
           "failed to build extension",
-          "compiling Rust extension",
           "failed to install the `wasm32-wasip2` target",
           "failed to retrieve the `wasm32-wasip2` target libdir",
-          "resolving clang path",
         ].find((marker) => text.includes(marker));
-        if (fatal && /Failed to install dev extension|failed to build extension|failed to install the|failed to retrieve/.test(fatal)) {
+        if (fatal) {
           throw new Error(`Zed reported dev-extension installation failure: ${fatal}`);
         }
       },
     );
   } catch (error) {
-    const state = devExtensionState(indexFile, wasmFile, foreground);
+    const state = devExtensionState(
+      manifest,
+      indexFile,
+      installedLink,
+      wasmFile,
+      foreground,
+    );
     fs.writeFileSync(
       path.join(manifest.evidence, "dev-extension-readiness-failure.json"),
       JSON.stringify({
@@ -752,45 +778,100 @@ function waitForDevExtensionInstalled(manifest, timeoutMs) {
       { mode: 0o600 },
     );
     throw new Error(
-      `${errorText(error)}; wasmExists=${state.wasmExists}, wasmSize=${state.wasmSize}, indexRegistered=${state.indexRegistered}; inspect evidence/dev-extension-readiness-failure.json and the install foreground log`,
+      `${errorText(error)}; wasmExists=${state.wasmExists}, wasmSize=${state.wasmSize}, indexRegistered=${state.indexRegistered}, indexDev=${state.indexDev}, installedLinkIsSymlink=${state.installedLinkIsSymlink}, installedLinkTargetMatches=${state.installedLinkTargetMatches}; inspect evidence/dev-extension-readiness-failure.json and the install foreground log`,
       { cause: error },
     );
   }
 
-  fs.writeFileSync(path.join(manifest.evidence, "dev-extension-ready.json"), JSON.stringify({
-    sourceHead: manifest.sourceHead,
-    observedAt: new Date().toISOString(),
-    indexRegistered: true,
-    wasmSha256: createHash("sha256").update(fs.readFileSync(wasmFile)).digest("hex"),
-  }, null, 2) + "\n", { mode: 0o600 });
+  const state = devExtensionState(
+    manifest,
+    indexFile,
+    installedLink,
+    wasmFile,
+    foreground,
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "dev-extension-ready.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      observedAt: new Date().toISOString(),
+      readiness: "persisted-install",
+      ...state,
+      wasmSha256: createHash("sha256").update(fs.readFileSync(wasmFile)).digest("hex"),
+      status: "PASS",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  process.stdout.write(
+    "[D007] dev extension persisted: compiled WASM + dev index + exact source symlink; activation will be proven by the next cold launch.\n",
+  );
 }
 
-function devExtensionState(indexFile, wasmFile, foreground) {
+function devExtensionState(manifest, indexFile, installedLink, wasmFile, foreground) {
   let indexRegistered = false;
+  let indexDev = false;
+  let indexIdMatches = false;
   try {
     if (fs.existsSync(indexFile)) {
       const index = JSON.parse(fs.readFileSync(indexFile, "utf8"));
-      indexRegistered = Boolean(index.extensions?.["spring-tools"]);
+      const entry = index.extensions?.["spring-tools"];
+      indexRegistered = Boolean(entry);
+      indexDev = entry?.dev === true;
+      indexIdMatches = entry?.manifest?.id === "spring-tools";
     }
   } catch {}
 
-  const foregroundText = fs.existsSync(foreground) ? fs.readFileSync(foreground, "utf8") : "";
+  let installedLinkExists = false;
+  let installedLinkIsSymlink = false;
+  let installedLinkTarget = null;
+  let installedLinkTargetMatches = false;
+  try {
+    const stat = fs.lstatSync(installedLink);
+    installedLinkExists = true;
+    installedLinkIsSymlink = stat.isSymbolicLink();
+    if (installedLinkIsSymlink) {
+      installedLinkTarget = fs.realpathSync(installedLink);
+      installedLinkTargetMatches =
+        fs.realpathSync(repository) === installedLinkTarget;
+    }
+  } catch {}
+
+  const foregroundText = fs.existsSync(foreground)
+    ? fs.readFileSync(foreground, "utf8")
+    : "";
   return {
     wasmExists: fs.existsSync(wasmFile),
     wasmSize: fileSize(wasmFile),
     indexRegistered,
+    indexDev,
+    indexIdMatches,
+    installedLink,
+    installedLinkExists,
+    installedLinkIsSymlink,
+    installedLinkTarget,
+    installedLinkTargetMatches,
     foregroundTail: foregroundText.slice(-12_000),
   };
 }
 
-function devExtensionReady(indexFile, wasmFile) {
-  if (!fs.existsSync(indexFile) || !fs.existsSync(wasmFile) || fileSize(wasmFile) === 0) return false;
-  try {
-    const index = JSON.parse(fs.readFileSync(indexFile, "utf8"));
-    return Boolean(index.extensions?.["spring-tools"]);
-  } catch {
-    return false;
-  }
+function devExtensionPersisted(manifest, indexFile, installedLink, wasmFile, foreground) {
+  const state = devExtensionState(
+    manifest,
+    indexFile,
+    installedLink,
+    wasmFile,
+    foreground,
+  );
+  return (
+    state.wasmExists &&
+    state.wasmSize > 0 &&
+    state.indexRegistered &&
+    state.indexDev &&
+    state.indexIdMatches &&
+    state.installedLinkExists &&
+    state.installedLinkIsSymlink &&
+    state.installedLinkTargetMatches
+  );
 }
 
 function triggerCompletionMacos(manifest, fixtureKind, evidenceName) {
@@ -1659,6 +1740,63 @@ function writeGateFailure(manifest, phase, error) {
   }, null, 2) + "\n", { mode: 0o600 });
 }
 
+function recordRunPhase(manifest, phase) {
+  const event = {
+    type: "phase",
+    sourceHead: manifest.sourceHead,
+    phase,
+    observedAt: new Date().toISOString(),
+  };
+  fs.appendFileSync(
+    path.join(manifest.evidence, "d007-run.log"),
+    JSON.stringify(event) + "\n",
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "run-status.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      status: "RUNNING",
+      phase,
+      updatedAt: event.observedAt,
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  process.stdout.write(`[D007] PHASE: ${phase}\n`);
+}
+
+function recordRunFinal(manifest, status, phase, error = null) {
+  const event = {
+    type: "final",
+    sourceHead: manifest.sourceHead,
+    status,
+    phase,
+    observedAt: new Date().toISOString(),
+    error: error === null ? null : errorText(error),
+  };
+  fs.appendFileSync(
+    path.join(manifest.evidence, "d007-run.log"),
+    JSON.stringify(event) + "\n",
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "run-status.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      status,
+      phase,
+      updatedAt: event.observedAt,
+      error: event.error,
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  const stream = status === "PASS" ? process.stdout : process.stderr;
+  stream.write(
+    `\n========== D007 ${status} ==========\nphase=${phase}\nevidence=${manifest.evidence}\n`,
+  );
+  if (event.error !== null) stream.write(`error=${event.error}\n`);
+}
+
 function writeCleanupFailure(manifest, error, phase = "zed-cleanup") {
   fs.writeFileSync(path.join(manifest.evidence, "cleanup-failure.json"), JSON.stringify({
     sourceHead: manifest.sourceHead,
@@ -1767,6 +1905,33 @@ function selfTest() {
     assert.equal(fs.existsSync(path.join(manifest.worktrees.gradle, "build.gradle")), true);
     assert.equal(fs.readFileSync(path.join(manifest.worktrees.maven, "src", "main", "resources", "application-d007.properties"), "utf8"), "ser");
     assert.equal(fs.readFileSync(path.join(manifest.worktrees.gradle, "src", "main", "resources", "application-d007.properties"), "utf8"), "ser");
+    const devIndex = path.join(manifest.profile, "extensions", "index.json");
+    const devLink = path.join(manifest.profile, "extensions", "installed", "spring-tools");
+    const devWasm = path.join(scratch, "dev-extension.wasm");
+    const devForeground = path.join(scratch, "dev-install.log");
+    fs.writeFileSync(devWasm, "wasm");
+    fs.writeFileSync(devForeground, "");
+    fs.symlinkSync(repository, devLink, "dir");
+    const devIndexJson = JSON.parse(fs.readFileSync(devIndex, "utf8"));
+    devIndexJson.extensions["spring-tools"] = {
+      dev: true,
+      manifest: { id: "spring-tools", version: "0.0.0-dev" },
+    };
+    fs.writeFileSync(devIndex, JSON.stringify(devIndexJson, null, 2) + "\n");
+    assert.equal(
+      devExtensionPersisted(manifest, devIndex, devLink, devWasm, devForeground),
+      true,
+      "dev extension persisted readiness requires exact source symlink + dev index + WASM",
+    );
+    fs.rmSync(devLink);
+    fs.symlinkSync(manifest.worktrees.maven, devLink, "dir");
+    assert.equal(
+      devExtensionPersisted(manifest, devIndex, devLink, devWasm, devForeground),
+      false,
+      "dev extension readiness must reject a symlink to the wrong checkout",
+    );
+    fs.rmSync(devLink);
+
     const stagedSettings = JSON.parse(fs.readFileSync(path.join(manifest.profile, "config", "settings.json"), "utf8"));
     assert.deepEqual(stagedSettings.languages.Java.language_servers, ["jdtls", "spring-tools"]);
     assert.equal(stagedSettings.lsp.jdtls.settings.java_home, javaHome);
@@ -1808,6 +1973,16 @@ function selfTest() {
       harnessSource.includes('controlPlane: "fresh-foreground-cli-per-phase"'),
       true,
       "D007 launch evidence must record the fresh per-phase foreground control plane",
+    );
+    assert.equal(
+      harnessSource.includes('path.join(manifest.evidence, "d007-run.log")'),
+      true,
+      "D007 must persist phase/final execution logs independently of terminal lifetime",
+    );
+    assert.equal(
+      harnessSource.includes('path.join(manifest.evidence, "run-status.json")'),
+      true,
+      "D007 must persist a recoverable final status",
     );
     assert.equal(
       d007Keymap().some((entry) =>

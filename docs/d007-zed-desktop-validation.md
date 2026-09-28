@@ -44,8 +44,8 @@ It performs the following bounded sequence:
 
 1. stages a fresh isolated profile and both build-tool fixtures;
 2. records the current shared `~/Library/Logs/Zed/Zed.log` byte boundary;
-3. launches a root-only Maven foreground Zed process bound to the exact staged `--user-data-dir`, installs/registers the dev extension, then stops that process;
-4. for each Maven/Gradle fixture, launches a **fresh foreground Zed process** with exactly two CLI targets: the fixture root and the absolute `application-d007.properties:1:4` target. No File Finder or secondary CLI request is used;
+3. launches a root-only Maven foreground Zed process bound to the exact staged `--user-data-dir` and starts dev-extension installation. Installation is not considered persisted until a fresh non-empty `extension.wasm`, a `dev: true` `spring-tools` index entry, and an `installed/spring-tools` symlink resolving to the exact candidate checkout all exist;
+4. then, for each Maven/Gradle fixture, launches a **fresh foreground Zed process** with exactly two CLI targets: the fixture root and the absolute `application-d007.properties:1:4` target. This first cold launch is the actual extension-activation proof: exact coordinator/document/index evidence must appear before completion validation continues. No File Finder or secondary CLI request is used;
 5. requires coordinator evidence that this cold launch actually produced `textDocument/didOpen` for the exact Properties URI, then requires coordinator startup and a positive `spring/index/updated`;
 6. invokes completion on that launch-target editor and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
 7. stops the completion process, then launches another fresh foreground Zed process for the same fixture with the fixture root plus the absolute `FixtureApplication.java` target;
@@ -246,3 +246,8 @@ fixture-file focus. Each fixture's one foreground launch opens only the director
 root; subsequent exact-file navigation stays inside that isolated Zed process
 through File Finder's public absolute-path resolver, D007-only key bindings, and
 protocol evidence.
+
+
+### Durable execution status
+
+Every macOS D007 run appends machine-readable phase/final records to `evidence/d007-run.log` and overwrites `evidence/run-status.json` with the latest state. These files are authoritative even if the invoking terminal closes immediately when Node exits. A successful run also writes `evidence/desktop-gate.json` and `evidence/summary.json`; failures write `evidence/gate-failure.json`.
