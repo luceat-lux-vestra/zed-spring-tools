@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -404,6 +405,7 @@ async function main() {
   };
 
   let child;
+  let versionMetadataServer;
   let stderr = "";
   try {
     await downloadPinnedArtifact(pin, jar);
@@ -416,6 +418,19 @@ async function main() {
     evidence.checks.fixtureCompile = compileFixture(worktree, javaHome);
 
     const configuration = structuredClone(DEFAULT_CONFIGURATION);
+    versionMetadataServer = await startDeterministicVersionMetadataServer();
+    configuration["boot-java"].io = {
+      api: versionMetadataServer.apiUrl,
+    };
+    configuration["spring-boot"] = {
+      ls: {
+        "problem-parameters": {
+          "version-validation": {
+            "use-project-build-file": false,
+          },
+        },
+      },
+    };
     const sharedMetadataFile = path.join(
       worktree,
       "config",
@@ -1145,7 +1160,18 @@ async function main() {
         code: patchDiagnostic.code,
         message: patchDiagnostic.message,
         diagnosticCount: versionDiagnostics.length,
+        metadataRequests: [...versionMetadataServer.requests],
       },
+    );
+    assert.equal(
+      versionMetadataServer.requests.includes("/projects"),
+      true,
+      "version validation must fetch the deterministic Spring projects index",
+    );
+    assert.equal(
+      versionMetadataServer.requests.includes("/projects/spring-boot/releases"),
+      true,
+      "version validation must fetch deterministic Spring Boot releases",
     );
 
     const versionActions = await client.request(
@@ -1159,7 +1185,7 @@ async function main() {
     );
     assert.equal(Array.isArray(versionActions), true);
     const upgradeAction = versionActions.find((action) =>
-      action?.command?.command === "sts/upgrade/spring-boot-patch"
+      action?.command?.command === "sts/upgrade/spring-boot"
     );
     assert.ok(
       upgradeAction,
@@ -1168,7 +1194,7 @@ async function main() {
     const upgradeArguments = upgradeAction.command.arguments ?? [];
     assert.equal(upgradeArguments.length >= 2, true);
     const targetVersion = String(upgradeArguments[1]);
-    assert.match(targetVersion, /^3\.5\.[0-9A-Za-z.+-]+$/);
+    assert.equal(targetVersion, "3.5.6");
 
     const upgradeEditStart = client.workspaceEdits.length;
     const upgradeResult = await client.request(
@@ -1267,6 +1293,7 @@ async function main() {
     writeEvidence(output, evidence);
     throw error;
   } finally {
+    if (versionMetadataServer) await versionMetadataServer.close();
     fs.rmSync(runRoot, { recursive: true, force: true });
   }
 }
@@ -2883,6 +2910,80 @@ function pass(proof, details = undefined) {
   return details === undefined
     ? { status: "pass", proof }
     : { status: "pass", proof, details };
+}
+
+async function startDeterministicVersionMetadataServer() {
+  const requests = [];
+  let baseUrl = null;
+  const server = createServer((request, response) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    requests.push(requestUrl.pathname);
+    response.setHeader("content-type", "application/hal+json");
+
+    if (request.method === "GET" && requestUrl.pathname === "/projects") {
+      response.end(JSON.stringify({
+        _embedded: {
+          projects: [{
+            name: "Spring Boot",
+            slug: "spring-boot",
+            repositoryUrl: "https://github.com/spring-projects/spring-boot",
+            status: "ACTIVE",
+            _links: {
+              self: { href: `${baseUrl}/projects/spring-boot` },
+              releases: { href: `${baseUrl}/projects/spring-boot/releases` },
+            },
+          }],
+        },
+      }));
+      return;
+    }
+
+    if (
+      request.method === "GET" &&
+      requestUrl.pathname === "/projects/spring-boot/releases"
+    ) {
+      response.end(JSON.stringify({
+        _embedded: {
+          releases: [
+            {
+              version: "3.5.5",
+              status: "GENERAL_AVAILABILITY",
+              current: false,
+            },
+            {
+              version: "3.5.6",
+              status: "GENERAL_AVAILABILITY",
+              current: true,
+            },
+          ],
+        },
+      }));
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ error: "not found" }));
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  assert.equal(typeof address, "object");
+  assert.ok(address && typeof address.port === "number");
+  baseUrl = `http://127.0.0.1:${address.port}`;
+
+  return {
+    apiUrl: `${baseUrl}/projects`,
+    requests,
+    close: () => new Promise((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    }),
+  };
 }
 
 async function downloadPinnedArtifact(pin, destination) {
