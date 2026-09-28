@@ -52,14 +52,16 @@ fn install_from_download(install: &Path) -> Result<SpringPaths, String> {
     let staging = install.join(format!("{ASSET}.download"));
     let _ = fs::remove_file(&staging);
 
-    zed::download_file(
+    if let Err(error) = zed::download_file(
         URL,
         staging
             .to_str()
             .ok_or_else(|| "Spring Tools download path is not UTF-8".to_owned())?,
         zed::DownloadedFileType::Uncompressed,
-    )
-    .map_err(|error| format!("download pinned Spring Tools {VERSION}: {error}"))?;
+    ) {
+        let _ = fs::remove_file(&staging);
+        return Err(format!("download pinned Spring Tools {VERSION}: {error}"));
+    }
 
     if let Err(error) = validate_file(&staging) {
         let _ = fs::remove_file(&staging);
