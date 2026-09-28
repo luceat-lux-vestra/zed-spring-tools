@@ -287,9 +287,17 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
       setPhase(`${fixtureKind}-run-debug-zed-readiness`);
       waitForZedReady(manifest, fixtureKind, 45_000);
       setPhase(`${fixtureKind}-run-debug-interaction`);
-      results.push(runDebugPhaseMacos(root, fixtureKind));
+      const fixtureResult = runDebugPhaseMacos(root, fixtureKind);
       setPhase(`${fixtureKind}-run-debug-shutdown`);
       stopAndWaitZed(root, manifest, 10_000, 5_000);
+      setPhase(`${fixtureKind}-generated-run-task-execution`);
+      fixtureResult.runTaskExecution = executeGeneratedRunTask(
+        manifest,
+        fixtureKind,
+        javaHome,
+        180_000,
+      );
+      results.push(fixtureResult);
     }
   } catch (error) {
     primaryError = error;
@@ -342,7 +350,12 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
           ? "PASS"
           : "FAIL"
         : "MISSING",
-    status: results.every((entry) => entry.debugConfig === "PASS" && entry.runTask === "PASS") &&
+    status: results.every(
+      (entry) =>
+        entry.debugConfig === "PASS" &&
+        entry.runTask === "PASS" &&
+        entry.runTaskExecution === "PASS",
+    ) &&
       summary.privateBoundary === "PASS" &&
       summary.completionEvidence === "PASS" &&
       summary.unexpectedRuntimeErrorEvidence === "PASS" &&
@@ -474,6 +487,135 @@ function runDebugPhaseMacos(root, fixtureKind) {
   };
   fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-result.json`), JSON.stringify(evidence, null, 2) + "\n", { mode: 0o600 });
   return evidence;
+}
+
+function executeGeneratedRunTask(
+  manifest,
+  fixtureKind,
+  javaHome,
+  timeoutMs,
+) {
+  const worktree = manifest.worktrees[fixtureKind];
+  const tasksFile = path.join(worktree, ".zed", "tasks.json");
+  requireFile(tasksFile, `${fixtureKind} generated tasks`);
+  const tasks = JSON.parse(fs.readFileSync(tasksFile, "utf8"));
+  assert.equal(Array.isArray(tasks), true, ".zed/tasks.json must contain an array");
+  const task = tasks.find((entry) =>
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools): ") &&
+    entry.label.endsWith(" (run)")
+  );
+  assert.ok(task, `${fixtureKind} generated Spring Boot run task must exist`);
+  const expectedCommand = fixtureKind === "maven" ? "mvn" : "./gradlew";
+  const expectedArgs = fixtureKind === "maven" ? ["spring-boot:run"] : ["bootRun"];
+  assert.equal(task.command, expectedCommand);
+  assert.deepEqual(task.args, expectedArgs);
+  assert.equal(task.cwd, "$ZED_WORKTREE_ROOT");
+
+  const applicationProperties = path.join(
+    worktree,
+    "src",
+    "main",
+    "resources",
+    "application.properties",
+  );
+  requireFile(applicationProperties, `${fixtureKind} application.properties`);
+  const originalProperties = fs.readFileSync(applicationProperties, "utf8");
+  const randomizedProperties = originalProperties.replace(
+    /^server\.port\s*=.*$/m,
+    "server.port=0",
+  );
+  assert.notEqual(
+    randomizedProperties,
+    originalProperties,
+    `${fixtureKind} fixture must expose a server.port line for collision-free execution`,
+  );
+  fs.writeFileSync(applicationProperties, randomizedProperties);
+
+  const logFile = path.join(
+    manifest.evidence,
+    `${fixtureKind}-generated-run-task-execution.log`,
+  );
+  const fd = fs.openSync(logFile, "w", 0o600);
+  const child = spawn(task.command, task.args, {
+    cwd: worktree,
+    detached: true,
+    stdio: ["ignore", fd, fd],
+    shell: false,
+    env: {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+  });
+  child.unref();
+  fs.closeSync(fd);
+
+  const started = Date.now();
+  let bootStarted = false;
+  let exitBeforeReady = false;
+  try {
+    while (Date.now() - started < timeoutMs) {
+      const text = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "";
+      bootStarted =
+        /Started\s+FixtureApplication\b/.test(text) &&
+        /Tomcat started on port/i.test(text);
+      if (bootStarted) break;
+      if (!processGroupAlive(child.pid)) {
+        exitBeforeReady = true;
+        break;
+      }
+      sleepMs(500);
+    }
+  } finally {
+    if (processGroupAlive(child.pid)) {
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+      const stopDeadline = Date.now() + 10_000;
+      while (Date.now() < stopDeadline && processGroupAlive(child.pid)) {
+        sleepMs(250);
+      }
+      if (processGroupAlive(child.pid)) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (error) {
+          if (error?.code !== "ESRCH") throw error;
+        }
+      }
+    }
+    fs.writeFileSync(applicationProperties, originalProperties);
+  }
+
+  const tail = fs.existsSync(logFile)
+    ? fs.readFileSync(logFile, "utf8").slice(-24_000)
+    : "";
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    command: task.command,
+    args: task.args,
+    cwd: "$ZED_WORKTREE_ROOT",
+    serverPortOverride: 0,
+    bootStarted,
+    exitBeforeReady,
+    status: bootStarted ? "PASS" : "FAIL",
+    logTail: tail,
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-generated-run-task-execution.json`),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  if (!bootStarted) {
+    throw new Error(
+      `${fixtureKind} generated run task did not start FixtureApplication within ${timeoutMs}ms`,
+    );
+  }
+  return "PASS";
 }
 
 function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
