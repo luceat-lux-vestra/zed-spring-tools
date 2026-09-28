@@ -450,6 +450,11 @@ test("D007 version validation uses deterministic loopback metadata and the Sprin
     "version validation must force the deterministic Spring projects provider path",
   );
   assert.equal(
+    regression.includes("initial workspace configuration replayed after standalone index readiness"),
+    true,
+    "direct D007 must model the coordinator's one-shot post-index configuration replay",
+  );
+  assert.equal(
     regression.includes('version: "3.5.6"') &&
       regression.includes('assert.equal(targetVersion, "3.5.6")'),
     true,
