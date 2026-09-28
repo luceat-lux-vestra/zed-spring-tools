@@ -810,10 +810,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "spring-java-intelligence",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "The exact-head standalone Spring runtime must re-observe Spring AI @Tool diagnostics and index-backed Structure output.",
       "requiredEvidence": [
         {
-          "source": "standalone-java-extended-regression",
+          "source": "standalone-capability-regression",
           "check": "springAi"
         }
       ]
