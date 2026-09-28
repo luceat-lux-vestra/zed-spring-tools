@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryFile = path.join(root, "docs", "capability-inventory.md");
 const matrixFile = path.join(root, "protocol", "d007-capability-acceptance.json");
+const desktopHarnessFile = path.join(root, "scripts", "d007-zed-desktop-validation.mjs");
 
 const STATES = new Set([
   "verified",
@@ -157,6 +158,31 @@ test("D007 live and external-page acceptance consumes the produced standalone re
       ),
       true,
       `${capability} must consume evidence emitted by the standalone regression runner`,
+    );
+  }
+});
+
+
+test("D007 evidence sources are all produced by the exact-head desktop harness", () => {
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+  const harness = fs.readFileSync(desktopHarnessFile, "utf8");
+  const sources = [...new Set(
+    matrix.entries.flatMap((entry) =>
+      (entry.requiredEvidence ?? []).map((requirement) => requirement.source)
+    ),
+  )].sort();
+
+  assert.deepEqual(sources, [
+    "desktop-dap-regression",
+    "desktop-gate",
+    "standalone-capability-regression",
+    "standalone-offline-regression",
+  ]);
+  for (const source of sources) {
+    assert.equal(
+      harness.includes(`"${source}.json"`),
+      true,
+      `D007 matrix source ${source} must have a concrete evidence producer`,
     );
   }
 });
