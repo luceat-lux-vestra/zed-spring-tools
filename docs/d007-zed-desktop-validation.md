@@ -1,4 +1,4 @@
-# D007 isolated Zed desktop validation
+# D007 standalone acceptance and isolated Zed desktop validation
 
 ## One-shot macOS gate
 
@@ -57,10 +57,14 @@ It performs the following bounded sequence:
 13. stops each phase's isolated process group with bounded `SIGTERM`/optional `SIGKILL`; every file-target phase is therefore a cold launch, never a request routed into an already-running macOS Zed instance;
 14. records coordinator lifecycle events, harvests only post-boundary shared Zed log bytes, checks retired private-boundary markers, and writes `evidence/desktop-gate.json` plus `evidence/summary.json`.
 
-A final `PASS` requires both Maven and Gradle run/debug configuration
-generation, the expected Java launch entry and build-tool run task for each fixture,
-no retired private-boundary marker, and coordinator protocol evidence proving
+A desktop-smoke `PASS` requires both Maven and Gradle run/debug configuration
+generation, successful execution of each exact generated Boot run task, the
+expected Java launch entry for each fixture, no retired private-boundary marker,
+no Spring error popup evidence, a passing standalone capability-regression
+evidence file on the same source HEAD, and coordinator protocol evidence proving
 the completion request, correlated Spring response, and `server.port` item.
+It still does **not** mean every capability row is release-facing verified; the
+D007 capability-accounting matrix remains authoritative for that decision.
 D007 enables this evidence only in the isolated launch environment; the
 coordinator writes the bounded JSONL trace to
 `<fixture>/.d007/coordinator-protocol.jsonl`. Normal extension runs do not
@@ -98,9 +102,39 @@ evidence is never promoted to PASS. If a phase throws, the harness
 records `evidence/gate-failure.json` with the exact phase before cleanup. A
 cleanup problem is recorded separately and never replaces the primary failure.
 
-This is the exact-final-HEAD desktop gate for the standalone Spring runtime
-selected by D007. It replaces the retired JDT/private-bridge desktop procedures
-for release acceptance.
+The one-shot runner now has two evidence layers on the same exact source HEAD:
+
+1. **standalone capability regression** — drives the real pinned Spring Tools
+   standalone server directly against the repository's rich Spring Boot fixture
+   and verifies representative project-aware properties/YAML intelligence,
+   Spring Java completion, SpEL, Spring Data, cron, navigation, CodeLens/inlay
+   surfaces, workspace symbols, Boot-project discovery/info, and structure;
+2. **isolated Zed architecture/integration smoke** — proves the official Java
+   extension/JDT LS and this extension's standalone Spring runtime coexist in a
+   fresh Zed profile, then exercises completion and run/debug generation for
+   Maven and Gradle.
+
+The desktop layer is deliberately labelled `architecture-smoke`; it is not
+allowed to promote historical capability claims on its own. The capability
+accounting contract is
+[`protocol/d007-capability-acceptance.json`](../protocol/d007-capability-acceptance.json).
+Any row still marked `pending-d007` remains a #159 release blocker.
+
+The run/debug path no longer stops at generated JSON. After Zed creates the
+reviewable task, the harness executes the exact generated `mvn spring-boot:run`
+or `./gradlew bootRun` command with a collision-free test port and requires
+`FixtureApplication` plus embedded Tomcat to start before terminating the
+test process group.
+
+Spring-originated `window/showMessage` and `window/showMessageRequest`
+events are recorded only as method/severity metadata. Message text is not
+persisted. Any severity-`error` event makes the desktop smoke fail, so a visible
+Spring error popup cannot coexist with a D007 PASS.
+
+This is the exact-final-HEAD acceptance harness for the standalone Spring
+runtime selected by D007. It replaces the retired JDT/private-bridge desktop
+procedures, but #159 closes only when both capability accounting and desktop
+integration evidence are complete.
 
 The harness intentionally reuses only the **installed official Java extension**
 from a known local Zed profile. It never copies or reads that extension's
