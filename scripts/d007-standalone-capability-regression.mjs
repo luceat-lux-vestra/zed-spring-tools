@@ -1424,7 +1424,7 @@ async function runEmbeddedMcpRegression(
         attempts.push({ endpoint: candidate, error: String(error).slice(0, 300) });
       }
     }
-    assert.ok(endpoint, \`embedded MCP initialize failed: \${JSON.stringify(attempts)}\`);
+    assert.ok(endpoint, `embedded MCP initialize failed: ${JSON.stringify(attempts)}`);
     assert.ok(initialized?.result);
 
     await mcpHttpCall(
@@ -1460,6 +1460,11 @@ async function runEmbeddedMcpRegression(
     assert.equal(projectResponse.status, 200);
     const projectPayload = parseMcpPayload(projectResponse.body);
     assert.equal(projectPayload?.error === undefined, true);
+    assert.equal(
+      projectPayload?.result?.isError === true,
+      false,
+      "getProjectList must return a usable MCP tool result",
+    );
 
     const completion = completionItems(await client.request(
       "textDocument/completion",
@@ -1487,8 +1492,8 @@ async function runEmbeddedMcpRegression(
     });
   } catch (error) {
     throw new Error(
-      \`embedded MCP regression failed: \${error instanceof Error ? error.message : String(error)}; \` +
-      \`stderr=\${stderr.split(/\\r?\\n/).slice(-40).join(" | ")}\`,
+      `embedded MCP regression failed: ${error instanceof Error ? error.message : String(error)}; ` +
+      `stderr=${stderr.split(/\r?\n/).slice(-40).join(" | ")}`,
     );
   } finally {
     if (child.exitCode === null) child.kill();
@@ -1506,8 +1511,8 @@ function listeningTcpPorts(pid) {
   );
   if (result.error || result.status !== 0) return [];
   const ports = [];
-  for (const line of String(result.stdout).split("\\n").slice(1)) {
-    const match = /:(\\d+)\\s+\\(LISTEN\\)\\s*$/.exec(line);
+  for (const line of String(result.stdout).split("\n").slice(1)) {
+    const match = /:(\d+)\s+\(LISTEN\)\s*$/.exec(line);
     if (match) ports.push(Number(match[1]));
   }
   return [...new Set(ports)];
@@ -1519,7 +1524,7 @@ async function mcpHttpCall(port, endpoint, body, sessionId) {
     Accept: "application/json, text/event-stream",
   };
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
-  const response = await fetch(\`http://127.0.0.1:\${port}\${endpoint}\`, {
+  const response = await fetch(`http://127.0.0.1:${port}${endpoint}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -1535,7 +1540,7 @@ async function mcpHttpCall(port, endpoint, body, sessionId) {
 function parseMcpPayload(payload) {
   const trimmed = String(payload).trim();
   if (trimmed.startsWith("{")) return JSON.parse(trimmed);
-  for (const line of trimmed.split("\\n")) {
+  for (const line of trimmed.split("\n")) {
     if (line.startsWith("data:")) {
       return JSON.parse(line.slice(5).trim());
     }
