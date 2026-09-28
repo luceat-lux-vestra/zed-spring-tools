@@ -331,10 +331,19 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
   }
 
   const summary = summarize(root);
+  const acceptance = runCapabilityAcceptanceSummary(manifest);
   const outcome = {
     sourceHead: manifest.sourceHead,
     gateScope: "architecture-smoke",
-    releaseAcceptance: summary.releaseAcceptance,
+    releaseAcceptance: acceptance.releaseAcceptance,
+    capabilityAcceptance: {
+      acceptedCount: acceptance.acceptedCount,
+      terminalCount: acceptance.terminalCount,
+      pendingCount: acceptance.pendingCount,
+      failedCount: acceptance.failedCount,
+      unresolvedCapabilities: acceptance.unresolvedCapabilities,
+      failedCapabilities: acceptance.failedCapabilities,
+    },
     fixtures: results,
     privateBoundary: summary.privateBoundary,
     completionEvidence: summary.completionEvidence,
@@ -377,6 +386,45 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     "complete",
     outcome.status === "PASS" ? null : new Error("desktop gate requires review"),
   );
+}
+
+function runCapabilityAcceptanceSummary(manifest) {
+  const script = path.join(
+    repository,
+    "scripts",
+    "d007-capability-acceptance-summary.mjs",
+  );
+  requireFile(script, "D007 capability acceptance summary");
+  const output = path.join(
+    manifest.evidence,
+    "d007-capability-acceptance-summary.json",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, manifest.evidence, output],
+    {
+      cwd: repository,
+      encoding: "utf8",
+      shell: false,
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `D007 capability acceptance summary failed: ${bounded(result.stderr || result.stdout)}`,
+    );
+  }
+  requireFile(output, "D007 capability acceptance summary evidence");
+  const acceptance = JSON.parse(fs.readFileSync(output, "utf8"));
+  assert.equal(
+    acceptance.sourceHead,
+    manifest.sourceHead,
+    "capability acceptance summary must bind the staged exact HEAD",
+  );
+  assert.equal(acceptance.totalCapabilities, 59);
+  return acceptance;
 }
 
 function runStandaloneCapabilityRegression(manifest, javaHome) {
