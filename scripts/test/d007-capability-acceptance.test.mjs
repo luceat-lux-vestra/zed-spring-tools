@@ -13,6 +13,8 @@ const basicPropertiesFixture = path.join(root, "tests", "fixtures", "spring-boot
 const basicYamlFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.yaml");
 const extensionManifestFile = path.join(root, "extension.toml");
 const basicPomFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "pom.xml");
+const greetingRepositoryFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "GreetingRepository.java");
+const spelFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "SpelSample.java");
 
 const STATES = new Set([
   "verified",
@@ -265,4 +267,43 @@ test("D007 fixture explicitly enables configuration metadata processing on JDK 2
     true,
     "standalone regression must fail at compile time if project metadata was not generated",
   );
+});
+
+
+test("D007 ambiguous capability probes use exact fixture lines", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const properties = fs.readFileSync(basicPropertiesFixture, "utf8");
+  const repository = fs.readFileSync(greetingRepositoryFixture, "utf8");
+  const spel = fs.readFileSync(spelFixture, "utf8");
+
+  assert.equal((properties.match(/server\.port/g) ?? []).length > 1, true);
+  assert.equal((properties.match(/fixture\.greeting\.salutation/g) ?? []).length > 1, true);
+  assert.equal((repository.match(/findByMessageAnd/g) ?? []).length > 1, true);
+  assert.equal((spel.match(/greetingPrefix/g) ?? []).length > 1, true);
+
+  for (const forbidden of [
+    'positionInside(props.text, "server.port", 3)',
+    'positionInside(props.text, "fixture.greeting.salutation", 12)',
+    'positionAfter(repositoryJava.text, "findByMessageAnd")',
+    'positionInside(spel.text, "greetingPrefix", 3)',
+  ]) {
+    assert.equal(
+      regression.includes(forbidden),
+      false,
+      `ambiguous first-substring probe must not reappear: ${forbidden}`,
+    );
+  }
+
+  for (const required of [
+    '"server.port=8080"',
+    '"fixture.greeting.salutation=hi"',
+    '"    List<Greeting> findByMessageAndId(String message, Long id);"',
+    "'    @Value(\"#{@greetingPrefix}\")'",
+  ]) {
+    assert.equal(
+      regression.includes(required),
+      true,
+      `exact fixture anchor must remain present: ${required}`,
+    );
+  }
 });
