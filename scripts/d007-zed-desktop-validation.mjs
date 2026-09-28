@@ -239,6 +239,25 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     setPhase("maven-install-shutdown");
     stopAndWaitZed(root, manifest, 10_000, 5_000);
 
+    const preflightJavaRelative =
+      "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+    setPhase("language-server-preflight-launch");
+    launchMacos(root, "maven", {
+      role: "preflight",
+      relativeTarget: preflightJavaRelative,
+    });
+    setPhase("language-server-preflight-zed-readiness");
+    waitForZedReady(manifest, "maven", 45_000);
+    setPhase("language-server-preflight-readiness");
+    waitForLanguageServerPreflightMacos(
+      manifest,
+      "maven",
+      preflightJavaRelative,
+      180_000,
+    );
+    setPhase("language-server-preflight-shutdown");
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+
     for (const fixtureKind of ["maven", "gradle"]) {
       const propertiesRelative = "src/main/resources/application-d007.properties";
       const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
@@ -710,8 +729,172 @@ function zedReady(record) {
   return isolatedZedProcess(record) !== undefined;
 }
 
-function isolatedZedProcess(record) {
-  const result = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,stat=,command="], { encoding: "utf8" });
+function waitForLanguageServerPreflightMacos(
+  manifest,
+  fixtureKind,
+  javaRelative,
+  timeoutMs,
+) {
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.role,
+    "preflight",
+    "language-server preflight must run in its dedicated foreground process",
+  );
+  const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
+  requireFile(javaFile, fixtureKind + " language-server preflight Java target");
+  const javaUri = pathToFileURL(javaFile).href;
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const started = Date.now();
+
+  let processes = {
+    jdtls: { observed: false, pid: null },
+    springTools: { observed: false, pid: null },
+  };
+  let spring = {
+    coordinatorStarted: false,
+    targetDocumentOpened: false,
+    indexReady: false,
+  };
+
+  while (Date.now() - started < timeoutMs) {
+    const ps = spawnSync(
+      "/bin/ps",
+      ["-axo", "pid=,pgid=,stat=,command="],
+      { encoding: "utf8" },
+    );
+    if (ps.status !== 0) {
+      throw new Error(
+        "ps failed while checking language-server preflight: " + bounded(ps.stderr),
+      );
+    }
+    processes = languageServerProcessReadiness(ps.stdout, processRecord.pid);
+    const protocolText = fs.existsSync(protocolFile)
+      ? fs.readFileSync(protocolFile, "utf8")
+      : "";
+    spring = springTargetReadiness(protocolText, javaUri);
+
+    if (
+      processes.jdtls.observed &&
+      processes.springTools.observed &&
+      spring.coordinatorStarted &&
+      spring.targetDocumentOpened &&
+      spring.indexReady
+    ) {
+      const evidence = {
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        targetRelativePath: javaRelative,
+        targetUri: javaUri,
+        readiness: {
+          jdtlsProcess: processes.jdtls,
+          springToolsStandaloneProcess: processes.springTools,
+          springCoordinatorStarted: spring.coordinatorStarted,
+          springTargetDocumentOpened: spring.targetDocumentOpened,
+          springIndexReady: spring.indexReady,
+        },
+        semantics: {
+          jdtls:
+            "process launch proves the official Java extension finished materializing a runnable JDT LS before functional validation",
+          springTools:
+            "standalone process + coordinator/index evidence proves the pinned Spring Tools artifact is runnable and initialized before functional validation",
+        },
+        privateRuntimePathInspected: false,
+        status: "PASS",
+      };
+      fs.writeFileSync(
+        path.join(manifest.evidence, "language-server-preflight-ready.json"),
+        JSON.stringify(evidence, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      process.stdout.write(
+        "[D007] language-server preflight ready: JDT LS + standalone Spring Tools are materialized and running; main validation starts only after this process is stopped.\n",
+      );
+      return evidence;
+    }
+    sleepMs(250);
+  }
+
+  fs.writeFileSync(
+    path.join(manifest.evidence, "language-server-preflight-failure.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      targetRelativePath: javaRelative,
+      targetUri: javaUri,
+      readiness: {
+        jdtlsProcess: processes.jdtls,
+        springToolsStandaloneProcess: processes.springTools,
+        springCoordinatorStarted: spring.coordinatorStarted,
+        springTargetDocumentOpened: spring.targetDocumentOpened,
+        springIndexReady: spring.indexReady,
+      },
+      classification: !processes.jdtls.observed
+        ? "jdtls-process-not-ready"
+        : !processes.springTools.observed
+          ? "spring-tools-standalone-process-not-ready"
+          : !spring.coordinatorStarted
+            ? "spring-coordinator-not-started"
+            : !spring.targetDocumentOpened
+              ? "spring-preflight-target-not-opened"
+              : "spring-index-not-ready",
+      privateRuntimePathInspected: false,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    "language-server preflight did not prove both JDT LS and standalone Spring Tools ready before functional validation",
+  );
+}
+
+function languageServerProcessReadiness(psOutput, expectedPgid) {
+  let jdtlsPid = null;
+  let springToolsPid = null;
+  for (const line of String(psOutput).split("\n")) {
+    const match = /^\\s*(\\d+)\\s+(\\d+)\\s+(\\S+)\\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const [, pidText, pgidText, state, command] = match;
+    if (Number(pgidText) !== Number(expectedPgid) || state.startsWith("Z")) {
+      continue;
+    }
+    if (
+      jdtlsPid === null &&
+      (
+        command.includes("org.eclipse.jdt.ls.core") ||
+        command.includes("org.eclipse.equinox.launcher")
+      )
+    ) {
+      jdtlsPid = Number(pidText);
+    }
+    if (
+      springToolsPid === null &&
+      command.includes("spring-boot-language-server-standalone-exec.jar")
+    ) {
+      springToolsPid = Number(pidText);
+    }
+  }
+  return {
+    jdtls: {
+      observed: jdtlsPid !== null,
+      pid: jdtlsPid,
+      signature: "org.eclipse.jdt.ls.core|org.eclipse.equinox.launcher",
+    },
+    springTools: {
+      observed: springToolsPid !== null,
+      pid: springToolsPid,
+      signature: "spring-boot-language-server-standalone-exec.jar",
+    },
+  };
+}
+
+function isolatedZedProcess(record) {  const result = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,stat=,command="], { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`ps failed while checking isolated Zed process: ${bounded(result.stderr)}`);
   }
@@ -2283,6 +2466,28 @@ function selfTest() {
       ),
       undefined,
       "the CLI launcher alone must not satisfy Zed app readiness",
+    );
+
+    const fakeLanguageServers = [
+      "  5001  4242 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /opaque/equinox.jar",
+      "  5002  4242 S /jdk/bin/java -jar /opaque/spring-boot-language-server-standalone-exec.jar",
+      "  5003  9999 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /other/equinox.jar",
+    ].join("\n");
+    assert.deepEqual(
+      languageServerProcessReadiness(fakeLanguageServers, 4242),
+      {
+        jdtls: {
+          observed: true,
+          pid: 5001,
+          signature: "org.eclipse.jdt.ls.core|org.eclipse.equinox.launcher",
+        },
+        springTools: {
+          observed: true,
+          pid: 5002,
+          signature: "spring-boot-language-server-standalone-exec.jar",
+        },
+      },
+      "D007 preflight must prove both language servers in the isolated Zed process group without recording private install paths",
     );
 
     const primaryFailure = new Error("primary failure");
