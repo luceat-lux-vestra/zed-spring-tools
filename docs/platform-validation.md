@@ -2,7 +2,13 @@
 
 [![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
 
-`Platform Validation` is the repository's continuously refreshed native CI evidence. The badge above reflects the latest `main` workflow result; the workflow artifacts retain the exact source HEAD, synthetic tested commit, runner identity, toolchain versions, and pinned Spring plus JDT/Spring/bridge runtime observations for each run.
+`Platform Validation` is the repository's continuously refreshed native,
+headless CI evidence. The badge reflects the latest `main` result; pull-request
+runs retain evidence for their own exact source HEAD and synthetic merge commit.
+
+D007 changed the runtime boundary on 2026-09-25. This workflow now validates the
+official **standalone Spring Tools language server** from `5.3.0.RELEASE`. The former JDT/Spring/bridge
+layer is retired and is not part of current platform evidence.
 
 ## Native matrix
 
@@ -15,32 +21,77 @@
 | Windows | x86_64 | `windows-2025` |
 | Windows | arm64 | `windows-11-arm` |
 
-Each tuple runs the same four evidence layers plus the native Rust/bridge checks.
+Each tuple executes the same product-contract and real-runtime evidence.
 
-### Layer 1 — native substrate
+### Layer 1 — native substrate and product contracts
 
-The workflow records and asserts the real runner OS/architecture and exercises native filesystem/path behavior, including spaces and Unicode, official-Java route path normalization, Maven/Gradle wrapper selection, Java bridge self-test, and native Rust tests.
+The workflow records and asserts the real runner OS/architecture, checks the
+repository's native path/filesystem assumptions, validates wrapper selection,
+runs the coordinator contract suite, executes the native platform capability
+probes, and runs the Rust test suite.
 
-### Layer 2 — coordinator capability contracts
+The coordinator suite is enumerated by
+`scripts/run-coordinator-tests.mjs` so Windows and Unix hosts discover the same
+test files. Platform-specific probes use native file URIs, paths, and wall-clock
+deadlines rather than inheriting POSIX-only fixtures.
 
-The coordinator contract suite is enumerated by `scripts/run-coordinator-tests.mjs` rather than by a shell wildcard, so Windows and Unix hosts discover the same test files. Linux and macOS run the complete existing suite directly. Seven legacy tests embed POSIX paths or use a tight `setImmediate` spin as their test fixture; on Windows those fixture-bound forms are replaced by `scripts/platform-capability-probes.mjs`, which drives the same affected behaviors with native file URIs/paths and wall-clock deadlines. The replacement probes cover native positional arguments, Structure document generation, Live metrics generation and bounds, remote credential redaction, and Boot project-info URI/path rendering.
+### Layer 2 — real pinned standalone Spring runtime
 
-### Layer 3 — real pinned Spring runtime
+Every native tuple reads `protocol/spring-artifacts.json` and requires
+`mode: "standalone"`. It downloads the exact canonical
+`spring-boot-language-server-standalone-exec.jar`, then verifies both the
+declared byte size and SHA-256 before launch.
 
-Every native tuple reads the canonical `protocol/spring-artifacts.json` pin, downloads the exact official Spring Tools VSIX, checks the archive identity and required runtime-file hashes, extracts the real runtime, and starts the pinned Spring Boot language server with the production JVM launch vector. The smoke drives real LSP initialize, a `spring-boot-properties` document, completion, hover, shutdown, and process termination.
+The smoke creates a real Maven Spring Boot fixture, starts the pinned server with
+the production standalone JVM vector (including the worktree project root), and
+drives an LSP session. It requires the server to:
 
-### Layer 4 — real pinned JDT/Spring/bridge integration
+1. initialize successfully;
+2. open both a Java document and a `spring-boot-properties` document;
+3. discover the Boot application through
+   `sts/spring-boot/executableBootProjects` **without JDT LS**;
+4. exercise the local `sts/project/gav` fallback;
+5. answer a real properties completion request;
+6. avoid every retired private-Java callback
+   (`sts/addClasspathListener`, `sts/removeClasspathListener`,
+   `sts/javaType`, Javadoc/location/search/hierarchy callbacks); and
+7. complete bounded LSP shutdown/process cleanup.
 
-Every native tuple independently downloads and checksum-verifies the pinned Eclipse JDT LS 1.60.0 milestone archive. It extracts and verifies the canonical five Spring 5.3 Java-extension JARs from the same pinned Spring Tools VSIX, builds the current bridge from repository source with Java 21 bytecode, and injects the five Spring bundles plus that bridge into the real JDT LS runtime. The smoke requires JDT LS to advertise `sts.java.search.types` and both `zed.spring.bridge.v1.*ClasspathListener` delegate commands, then executes the bridge remove command and performs bounded LSP shutdown/process cleanup.
+The smoke also treats `sts/javaCodeComplete` as the known standalone callback
+whose product behavior is an explicit empty result; it is not tunneled to the
+official Java extension.
 
-That executed remove command proves that the current bridge bundle resolved and activated inside the real JDT runtime, its delegate handler was registered and invoked, and the bridge linked against the Spring JDT commons dependency. It deliberately does **not** claim that the add/listener/callback route was driven end to end, nor that the official Java extension/proxy participated in this headless smoke.
+### JDK 21 runtime floor
 
-A separate JDK 21 floor job runs both Layer 3 and Layer 4 on Linux x86_64. The six-way matrix owns host portability; the floor job owns the declared minimum Java runtime.
+A separate Linux x86_64 job runs the same real standalone runtime smoke on the
+declared minimum JDK 21. The six-way matrix owns native host portability; the
+floor job owns the minimum JVM claim.
 
-These checks are stronger than compile-only or mock-only portability tests, but they remain **headless CI evidence**. They do not run Zed desktop together with the official Java extension/proxy, JDT LS, Spring Tools, and this extension end to end on every tuple. Therefore they do not by themselves promote a tuple to a fully verified Zed runtime/support claim. `COMPATIBILITY.md` remains authoritative for driven integrated runtime observations.
+## What this evidence does not prove
+
+These checks are stronger than compile-only or mock-only portability tests, but
+they remain **headless CI evidence**. They do not prove the exact submitted
+commit works as a Zed desktop development extension, nor do they exercise the
+real Registry install/update/uninstall lifecycle.
+
+For #159 and Registry preparation, the exact final source HEAD must still be
+loaded and manually exercised in Zed. A later HEAD cannot inherit that manual
+evidence from an earlier revision.
+
+Historical JDT/bridge gates remain in research/spike records and
+`COMPATIBILITY.md` for regression history; they are not current standalone
+runtime evidence.
 
 ## Evidence artifacts
 
-Each platform job uploads `platform-evidence.json`, `spring-runtime-evidence.json`, and `jdt-spring-runtime-evidence.json`. The evidence identifies both the source branch HEAD and the pull-request synthetic merge commit, so a later HEAD cannot inherit evidence from an earlier revision. The JDK-floor job independently retains both its Spring runtime evidence and its JDT/Spring/bridge runtime evidence.
+Each native platform job uploads `platform-evidence.json` and
+`spring-runtime-evidence.json`. The standalone runtime artifact records the
+source HEAD, tested commit, host OS/architecture, exact Spring Tools
+tag/source-commit/artifact checksum, observed server callbacks, executable
+project discovery, and completion result.
 
-A deterministic failure is a failed gate. The acceptance path is to fix the failing contract at a new HEAD and rerun the complete gate; rerun-until-green is not evidence.
+The JDK-floor job independently uploads its standalone runtime evidence.
+
+A deterministic failure is a failed gate. The acceptance path is to classify the
+failure, fix its responsibility layer at a new HEAD, and run the complete gate
+again. Rerun-until-green is not evidence.
