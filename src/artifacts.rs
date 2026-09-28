@@ -1,57 +1,30 @@
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use zed_extension_api as zed;
 
 const VERSION: &str = "5.3.0.RELEASE";
-const ASSET: &str = "vscode-spring-boot-2.3.0-RC2.vsix";
-const URL: &str = "https://github.com/spring-projects/spring-tools/releases/download/5.3.0.RELEASE/vscode-spring-boot-2.3.0-RC2.vsix";
-const SIZE: u64 = 83_000_863;
-const SHA256: &str = "8e555da123e5b4edb7449d3ef1f922a922503e64a86cd66cbe713638f94a9e50";
-const MAX_ENTRIES: usize = 10_000;
-const MAX_FILE_BYTES: u64 = 512 * 1024 * 1024;
-const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-
-const REQUIRED: &[(&str, &str)] = &[
-    (
-        "extension/language-server/spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar",
-        "eed894c869caa71ce139eaf1f95f56120e97518102d52471803fd5a9d436a682",
-    ),
-    (
-        "extension/jars/io.projectreactor.reactor-core.jar",
-        "76ea420992e2c864f9a21d241ac29ac6582e857ae30ecd878cb96af827597590",
-    ),
-    (
-        "extension/jars/org.reactivestreams.reactive-streams.jar",
-        "71e23e2a0d9159fc1aae1158af714ac72fc67a384bb6fe195301081df49c2038",
-    ),
-    (
-        "extension/jars/jdt-ls-commons.jar",
-        "bfdb51f0ae7df7bd4f1ba7a07109ccab361b62f1f003ac1613cede0434040530",
-    ),
-    (
-        "extension/jars/jdt-ls-extension.jar",
-        "7a6d24e436adec9674098b15fc3f28b8161d216d5bd372b7fdc29c50491e261c",
-    ),
-    (
-        "extension/jars/sts-gradle-tooling.jar",
-        "8063a93858cc90bcf8d3f890a0c5ff11b557f9b4fd24cb0b954bb1e1b96c6d0e",
-    ),
-];
+const ASSET: &str = "spring-boot-language-server-standalone-exec.jar";
+const URL: &str = "https://cdn.spring.io/spring-tools/release/language-server/spring-boot/2.3.0/spring-boot-language-server-standalone-exec.jar";
+const SIZE: u64 = 98_065_695;
+const SHA256: &str = "a4c83e721c2799e4bca72939db840ad29440da34227e291b0447a6c06ff23a6b";
 
 #[derive(Debug, Clone)]
 pub struct SpringPaths {
     pub root: PathBuf,
     pub server: PathBuf,
-    pub bundles: Vec<PathBuf>,
 }
 
 pub fn ensure_installed(language_server_id: &zed::LanguageServerId) -> Result<SpringPaths, String> {
     let install = install_root()?;
-    if validate_install(&install).is_ok() {
-        return paths(install);
+    let server = install.join(ASSET);
+    if validate_file(&server).is_ok() {
+        return Ok(SpringPaths {
+            root: install,
+            server,
+        });
     }
 
     zed::set_language_server_installation_status(
@@ -73,46 +46,36 @@ pub fn ensure_installed(language_server_id: &zed::LanguageServerId) -> Result<Sp
 }
 
 fn install_from_download(install: &Path) -> Result<SpringPaths, String> {
-    let downloads = PathBuf::from("downloads").join(VERSION);
-    fs::create_dir_all(&downloads)
-        .map_err(|error| format!("create Spring Tools download directory: {error}"))?;
-    let archive = downloads.join(ASSET);
-    if validate_archive(&archive).is_err() {
-        let _ = fs::remove_file(&archive);
-        zed::download_file(
-            URL,
-            archive
-                .to_str()
-                .ok_or_else(|| "Spring Tools download path is not UTF-8".to_owned())?,
-            zed::DownloadedFileType::Uncompressed,
-        )
-        .map_err(|error| format!("download pinned Spring Tools {VERSION}: {error}"))?;
-        validate_archive(&archive)?;
-    }
+    fs::create_dir_all(install)
+        .map_err(|error| format!("create Spring Tools install directory: {error}"))?;
+    let server = install.join(ASSET);
+    let staging = install.join(format!("{ASSET}.download"));
+    let _ = fs::remove_file(&staging);
 
-    let staging = install.with_extension("staging");
-    if staging.exists() {
-        fs::remove_dir_all(&staging)
-            .map_err(|error| format!("remove stale Spring Tools staging directory: {error}"))?;
-    }
-    fs::create_dir_all(&staging)
-        .map_err(|error| format!("create Spring Tools staging directory: {error}"))?;
-    if let Err(error) = extract_archive(&archive, &staging).and_then(|_| validate_install(&staging))
-    {
-        let _ = fs::remove_dir_all(&staging);
+    zed::download_file(
+        URL,
+        staging
+            .to_str()
+            .ok_or_else(|| "Spring Tools download path is not UTF-8".to_owned())?,
+        zed::DownloadedFileType::Uncompressed,
+    )
+    .map_err(|error| format!("download pinned Spring Tools {VERSION}: {error}"))?;
+
+    if let Err(error) = validate_file(&staging) {
+        let _ = fs::remove_file(&staging);
         return Err(error);
     }
-    if install.exists() {
-        fs::remove_dir_all(install)
+    if server.exists() {
+        fs::remove_file(&server)
             .map_err(|error| format!("remove invalid Spring Tools installation: {error}"))?;
     }
-    if let Some(parent) = install.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("create Spring Tools install parent: {error}"))?;
-    }
-    fs::rename(&staging, install)
+    fs::rename(&staging, &server)
         .map_err(|error| format!("activate Spring Tools installation: {error}"))?;
-    paths(install.to_path_buf())
+
+    Ok(SpringPaths {
+        root: install.to_path_buf(),
+        server,
+    })
 }
 
 fn install_root() -> Result<PathBuf, String> {
@@ -122,96 +85,21 @@ fn install_root() -> Result<PathBuf, String> {
         .join(VERSION))
 }
 
-fn validate_archive(path: &Path) -> Result<(), String> {
+fn validate_file(path: &Path) -> Result<(), String> {
     let metadata = fs::symlink_metadata(path)
-        .map_err(|error| format!("read Spring Tools archive metadata: {error}"))?;
+        .map_err(|error| format!("read Spring Tools artifact metadata: {error}"))?;
     if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() != SIZE {
-        return Err("Spring Tools archive identity does not match the pinned size".to_owned());
+        return Err(
+            "Spring Tools standalone artifact identity does not match the pinned size".to_owned(),
+        );
     }
     if sha256_file(path)? != SHA256 {
-        return Err("Spring Tools archive checksum does not match the pinned release".to_owned());
+        return Err(
+            "Spring Tools standalone artifact checksum does not match the pinned release"
+                .to_owned(),
+        );
     }
     Ok(())
-}
-
-fn extract_archive(archive_path: &Path, destination: &Path) -> Result<(), String> {
-    let archive_file =
-        File::open(archive_path).map_err(|error| format!("open Spring Tools archive: {error}"))?;
-    let mut archive = zip::ZipArchive::new(archive_file)
-        .map_err(|error| format!("parse Spring Tools VSIX: {error}"))?;
-    if archive.len() > MAX_ENTRIES {
-        return Err("Spring Tools VSIX has too many entries".to_owned());
-    }
-    let mut total = 0u64;
-    for index in 0..archive.len() {
-        let mut entry = archive
-            .by_index(index)
-            .map_err(|error| format!("read Spring Tools VSIX entry: {error}"))?;
-        if entry.is_symlink() {
-            return Err("Spring Tools VSIX contains a symbolic link".to_owned());
-        }
-        let relative = entry
-            .enclosed_name()
-            .ok_or_else(|| "Spring Tools VSIX contains an unsafe path".to_owned())?;
-        let output = destination.join(relative);
-        if entry.is_dir() {
-            fs::create_dir_all(&output)
-                .map_err(|error| format!("create extracted directory: {error}"))?;
-            continue;
-        }
-        if entry.size() > MAX_FILE_BYTES {
-            return Err("Spring Tools VSIX entry exceeds the file limit".to_owned());
-        }
-        total = total
-            .checked_add(entry.size())
-            .ok_or_else(|| "Spring Tools VSIX expanded size overflowed".to_owned())?;
-        if total > MAX_TOTAL_BYTES {
-            return Err("Spring Tools VSIX exceeds the expanded size limit".to_owned());
-        }
-        if let Some(parent) = output.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("create extracted file parent: {error}"))?;
-        }
-        let mut file = File::create(&output)
-            .map_err(|error| format!("create extracted Spring Tools file: {error}"))?;
-        io::copy(&mut entry, &mut file)
-            .map_err(|error| format!("extract Spring Tools file: {error}"))?;
-        file.flush()
-            .map_err(|error| format!("flush extracted Spring Tools file: {error}"))?;
-    }
-    Ok(())
-}
-
-fn validate_install(root: &Path) -> Result<(), String> {
-    for (relative, expected) in REQUIRED {
-        let path = root.join(relative);
-        let metadata = fs::symlink_metadata(&path)
-            .map_err(|error| format!("missing required Spring Tools file {relative}: {error}"))?;
-        if !metadata.is_file() || metadata.file_type().is_symlink() {
-            return Err(format!(
-                "required Spring Tools path is not a regular file: {relative}"
-            ));
-        }
-        if sha256_file(&path)? != *expected {
-            return Err(format!(
-                "required Spring Tools checksum mismatch: {relative}"
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn paths(root: PathBuf) -> Result<SpringPaths, String> {
-    let server = root.join(REQUIRED[0].0);
-    let bundles = REQUIRED[1..]
-        .iter()
-        .map(|(relative, _)| root.join(relative))
-        .collect();
-    Ok(SpringPaths {
-        root,
-        server,
-        bundles,
-    })
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
@@ -240,15 +128,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn product_manifest_contains_exact_five_spring_bundles() {
-        assert_eq!(REQUIRED.len(), 6);
-        assert!(REQUIRED[0].0.ends_with("-exec.jar"));
-        assert_eq!(paths(PathBuf::from("/spring")).unwrap().bundles.len(), 5);
-    }
-
-    #[test]
-    fn archive_identity_is_pinned_and_not_latest() {
-        assert!(URL.contains(VERSION));
+    fn standalone_artifact_identity_is_pinned_and_not_latest() {
+        assert_eq!(VERSION, "5.3.0.RELEASE");
         assert!(URL.ends_with(ASSET));
         assert!(!URL.contains("latest"));
         assert_eq!(SHA256.len(), 64);
@@ -256,7 +137,8 @@ mod tests {
 
     #[test]
     fn install_paths_are_absolute_before_the_language_server_changes_working_directory() {
-        assert!(install_root().unwrap().is_absolute());
-        assert!(paths(install_root().unwrap()).unwrap().server.is_absolute());
+        let root = install_root().unwrap();
+        assert!(root.is_absolute());
+        assert!(root.join(ASSET).is_absolute());
     }
 }
