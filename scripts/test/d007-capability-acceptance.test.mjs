@@ -132,3 +132,31 @@ test("D007 explicitly classifies the private-Java dependent redesigns", () => {
     "blocked-zed-api",
   );
 });
+
+
+test("D007 live and external-page acceptance consumes the produced standalone regression evidence", () => {
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+  const byCapability = new Map(matrix.entries.map((entry) => [entry.capability, entry]));
+
+  for (const capability of [
+    "Connect / disconnect to a local Boot process",
+    "Remote connect",
+    "Live hover data",
+    "Show / hide / refresh live data",
+    "Metrics",
+    "Loggers and log levels",
+    "Automatic connection",
+    "Live-data highlight CodeLens",
+    "Open Boot app page URL",
+  ]) {
+    const requirements = byCapability.get(capability)?.requiredEvidence ?? [];
+    assert.equal(requirements.length > 0, true, capability);
+    assert.equal(
+      requirements.every((requirement) =>
+        requirement.source === "standalone-capability-regression"
+      ),
+      true,
+      `${capability} must consume evidence emitted by the standalone regression runner`,
+    );
+  }
+});
