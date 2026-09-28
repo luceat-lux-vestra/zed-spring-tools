@@ -612,10 +612,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "boot-project-and-execution",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "The exact-head standalone Spring runtime must emit and execute the named version-validation path.",
       "requiredEvidence": [
         {
-          "source": "standalone-version-regression",
+          "source": "standalone-capability-regression",
           "check": "bootUpgrade"
         }
       ]
@@ -796,10 +796,10 @@
       "classification": "retained-requires-standalone-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "boot-project-and-execution",
-      "reason": "Conservatively revalidate on the standalone runtime before retaining the historical claim.",
+      "reason": "The exact-head standalone Spring runtime must emit and execute the named version-validation path.",
       "requiredEvidence": [
         {
-          "source": "standalone-version-regression",
+          "source": "standalone-capability-regression",
           "check": "versionSupport"
         }
       ]
