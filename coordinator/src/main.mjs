@@ -428,12 +428,15 @@ export class Coordinator {
       const request = this.codeActionRequests.get(pendingKey);
       this.codeActionRequests.delete(pendingKey);
       const merged = this.#mergeCodeActions(message, request);
-      const evidence = codeActionResultEvidence(merged.result);
+      const evidence = codeActionResultEvidence(merged.result, request.uri);
       this.protocolEvidence({
         event: "code-action-response",
         itemCount: evidence.itemCount,
         configureBootRunPresent: evidence.configureBootRunPresent,
         configureBootRunIndex: evidence.configureBootRunIndex,
+        configureBootRunCommand: evidence.configureBootRunCommand,
+        configureBootRunArgumentUriMatchesRequest:
+          evidence.configureBootRunArgumentUriMatchesRequest,
       });
       this.sendZed(encodeLsp(merged));
       return;
@@ -3828,15 +3831,27 @@ export function completionResultEvidence(result) {
   return { itemCount: items.length, serverPort };
 }
 
-export function codeActionResultEvidence(result) {
+export function codeActionResultEvidence(result, expectedUri = null) {
   const actions = Array.isArray(result) ? result : [];
   const configureBootRunIndex = actions.findIndex(
     (action) => action?.title === CONFIGURE_BOOT_RUN_TITLE,
   );
+  const configureBootRunAction =
+    configureBootRunIndex >= 0 ? actions[configureBootRunIndex] : undefined;
+  const configureBootRunCommand =
+    typeof configureBootRunAction?.command?.command === "string"
+      ? configureBootRunAction.command.command
+      : null;
+  const firstArgument = configureBootRunAction?.command?.arguments?.[0];
   return {
     itemCount: actions.length,
     configureBootRunPresent: configureBootRunIndex >= 0,
     configureBootRunIndex: configureBootRunIndex >= 0 ? configureBootRunIndex : null,
+    configureBootRunCommand,
+    configureBootRunArgumentUriMatchesRequest:
+      expectedUri === null
+        ? null
+        : firstArgument?.uri === expectedUri,
   };
 }
 
