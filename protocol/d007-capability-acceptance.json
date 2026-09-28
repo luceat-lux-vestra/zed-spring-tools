@@ -701,12 +701,12 @@
       ]
     },
     {
-      "capability": "Java type resolution for the server",
+      "capability": "Spring Java type/index resolution",
       "historicalState": "verified",
       "classification": "redesigned-requires-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "runtime-boundary",
-      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof.",
+      "reason": "D007 replaces the private sts/javaType callback with the standalone Maven/Gradle project model and Jandex-backed Java index.",
       "requiredEvidence": [
         {
           "source": "standalone-capability-regression",
@@ -719,30 +719,34 @@
       ]
     },
     {
-      "capability": "Classpath listening",
+      "capability": "Spring project/index synchronization",
       "historicalState": "verified",
       "classification": "redesigned-requires-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "runtime-boundary",
-      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof.",
+      "reason": "D007 retires JDT classpath listening; the user outcome is preserved by standalone project discovery/indexing with enableJdtClasspath=false.",
       "requiredEvidence": [
         {
           "source": "standalone-capability-regression",
           "check": "indexReady"
+        },
+        {
+          "source": "standalone-capability-regression",
+          "check": "executableBootProjects"
         }
       ]
     },
     {
-      "capability": "Missing / incompatible Java diagnostic",
+      "capability": "Spring runtime Java requirement diagnostic",
       "historicalState": "verified",
       "classification": "redesigned-requires-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "runtime-boundary",
-      "reason": "The D007 standalone boundary changes the delivery/runtime contract; historical evidence is not release-facing proof.",
+      "reason": "D007 keeps only the standalone Java launcher requirement: missing or pre-21 Java must fail closed; private Java provider-schema diagnostics are retired.",
       "requiredEvidence": [
         {
-          "source": "unmapped-d007-evidence",
-          "check": "Missing / incompatible Java diagnostic"
+          "source": "standalone-runtime-boundary",
+          "check": "javaRequirementDiagnostic"
         }
       ]
     },
