@@ -123,8 +123,12 @@ inside this extension's own work directory.
 3. coordinator, Rust, repository-policy, dependency, and platform validation all
    pass without weakening their gates;
 4. capability inventory and limitations distinguish current standalone evidence
-   from historical JDT/bridge evidence; and
-5. the exact source commit intended for Registry submission is loaded and
+   from historical JDT/bridge evidence;
+5. before Maven/Gradle feature probes begin, the isolated D007 gate proves both
+   the official JDT LS and the standalone Spring Tools server have materialized
+   into live processes, with Spring coordinator/document/index readiness also
+   established, without reading the Java extension's private runtime paths; and
+6. the exact source commit intended for Registry submission is loaded and
    exercised as a Zed dev extension through the isolated D007 desktop gate in
    [`docs/d007-zed-desktop-validation.md`](../d007-zed-desktop-validation.md).
 
