@@ -2522,7 +2522,7 @@ function fixtureFiles(worktree) {
   const specs = [
     ["pom.xml", "xml"],
     ["src/main/resources/application.properties", "spring-boot-properties"],
-    ["src/main/resources/application.yaml", "spring-boot-yaml"],
+    ["src/main/resources/application.yaml", "spring-boot-properties-yaml"],
     ["src/main/resources/META-INF/jpa-named-queries.properties", "jpa-query-properties"],
     ["src/main/resources/META-INF/spring.factories", "spring-factories"],
     ["src/main/resources/beans.xml", "xml"],
