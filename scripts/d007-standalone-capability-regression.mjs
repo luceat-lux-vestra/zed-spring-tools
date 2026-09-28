@@ -1051,6 +1051,13 @@ async function main() {
     await client.request("shutdown", null);
     client.notify("exit", null);
 
+    evidence.checks.mcpTools = await runEmbeddedMcpRegression(
+      pin,
+      jar,
+      javaHome,
+      runRoot,
+    );
+
     const modulith = await runModulithRegression(
       pin,
       jar,
@@ -1285,6 +1292,255 @@ function compileFixture(worktree, javaHome) {
       ),
     ),
   });
+}
+
+async function runEmbeddedMcpRegression(
+  pin,
+  jar,
+  javaHome,
+  runRoot,
+) {
+  const worktree = path.join(runRoot, "mcp-fixture");
+  fs.cpSync(FIXTURE, worktree, { recursive: true });
+  compileFixture(worktree, javaHome);
+
+  const java = path.join(
+    javaHome,
+    "bin",
+    process.platform === "win32" ? "java.exe" : "java",
+  );
+  const child = spawn(java, springArguments(jar, worktree, 0), {
+    cwd: worktree,
+    shell: false,
+    windowsHide: true,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr = (stderr + chunk.toString("utf8")).slice(-256 * 1024);
+  });
+  const workspaceUri = directoryUri(worktree);
+  const client = new LspClient(
+    child,
+    [{ uri: workspaceUri, name: "spring-boot-basic-mcp" }],
+    structuredClone(DEFAULT_CONFIGURATION),
+  );
+
+  try {
+    const initialize = await client.request("initialize", {
+      processId: process.pid,
+      clientInfo: { name: "zed-spring-tools-d007-mcp", version: "1" },
+      rootUri: workspaceUri,
+      workspaceFolders: [{ uri: workspaceUri, name: "spring-boot-basic-mcp" }],
+      capabilities: standardClientCapabilities(),
+      initializationOptions: {},
+    });
+    assert.ok(initialize?.capabilities);
+    client.notify("initialized", {});
+    client.notify("workspace/didChangeConfiguration", {
+      settings: structuredClone(DEFAULT_CONFIGURATION),
+    });
+
+    const javaFile = path.join(
+      worktree,
+      "src",
+      "main",
+      "java",
+      "dev",
+      "zed",
+      "spring",
+      "fixture",
+      "FixtureApplication.java",
+    );
+    const propertiesFile = path.join(
+      worktree,
+      "src",
+      "main",
+      "resources",
+      "application.properties",
+    );
+    for (const [file, languageId] of [
+      [javaFile, "java"],
+      [propertiesFile, "spring-boot-properties"],
+    ]) {
+      client.notify("textDocument/didOpen", {
+        textDocument: {
+          uri: pathToFileURL(file).href,
+          languageId,
+          version: 1,
+          text: fs.readFileSync(file, "utf8"),
+        },
+      });
+    }
+    await waitFor(
+      () => client.notifications.some(
+        (message) =>
+          message.method === "spring/index/updated" &&
+          Array.isArray(message.params?.affectedProjects) &&
+          message.params.affectedProjects.length > 0,
+      ),
+      "MCP Spring index",
+      INDEX_TIMEOUT_MS,
+    );
+
+    let ports = [];
+    await waitFor(
+      () => {
+        ports = listeningTcpPorts(child.pid);
+        return ports.length > 0;
+      },
+      "embedded MCP listening port",
+      60_000,
+    );
+    const attempts = [];
+    let endpoint = null;
+    let sessionId = null;
+    let initialized = null;
+    for (const candidate of ["/mcp", "/mcp/message", "/api/mcp", "/"]) {
+      try {
+        const response = await mcpHttpCall(
+          ports[0],
+          candidate,
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              clientInfo: { name: "zed-spring-tools-d007", version: "1" },
+            },
+          },
+          null,
+        );
+        attempts.push({ endpoint: candidate, status: response.status });
+        if (response.status === 200) {
+          endpoint = candidate;
+          sessionId = response.sessionId;
+          initialized = parseMcpPayload(response.body);
+          break;
+        }
+      } catch (error) {
+        attempts.push({ endpoint: candidate, error: String(error).slice(0, 300) });
+      }
+    }
+    assert.ok(endpoint, \`embedded MCP initialize failed: \${JSON.stringify(attempts)}\`);
+    assert.ok(initialized?.result);
+
+    await mcpHttpCall(
+      ports[0],
+      endpoint,
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      sessionId,
+    );
+    const listResponse = await mcpHttpCall(
+      ports[0],
+      endpoint,
+      { jsonrpc: "2.0", id: 2, method: "tools/list" },
+      sessionId,
+    );
+    assert.equal(listResponse.status, 200);
+    const list = parseMcpPayload(listResponse.body);
+    const toolList = list?.result?.tools ?? [];
+    assert.equal(Array.isArray(toolList) && toolList.length > 0, true);
+    const toolNames = toolList.map((tool) => tool.name);
+    assert.equal(toolNames.includes("getProjectList"), true);
+
+    const projectResponse = await mcpHttpCall(
+      ports[0],
+      endpoint,
+      {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: { name: "getProjectList", arguments: {} },
+      },
+      sessionId,
+    );
+    assert.equal(projectResponse.status, 200);
+    const projectPayload = parseMcpPayload(projectResponse.body);
+    assert.equal(projectPayload?.error === undefined, true);
+
+    const completion = completionItems(await client.request(
+      "textDocument/completion",
+      {
+        textDocument: { uri: pathToFileURL(propertiesFile).href },
+        position: { line: 0, character: 3 },
+      },
+    ));
+    assert.equal(
+      completion.some((item) =>
+        String(item?.label ?? item?.insertText ?? "").includes("server.port")
+      ),
+      true,
+      "LSP must remain usable after MCP requests",
+    );
+
+    await client.request("shutdown", null);
+    client.notify("exit", null);
+    return pass("embedded MCP and LSP coexist on the pinned standalone server", {
+      port: ports[0],
+      endpoint,
+      toolCount: toolList.length,
+      projectListCalled: true,
+      lspCompletionAfterMcp: true,
+    });
+  } catch (error) {
+    throw new Error(
+      \`embedded MCP regression failed: \${error instanceof Error ? error.message : String(error)}; \` +
+      \`stderr=\${stderr.split(/\\r?\\n/).slice(-40).join(" | ")}\`,
+    );
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+}
+
+function listeningTcpPorts(pid) {
+  if (process.platform === "win32") {
+    throw new Error("D007 embedded MCP desktop probe currently requires POSIX lsof");
+  }
+  const result = spawnSync(
+    "lsof",
+    ["-nP", "-a", "-p", String(pid), "-iTCP", "-sTCP:LISTEN"],
+    { encoding: "utf8", shell: false, timeout: 5_000 },
+  );
+  if (result.error || result.status !== 0) return [];
+  const ports = [];
+  for (const line of String(result.stdout).split("\\n").slice(1)) {
+    const match = /:(\\d+)\\s+\\(LISTEN\\)\\s*$/.exec(line);
+    if (match) ports.push(Number(match[1]));
+  }
+  return [...new Set(ports)];
+}
+
+async function mcpHttpCall(port, endpoint, body, sessionId) {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+  const response = await fetch(\`http://127.0.0.1:\${port}\${endpoint}\`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  return {
+    status: response.status,
+    sessionId: response.headers.get("mcp-session-id"),
+    body: await response.text(),
+  };
+}
+
+function parseMcpPayload(payload) {
+  const trimmed = String(payload).trim();
+  if (trimmed.startsWith("{")) return JSON.parse(trimmed);
+  for (const line of trimmed.split("\\n")) {
+    if (line.startsWith("data:")) {
+      return JSON.parse(line.slice(5).trim());
+    }
+  }
+  throw new Error("MCP response contained no JSON-RPC payload");
 }
 
 async function runModulithRegression(pin, jar, javaHome, runRoot) {
