@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { Coordinator, springArguments } from "../coordinator/src/main.mjs";
+import { Coordinator, run as runCoordinator, springArguments } from "../coordinator/src/main.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = path.join(ROOT, "protocol", "spring-artifacts.json");
@@ -338,6 +338,9 @@ async function main() {
     await downloadPinnedArtifact(pin, jar);
     assert.equal(fs.statSync(jar).size, pin.size);
     assert.equal(sha256(jar), pin.sha256);
+
+    evidence.checks.javaRequirementDiagnostic =
+      await javaRequirementDiagnosticRegression(worktree, jar);
 
     evidence.checks.fixtureCompile = compileFixture(worktree, javaHome);
 
@@ -997,6 +1000,55 @@ async function main() {
   } finally {
     fs.rmSync(runRoot, { recursive: true, force: true });
   }
+}
+
+async function javaRequirementDiagnosticRegression(worktree, jar) {
+  const fakeJava = path.join(worktree, ".d007-java17");
+  fs.writeFileSync(fakeJava, "");
+  let spawnAttempted = false;
+  let error = null;
+  try {
+    await runCoordinator(
+      [
+        "--worktree", worktree,
+        "--java", fakeJava,
+        "--spring-server", jar,
+        "--spring-home", path.dirname(jar),
+        "--host-os", process.platform === "darwin"
+          ? "macos"
+          : process.platform === "win32"
+            ? "windows"
+            : "linux",
+        "--extension-version", "d007",
+        "--automatic-live-connection", "false",
+        "--mcp-server-port", "off",
+      ],
+      {
+        environment: {},
+        spawnSync: () => ({
+          status: 0,
+          stdout: "",
+          stderr: 'openjdk version "17.0.12" 2024-07-16',
+        }),
+        spawn: () => {
+          spawnAttempted = true;
+          throw new Error("Spring child must not start under JDK 17");
+        },
+      },
+    );
+  } catch (caught) {
+    error = caught;
+  }
+  assert.ok(error instanceof Error, "JDK 17 must be rejected");
+  assert.match(error.message, /JDK 21 or newer is required by Spring Tools/);
+  assert.equal(
+    spawnAttempted,
+    false,
+    "Spring child must not start before the Java floor is satisfied",
+  );
+  return pass("coordinator rejects JDK 17 before Spring child launch", {
+    message: error.message,
+  });
 }
 
 async function conversionWorkspaceEdit(
