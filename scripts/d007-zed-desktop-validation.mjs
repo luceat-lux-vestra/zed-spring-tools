@@ -161,6 +161,7 @@ function d007CodeActionIndexKeys() {
 
 function d007Keymap() {
   const workspaceBindings = {
+    "ctrl-cmd-alt-i": "zed::InstallDevExtension",
     "ctrl-cmd-alt-v": "file_finder::Toggle",
   };
   const fileFinderBindings = {
@@ -1544,60 +1545,122 @@ function installDevExtensionMacos(root) {
   const staleWasmRemoved = fs.existsSync(wasmFile);
   fs.rmSync(wasmFile, { force: true });
 
-  const appleScript = [
-    `set extensionPath to "${escapeAppleScript(repository)}"`,
-    'set installAction to "zed: install dev extension"',
-    'set previousClipboard to the clipboard',
-    'try',
-    '  tell application "Zed" to activate',
-    '  delay 1.0',
-    // 1-3: open the command palette, paste the exact action, invoke it.
-    '  set the clipboard to installAction',
-    '  tell application "System Events"',
-    '    tell process "Zed" to set frontmost to true',
-    '    keystroke "p" using {command down, shift down}',
-    '    delay 0.8',
-    '    keystroke "a" using {command down}',
-    '    keystroke "v" using {command down}',
-    '    delay 0.8',
-    '    key code 36',
-    '  end tell',
-    '  delay 1.5',
-    // 4-6: replace the OpenPathPrompt query with the exact repository path.
-    '  set the clipboard to extensionPath',
-    '  tell application "System Events"',
-    '    tell process "Zed" to set frontmost to true',
-    '    keystroke "a" using {command down}',
-    '    delay 0.2',
-    '    keystroke "v" using {command down}',
-    '    delay 1.0',
-    '    key code 36',
-    '  end tell',
-    '  delay 0.2',
-    '  set the clipboard to previousClipboard',
-    'on error errorMessage number errorNumber',
-    '  set the clipboard to previousClipboard',
-    '  error errorMessage number errorNumber',
-    'end try',
-  ].join("\n");
+  const foreground = path.join(manifest.evidence, "zed-maven-foreground.log");
+  const foregroundStart = fileSize(foreground);
+  const sharedLog = path.join(os.homedir(), "Library", "Logs", "Zed", "Zed.log");
+  const sharedStart = fileSize(sharedLog);
+  const extensionPath = repository + path.sep;
 
-  const result = spawnSync("osascript", ["-e", appleScript], { encoding: "utf8" });
-  fs.writeFileSync(path.join(manifest.evidence, "dev-extension-install.json"), JSON.stringify({
+  sendD007ActionKeyMacos(
+    manifest,
+    "i",
+    "dev-extension-install-action",
+  );
+
+  const pasteScript = [
+    `set extensionPath to "${escapeAppleScript(extensionPath)}"`,
+    "set previousClipboard to the clipboard",
+    "try",
+    "  set the clipboard to extensionPath",
+    '  tell application "Zed" to activate',
+    '  tell application "System Events"',
+    '    tell process "Zed" to set frontmost to true',
+    "    delay 0.5",
+    '    keystroke "a" using {command down}',
+    '    keystroke "v" using {command down}',
+    "  end tell",
+    "  delay 0.2",
+    "  set the clipboard to previousClipboard",
+    "on error errorMessage number errorNumber",
+    "  set the clipboard to previousClipboard",
+    "  error errorMessage number errorNumber",
+    "end try",
+  ].join("\n");
+  runOsa(pasteScript, "dev-extension-install-path", manifest.evidence);
+
+  const started = Date.now();
+  const timeoutMs = 45_000;
+  let attempts = 0;
+  let buildStartObserved = false;
+  let fatal = null;
+
+  while (Date.now() - started < timeoutMs) {
+    attempts += 1;
+    const confirmScript = [
+      'tell application "Zed" to activate',
+      'tell application "System Events"',
+      '  tell process "Zed" to set frontmost to true',
+      '  key code 36',
+      'end tell',
+    ].join("\n");
+    runOsa(
+      confirmScript,
+      `dev-extension-install-confirm-${attempts}`,
+      manifest.evidence,
+    );
+
+    const probeDeadline = Math.min(started + timeoutMs, Date.now() + 2_000);
+    do {
+      const foregroundDelta = readFileDelta(foreground, foregroundStart);
+      const sharedDelta = readFileDelta(sharedLog, sharedStart);
+      const installText = `${foregroundDelta}\n${sharedDelta}`;
+      fatal = [
+        "Failed to install dev extension",
+        "failed to build extension",
+      ].find((marker) => installText.includes(marker)) ?? null;
+      if (fatal !== null) break;
+
+      buildStartObserved =
+        installText.includes("compiling Rust extension") &&
+        installText.includes(repository);
+      if (buildStartObserved) break;
+      sleepMs(100);
+    } while (Date.now() < probeDeadline);
+
+    if (fatal !== null || buildStartObserved) break;
+  }
+
+  const installEvidence = {
     attemptedAt: new Date().toISOString(),
     sourceHead: manifest.sourceHead,
     staleWasmRemoved,
-    automation: "command-palette-clipboard-paste",
-    action: "zed: install dev extension",
+    automation: "direct-action-open-path-prompt-bounded-confirm",
+    action: "zed::InstallDevExtension",
     repository,
-    status: result.status === 0 ? "automation-issued" : "failed",
-    exitCode: result.status,
-    stderr: bounded(result.stderr),
-    stdout: bounded(result.stdout),
-  }, null, 2) + "\n", { mode: 0o600 });
-  if (result.status !== 0) {
-    throw new Error("Zed dev-extension UI automation failed; inspect evidence/dev-extension-install.json");
+    promptQuery: extensionPath,
+    promptQueryStrategy: "absolute-directory-with-trailing-separator",
+    attempts,
+    buildStartObserved,
+    buildStartEvidence: "compiling Rust extension <exact repository>",
+    fatal,
+    foregroundTail: readFileDelta(foreground, foregroundStart).slice(-12_000),
+    sharedLogTail: readFileDelta(sharedLog, sharedStart).slice(-12_000),
+    status: fatal !== null
+      ? "failed"
+      : buildStartObserved
+        ? "install-started"
+        : "install-not-started",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, "dev-extension-install.json"),
+    JSON.stringify(installEvidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+
+  if (fatal !== null) {
+    throw new Error(
+      `Zed reported dev-extension installation failure after prompt confirmation: ${fatal}`,
+    );
   }
-  process.stdout.write("Issued Zed Install Dev Extension automation; waiting for registration/build readiness.\n");
+  if (!buildStartObserved) {
+    throw new Error(
+      `Zed dev-extension OpenPathPrompt never started installation after ${attempts} bounded confirms; inspect evidence/dev-extension-install.json`,
+    );
+  }
+
+  process.stdout.write(
+    `Zed Install Dev Extension started after ${attempts} bounded OpenPathPrompt confirm attempt(s); waiting for registration/build readiness.\n`,
+  );
 }
 
 function summarize(root) {
@@ -1769,6 +1832,10 @@ function selfTest() {
     const stagedKeymap = JSON.parse(fs.readFileSync(path.join(manifest.profile, "config", "keymap.json"), "utf8"));
     assert.equal(stagedKeymap[0].context, "Workspace");
     assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-i"],
+      "zed::InstallDevExtension",
+    );
+    assert.equal(
       stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
       "file_finder::Toggle",
     );
@@ -1810,6 +1877,17 @@ function selfTest() {
       harnessSource.includes('"file_finder::OpenWithoutDismiss"'),
       true,
       "D007 exact-file opening must probe asynchronous File Finder matches safely",
+    );
+    assert.equal(
+      harnessSource.includes('"zed::InstallDevExtension"'),
+      true,
+      "D007 dev-extension installation must dispatch the public action directly",
+    );
+    const retiredInstallPaletteLiteral = ['set installAction to ', '"zed: install dev extension"'].join("");
+    assert.equal(
+      harnessSource.includes(retiredInstallPaletteLiteral),
+      false,
+      "D007 dev-extension installation must not depend on command-palette search",
     );
     assert.equal(
       harnessSource.includes('targeting: "file-finder-absolute-path-probed-open"'),

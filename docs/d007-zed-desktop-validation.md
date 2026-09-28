@@ -45,7 +45,7 @@ It performs the following bounded sequence:
 1. stages a fresh isolated profile and both build-tool fixtures;
 2. records the current shared `~/Library/Logs/Zed/Zed.log` byte boundary;
 3. launches the Maven fixture through **one foreground macOS Zed CLI process** bound to the exact staged `--user-data-dir`; that launch opens only the fixture root, avoiding any dependence on multi-path tab ordering;
-4. waits until the new launch process group contains a live Zed app process bound to that isolated profile, then removes any ignored stale root `extension.wasm`, drives Zed's own `Install Dev Extension` action/OpenPathPrompt, and requires Zed itself to build/register the exact checkout;
+4. waits until the new launch process group contains a live Zed app process bound to that isolated profile, removes any ignored stale root `extension.wasm`, dispatches Zed's public `zed::InstallDevExtension` action directly, then drives its `OpenPathPrompt` with the exact repository directory and requires Zed itself to build/register the exact checkout;
 5. after that first launch, never invokes a second macOS Zed CLI to focus a file. The isolated D007 keymap opens Zed's public `file_finder::Toggle`, and the harness pastes the exact absolute fixture path so File Finder takes its explicit absolute-path resolver rather than fuzzy relative-path ranking;
 6. because File Finder search is asynchronous, the harness does not send a blind Enter after a fixed delay. It repeatedly dispatches public `file_finder::OpenWithoutDismiss`, which is a safe no-op while no match exists; once coordinator evidence proves `textDocument/didOpen` for the exact target URI, one public `menu::Confirm` focuses that already-proven selected editor and dismisses the picker;
 7. for `application-d007.properties:1:4`, the gate then requires coordinator startup and a positive `spring/index/updated`, invokes completion on the already-proven editor, and accepts only the exact URI at line 0 / character 3 with a correlated Spring response containing `server.port`;
@@ -172,16 +172,9 @@ node scripts/d007-zed-desktop-validation.mjs \
   "$ROOT"
 ```
 
-This invokes `zed: install dev extension` and selects the current repository.
-Zed currently uses an in-editor `OpenPathPrompt` picker for this action rather
-than a native macOS file chooser, so the harness enters the absolute repository
-path directly into that picker and confirms it once. It uses macOS
-Accessibility/System Events. If Accessibility permission is missing or the
-picker cannot be driven, it fails closed and records
-`evidence/dev-extension-install.json`; if compilation/registration does not
-finish, it additionally records `evidence/dev-extension-readiness-failure.json`
-with WASM/index state and the foreground-log tail. Do not treat UI-driving
-failure as product failure.
+This dispatches the public `zed::InstallDevExtension` action directly through the isolated D007 keymap; it does not search for the action through Command Palette. Zed then uses an in-editor `OpenPathPrompt` rather than a native macOS file chooser. The harness enters the exact absolute repository path with a trailing separator, making that directory itself the prompt's current-directory candidate instead of relying on fuzzy ranking.
+
+`OpenPathPrompt` populates candidates asynchronously and its `confirm()` is a no-op when no selected candidate exists. The harness therefore does not use a one-shot Enter after a fixed delay. It performs bounded confirm attempts and stops immediately when Zed emits `compiling Rust extension <exact repository>`, which proves that the prompt resolved and `install_dev_extension` actually started. It then waits separately for the fresh `extension.wasm` and isolated extension-index registration. Accessibility failure, failure to start installation, compilation failure, and registration timeout are recorded independently in `evidence/dev-extension-install.json` / `evidence/dev-extension-readiness-failure.json`. Do not treat UI-driving failure as product failure.
 
 Zed still owns compilation/installation of the development extension. The
 harness does not synthesize Zed's extension state.
