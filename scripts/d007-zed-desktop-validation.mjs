@@ -858,7 +858,7 @@ function languageServerProcessReadiness(psOutput, expectedPgid) {
   let jdtlsPid = null;
   let springToolsPid = null;
   for (const line of String(psOutput).split("\n")) {
-    const match = /^\\s*(\\d+)\\s+(\\d+)\\s+(\\S+)\\s+(.*)$/.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
     if (!match) continue;
     const [, pidText, pgidText, state, command] = match;
     if (Number(pgidText) !== Number(expectedPgid) || state.startsWith("Z")) {
@@ -894,7 +894,7 @@ function languageServerProcessReadiness(psOutput, expectedPgid) {
   };
 }
 
-function isolatedZedProcess(record) {  const result = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,stat=,command="], { encoding: "utf8" });
+function isolatedZedProcess(record) {\n  const result = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,stat=,command="], { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`ps failed while checking isolated Zed process: ${bounded(result.stderr)}`);
   }
