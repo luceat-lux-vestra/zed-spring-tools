@@ -1617,7 +1617,7 @@ async function runEmbeddedMcpRegression(
     const baselineCompletionResult = await waitForCompletion(
       client,
       pathToFileURL(propertiesFile).href,
-      { line: 0, character: 3 },
+      positionAtExactLineEnd(fs.readFileSync(propertiesFile, "utf8"), "ser"),
       (items) => items.some((item) =>
         String(item?.label ?? item?.insertText ?? "").includes("server.port")
       ),
@@ -1711,7 +1711,7 @@ async function runEmbeddedMcpRegression(
     const completionResult = await waitForCompletion(
       client,
       pathToFileURL(propertiesFile).href,
-      { line: 0, character: 3 },
+      positionAtExactLineEnd(fs.readFileSync(propertiesFile, "utf8"), "ser"),
       (items) => items.some((item) =>
         String(item?.label ?? item?.insertText ?? "").includes("server.port")
       ),
