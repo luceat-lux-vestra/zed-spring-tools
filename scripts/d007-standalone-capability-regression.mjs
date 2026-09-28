@@ -195,6 +195,13 @@ class LspClient {
 
     if (typeof message.method === "string") {
       this.notifications.push(message);
+      if (message.method === "window/showMessage") {
+        this.windowMessages.push({
+          method: message.method,
+          type: Number.isInteger(message.params?.type) ? message.params.type : null,
+          message: String(message.params?.message ?? "").slice(0, 500),
+        });
+      }
       if (message.method === "textDocument/publishDiagnostics") {
         const uri = message.params?.uri;
         if (typeof uri === "string") {
