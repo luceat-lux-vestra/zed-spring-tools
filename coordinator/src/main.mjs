@@ -3611,6 +3611,17 @@ export async function run(arguments_, dependencies = {}) {
   const decoder = new LspDecoder();
   const completionRequests = new Map();
   const completionTrace = (message) => {
+    if (d007EvidenceFile !== null && message?.method === "textDocument/didOpen") {
+      appendD007ProtocolEvidence(d007EvidenceFile, {
+        event: "document-open",
+        uri: typeof message.params?.textDocument?.uri === "string"
+          ? message.params.textDocument.uri
+          : null,
+        languageId: typeof message.params?.textDocument?.languageId === "string"
+          ? message.params.textDocument.languageId
+          : null,
+      });
+    }
     if (
       d007EvidenceFile !== null &&
       message?.method === "textDocument/completion" &&

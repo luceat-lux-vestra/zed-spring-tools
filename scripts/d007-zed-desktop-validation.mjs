@@ -166,10 +166,6 @@ function d007Keymap() {
 
   const editorBindings = {
     "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
-    "ctrl-cmd-alt-y": [
-      "editor::MoveToEndOfLine",
-      { stop_at_soft_wraps: false },
-    ],
     "ctrl-cmd-alt-z": "editor::ShowCompletions",
   };
   d007CodeActionIndexKeys().forEach((key, itemIx) => {
@@ -553,16 +549,38 @@ function sendD007ActionKeyMacos(manifest, key, evidenceName) {
   runOsa(script, evidenceName, manifest.evidence);
 }
 
-function openFixtureFileMacos(manifest, fixtureKind, relativePath, evidenceName) {
+function openFixtureFileMacos(
+  manifest,
+  fixtureKind,
+  relativePath,
+  evidenceName,
+  { row = null, column = null, searchSettleMs = 1_200 } = {},
+) {
   assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
   const target = path.join(manifest.worktrees[fixtureKind], relativePath);
   requireFile(target, `${fixtureKind} exact file target`);
+  const hasPosition = row !== null || column !== null;
+  if (hasPosition) {
+    assert.equal(Number.isInteger(row) && row > 0, true, "File Finder row must be a positive integer");
+    assert.equal(
+      Number.isInteger(column) && column > 0,
+      true,
+      "File Finder column must be a positive integer",
+    );
+  }
+  assert.equal(
+    Number.isInteger(searchSettleMs) && searchSettleMs >= 250 && searchSettleMs <= 10_000,
+    true,
+    "File Finder settle time must be bounded",
+  );
 
+  const targetQuery = hasPosition ? `${relativePath}:${row}:${column}` : relativePath;
+  const settleSeconds = (searchSettleMs / 1000).toFixed(3);
   const appleScript = [
-    `set targetPath to "${escapeAppleScript(relativePath)}"`,
+    `set targetQuery to "${escapeAppleScript(targetQuery)}"`,
     "set previousClipboard to the clipboard",
     "try",
-    "  set the clipboard to targetPath",
+    "  set the clipboard to targetQuery",
     '  tell application "Zed" to activate',
     '  tell application "System Events"',
     '    tell process "Zed" to set frontmost to true',
@@ -570,10 +588,10 @@ function openFixtureFileMacos(manifest, fixtureKind, relativePath, evidenceName)
     "    delay 0.6",
     '    keystroke "a" using {command down}',
     '    keystroke "v" using {command down}',
-    "    delay 0.8",
+    `    delay ${settleSeconds}`,
     "    key code 36",
     "  end tell",
-    "  delay 0.6",
+    "  delay 0.8",
     "  set the clipboard to previousClipboard",
     "on error errorMessage number errorNumber",
     "  set the clipboard to previousClipboard",
@@ -589,7 +607,10 @@ function openFixtureFileMacos(manifest, fixtureKind, relativePath, evidenceName)
       fixture: fixtureKind,
       relativePath,
       absolutePath: target,
-      targeting: "file-finder-exact-relative-path",
+      targetQuery,
+      requestedPosition: hasPosition ? { row, column } : null,
+      searchSettleMs,
+      targeting: "file-finder-exact-relative-path-position",
       action: "file_finder::Toggle",
       status: result.status === 0 ? "automation-issued" : "failed",
       exitCode: result.status,
@@ -600,7 +621,7 @@ function openFixtureFileMacos(manifest, fixtureKind, relativePath, evidenceName)
   );
   if (result.status !== 0) {
     throw new Error(
-      `${fixtureKind} exact-file targeting failed for ${relativePath}; inspect ${evidenceName}-file-target.json`,
+      `${fixtureKind} exact-file targeting failed for ${targetQuery}; inspect ${evidenceName}-file-target.json`,
     );
   }
 }
@@ -812,6 +833,148 @@ function protocolEvidenceEvents(text) {
   return events;
 }
 
+function springTargetReadiness(text, expectedUri) {
+  const events = protocolEvidenceEvents(text);
+  return {
+    coordinatorStarted: events.some((event) => event.event === "coordinator-start"),
+    targetDocumentOpened: events.some(
+      (event) => event.event === "document-open" && event.uri === expectedUri,
+    ),
+    indexReady: events.some(
+      (event) =>
+        event.event === "spring-index-updated" &&
+        Number.isInteger(event.affectedProjectCount) &&
+        event.affectedProjectCount > 0,
+    ),
+  };
+}
+
+function waitForSpringTargetReadyMacos(
+  manifest,
+  fixtureKind,
+  protocolFile,
+  expectedRelativePath,
+  expectedUri,
+  started,
+  timeoutMs,
+  maxAttempts,
+) {
+  let attempts = 0;
+  let readiness = {
+    coordinatorStarted: false,
+    targetDocumentOpened: false,
+    indexReady: false,
+  };
+
+  for (
+    let localAttempt = 0;
+    localAttempt < maxAttempts && Date.now() - started < timeoutMs;
+    localAttempt += 1
+  ) {
+    attempts += 1;
+    openFixtureFileMacos(
+      manifest,
+      fixtureKind,
+      expectedRelativePath,
+      `${fixtureKind}-completion-target-${attempts}`,
+      {
+        row: 1,
+        column: 4,
+        searchSettleMs: 1_200 + localAttempt * 1_000,
+      },
+    );
+
+    const documentDeadline = Math.min(started + timeoutMs, Date.now() + 15_000);
+    do {
+      const allText = fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "";
+      readiness = springTargetReadiness(allText, expectedUri);
+      if (readiness.targetDocumentOpened) break;
+      sleepMs(250);
+    } while (Date.now() < documentDeadline);
+
+    if (readiness.targetDocumentOpened) {
+      const readinessDeadline = Math.min(started + timeoutMs, Date.now() + 60_000);
+      do {
+        const allText = fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "";
+        readiness = springTargetReadiness(allText, expectedUri);
+        if (readiness.coordinatorStarted && readiness.indexReady) break;
+        sleepMs(250);
+      } while (Date.now() < readinessDeadline);
+
+      if (readiness.coordinatorStarted && readiness.indexReady) {
+        const targetEvidence = {
+          targetRelativePath: expectedRelativePath,
+          targetUri: expectedUri,
+          targeting: "file-finder-exact-relative-path-position",
+          requestedFileFinderPosition: { row: 1, column: 4 },
+          targetDocumentOpened: true,
+        };
+        fs.writeFileSync(
+          path.join(manifest.evidence, `${fixtureKind}-spring-runtime-ready.json`),
+          JSON.stringify({
+            sourceHead: manifest.sourceHead,
+            fixture: fixtureKind,
+            observedAt: new Date().toISOString(),
+            attempts,
+            requiredEvidence: ["coordinator-start", "document-open exact URI"],
+            ...targetEvidence,
+            status: "PASS",
+          }, null, 2) + "\n",
+          { mode: 0o600 },
+        );
+        fs.writeFileSync(
+          path.join(manifest.evidence, `${fixtureKind}-spring-index-ready.json`),
+          JSON.stringify({
+            sourceHead: manifest.sourceHead,
+            fixture: fixtureKind,
+            observedAt: new Date().toISOString(),
+            attempts,
+            requiredEvidence: ["spring-index-updated affectedProjectCount>0"],
+            ...targetEvidence,
+            status: "PASS",
+          }, null, 2) + "\n",
+          { mode: 0o600 },
+        );
+        return { attempts, ...readiness };
+      }
+      break;
+    }
+
+    cancelTransientUiMacos(
+      manifest,
+      `${fixtureKind}-completion-target-cancel-${attempts}`,
+    );
+    sleepMs(500);
+  }
+
+  const classification = !readiness.targetDocumentOpened
+    ? "completion-target-document-not-opened"
+    : !readiness.coordinatorStarted
+      ? "completion-coordinator-not-started"
+      : "completion-spring-index-not-ready";
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-completion-target-failure.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      attempts,
+      targetRelativePath: expectedRelativePath,
+      targetUri: expectedUri,
+      requestedFileFinderPosition: { row: 1, column: 4 },
+      targeting: "file-finder-exact-relative-path-position",
+      classification,
+      ...readiness,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    `${fixtureKind} Spring completion target was not ready after ${attempts} exact-file attempts: ${classification}`,
+  );
+}
 
 function waitForSpringCompletion(
   manifest,
@@ -822,6 +985,9 @@ function waitForSpringCompletion(
   timeoutMs,
   maxAttempts,
 ) {
+  void sharedLog;
+  void sharedStart;
+  void baseline;
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
   const started = Date.now();
   let attempts = 0;
@@ -848,16 +1014,15 @@ function waitForSpringCompletion(
   };
   let text = "";
 
-  openFixtureFileMacos(
+  const targetReadiness = waitForSpringTargetReadyMacos(
     manifest,
     fixtureKind,
+    protocolFile,
     expectedRelativePath,
-    `${fixtureKind}-completion-open-properties`,
-  );
-  sendD007ActionKeyMacos(
-    manifest,
-    "y",
-    `${fixtureKind}-completion-end-of-line`,
+    expectedRequest.uri,
+    started,
+    timeoutMs,
+    maxAttempts,
   );
 
   for (
@@ -866,6 +1031,21 @@ function waitForSpringCompletion(
     localAttempt += 1
   ) {
     attempts += 1;
+    // Re-establish the exact active editor on every retry. The :1:4 suffix is
+    // interpreted by File Finder itself, so cursor identity is part of the
+    // public navigation action rather than a second timing-sensitive editor action.
+    openFixtureFileMacos(
+      manifest,
+      fixtureKind,
+      expectedRelativePath,
+      `${fixtureKind}-completion-refocus-${localAttempt + 1}`,
+      {
+        row: 1,
+        column: 4,
+        searchSettleMs: 1_200 + localAttempt * 1_000,
+      },
+    );
+
     const protocolStart = fileSize(protocolFile);
     triggerCompletionMacos(
       manifest,
@@ -929,58 +1109,23 @@ function waitForSpringCompletion(
       observation.expectedResponseObserved &&
       observation.serverPortObserved
     ) {
-      let coordinatorStarted = false;
-      let indexReady = false;
-      const readinessDeadline = Math.min(started + timeoutMs, Date.now() + 60_000);
-      do {
-        const allEvents = protocolEvidenceEvents(
-          fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
-        );
-        coordinatorStarted = allEvents.some((event) => event.event === "coordinator-start");
-        indexReady = allEvents.some(
-          (event) =>
-            event.event === "spring-index-updated" &&
-            Number.isInteger(event.affectedProjectCount) &&
-            event.affectedProjectCount > 0,
-        );
-        if (coordinatorStarted && indexReady) break;
-        sleepMs(250);
-      } while (Date.now() < readinessDeadline);
-      if (!coordinatorStarted || !indexReady) {
-        throw new Error(
-          `${fixtureKind} completion succeeded but coordinator/index readiness was not proven`,
-        );
-      }
-
-      const targetEvidence = {
-        targetRelativePath: expectedRelativePath,
-        targeting: "file-finder-exact-relative-path",
-      };
-      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-runtime-ready.json`), JSON.stringify({
-        sourceHead: manifest.sourceHead,
-        fixture: fixtureKind,
-        observedAt: new Date().toISOString(),
-        requiredEvidence: ["coordinator-start"],
-        ...targetEvidence,
-        status: "PASS",
-      }, null, 2) + "\n", { mode: 0o600 });
-      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-spring-index-ready.json`), JSON.stringify({
-        sourceHead: manifest.sourceHead,
-        fixture: fixtureKind,
-        observedAt: new Date().toISOString(),
-        requiredEvidence: ["spring-index-updated affectedProjectCount>0"],
-        ...targetEvidence,
-        status: "PASS",
-      }, null, 2) + "\n", { mode: 0o600 });
-      fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`), JSON.stringify({
-        sourceHead: manifest.sourceHead,
-        fixture: fixtureKind,
-        observedAt: new Date().toISOString(),
-        attempts,
-        ...targetEvidence,
-        ...observation,
-        status: "PASS",
-      }, null, 2) + "\n", { mode: 0o600 });
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          observedAt: new Date().toISOString(),
+          attempts,
+          readinessAttempts: targetReadiness.attempts,
+          targetRelativePath: expectedRelativePath,
+          targetUri: expectedRequest.uri,
+          targeting: "file-finder-exact-relative-path-position",
+          requestedFileFinderPosition: { row: 1, column: 4 },
+          ...observation,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
       return expectedRelativePath;
     }
 
@@ -1001,19 +1146,26 @@ function waitForSpringCompletion(
         : !finalObservation.expectedResponseObserved
           ? "completion-response-target-mismatch"
           : "completion-response-missing-server-port";
-  fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-completion-failure.json`), JSON.stringify({
-    sourceHead: manifest.sourceHead,
-    fixture: fixtureKind,
-    observedAt: new Date().toISOString(),
-    attempts,
-    targetRelativePath: expectedRelativePath,
-    targeting: "file-finder-exact-relative-path",
-    classification,
-    ...finalObservation,
-    protocolTail: fs.existsSync(protocolFile)
-      ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
-      : "",
-  }, null, 2) + "\n", { mode: 0o600 });
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-completion-failure.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      attempts,
+      readinessAttempts: targetReadiness.attempts,
+      targetRelativePath: expectedRelativePath,
+      targetUri: expectedRequest.uri,
+      targeting: "file-finder-exact-relative-path-position",
+      requestedFileFinderPosition: { row: 1, column: 4 },
+      classification,
+      ...finalObservation,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
   throw new Error(
     `${fixtureKind} Spring completion failed after ${attempts} exact-file attempts: ${classification}`,
   );
@@ -1583,10 +1735,6 @@ function selfTest() {
       stagedKeymap[1].bindings["ctrl-cmd-alt-0"],
       ["editor::ConfirmCodeAction", { item_ix: 0 }],
     );
-    assert.deepEqual(
-      stagedKeymap[1].bindings["ctrl-cmd-alt-y"],
-      ["editor::MoveToEndOfLine", { stop_at_soft_wraps: false }],
-    );
     assert.equal(d007ConfirmKey(25), "p");
     assert.throws(() => d007ConfirmKey(26), /exceeds the D007 keymap range/);
 
@@ -1663,6 +1811,18 @@ function selfTest() {
         expectedResponseObserved: false,
         itemCount: null,
         serverPortObserved: false,
+      },
+    );
+    assert.deepEqual(
+      springTargetReadiness([
+        '{"event":"coordinator-start"}',
+        '{"event":"document-open","uri":"file:///fixture/application-d007.properties"}',
+        '{"event":"spring-index-updated","affectedProjectCount":1}',
+      ].join("\n"), "file:///fixture/application-d007.properties"),
+      {
+        coordinatorStarted: true,
+        targetDocumentOpened: true,
+        indexReady: true,
       },
     );
     assert.deepEqual(

@@ -47,8 +47,8 @@ It performs the following bounded sequence:
 3. launches the Maven fixture through **one foreground macOS Zed CLI process** bound to the exact staged `--user-data-dir`; that launch opens only the fixture root, avoiding any dependence on multi-path tab ordering;
 4. waits until the new launch process group contains a live Zed app process bound to that isolated profile, then removes any ignored stale root `extension.wasm`, drives Zed's own `Install Dev Extension` action/OpenPathPrompt, and requires Zed itself to build/register the exact checkout;
 5. after that first launch, never invokes a second macOS Zed CLI to focus a file. The isolated D007 keymap opens Zed's public `file_finder::Toggle`, and the harness pastes the exact project-relative target path into its searchable input;
-6. opens `src/main/resources/application-d007.properties` through File Finder, moves its cursor to end-of-line, invokes completion, and accepts the probe only when coordinator protocol evidence proves the exact Properties URI at line 0 / character 3 and the correlated Spring response contains `server.port`;
-7. additionally requires coordinator startup and a positive `spring/index/updated` notification, waiting on those state signals rather than assuming a fixed ordering relative to the completion response;
+6. opens `src/main/resources/application-d007.properties:1:4` through File Finder, then requires D007 protocol evidence that the coordinator started, Zed actually sent `textDocument/didOpen` for that exact Properties URI, and Spring reported a positive `spring/index/updated` before completion is attempted;
+7. re-establishes that exact File Finder target on every bounded completion retry, then accepts the probe only when coordinator protocol evidence proves the exact Properties URI at line 0 / character 3 and the correlated Spring response contains `server.port`;
 8. opens `src/main/java/dev/zed/spring/fixture/FixtureApplication.java` through File Finder, toggles Code Actions, and accepts the editor only when the merged response contains `Spring Boot: Configure run/debug for a project…`;
 9. dispatches the exact returned Code Action index through D007's `editor::ConfirmCodeAction { item_ix }` binding, then requires coordinator evidence for the actual `zed-spring-tools.configure-boot-run` command;
 10. verifies the Java source SHA-256 is unchanged, waits for both generated `.zed/debug.json` and `.zed/tasks.json` **without re-dispatching the command**, and machine-checks the Java launch contract plus Maven `mvn spring-boot:run` or Gradle `./gradlew bootRun`;
@@ -62,7 +62,9 @@ the completion request, correlated Spring response, and `server.port` item.
 D007 enables this evidence only in the isolated launch environment; the
 coordinator writes the bounded JSONL trace to
 `<fixture>/.d007/coordinator-protocol.jsonl`. Normal extension runs do not
-create this file. If completion cannot be proven, the fixture records one of
+create this file. Before completion, target-readiness failures are classified as
+`completion-target-document-not-opened`, `completion-coordinator-not-started`, or
+`completion-spring-index-not-ready`. If completion itself cannot be proven, the fixture records one of
 `completion-request-not-observed`,
 `completion-request-target-mismatch`,
 `completion-response-not-observed`,
@@ -80,8 +82,9 @@ picker result cannot silently satisfy the gate. Completion is dispatched directl
 through the isolated keymap rather than reopening the command palette, so palette
 focus cannot masquerade as editor focus. The Code Actions popover is treated as a
 selection list, not a searchable input. The isolated profile gets D007-only
-bindings for `file_finder::Toggle`, `editor::MoveToEndOfLine`,
+bindings for `file_finder::Toggle`, `editor::ShowCompletions`,
 `editor::ToggleCodeActions`, and indexed `editor::ConfirmCodeAction` actions.
+The Properties picker query carries `:1:4`, so the public File Finder action owns both exact-file selection and cursor placement. The gate does not send completion until the D007-only coordinator trace has observed `textDocument/didOpen` for that exact URI and a positive Spring index update.
 The harness waits for coordinator evidence that the configure action exists and
 uses the exact returned item index. If the menu has not been materialized yet,
 Zed's `ConfirmCodeAction` handler returns `None`, so bounded retries are
