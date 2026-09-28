@@ -1964,9 +1964,10 @@ function selfTest() {
     assert.equal(stagedKeymap[1].context, "Editor");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
     assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-z"], "editor::ShowCompletions");
+    const retiredConfirmCodeAction = ["editor", "ConfirmCodeAction"].join("::");
     assert.equal(
       Object.values(stagedKeymap[1].bindings).some((binding) =>
-        JSON.stringify(binding).includes("editor::ConfirmCodeAction")
+        JSON.stringify(binding).includes(retiredConfirmCodeAction)
       ),
       false,
       "D007 must not confuse a provider-local Code Action index with Zed's merged menu index",
@@ -2031,7 +2032,6 @@ function selfTest() {
       true,
       "D007 run/debug dispatch must use Zed's public LSP command selector",
     );
-    const retiredConfirmCodeAction = ["editor", "ConfirmCodeAction"].join("::");
     assert.equal(
       harnessSource.includes(retiredConfirmCodeAction),
       false,
