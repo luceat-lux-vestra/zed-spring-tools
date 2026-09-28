@@ -567,6 +567,8 @@ function runStandaloneOfflineRegressionMacos(
   const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
 
   let warmLaunchStarted = false;
+  let missingLaunchStarted = false;
+  let firstRecoveryLaunchStarted = false;
   let corruptLaunchStarted = false;
   let repairLaunchStarted = false;
   try {
@@ -590,6 +592,71 @@ function runStandaloneOfflineRegressionMacos(
     );
     stopAndWaitZed(root, manifest, 10_000, 5_000);
     warmLaunchStarted = false;
+
+    fs.rmSync(artifact);
+    assert.equal(fs.existsSync(artifact), false);
+
+    const missingProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-first-install",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    missingLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const missingRecord = JSON.parse(
+      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+    );
+    const missingFailure = waitForOfflineDownloadFailure(
+      missingRecord.logPath,
+      missingRecord.logStartOffset,
+      pin.tag,
+      60_000,
+    );
+    const missingProtocolDelta = readFileDelta(protocolFile, missingProtocolStart);
+    assert.equal(
+      protocolEvidenceEvents(missingProtocolDelta)
+        .some((event) => event.event === "coordinator-start"),
+      false,
+      "first install without network must not enter a reduced coordinator mode",
+    );
+    assert.equal(
+      fs.existsSync(artifact),
+      false,
+      "first-install offline failure must not create a usable artifact",
+    );
+    assert.equal(
+      fs.existsSync(artifact + ".download"),
+      false,
+      "first-install offline failure must not leave a partial staging artifact",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    missingLaunchStarted = false;
+
+    const firstRecoveryProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-first-install-recovery",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "normal",
+    });
+    firstRecoveryLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const firstRecovery = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      firstRecoveryProtocolStart,
+      timeoutMs,
+      "offline-first-install-recovery",
+    );
+    assert.equal(fs.statSync(artifact).size, pin.size);
+    assert.equal(sha256File(artifact), pin.sha256);
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    firstRecoveryLaunchStarted = false;
 
     const originalDigest = sha256File(artifact);
     corruptFileByte(artifact);
@@ -671,6 +738,9 @@ function runStandaloneOfflineRegressionMacos(
           status: "PASS",
           networkDenialProbe: "PASS",
           warmCachedStartup: warm.status,
+          firstInstallOfflineFailClosed: "PASS",
+          firstInstallFailureMarker: missingFailure.marker,
+          firstInstallOnlineRecovery: firstRecovery.status,
           corruptOfflineFailClosed: "PASS",
           corruptFailureMarker: failure.marker,
           partialDownloadAbsent: true,
@@ -687,7 +757,13 @@ function runStandaloneOfflineRegressionMacos(
     );
     return evidence;
   } finally {
-    if (warmLaunchStarted || corruptLaunchStarted || repairLaunchStarted) {
+    if (
+      warmLaunchStarted ||
+      missingLaunchStarted ||
+      firstRecoveryLaunchStarted ||
+      corruptLaunchStarted ||
+      repairLaunchStarted
+    ) {
       ensureZedStopped(root, manifest, 5_000, 5_000);
     }
   }
