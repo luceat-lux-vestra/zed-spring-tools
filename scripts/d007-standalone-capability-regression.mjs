@@ -13,6 +13,12 @@ import { springArguments } from "../coordinator/src/main.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = path.join(ROOT, "protocol", "spring-artifacts.json");
 const FIXTURE = path.join(ROOT, "tests", "fixtures", "spring-boot-basic");
+const MODULITH_FIXTURE = path.join(
+  ROOT,
+  "tests",
+  "fixtures",
+  "spring-modulith-gradle",
+);
 const DOWNLOAD_TIMEOUT_MS = 180_000;
 const INDEX_TIMEOUT_MS = 180_000;
 const REQUEST_TIMEOUT_MS = 45_000;
@@ -849,6 +855,17 @@ async function main() {
     await client.request("shutdown", null);
     client.notify("exit", null);
 
+    const modulith = await runModulithRegression(
+      pin,
+      jar,
+      javaHome,
+      runRoot,
+    );
+    evidence.checks.modulithProjects = modulith.projects;
+    evidence.checks.modulithMetadataRefresh = modulith.metadataRefresh;
+    evidence.checks.modulithViolation = modulith.violation;
+    evidence.checks.modulithStructure = modulith.structure;
+
     evidence.status = "pass";
     evidence.finishedAt = new Date().toISOString();
     evidence.stderrTail = stderr.split(/\r?\n/).slice(-80);
@@ -921,6 +938,226 @@ function compileFixture(worktree, javaHome) {
       ),
     ),
   });
+}
+
+async function runModulithRegression(pin, jar, javaHome, runRoot) {
+  const worktree = path.join(runRoot, "modulith-fixture");
+  fs.cpSync(MODULITH_FIXTURE, worktree, { recursive: true });
+
+  const compile = spawnSync(
+    process.platform === "win32" ? "gradlew.bat" : "./gradlew",
+    ["classes", "--no-daemon"],
+    {
+      cwd: worktree,
+      encoding: "utf8",
+      shell: false,
+      timeout: 300_000,
+      maxBuffer: 16 * 1024 * 1024,
+      env: {
+        ...process.env,
+        JAVA_HOME: javaHome,
+        PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+      },
+    },
+  );
+  if (compile.error) throw compile.error;
+  if (compile.status !== 0) {
+    throw new Error(
+      `Modulith Gradle classes failed: ${String(compile.stderr ?? "").slice(-8000)}`,
+    );
+  }
+
+  const configuration = structuredClone(DEFAULT_CONFIGURATION);
+  const java = path.join(
+    javaHome,
+    "bin",
+    process.platform === "win32" ? "java.exe" : "java",
+  );
+  const child = spawn(java, springArguments(jar, worktree, null), {
+    cwd: worktree,
+    shell: false,
+    windowsHide: true,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr = (stderr + chunk.toString("utf8")).slice(-256 * 1024);
+  });
+
+  const workspaceUri = directoryUri(worktree);
+  const client = new LspClient(
+    child,
+    [{ uri: workspaceUri, name: "inventory-app-gradle" }],
+    configuration,
+  );
+
+  try {
+    const initialize = await client.request("initialize", {
+      processId: process.pid,
+      clientInfo: { name: "zed-spring-tools-d007-modulith", version: "1" },
+      rootUri: workspaceUri,
+      workspaceFolders: [{ uri: workspaceUri, name: "inventory-app-gradle" }],
+      capabilities: standardClientCapabilities(),
+      initializationOptions: {},
+    });
+    assert.ok(initialize?.capabilities);
+    client.notify("initialized", {});
+    client.notify("workspace/didChangeConfiguration", { settings: configuration });
+
+    const javaFiles = findFilesByExtension(
+      path.join(worktree, "src", "main", "java"),
+      ".java",
+    );
+    assert.equal(javaFiles.length > 0, true);
+    let version = 1;
+    for (const file of javaFiles) {
+      client.notify("textDocument/didOpen", {
+        textDocument: {
+          uri: pathToFileURL(file).href,
+          languageId: "java",
+          version: version++,
+          text: fs.readFileSync(file, "utf8"),
+        },
+      });
+    }
+
+    await waitFor(
+      () => client.notifications.some(
+        (message) =>
+          message.method === "spring/index/updated" &&
+          Array.isArray(message.params?.affectedProjects) &&
+          message.params.affectedProjects.length > 0,
+      ),
+      "Modulith standalone Spring index",
+      INDEX_TIMEOUT_MS,
+    );
+
+    for (const file of javaFiles) {
+      client.notify("textDocument/didChange", {
+        textDocument: { uri: pathToFileURL(file).href, version: version++ },
+        contentChanges: [{ text: fs.readFileSync(file, "utf8") }],
+      });
+    }
+
+    const projects = await client.request("workspace/executeCommand", {
+      command: "sts/modulith/projects",
+      arguments: [],
+    }, 90_000);
+    assert.equal(projects !== null && typeof projects === "object", true);
+    const projectEntries = Object.entries(projects);
+    assert.equal(projectEntries.length > 0, true);
+    const selected = projectEntries.find(([name]) => /inventory-app-gradle/.test(name))
+      ?? projectEntries[0];
+    assert.equal(typeof selected[1], "string");
+
+    const refresh = await client.request("workspace/executeCommand", {
+      command: "sts/modulith/metadata/refresh",
+      arguments: [selected[1]],
+    }, 120_000);
+
+    const violation = await waitForAnyDiagnostic(
+      client,
+      (diagnostic) =>
+        String(diagnostic.code ?? "").includes("MODULITH_TYPE_REF_VIOLATION") ||
+        /Invalid reference to non-exposed type/i.test(String(diagnostic.message ?? "")),
+      "Modulith type-reference violation",
+      INDEX_TIMEOUT_MS,
+    );
+
+    const structure = await client.request("workspace/executeCommand", {
+      command: "sts/spring-boot/structure",
+      arguments: [{ updateMetadata: true }],
+    }, 90_000);
+    const structureText = JSON.stringify(structure);
+    assert.match(structureText, /catalog/i);
+    assert.match(structureText, /internal|API/i);
+
+    const windowErrors = client.windowMessages.filter((message) => message.type === 1);
+    assert.deepEqual(
+      windowErrors,
+      [],
+      `Modulith standalone regression emitted an error popup; stderr=${stderr.slice(-4000)}`,
+    );
+
+    await client.request("shutdown", null);
+    client.notify("exit", null);
+
+    return {
+      projects: pass("sts/modulith/projects", {
+        count: projectEntries.length,
+        selectedProject: selected[0],
+      }),
+      metadataRefresh: pass("sts/modulith/metadata/refresh completed", {
+        resultWasNull: refresh === null,
+      }),
+      violation: pass("MODULITH_TYPE_REF_VIOLATION", {
+        code: violation.code ?? null,
+      }),
+      structure: pass("Modulith structure contains module exposure markers"),
+    };
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+}
+
+async function waitForAnyDiagnostic(client, predicate, label, timeoutMs) {
+  let match = null;
+  await waitFor(
+    () => {
+      for (const diagnostics of client.diagnostics.values()) {
+        match = diagnostics.find(predicate) ?? null;
+        if (match !== null) return true;
+      }
+      return false;
+    },
+    label,
+    timeoutMs,
+  );
+  return match;
+}
+
+function findFilesByExtension(directory, extension) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...findFilesByExtension(target, extension));
+    } else if (entry.isFile() && entry.name.endsWith(extension)) {
+      files.push(target);
+    }
+  }
+  return files.sort();
+}
+
+function standardClientCapabilities() {
+  return {
+    workspace: {
+      configuration: true,
+      applyEdit: true,
+      workspaceFolders: true,
+      symbol: { dynamicRegistration: true },
+      executeCommand: { dynamicRegistration: true },
+    },
+    textDocument: {
+      synchronization: { dynamicRegistration: true },
+      publishDiagnostics: {},
+      completion: { dynamicRegistration: true },
+      hover: { dynamicRegistration: true },
+      definition: { dynamicRegistration: true },
+      references: { dynamicRegistration: true },
+      implementation: { dynamicRegistration: true },
+      codeAction: { dynamicRegistration: true },
+      codeLens: { dynamicRegistration: true },
+      inlayHint: { dynamicRegistration: true },
+      semanticTokens: { dynamicRegistration: true, requests: { full: true } },
+      documentSymbol: { dynamicRegistration: true },
+    },
+    window: {
+      showMessage: {},
+      showDocument: { support: true },
+      workDoneProgress: true,
+    },
+  };
 }
 
 function fixtureFiles(worktree) {
