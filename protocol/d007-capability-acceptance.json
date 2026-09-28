@@ -750,10 +750,10 @@
       "classification": "redesigned-requires-evidence",
       "currentClaim": "pending-d007",
       "evidenceGroup": "runtime-boundary",
-      "reason": "D007 keeps only the standalone Java launcher requirement: missing or pre-21 Java must fail closed; private Java provider-schema diagnostics are retired.",
+      "reason": "The standalone coordinator must reject a pre-JDK-21 runtime before starting Spring Tools.",
       "requiredEvidence": [
         {
-          "source": "standalone-runtime-boundary",
+          "source": "standalone-capability-regression",
           "check": "javaRequirementDiagnostic"
         }
       ]
