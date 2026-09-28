@@ -1174,6 +1174,12 @@ test("coordinator run records bounded D007 completion and index evidence", async
   ]);
   assert.equal(events[0].coordinatorPid, process.pid);
   assert.equal(typeof events[0].coordinatorSession, "string");
+  assert.equal(events[1].uri, "file:///tmp/application.properties");
+  assert.equal(events[1].line, 0);
+  assert.equal(events[1].character, 3);
+  assert.equal(events[2].uri, "file:///tmp/application.properties");
+  assert.equal(events[2].line, 0);
+  assert.equal(events[2].character, 3);
   assert.equal(events[2].itemCount, 2);
   assert.equal(events[2].serverPort, true);
   assert.equal(events[2].error, false);

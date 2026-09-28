@@ -3609,16 +3609,28 @@ export async function run(arguments_, dependencies = {}) {
     protocolEvidence: (evidence) => appendD007ProtocolEvidence(d007EvidenceFile, evidence),
   });
   const decoder = new LspDecoder();
-  const completionRequests = new Set();
+  const completionRequests = new Map();
   const completionTrace = (message) => {
     if (
       d007EvidenceFile !== null &&
       message?.method === "textDocument/completion" &&
       Object.hasOwn(message, "id")
     ) {
-      completionRequests.add(idKey(message.id));
+      const requestEvidence = {
+        uri: typeof message.params?.textDocument?.uri === "string"
+          ? message.params.textDocument.uri
+          : null,
+        line: Number.isInteger(message.params?.position?.line)
+          ? message.params.position.line
+          : null,
+        character: Number.isInteger(message.params?.position?.character)
+          ? message.params.position.character
+          : null,
+      };
+      completionRequests.set(idKey(message.id), requestEvidence);
       appendD007ProtocolEvidence(d007EvidenceFile, {
         event: "completion-request",
+        ...requestEvidence,
       });
     }
   };
@@ -3663,10 +3675,13 @@ export async function run(arguments_, dependencies = {}) {
           });
         }
         const key = responseKey(message);
-        if (key !== null && completionRequests.delete(key)) {
+        const completionRequest = key === null ? undefined : completionRequests.get(key);
+        if (key !== null && completionRequest !== undefined) {
+          completionRequests.delete(key);
           const evidence = completionResultEvidence(message.result);
           appendD007ProtocolEvidence(d007EvidenceFile, {
             event: "completion-response",
+            ...completionRequest,
             itemCount: evidence.itemCount,
             serverPort: evidence.serverPort,
             error: Object.hasOwn(message, "error"),
