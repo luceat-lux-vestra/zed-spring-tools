@@ -687,3 +687,40 @@ test("D007 automatic live arm keeps CLI and workspace settings consistent", () =
   );
 });
 
+test("D007 Modulith regression bootstraps the ignored pinned Gradle wrapper", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  const helperStart = regression.indexOf("function ensurePinnedGradleWrapper(");
+  const helperEnd = regression.indexOf(
+    "async function runModulithRegression(",
+    helperStart,
+  );
+  const helper = regression.slice(helperStart, helperEnd);
+
+  assert.equal(helperStart >= 0 && helperEnd > helperStart, true);
+  assert.equal(
+    helper.includes('"gradle-wrapper.properties"') &&
+      helper.includes('"gradle-wrapper.jar"'),
+    true,
+    "bootstrap must derive the missing binary from the copied fixture wrapper metadata",
+  );
+  assert.equal(
+    helper.includes('"gradle"') &&
+      helper.includes('"wrapper"') &&
+      helper.includes('"--gradle-version"') &&
+      helper.includes('"--distribution-type"'),
+    true,
+    "bootstrap must run the Gradle wrapper task at the fixture-pinned version",
+  );
+  assert.equal(
+    helper.includes("Gradle wrapper bootstrap must preserve the fixture's pinned distribution"),
+    true,
+    "bootstrap must fail closed if it changes the pinned distribution",
+  );
+  assert.equal(
+    regression.includes("ensurePinnedGradleWrapper(worktree, javaHome);"),
+    true,
+    "Modulith compilation must bootstrap the ignored wrapper before invoking ./gradlew",
+  );
+});
+
