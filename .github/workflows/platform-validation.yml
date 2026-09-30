@@ -111,51 +111,38 @@ jobs:
       - name: Native Rust tests
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: cargo test --locked
-      - name: Retain platform evidence
-        if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (always()) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: platform-evidence-${{ matrix.id }}-${{ env.SOURCE_HEAD_SHA }}
-          path: |
-            ${{ env.PLATFORM_EVIDENCE }}
-            ${{ env.SPRING_RUNTIME_EVIDENCE }}
-          if-no-files-found: warn
-          retention-days: 14
 
-
-  # Temporary PR #160 branch-only runner. It keeps the full standalone D007
-  # regression on the macOS arm64 tuple while the PR remains draft; remove this
-  # job before the exact-final candidate is marked ready for review.
-  d007-standalone-debug:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' }}
-    runs-on: macos-15
-    timeout-minutes: 45
-    env:
-      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-    steps:
+      # PR #160 draft-only standalone D007 runner. Reuse the already-classified
+      # macOS arm64 matrix job so temporary validation cannot bypass or expand
+      # the merge-gate job inventory. Remove these steps before ready_for_review.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         with:
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         with:
           distribution: microsoft
           java-version: ${{ env.JAVA_LTS }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         with:
           node-version: ${{ env.NODE_LTS }}
       - name: Validate D007 harness contracts
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         run: |
           node --test \
             scripts/test/d007-standalone-capability-regression.test.mjs \
             scripts/test/d007-capability-acceptance.test.mjs
       - name: Run D007 standalone regression
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         run: |
           mkdir -p tmp
           node scripts/d007-standalone-capability-regression.mjs \
             "tmp/d007-standalone-${SOURCE_HEAD_SHA}.json" \
             "$JAVA_HOME"
       - name: Print D007 standalone evidence
-        if: ${{ always() }}
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         run: |
           evidence="tmp/d007-standalone-${SOURCE_HEAD_SHA}.json"
           if [ -f "$evidence" ]; then
@@ -164,11 +151,21 @@ jobs:
             echo "No standalone evidence file produced"
           fi
       - name: Upload D007 standalone evidence
-        if: ${{ always() }}
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: d007-standalone-${{ env.SOURCE_HEAD_SHA }}
           path: tmp/d007-standalone-${{ env.SOURCE_HEAD_SHA }}.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Retain platform evidence
+        if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (always()) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-evidence-${{ matrix.id }}-${{ env.SOURCE_HEAD_SHA }}
+          path: |
+            ${{ env.PLATFORM_EVIDENCE }}
+            ${{ env.SPRING_RUNTIME_EVIDENCE }}
           if-no-files-found: warn
           retention-days: 14
 
