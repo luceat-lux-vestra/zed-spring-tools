@@ -1273,13 +1273,10 @@ async function main() {
       runRoot,
     );
 
-    const liveChecks = await runStandaloneLiveRegression(
-      jar,
-      javaHome,
-      runRoot,
-    );
-    Object.assign(evidence.checks, liveChecks);
-
+    // Keep deterministic build/project-model validation ahead of the
+    // environment-sensitive local Attach/JMX regression. Both remain required:
+    // a live-data failure still fails the run, but it cannot hide a later
+    // deterministic Modulith defect behind hosted-runner network variance.
     const modulith = await runModulithRegression(
       pin,
       jar,
@@ -1290,6 +1287,13 @@ async function main() {
     evidence.checks.modulithMetadataRefresh = modulith.metadataRefresh;
     evidence.checks.modulithViolation = modulith.violation;
     evidence.checks.modulithStructure = modulith.structure;
+
+    const liveChecks = await runStandaloneLiveRegression(
+      jar,
+      javaHome,
+      runRoot,
+    );
+    Object.assign(evidence.checks, liveChecks);
 
     evidence.status = "pass";
     evidence.finishedAt = new Date().toISOString();
