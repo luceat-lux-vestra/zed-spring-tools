@@ -2527,9 +2527,81 @@ function stopProcessGroup(child) {
   }
 }
 
+function ensurePinnedGradleWrapper(worktree, javaHome) {
+  const wrapperJar = path.join(
+    worktree,
+    "gradle",
+    "wrapper",
+    "gradle-wrapper.jar",
+  );
+  if (fs.existsSync(wrapperJar)) return;
+
+  const propertiesFile = path.join(
+    worktree,
+    "gradle",
+    "wrapper",
+    "gradle-wrapper.properties",
+  );
+  const properties = fs.readFileSync(propertiesFile, "utf8");
+  const versionMatch =
+    /^distributionUrl=.*\/gradle-([0-9][0-9A-Za-z.+-]*)-bin\.zip$/m.exec(
+      properties,
+    );
+  assert.ok(
+    versionMatch,
+    "Modulith fixture must pin a parseable Gradle bin distribution",
+  );
+  const pinnedVersion = versionMatch[1];
+
+  const bootstrap = spawnSync(
+    "gradle",
+    ["wrapper", "--gradle-version", pinnedVersion, "--distribution-type", "bin"],
+    {
+      cwd: worktree,
+      encoding: "utf8",
+      shell: false,
+      timeout: 120_000,
+      maxBuffer: 8 * 1024 * 1024,
+      env: {
+        ...process.env,
+        JAVA_HOME: javaHome,
+        PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+      },
+    },
+  );
+  if (bootstrap.error) {
+    throw new Error(
+      "Modulith Gradle wrapper bootstrap failed before capability validation: " +
+        bootstrap.error.message,
+    );
+  }
+  if (bootstrap.status !== 0) {
+    throw new Error(
+      "Modulith Gradle wrapper bootstrap failed before capability validation: " +
+        boundedCompletionText(
+          String(bootstrap.stderr ?? bootstrap.stdout ?? ""),
+          8000,
+        ),
+    );
+  }
+  assert.equal(
+    fs.existsSync(wrapperJar),
+    true,
+    "Gradle wrapper bootstrap must materialize gradle-wrapper.jar",
+  );
+  const after = fs.readFileSync(propertiesFile, "utf8");
+  assert.equal(
+    after.includes("/gradle-" + pinnedVersion + "-bin.zip"),
+    true,
+    "Gradle wrapper bootstrap must preserve the fixture's pinned distribution",
+  );
+}
+
 async function runModulithRegression(pin, jar, javaHome, runRoot) {
   const worktree = path.join(runRoot, "modulith-fixture");
   fs.cpSync(MODULITH_FIXTURE, worktree, { recursive: true });
+
+  ensurePinnedGradleWrapper(worktree, javaHome);
 
   const compile = spawnSync(
     process.platform === "win32" ? "gradlew.bat" : "./gradlew",
