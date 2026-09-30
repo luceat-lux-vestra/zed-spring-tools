@@ -1532,6 +1532,15 @@ async function runEmbeddedMcpRegression(
   fs.cpSync(FIXTURE, worktree, { recursive: true });
   compileFixture(worktree, javaHome);
 
+  const configuredAutomatic =
+    configuration?.["boot-java"]?.["live-information"]
+      ??.["automatic-connection"]?.on === true;
+  assert.equal(
+    configuredAutomatic,
+    automaticLiveConnection,
+    "D007 coordinator CLI automatic-live flag must match forwarded workspace configuration",
+  );
+
   const java = path.join(
     javaHome,
     "bin",
@@ -2162,11 +2171,16 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
 
     await shutdownRegressionClient(coordinator);
 
+    const automaticConfiguration = structuredClone(configuration);
+    automaticConfiguration["boot-java"]["live-information"] = {
+      ...(automaticConfiguration["boot-java"]["live-information"] ?? {}),
+      "automatic-connection": { on: true },
+    };
     const automatic = await startCoordinatorRegressionClient({
       jar,
       javaHome,
       worktree,
-      configuration,
+      configuration: automaticConfiguration,
       automaticLiveConnection: true,
       responder: () => null,
     });
