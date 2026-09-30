@@ -653,3 +653,25 @@ test("D007 client records window showMessage notifications for notices and error
   );
 });
 
+test("D007 automatic live arm keeps CLI and workspace settings consistent", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('"automatic-connection": { on: true }'),
+    true,
+    "automatic live acceptance must forward the same opt-in through workspace configuration",
+  );
+  assert.equal(
+    regression.includes(
+      '"D007 coordinator CLI automatic-live flag must match forwarded workspace configuration"',
+    ),
+    true,
+    "harness must fail closed when coordinator CLI and didChangeConfiguration disagree",
+  );
+  assert.equal(
+    regression.includes("configuration: automaticConfiguration"),
+    true,
+    "automatic arm must launch with the configuration carrying automatic-connection.on=true",
+  );
+});
+
