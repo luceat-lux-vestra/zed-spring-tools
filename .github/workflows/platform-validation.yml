@@ -122,6 +122,57 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+
+  # Temporary PR #160 branch-only runner. It keeps the full standalone D007
+  # regression on the macOS arm64 tuple while the PR remains draft; remove this
+  # job before the exact-final candidate is marked ready for review.
+  d007-standalone-debug:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: microsoft
+          java-version: ${{ env.JAVA_LTS }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_LTS }}
+      - name: Validate D007 harness contracts
+        run: |
+          node --test \
+            scripts/test/d007-standalone-capability-regression.test.mjs \
+            scripts/test/d007-capability-acceptance.test.mjs
+      - name: Run D007 standalone regression
+        run: |
+          mkdir -p tmp
+          node scripts/d007-standalone-capability-regression.mjs \
+            "tmp/d007-standalone-${SOURCE_HEAD_SHA}.json" \
+            "$JAVA_HOME"
+      - name: Print D007 standalone evidence
+        if: ${{ always() }}
+        run: |
+          evidence="tmp/d007-standalone-${SOURCE_HEAD_SHA}.json"
+          if [ -f "$evidence" ]; then
+            cat "$evidence"
+          else
+            echo "No standalone evidence file produced"
+          fi
+      - name: Upload D007 standalone evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: d007-standalone-${{ env.SOURCE_HEAD_SHA }}
+          path: tmp/d007-standalone-${{ env.SOURCE_HEAD_SHA }}.json
+          if-no-files-found: warn
+          retention-days: 14
+
+
   # Keep the declared JDK 21 floor continuously exercised against both real
   # pinned Java runtimes. One Linux x86_64 arm is sufficient here: the six-way
   # matrix above owns host portability while this job owns the JVM floor.
