@@ -661,12 +661,24 @@ test("D007 automatic live arm keeps CLI and workspace settings consistent", () =
     true,
     "automatic live acceptance must forward the same opt-in through workspace configuration",
   );
+  const helperStart = regression.indexOf("async function startCoordinatorRegressionClient({");
+  const helperEnd = regression.indexOf("function liveControllerFile(", helperStart);
+  const helper = regression.slice(helperStart, helperEnd);
+  const mcpStart = regression.indexOf("async function runEmbeddedMcpRegression(");
+  const mcpEnd = regression.indexOf("async function runStandaloneLiveRegression(", mcpStart);
+  const mcp = regression.slice(mcpStart, mcpEnd);
+
   assert.equal(
-    regression.includes(
+    helper.includes(
       '"D007 coordinator CLI automatic-live flag must match forwarded workspace configuration"',
     ),
     true,
-    "harness must fail closed when coordinator CLI and didChangeConfiguration disagree",
+    "harness must fail closed inside startCoordinatorRegressionClient when CLI and didChangeConfiguration disagree",
+  );
+  assert.equal(
+    mcp.includes("configuredAutomatic"),
+    false,
+    "automatic live configuration assertion must not leak into unrelated MCP regression setup",
   );
   assert.equal(
     regression.includes("configuration: automaticConfiguration"),
