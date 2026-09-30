@@ -1534,7 +1534,7 @@ async function runEmbeddedMcpRegression(
 
   const configuredAutomatic =
     configuration?.["boot-java"]?.["live-information"]
-      ??.["automatic-connection"]?.on === true;
+      ?.["automatic-connection"]?.on === true;
   assert.equal(
     configuredAutomatic,
     automaticLiveConnection,
