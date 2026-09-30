@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   standalone:
-    runs-on: ubuntu-latest
+    # Full live-data acceptance relies on the 5.3 PID/local-attach path. Linux\n    # hosted runners cannot reliably return that local JMX payload; use the same\n    # macOS arm64 runner already covered by Platform Validation instead of\n    # reintroducing the RMI arguments that Spring Tools 5.3 intentionally removed.\n    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
