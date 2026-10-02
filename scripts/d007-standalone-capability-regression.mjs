@@ -1893,6 +1893,10 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
     assert.ok(portMatch);
     const appPort = Number(portMatch[1]);
     assert.equal(Number.isInteger(appPort) && appPort > 0, true);
+    const appPidMatch = /Starting FixtureApplication .* with PID (\d+)/.exec(appLog);
+    assert.ok(appPidMatch, "live fixture startup log must expose the exact application JVM PID");
+    const appProcessKey = appPidMatch[1];
+    assert.match(appProcessKey, /^\d+$/);
 
     const configuration = structuredClone(DEFAULT_CONFIGURATION);
     configuration["boot-java"]["live-information"] = {
@@ -1945,13 +1949,15 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
       client,
       (entry) =>
         entry?.action === "sts/livedata/connect" &&
-        (
-          entry?.projectName === "zed-spring-tools-fixture" ||
-          /FixtureApplication|zed-spring-tools-fixture/.test(String(entry?.label ?? ""))
-        ),
-      "local Boot process descriptor",
+        String(entry?.processKey ?? "") === appProcessKey,
+      "exact local Boot application process descriptor",
     );
-    assert.equal(typeof localDescriptor.processKey, "string");
+    assert.equal(localDescriptor.processKey, appProcessKey);
+    assert.equal(
+      localDescriptor.projectName,
+      "zed-spring-tools-fixture",
+      "exact Boot JVM must carry the production spring.boot.project.name launch argument",
+    );
 
     promptMode = "connect-local";
     const notificationStart = client.notifications.length;
