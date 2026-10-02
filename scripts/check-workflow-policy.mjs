@@ -477,6 +477,23 @@ for (const workflow of workflows.values()) {
 
 // --- live repository state ----------------------------------------------
 
+const retiredActionsEventPolicyIds = policy.retired_actions_event_policy_ids ?? [];
+if (!Array.isArray(retiredActionsEventPolicyIds)) {
+  fail(`${POLICY_FILE} retired_actions_event_policy_ids must be an array.`);
+} else {
+  const seen = new Set();
+  for (const id of retiredActionsEventPolicyIds) {
+    if (!Number.isInteger(id) || id <= 0) {
+      fail(`${POLICY_FILE} retired Actions event policy id ${JSON.stringify(id)} is not a positive integer.`);
+      continue;
+    }
+    if (seen.has(id)) {
+      fail(`${POLICY_FILE} lists retired Actions event policy id ${id} more than once.`);
+    }
+    seen.add(id);
+  }
+}
+
 function gh(path) {
   return JSON.parse(execFileSync("gh", ["api", path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
 }
@@ -501,6 +518,17 @@ if (live) {
 
   const actions = gh(`repos/${repository}/actions/permissions`);
   const workflowPermissions = gh(`repos/${repository}/actions/permissions/workflow`);
+  const actionsEventPolicies = gh(`repos/${repository}/actions/policies`);
+  if (!Array.isArray(actionsEventPolicies.policies)) {
+    fail("Live Actions event-policy readback returned no policies array.");
+  } else {
+    const liveEventPolicyIds = new Set(actionsEventPolicies.policies.map((entry) => entry.id));
+    for (const id of retiredActionsEventPolicyIds) {
+      if (liveEventPolicyIds.has(id)) {
+        fail(`Retired Actions event policy ${id} still exists; remove the obsolete repository-level exception.`);
+      }
+    }
+  }
   for (const [key, expected] of Object.entries(policy.actions_policy ?? {})) {
     const observed = key in actions ? actions[key] : workflowPermissions[key];
     if (observed !== expected) {
