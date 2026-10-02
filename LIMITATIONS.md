@@ -61,20 +61,23 @@ exact submitted commit.
   answers null and **Zed caches that per buffer and does not ask again on
   refocus**. Any edit, or opening a different Java file, restores it in well
   under a second.
-- **Gradle is driven, with exactly one exception: the Boot upgrade.** Until
-  2026-07-29 every capability gate had used a Maven fixture and the whole build
-  system axis was unobserved. It was then driven end to end against two Gradle
-  fixtures — a Boot 3.5.0 web app and a Spring Modulith 1.4.12 app — and the
-  outcome is that the build system is not a dividing line anywhere except that
-  one row. Property completion and validation, the Java reconcilers, Spring Data
-  query and SpEL diagnostics, cron, CodeLens and every product code action, Boot
-  project info (reporting `gradle build`), Boot version and support validation
-  (anchored on `build.gradle`), run/debug generation *and execution*, Modulith
-  metadata refresh, the module-violation diagnostic, and the embedded MCP
-  server's index-backed tools were all observed working on Gradle. The generated
-  `./gradlew bootRun` entries were run verbatim and served the application, with
-  the profile entry moving the port exactly as its profile file specifies, so
-  the Gradle profile form is verified rather than merely written.
+- **The 2026-07-29 Gradle evidence is historical for D007.** Under the retired
+  JDT-fed architecture, the Gradle axis was driven end to end against a Boot
+  3.5.0 web app and a Spring Modulith 1.4.12 app: property/Java intelligence,
+  run/debug generation and execution, version validation, Modulith metadata and
+  its violation diagnostic, and MCP index-backed tools were all observed.
+  D007 cannot reuse that project-model evidence. The pinned Spring Tools
+  5.3.0 standalone Gradle model reports each source set's Eclipse output
+  directory (normally `bin` / `bin/main`) as the Java class output, while a
+  normal `./gradlew classes` build writes application classes to
+  `build/classes/java/main`. `ModulithService` checks only the reported source
+  output folders before running its exporter, so the D007 standalone Gradle
+  fixture is rejected as uncompiled even after a successful Gradle build.
+  D007 therefore proves the retained Modulith capability on the equivalent
+  Maven fixture, whose project model points at the actual compiled output, and
+  does **not** claim current standalone Gradle Modulith refresh/violation support.
+  General Gradle editor, project-discovery, version-validation, and run/debug
+  paths remain subject to their own D007 evidence.
   **The Boot upgrade is genuinely Maven-only**, in upstream's code rather than
   in this extension: the pinned release attaches its upgrade quick fix only when
   the project's build type is Maven, and the command behind it asserts the same
