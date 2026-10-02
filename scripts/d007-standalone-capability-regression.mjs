@@ -14,11 +14,11 @@ import { Coordinator, run as runCoordinator, springArguments } from "../coordina
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = path.join(ROOT, "protocol", "spring-artifacts.json");
 const FIXTURE = path.join(ROOT, "tests", "fixtures", "spring-boot-basic");
-const MODULITH_FIXTURE = path.join(
+const MODULITH_MAVEN_FIXTURE = path.join(
   ROOT,
   "tests",
   "fixtures",
-  "spring-modulith-gradle",
+  "spring-modulith-maven",
 );
 const DOWNLOAD_TIMEOUT_MS = 180_000;
 const INDEX_TIMEOUT_MS = 180_000;
@@ -2531,85 +2531,13 @@ function stopProcessGroup(child) {
   }
 }
 
-function ensurePinnedGradleWrapper(worktree, javaHome) {
-  const wrapperJar = path.join(
-    worktree,
-    "gradle",
-    "wrapper",
-    "gradle-wrapper.jar",
-  );
-  if (fs.existsSync(wrapperJar)) return;
-
-  const propertiesFile = path.join(
-    worktree,
-    "gradle",
-    "wrapper",
-    "gradle-wrapper.properties",
-  );
-  const properties = fs.readFileSync(propertiesFile, "utf8");
-  const versionMatch =
-    /^distributionUrl=.*\/gradle-([0-9][0-9A-Za-z.+-]*)-bin\.zip$/m.exec(
-      properties,
-    );
-  assert.ok(
-    versionMatch,
-    "Modulith fixture must pin a parseable Gradle bin distribution",
-  );
-  const pinnedVersion = versionMatch[1];
-
-  const bootstrap = spawnSync(
-    "gradle",
-    ["wrapper", "--gradle-version", pinnedVersion, "--distribution-type", "bin"],
-    {
-      cwd: worktree,
-      encoding: "utf8",
-      shell: false,
-      timeout: 120_000,
-      maxBuffer: 8 * 1024 * 1024,
-      env: {
-        ...process.env,
-        JAVA_HOME: javaHome,
-        PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
-      },
-    },
-  );
-  if (bootstrap.error) {
-    throw new Error(
-      "Modulith Gradle wrapper bootstrap failed before capability validation: " +
-        bootstrap.error.message,
-    );
-  }
-  if (bootstrap.status !== 0) {
-    throw new Error(
-      "Modulith Gradle wrapper bootstrap failed before capability validation: " +
-        boundedCompletionText(
-          String(bootstrap.stderr ?? bootstrap.stdout ?? ""),
-          8000,
-        ),
-    );
-  }
-  assert.equal(
-    fs.existsSync(wrapperJar),
-    true,
-    "Gradle wrapper bootstrap must materialize gradle-wrapper.jar",
-  );
-  const after = fs.readFileSync(propertiesFile, "utf8");
-  assert.equal(
-    after.includes("/gradle-" + pinnedVersion + "-bin.zip"),
-    true,
-    "Gradle wrapper bootstrap must preserve the fixture's pinned distribution",
-  );
-}
-
 async function runModulithRegression(pin, jar, javaHome, runRoot) {
   const worktree = path.join(runRoot, "modulith-fixture");
-  fs.cpSync(MODULITH_FIXTURE, worktree, { recursive: true });
-
-  ensurePinnedGradleWrapper(worktree, javaHome);
+  fs.cpSync(MODULITH_MAVEN_FIXTURE, worktree, { recursive: true });
 
   const compile = spawnSync(
-    process.platform === "win32" ? "gradlew.bat" : "./gradlew",
-    ["classes", "--no-daemon"],
+    "mvn",
+    ["-q", "-DskipTests", "compile"],
     {
       cwd: worktree,
       encoding: "utf8",
@@ -2626,9 +2554,19 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
   if (compile.error) throw compile.error;
   if (compile.status !== 0) {
     throw new Error(
-      `Modulith Gradle classes failed: ${String(compile.stderr ?? "").slice(-8000)}`,
+      `Modulith Maven compile failed: ${String(compile.stderr ?? "").slice(-8000)}`,
     );
   }
+
+  const compiledClasses = findFilesByExtension(
+    path.join(worktree, "target", "classes"),
+    ".class",
+  );
+  assert.equal(
+    compiledClasses.length > 0,
+    true,
+    "Maven Modulith fixture must contain compiled classes before metadata refresh",
+  );
 
   const configuration = structuredClone(DEFAULT_CONFIGURATION);
   const java = path.join(
@@ -2650,7 +2588,7 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
   const workspaceUri = directoryUri(worktree);
   const client = new LspClient(
     child,
-    [{ uri: workspaceUri, name: "inventory-app-gradle" }],
+    [{ uri: workspaceUri, name: "inventory-app-maven" }],
     configuration,
   );
 
@@ -2659,7 +2597,7 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
       processId: process.pid,
       clientInfo: { name: "zed-spring-tools-d007-modulith", version: "1" },
       rootUri: workspaceUri,
-      workspaceFolders: [{ uri: workspaceUri, name: "inventory-app-gradle" }],
+      workspaceFolders: [{ uri: workspaceUri, name: "inventory-app-maven" }],
       capabilities: standardClientCapabilities(),
       initializationOptions: {},
     });
@@ -2706,7 +2644,7 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
     assert.equal(projects !== null && typeof projects === "object", true);
     const projectEntries = Object.entries(projects);
     assert.equal(projectEntries.length > 0, true);
-    const selected = projectEntries.find(([name]) => /inventory-app-gradle/.test(name))
+    const selected = projectEntries.find(([name]) => /inventory-app-maven/.test(name))
       ?? projectEntries[0];
     assert.equal(typeof selected[1], "string");
 
