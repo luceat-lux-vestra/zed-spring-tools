@@ -777,5 +777,11 @@ test("D007 Modulith refresh is serialized before the violation reconcile", () =>
     true,
     "Modulith timeout evidence must retain bounded diagnostics, client messages, and server stderr",
   );
+  assert.equal(
+    regression.includes("stderr.split(/\\r?\\n/).slice(-60)") &&
+      regression.includes('metadataChanged: refresh === "true"'),
+    true,
+    "Modulith failure/success evidence must preserve line-bounded stderr and the refresh result",
+  );
 });
 
