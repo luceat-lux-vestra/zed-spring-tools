@@ -12,6 +12,16 @@
   [capability-delivery-plan](capability-delivery-plan.md);
   [LIMITATIONS](../LIMITATIONS.md)
 
+> **D007 note (2026-10):** this document records the 2026-07-29
+> JDT-fed architecture and remains historical evidence. It is not current
+> standalone project-model proof. In Spring Tools 5.3 standalone, the Gradle
+> model reports Eclipse source outputs (`bin` / `bin/main`) while
+> `./gradlew classes` writes to `build/classes/java/main`; consequently the
+> standalone `ModulithService` rejects the compiled Gradle fixture as having no
+> class files. D007 revalidates Modulith on Maven and records standalone Gradle
+> Modulith as an upstream limitation rather than silently carrying this result
+> forward.
+
 Every driven gate in this repository so far ran on a Maven project. M6 names
 that as a gap and fixes the exit condition: before a stable release, each
 capability with a build-system dependency must sit in exactly one of two
