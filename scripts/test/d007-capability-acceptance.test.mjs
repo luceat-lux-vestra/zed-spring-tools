@@ -724,3 +724,19 @@ test("D007 Modulith regression bootstraps the ignored pinned Gradle wrapper", ()
   );
 });
 
+test("D007 draft platform gate checks out and asserts the exact PR head", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "platform-validation.yml"), "utf8");
+
+  assert.equal(
+    workflow.includes("ref: ${{ env.SOURCE_HEAD_SHA }}"),
+    true,
+    "draft D007 checkout must use the immutable PR head SHA rather than GitHub's synthetic merge ref",
+  );
+  assert.equal(
+    workflow.includes('actual="$(git rev-parse HEAD)"') &&
+      workflow.includes('test "$actual" = "$SOURCE_HEAD_SHA"'),
+    true,
+    "draft D007 gate must fail closed when the checked-out commit differs from SOURCE_HEAD_SHA",
+  );
+});
+
