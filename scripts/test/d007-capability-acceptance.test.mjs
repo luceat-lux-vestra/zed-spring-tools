@@ -740,3 +740,42 @@ test("D007 draft platform gate checks out and asserts the exact PR head", () => 
   );
 });
 
+test("D007 Modulith refresh is serialized before the violation reconcile", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const start = regression.indexOf("async function runModulithRegression(");
+  const end = regression.indexOf(
+    "function boundedDiagnosticState(",
+    start,
+  );
+  const modulith = regression.slice(start, end);
+
+  assert.equal(start >= 0 && end > start, true);
+  const refreshIndex = modulith.indexOf('command: "sts/modulith/metadata/refresh"');
+  const orderServiceChangeIndex = modulith.indexOf(
+    'uri: pathToFileURL(orderService).href',
+  );
+  assert.equal(
+    refreshIndex >= 0 && orderServiceChangeIndex > refreshIndex,
+    true,
+    "the deliberate violation source must reconcile only after metadata refresh has completed",
+  );
+  assert.equal(
+    modulith.slice(0, refreshIndex).includes('textDocument/didChange'),
+    false,
+    "the Modulith arm must not flood didChange before metadata refresh and race validateWith",
+  );
+  assert.equal(
+    modulith.includes('"OrderService.java"') &&
+      modulith.includes('refresh === "true" || refresh === "false"'),
+    true,
+    "the arm must target the exact violation fixture and validate the refresh result",
+  );
+  assert.equal(
+    regression.includes("diagnosticState=${JSON.stringify(boundedDiagnosticState(client))}") &&
+      regression.includes("windowMessages=${JSON.stringify(client.windowMessages.slice(-8))}") &&
+      regression.includes("stderrTail="),
+    true,
+    "Modulith timeout evidence must retain bounded diagnostics, client messages, and server stderr",
+  );
+});
+
