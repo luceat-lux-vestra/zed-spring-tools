@@ -2748,7 +2748,7 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
         `${error instanceof Error ? error.message : String(error)}; ` +
           `refresh=${JSON.stringify(refresh)}; ` +
           `windowMessages=${JSON.stringify(client.windowMessages.slice(-8))}; ` +
-          `stderrTail=${JSON.stringify(stderr.split(/\\r?\\n/).slice(-60))}`,
+          `stderrTail=${JSON.stringify(stderr.split(/\r?\n/).slice(-60))}`,
       );
     }
 
@@ -2776,7 +2776,8 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
         selectedProject: selected[0],
       }),
       metadataRefresh: pass("sts/modulith/metadata/refresh completed", {
-        resultWasNull: refresh === null,
+        result: refresh,
+        metadataChanged: refresh === "true",
       }),
       violation: pass("MODULITH_TYPE_REF_VIOLATION", {
         code: violation.code ?? null,
