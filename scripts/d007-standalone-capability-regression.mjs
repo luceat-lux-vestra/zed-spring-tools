@@ -2672,6 +2672,10 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
       ".java",
     );
     assert.equal(javaFiles.length > 0, true);
+    const orderService = javaFiles.find((file) =>
+      file.endsWith(path.join("order", "OrderService.java"))
+    );
+    assert.ok(orderService, "Modulith violation probe source must exist");
     let version = 1;
     for (const file of javaFiles) {
       client.notify("textDocument/didOpen", {
@@ -2695,13 +2699,6 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
       INDEX_TIMEOUT_MS,
     );
 
-    for (const file of javaFiles) {
-      client.notify("textDocument/didChange", {
-        textDocument: { uri: pathToFileURL(file).href, version: version++ },
-        contentChanges: [{ text: fs.readFileSync(file, "utf8") }],
-      });
-    }
-
     const projects = await client.request("workspace/executeCommand", {
       command: "sts/modulith/projects",
       arguments: [],
@@ -2717,15 +2714,43 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
       command: "sts/modulith/metadata/refresh",
       arguments: [selected[1]],
     }, 120_000);
-
-    const violation = await waitForAnyDiagnostic(
-      client,
-      (diagnostic) =>
-        String(diagnostic.code ?? "").includes("MODULITH_TYPE_REF_VIOLATION") ||
-        /Invalid reference to non-exposed type/i.test(String(diagnostic.message ?? "")),
-      "Modulith type-reference violation",
-      INDEX_TIMEOUT_MS,
+    assert.equal(
+      refresh === "true" || refresh === "false",
+      true,
+      `Modulith metadata refresh returned unexpected result: ${JSON.stringify(refresh)}`,
     );
+
+    // Do not flood every open Java document immediately before the metadata
+    // refresh. Spring Tools 5.3 uses THROTTLE/0 for document reconciliation and
+    // drops a second validateWith(uri) while that URI is already reconciling.
+    // Once refresh has completed, the metadata cache is settled; reconcile the
+    // single source that owns the deliberate cross-module violation.
+    client.notify("textDocument/didChange", {
+      textDocument: {
+        uri: pathToFileURL(orderService).href,
+        version: version++,
+      },
+      contentChanges: [{ text: fs.readFileSync(orderService, "utf8") }],
+    });
+
+    let violation;
+    try {
+      violation = await waitForAnyDiagnostic(
+        client,
+        (diagnostic) =>
+          String(diagnostic.code ?? "").includes("MODULITH_TYPE_REF_VIOLATION") ||
+          /Invalid reference to non-exposed type/i.test(String(diagnostic.message ?? "")),
+        "Modulith type-reference violation",
+        INDEX_TIMEOUT_MS,
+      );
+    } catch (error) {
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}; ` +
+          `refresh=${JSON.stringify(refresh)}; ` +
+          `windowMessages=${JSON.stringify(client.windowMessages.slice(-8))}; ` +
+          `stderrTail=${JSON.stringify(stderr.split(/\\r?\\n/).slice(-60))}`,
+      );
+    }
 
     const structure = await client.request("workspace/executeCommand", {
       command: "sts/spring-boot/structure",
@@ -2763,20 +2788,33 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
   }
 }
 
+function boundedDiagnosticState(client) {
+  const uris = [
+    ...new Set([
+      ...client.diagnostics.keys(),
+      ...client.diagnosticHistory.keys(),
+    ]),
+  ].slice(0, 12);
+  return uris.map((uri) => ({
+    uri: boundedCompletionText(uri, 240),
+    latest: boundedDiagnosticSummary(client.diagnostics.get(uri) ?? []),
+    history: (client.diagnosticHistory.get(uri) ?? []).slice(-4),
+  }));
+}
+
 async function waitForAnyDiagnostic(client, predicate, label, timeoutMs) {
-  let match = null;
-  await waitFor(
-    () => {
-      for (const diagnostics of client.diagnostics.values()) {
-        match = diagnostics.find(predicate) ?? null;
-        if (match !== null) return true;
-      }
-      return false;
-    },
-    label,
-    timeoutMs,
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const diagnostics of client.diagnostics.values()) {
+      const match = diagnostics.find(predicate) ?? null;
+      if (match !== null) return match;
+    }
+    await sleep(POLL_MS);
+  }
+  throw new Error(
+    `timed out waiting for ${label} after ${timeoutMs}ms; ` +
+      `diagnosticState=${JSON.stringify(boundedDiagnosticState(client))}`,
   );
-  return match;
 }
 
 function findFilesByExtension(directory, extension) {
