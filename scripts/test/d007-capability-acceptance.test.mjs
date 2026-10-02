@@ -594,6 +594,27 @@ test("D007 live Hover probe targets the exact GetMapping annotation", () => {
   );
 });
 
+test("D007 local live connection selects the exact Boot application PID", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("Starting FixtureApplication .* with PID (\\d+)") &&
+      regression.includes("const appProcessKey = appPidMatch[1]"),
+    true,
+    "live regression must derive the target process key from the Boot application's own startup PID",
+  );
+  assert.equal(
+    regression.includes('String(entry?.processKey ?? "") === appProcessKey'),
+    true,
+    "local live descriptor selection must match Spring Tools processKey to that exact JVM PID",
+  );
+  assert.equal(
+    regression.includes('/FixtureApplication|zed-spring-tools-fixture/.test(String(entry?.label ?? ""))'),
+    false,
+    "broad label matching must not select a Maven parent or unrelated JVM",
+  );
+});
+
 test("D007 live fixture launches with production live-data VM arguments", () => {
   const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
   const coordinator = fs.readFileSync(path.join(root, "coordinator", "src", "main.mjs"), "utf8");
