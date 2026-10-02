@@ -66,6 +66,15 @@ For #159 and the Registry release gate, apply this overlay:
   returns an empty list. That sub-capability is `blocked-zed-api` under D007
   even though the broader XML support row retains historical evidence for
   scanning, diagnostics, property completion, and hyperlinks.
+- **D007 Gradle Modulith boundary:** the historical Gradle Modulith proof below
+  used the retired JDT-fed project model. Spring Tools 5.3 standalone derives
+  Gradle source output from the Tooling API Eclipse model (`bin` /
+  `bin/main`), while the normal Gradle classes task writes to
+  `build/classes/java/main`; `ModulithService` checks only the former and
+  refuses metadata refresh as uncompiled. The current D007 capability proof is
+  therefore a compiled Maven Modulith fixture. Until upstream aligns the
+  standalone Gradle output model, Gradle Modulith refresh/violation is not a
+  release-facing D007 claim.
 - **Evidence boundary:** the six-platform standalone runtime smoke is automated
   headless evidence. It does not promote affected rows to release-facing
   `verified`; exact-final-HEAD Zed development-extension validation is still
