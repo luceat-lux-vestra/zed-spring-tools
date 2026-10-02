@@ -2644,8 +2644,11 @@ async function runModulithRegression(pin, jar, javaHome, runRoot) {
     assert.equal(projects !== null && typeof projects === "object", true);
     const projectEntries = Object.entries(projects);
     assert.equal(projectEntries.length > 0, true);
-    const selected = projectEntries.find(([name]) => /inventory-app-maven/.test(name))
-      ?? projectEntries[0];
+    const selected = projectEntries.find(([name]) => name === "inventory-app-maven");
+    assert.ok(
+      selected,
+      `standalone Modulith project list must contain exact Maven fixture: ${JSON.stringify(projectEntries.map(([name]) => name))}`,
+    );
     assert.equal(typeof selected[1], "string");
 
     const refresh = await client.request("workspace/executeCommand", {
