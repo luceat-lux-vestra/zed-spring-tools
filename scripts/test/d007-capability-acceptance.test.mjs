@@ -17,6 +17,7 @@ const greetingRepositoryFixture = path.join(root, "tests", "fixtures", "spring-b
 const spelFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "SpelSample.java");
 const namedQueriesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "META-INF", "jpa-named-queries.properties");
 const codeLensProbeFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "CodeLensProbeController.java");
+const modulithMavenPom = path.join(root, "tests", "fixtures", "spring-modulith-maven", "pom.xml");
 
 const STATES = new Set([
   "verified",
@@ -687,40 +688,39 @@ test("D007 automatic live arm keeps CLI and workspace settings consistent", () =
   );
 });
 
-test("D007 Modulith regression bootstraps the ignored pinned Gradle wrapper", () => {
+test("D007 Modulith regression proves the standalone capability on a compiled Maven fixture", () => {
   const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const pom = fs.readFileSync(modulithMavenPom, "utf8");
 
-  const helperStart = regression.indexOf("function ensurePinnedGradleWrapper(");
-  const helperEnd = regression.indexOf(
-    "async function runModulithRegression(",
-    helperStart,
-  );
-  const helper = regression.slice(helperStart, helperEnd);
-
-  assert.equal(helperStart >= 0 && helperEnd > helperStart, true);
   assert.equal(
-    helper.includes('"gradle-wrapper.properties"') &&
-      helper.includes('"gradle-wrapper.jar"'),
+    pom.includes("<artifactId>spring-boot-starter-parent</artifactId>") &&
+      pom.includes("<version>3.5.5</version>") &&
+      pom.includes("<artifactId>spring-modulith-starter-core</artifactId>") &&
+      pom.includes("<version>1.4.12</version>"),
     true,
-    "bootstrap must derive the missing binary from the copied fixture wrapper metadata",
+    "Maven Modulith fixture must pin the same Boot/Modulith generations as the historical Gradle probe",
   );
   assert.equal(
-    helper.includes('"gradle"') &&
-      helper.includes('"wrapper"') &&
-      helper.includes('"--gradle-version"') &&
-      helper.includes('"--distribution-type"'),
+    regression.includes('"tests", "fixtures", "spring-modulith-maven"'),
     true,
-    "bootstrap must run the Gradle wrapper task at the fixture-pinned version",
+    "standalone Modulith proof must use the dedicated Maven fixture",
   );
   assert.equal(
-    helper.includes("Gradle wrapper bootstrap must preserve the fixture's pinned distribution"),
+    regression.includes('["-q", "-DskipTests", "compile"]') &&
+      regression.includes('"target", "classes"') &&
+      regression.includes("Maven Modulith fixture must contain compiled classes before metadata refresh"),
     true,
-    "bootstrap must fail closed if it changes the pinned distribution",
+    "standalone proof must compile and verify the exact Maven output before metadata refresh",
   );
   assert.equal(
-    regression.includes("ensurePinnedGradleWrapper(worktree, javaHome);"),
+    regression.includes('name === "inventory-app-maven"'),
     true,
-    "Modulith compilation must bootstrap the ignored wrapper before invoking ./gradlew",
+    "Modulith project selection must fail closed on the exact fixture project",
+  );
+  assert.equal(
+    regression.includes("ensurePinnedGradleWrapper("),
+    false,
+    "standalone capability proof must not fake Gradle output through wrapper bootstrap",
   );
 });
 
