@@ -701,7 +701,9 @@ test("D007 Modulith regression proves the standalone capability on a compiled Ma
     "Maven Modulith fixture must pin the same Boot/Modulith generations as the historical Gradle probe",
   );
   assert.equal(
-    regression.includes('"tests", "fixtures", "spring-modulith-maven"'),
+    regression.includes("const MODULITH_MAVEN_FIXTURE = path.join(") &&
+      regression.includes('"spring-modulith-maven"') &&
+      regression.includes("fs.cpSync(MODULITH_MAVEN_FIXTURE, worktree"),
     true,
     "standalone Modulith proof must use the dedicated Maven fixture",
   );
