@@ -119,6 +119,15 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         with:
           persist-credentials: false
+          ref: ${{ env.SOURCE_HEAD_SHA }}
+      - name: Assert D007 exact PR HEAD
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
+        run: |
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$SOURCE_HEAD_SHA" || {
+            echo "FAIL: D007 checkout is not exact PR HEAD: expected=$SOURCE_HEAD_SHA actual=$actual"
+            exit 1
+          }
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls' && matrix.id == 'macos-arm64' }}
         with:
