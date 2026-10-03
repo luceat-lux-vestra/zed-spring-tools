@@ -60,4 +60,24 @@ test("D007 desktop DAP retries with fresh modal and preserves source integrity",
     true,
     "DAP readiness must be proven in the cold process that owns the picker",
   );
+  assert.equal(
+    source.includes("observeOfflineSpringFailClosedMacos({"),
+    true,
+    "offline regression must prove fail-closed state directly",
+  );
+  assert.equal(
+    source.includes('activationProbe: "editor::ShowCompletions"'),
+    true,
+    "offline proof must actively stimulate the Spring-only Properties target",
+  );
+  assert.equal(
+    source.includes("waitForOfflineDownloadFailure("),
+    false,
+    "offline proof must not depend on unstable Zed foreground-log markers",
+  );
+  assert.equal(
+    source.includes("paired online recovery follows in the same lifecycle gate"),
+    true,
+    "offline negative proof must be paired with online recovery",
+  );
 });
