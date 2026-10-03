@@ -92,17 +92,44 @@ test("the MCP port is the only thing that changes the Spring launch vector", () 
   );
 });
 
-test("standalone project-dir JVM argument is cwd-relative and Unicode-safe", () => {
-  const project = process.platform === "win32"
-    ? "C:\\tmp\\workspace space 한글"
-    : "/tmp/workspace space 한글";
-  const args = springArguments("/tmp/spring/server.jar", project, null);
-  assert.ok(args.includes("-Dspring.boot.ls.project.dir=."));
-  assert.equal(
-    args.some((argument) => argument.includes(project)),
-    false,
-    "the absolute worktree must stay out of JVM argv; run() carries it as child cwd",
+test("standalone project-dir JVM argument preserves host path identity", () => {
+  const windowsProject = "C:\\tmp\\workspace space 한글";
+  const windowsArgs = springArguments(
+    "C:\\tmp\\spring\\server.jar",
+    windowsProject,
+    null,
+    "win32",
   );
+  assert.ok(windowsArgs.includes("-Dspring.boot.ls.project.dir=."));
+  assert.equal(
+    windowsArgs.some((argument) => argument.includes(windowsProject)),
+    false,
+    "Windows must keep the Unicode absolute worktree out of JVM argv",
+  );
+
+  const macProject = "/var/folders/demo/workspace";
+  const macArgs = springArguments(
+    "/tmp/spring/server.jar",
+    macProject,
+    null,
+    "darwin",
+  );
+  assert.ok(macArgs.includes(`-Dspring.boot.ls.project.dir=${macProject}`));
+  assert.equal(
+    macArgs.includes("-Dspring.boot.ls.project.dir=."),
+    false,
+    "POSIX must keep the exact workspace identity instead of cwd canonicalization",
+  );
+
+  const linuxProject = "/tmp/workspace space 한글";
+  const linuxArgs = springArguments(
+    "/tmp/spring/server.jar",
+    linuxProject,
+    null,
+    "linux",
+  );
+  assert.ok(linuxArgs.includes(`-Dspring.boot.ls.project.dir=${linuxProject}`));
+
   assert.throws(
     () => springArguments("/tmp/spring/server.jar", "", null),
     /standalone Spring Tools project directory is required/,
