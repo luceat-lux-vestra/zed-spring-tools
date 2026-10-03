@@ -45,10 +45,11 @@ declared byte size and SHA-256 before launch.
 The smoke creates a real Maven Spring Boot fixture under a path containing both
 spaces and non-ASCII characters, starts the pinned server with the production
 standalone JVM vector, and drives an LSP session. The Java child is launched with
-the exact worktree as its native `cwd`; Spring's
-`spring.boot.ls.project.dir` property is deliberately `.` so Windows does not
-duplicate a Unicode worktree through a lossy JVM command-line boundary. It
-requires the server to:
+the exact worktree as its native `cwd`. On Windows,
+`spring.boot.ls.project.dir=.` avoids duplicating a Unicode worktree through the
+JVM command-line boundary; on POSIX the property keeps the exact absolute
+worktree so path aliases such as macOS `/var` and `/private/var` cannot import
+one physical project under two URI identities. It requires the server to:
 
 1. initialize successfully;
 2. open both a Java document and a `spring-boot-properties` document;
