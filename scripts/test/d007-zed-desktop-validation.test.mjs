@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -35,4 +36,15 @@ test("D007 isolated Zed desktop harness stages without Java private work state",
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /D007 Zed desktop validation self-test: ok/);
+});
+
+test("D007 desktop DAP retries with fresh modal and preserves source integrity", () => {
+  const script = path.resolve("scripts", "d007-zed-desktop-validation.mjs");
+  const source = fs.readFileSync(script, "utf8");
+  assert.equal(source.includes("fresh debugger modal attempt(s)"), true);
+  assert.equal(source.includes("freshModalPerAttempt: true"), true);
+  assert.equal(source.includes("sourceIntegrityObserved: true"), true);
+  assert.equal(source.includes("DAP picker query modified the Java source"), true);
+  assert.equal(source.includes("timeout: 15_000"), true);
+  assert.equal(source.includes("timedOut: result.error?.code === \"ETIMEDOUT\""), true);
 });
