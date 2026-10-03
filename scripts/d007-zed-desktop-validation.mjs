@@ -956,6 +956,20 @@ function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
   );
   assert.ok(config, fixtureKind + " base Spring Boot Java debug config must exist");
 
+  const sourceFile = path.join(
+    worktree,
+    "src",
+    "main",
+    "java",
+    "dev",
+    "zed",
+    "spring",
+    "fixture",
+    "FixtureApplication.java",
+  );
+  requireFile(sourceFile, fixtureKind + " DAP Java source");
+  const sourceDigestBefore = sha256File(sourceFile);
+
   const before = new Set(
     javaDebugProcessCandidates(
       processSnapshot(),
@@ -964,31 +978,59 @@ function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
     ).map((entry) => entry.pid),
   );
 
-  sendD007ActionKeyMacos(
-    manifest,
-    "d",
-    fixtureKind + "-dap-start-action",
-  );
-  sleepMs(900);
-  typeD007PickerQueryMacos(
-    manifest,
-    config.label,
-    fixtureKind + "-dap-debug-config-query",
-  );
-  sleepMs(900);
-
   const started = Date.now();
   let attempts = 0;
   let observed;
-  while (Date.now() - started < timeoutMs) {
-    if (attempts < 3) {
-      attempts += 1;
-      confirmD007PickerMacos(
-        manifest,
-        fixtureKind + "-dap-confirm-" + attempts,
+  const maxAttempts = 3;
+  while (
+    observed === undefined &&
+    attempts < maxAttempts &&
+    Date.now() - started < timeoutMs
+  ) {
+    attempts += 1;
+    const sourceDigestAttemptStart = sha256File(sourceFile);
+    assert.equal(
+      sourceDigestAttemptStart,
+      sourceDigestBefore,
+      fixtureKind + " Java source changed before DAP picker attempt",
+    );
+
+    sendD007ActionKeyMacos(
+      manifest,
+      "d",
+      fixtureKind + "-dap-start-action-" + attempts,
+    );
+    sleepMs(900);
+    typeD007PickerQueryMacos(
+      manifest,
+      config.label,
+      fixtureKind + "-dap-debug-config-query-" + attempts,
+    );
+    sleepMs(900);
+
+    const sourceDigestAfterQuery = sha256File(sourceFile);
+    if (sourceDigestAfterQuery !== sourceDigestBefore) {
+      throw new Error(
+        fixtureKind +
+          " DAP picker query modified the Java source; debugger::Start did not own text focus",
       );
     }
-    const attemptDeadline = Math.min(started + timeoutMs, Date.now() + 20_000);
+
+    captureScreen(
+      path.join(
+        manifest.evidence,
+        fixtureKind + "-dap-picker-attempt-" + attempts + ".png",
+      ),
+    );
+    confirmD007PickerMacos(
+      manifest,
+      fixtureKind + "-dap-confirm-" + attempts,
+    );
+
+    const attemptDeadline = Math.min(
+      started + timeoutMs,
+      Date.now() + 30_000,
+    );
     while (Date.now() < attemptDeadline) {
       observed = javaDebugProcessCandidates(
         processSnapshot(),
@@ -998,14 +1040,30 @@ function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
       if (observed !== undefined) break;
       sleepMs(250);
     }
-    if (observed !== undefined) break;
+
+    const sourceDigestAfterAttempt = sha256File(sourceFile);
+    if (sourceDigestAfterAttempt !== sourceDigestBefore) {
+      throw new Error(
+        fixtureKind + " Java source changed during DAP picker automation",
+      );
+    }
+
+    if (observed === undefined) {
+      cancelTransientUiMacos(
+        manifest,
+        fixtureKind + "-dap-cancel-after-attempt-" + attempts,
+      );
+      sleepMs(750);
+    }
   }
 
   if (observed === undefined) {
     captureScreen(path.join(manifest.evidence, fixtureKind + "-dap-failure.png"));
     throw new Error(
       fixtureKind +
-        " generated Java debug configuration did not launch a new JDWP application process",
+        " generated Java debug configuration did not launch a new JDWP application process after " +
+        attempts +
+        " fresh debugger modal attempt(s)",
     );
   }
 
@@ -1019,6 +1077,13 @@ function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
     () => !processPidIsLive(observed.pid),
     fixtureKind + " debuggee shutdown after debugger::Stop",
     30_000,
+  );
+
+  const sourceDigestAfter = sha256File(sourceFile);
+  assert.equal(
+    sourceDigestAfter,
+    sourceDigestBefore,
+    fixtureKind + " Java source must remain unchanged across DAP regression",
   );
 
   const evidence = {
@@ -1036,6 +1101,8 @@ function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
         jdwpObserved: observed.jdwpObserved,
         exactWorktreeObserved: observed.exactWorktreeObserved,
         pickerConfirmAttempts: attempts,
+        freshModalPerAttempt: true,
+        sourceIntegrityObserved: true,
         stoppedViaPublicDebuggerAction: true,
       },
     },
@@ -2502,13 +2569,21 @@ function runtimeText(manifest, sharedLog, sharedStart) {
 }
 
 function runOsa(script, name, evidence) {
-  const result = spawnSync("osascript", ["-e", script], { encoding: "utf8" });
+  const result = spawnSync("osascript", ["-e", script], {
+    encoding: "utf8",
+    timeout: 15_000,
+  });
   fs.writeFileSync(path.join(evidence, `${name}-automation.json`), JSON.stringify({
     at: new Date().toISOString(),
     exitCode: result.status,
+    signal: result.signal ?? null,
+    timedOut: result.error?.code === "ETIMEDOUT",
     stdout: bounded(result.stdout),
     stderr: bounded(result.stderr),
   }, null, 2) + "\n", { mode: 0o600 });
+  if (result.error) {
+    throw new Error(`${name} UI automation failed: ${errorText(result.error)}`);
+  }
   if (result.status !== 0) throw new Error(`${name} UI automation failed`);
 }
 
