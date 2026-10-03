@@ -934,6 +934,14 @@ function observeOfflineSpringFailClosedMacos({
     "loopback-only",
     "offline fail-closed proof requires the loopback-only sandbox",
   );
+  const stagedSettings = JSON.parse(
+    fs.readFileSync(path.join(manifest.profile, "config", "settings.json"), "utf8"),
+  );
+  assert.deepEqual(
+    stagedSettings.languages?.Properties?.language_servers,
+    ["spring-tools"],
+    "offline activation probe must target a document owned only by spring-tools",
+  );
 
   // The target is a Properties document whose staged language-server list is
   // spring-tools only. Drive a real public completion action so this proof does
