@@ -36,6 +36,25 @@ test("the real workflow tree satisfies the offline policy", () => {
   assert.equal(result.code, 0, result.output);
 });
 
+test("retired Actions event policy 5154 remains tracked", () => {
+  const policy = JSON.parse(
+    readFileSync(join(REPOSITORY, ".github/merge-gate-policy.json"), "utf8"),
+  );
+  assert.deepEqual(policy.retired_actions_event_policy_ids, [5154]);
+});
+
+test("retired Actions event policy ids must be positive and unique", () => {
+  const root = fixture();
+  const path = join(root, ".github/merge-gate-policy.json");
+  const policy = JSON.parse(readFileSync(path, "utf8"));
+  policy.retired_actions_event_policy_ids = [5154, 5154, 0];
+  writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /lists retired Actions event policy id 5154 more than once/);
+  assert.match(result.output, /not a positive integer/);
+});
+
 test("a renamed required producer is rejected", () => {
   const root = fixture();
   edit(root, ".github/workflows/ci.yml", "  rust:\n", "  rust:\n    name: Rust renamed\n");

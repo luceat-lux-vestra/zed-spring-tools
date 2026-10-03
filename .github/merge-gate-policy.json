@@ -151,5 +151,8 @@
       "CONTRIBUTORS.md",
       "THIRD_PARTY_NOTICES.md"
     ]
-  }
+  },
+  "retired_actions_event_policy_ids": [
+    5154
+  ]
 }
