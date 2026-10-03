@@ -1,37 +1,13 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "springTools": {
     "tag": "5.3.0.RELEASE",
     "sourceCommit": "573f714dc76f178bfb2af392d03864f2a0a540ac",
-    "asset": "vscode-spring-boot-2.3.0-RC2.vsix",
-    "url": "https://github.com/spring-projects/spring-tools/releases/download/5.3.0.RELEASE/vscode-spring-boot-2.3.0-RC2.vsix",
-    "size": 83000863,
-    "sha256": "8e555da123e5b4edb7449d3ef1f922a922503e64a86cd66cbe713638f94a9e50",
-    "requiredFiles": [
-      {
-        "path": "extension/language-server/spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar",
-        "sha256": "eed894c869caa71ce139eaf1f95f56120e97518102d52471803fd5a9d436a682"
-      },
-      {
-        "path": "extension/jars/io.projectreactor.reactor-core.jar",
-        "sha256": "76ea420992e2c864f9a21d241ac29ac6582e857ae30ecd878cb96af827597590"
-      },
-      {
-        "path": "extension/jars/org.reactivestreams.reactive-streams.jar",
-        "sha256": "71e23e2a0d9159fc1aae1158af714ac72fc67a384bb6fe195301081df49c2038"
-      },
-      {
-        "path": "extension/jars/jdt-ls-commons.jar",
-        "sha256": "bfdb51f0ae7df7bd4f1ba7a07109ccab361b62f1f003ac1613cede0434040530"
-      },
-      {
-        "path": "extension/jars/jdt-ls-extension.jar",
-        "sha256": "7a6d24e436adec9674098b15fc3f28b8161d216d5bd372b7fdc29c50491e261c"
-      },
-      {
-        "path": "extension/jars/sts-gradle-tooling.jar",
-        "sha256": "8063a93858cc90bcf8d3f890a0c5ff11b557f9b4fd24cb0b954bb1e1b96c6d0e"
-      }
-    ]
+    "artifactVersion": "2.3.0",
+    "asset": "spring-boot-language-server-standalone-exec.jar",
+    "url": "https://cdn.spring.io/spring-tools/release/language-server/spring-boot/2.3.0/spring-boot-language-server-standalone-exec.jar",
+    "size": 98065695,
+    "sha256": "a4c83e721c2799e4bca72939db840ad29440da34227e291b0447a6c06ff23a6b",
+    "mode": "standalone"
   }
 }

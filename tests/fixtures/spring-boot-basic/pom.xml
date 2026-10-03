@@ -54,4 +54,25 @@
             <optional>true</optional>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!--
+                        JDK 23+ no longer discovers annotation processors from the
+                        ordinary compile classpath by default. Keep the fixture's
+                        project-metadata contract explicit and narrow so
+                        spring-configuration-metadata.json is generated on the
+                        JDK 25+ D007 validation tuple.
+                    -->
+                    <annotationProcessors>
+                        <annotationProcessor>org.springframework.boot.configurationprocessor.ConfigurationMetadataAnnotationProcessor</annotationProcessor>
+                    </annotationProcessors>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

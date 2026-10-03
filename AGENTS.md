@@ -7,18 +7,23 @@ is a milestone record, not the current roadmap. Current work is the Registry-fir
 distribution and v1.0 program owned by release Epic #108 and
 `docs/preview-release-gate.md`.
 
-Current `main` still contains the D002-D006 private Java/Spring coordination
-architecture. The 2026-09-25 publishing-policy audit opened #159 as a release
-blocker because that production path reads another extension's private work
-directory/proxy boundary. That finding blocks Registry refresh/release claims;
-it does not retroactively erase historical capability evidence. Draft PR #160 is
-a candidate remediation and is not current authority until it merges with its
-required evidence.
+D007 is the current runtime publishing boundary for the #159 remediation.
+Production Spring analysis uses Spring Tools' official standalone Boot language
+server inside this extension's own work boundary. The official Java extension
+remains the Java editor/runtime owner, but this extension no longer reads its
+private work directory/proxy route and no longer injects the retired bridge
+bundle into JDT LS. D002/D003/D006 remain historical records for the superseded
+private-coordination design; D004/D005 remain applicable only where they do not
+conflict with D007.
 
-The external Registry contribution zed-industries/extensions#6875 remains open,
-`extension.toml` remains at `0.1.0`, and #112/#113 remain the release-lifecycle
-and v1.0 promotion tasks. Do not claim Registry publication or v1.0 before those
-gates actually pass. Spike code remains excluded from production.
+Release evidence remains exact-revision scoped. Registry refresh must not resume
+merely because the code exists: #159's closure evidence must bind the final
+candidate to repository-required checks and the isolated macOS D007 desktop
+validation. The external Registry contribution zed-industries/extensions#6875
+remains open, `extension.toml` remains at `0.1.0`, and #112/#113 remain the
+release-lifecycle and v1.0 promotion tasks. Do not claim Registry publication or
+v1.0 before those gates actually pass. Spike code remains excluded from
+production.
 
 ## Product goal and delivery strategy
 
@@ -44,30 +49,34 @@ gates actually pass. Spike code remains excluded from production.
   `docs/decisions/`.
 - Add minimal disposable code under `spikes/` only when a written spike plan
   identifies the hypothesis and success criteria.
-- Implement product code under `src/`, `coordinator/`, `bridge/`, `protocol/`,
-  `scripts/`, and `tests/` only within the current reviewed architecture and
-  the scope of an owning issue/decision. `docs/implementation-plan.md` is
-  historical; do not use it as an active milestone authority.
+- Implement product code under `src/`, `coordinator/`, `protocol/`,
+  `scripts/`, and `tests/` within the boundary fixed by D007 and the
+  capability-delivery policy retained from D005. The former production
+  `bridge/` module is retired by D007 and must not be recreated without a new
+  recorded decision. `docs/implementation-plan.md` is historical; do not use
+  it as an active milestone authority.
 - Update this file or the root README when the workflow itself changes.
 
 ## Work that requires an explicit direction decision
 
-D002-D006 remain the checked-in architecture on current `main`, but #159 has
-reopened the release/publishing boundary for the private Java transport. Do not
-treat draft remediation as merged authority, and do not expand a release-blocked
-private surface while that decision is unresolved.
+D007 is authoritative for the runtime publishing boundary. D004 still governs
+the source-first product stack where it does not conflict with D007, and D005
+still governs stock-Zed capability delivery. D002/D003/D006 remain historical
+records for the superseded private Java coordination design.
 
 Do not add any of the following until a recorded current issue/decision supports it:
 
 - a new packaging/distribution/release-automation path outside release Epic #108,
   the current release gate, and existing reviewed workflows;
 - a new runtime dependency, downloaded artifact, or network call beyond the
-  existing pinned Spring Tools acquisition boundary;
-- new dependence on the official Java extension's private proxy/work directory,
-  or expansion of the current allowlisted bridge route while #159 is open;
-- a reduced or self-managed JDT fallback, which D002 and D003 exclude;
+  pinned standalone Spring Tools acquisition boundary;
+- any read, write, discovery, or protocol dependency on another extension's
+  private work directory, proxy, localhost endpoint, or injected JDT bundle;
+- a private or self-managed JDT fallback; the selected Spring runtime is the
+  official standalone Spring Tools server, not a second JDT LS;
 - replacement or co-ownership of the official Java language, grammar, or query
-  pack, which D003 and D005 exclude from the baseline;
+  pack; D005 and D007 keep ordinary Java editing with the official Java
+  extension;
 - a custom Zed distribution or external dashboard runtime, which D005 does not
   select;
 - promotion of `spikes/` code into production; or
@@ -251,17 +260,20 @@ derive and validate them.
 
 ## Decision gate
 
-The original D002-D006 architecture remains the checked-in production boundary
-on current `main`, but the release/publishing decision is no longer closed:
-#159 records evidence that the private cross-extension Java transport is not an
-acceptable Registry-release boundary under this project's fail-closed policy.
+This gate is closed for the product runtime architecture. D007 supersedes the
+private cross-extension coordination selected by D002/D003 and the affected
+portions of D004/D006. Spring Tools' official standalone Boot language server now
+runs inside this extension's own boundary while the official Java extension
+remains the Java editor/runtime owner. D005's LSP-first user-facing delivery
+policy remains in force.
 
-Until a replacement decision/remediation is merged and revalidated, preserve the
-current runtime for reproducibility but do not broaden the private transport,
-present it as Registry-compliant, refresh the upstream Registry pointer, or
-promote release claims. Draft PR #160 is remediation work, not current
-architecture authority.
+Do not reintroduce sibling-workdir discovery, the official Java private proxy,
+the retired bridge bundle, or private `sts.java.*` mappings as a fallback.
+Release authorization is separate from architecture selection: exact-final
+repository-required checks and the isolated D007 desktop gate must still prove
+the candidate before Registry refresh or release claims advance.
 
-Any replacement architecture must be recorded in a decision document and must
-reconcile capability evidence, compatibility/limitations, release gating, and
-the exact Registry candidate before the decision gate can close again.
+Reopen the architecture gate only if new public Zed integration surfaces or
+other evidence justify a different boundary, and record the outcome in a
+decision document before changing production code.
+

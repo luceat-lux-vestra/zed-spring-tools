@@ -1,0 +1,811 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const inventoryFile = path.join(root, "docs", "capability-inventory.md");
+const matrixFile = path.join(root, "protocol", "d007-capability-acceptance.json");
+const desktopHarnessFile = path.join(root, "scripts", "d007-zed-desktop-validation.mjs");
+const standaloneRegressionFile = path.join(root, "scripts", "d007-standalone-capability-regression.mjs");
+const basicPropertiesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.properties");
+const basicYamlFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "application.yaml");
+const extensionManifestFile = path.join(root, "extension.toml");
+const basicPomFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "pom.xml");
+const greetingRepositoryFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "GreetingRepository.java");
+const spelFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "SpelSample.java");
+const namedQueriesFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "resources", "META-INF", "jpa-named-queries.properties");
+const codeLensProbeFixture = path.join(root, "tests", "fixtures", "spring-boot-basic", "src", "main", "java", "dev", "zed", "spring", "fixture", "CodeLensProbeController.java");
+const modulithMavenPom = path.join(root, "tests", "fixtures", "spring-modulith-maven", "pom.xml");
+
+const STATES = new Set([
+  "verified",
+  "implemented",
+  "planned",
+  "blocked-zed-api",
+  "blocked-upstream",
+  "zed-native-equivalent",
+  "not-pursued",
+]);
+
+function inventoryRows() {
+  const rows = [];
+  for (const line of fs.readFileSync(inventoryFile, "utf8").split("\n")) {
+    if (!line.startsWith("| ")) continue;
+    const columns = line.split("|").slice(1, -1).map((value) => value.trim());
+    if (columns.length < 2) continue;
+    const state = columns[1].replaceAll("`", "");
+    const capability = columns[0];
+    if (!STATES.has(state) || STATES.has(capability.replaceAll("`", ""))) continue;
+    rows.push({ capability, historicalState: state });
+  }
+  return rows;
+}
+
+test("D007 classifies every tracked capability exactly once", () => {
+  const inventory = inventoryRows();
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+
+  assert.equal(inventory.length, 59);
+  assert.equal(matrix.schemaVersion, 1);
+  assert.equal(matrix.decision, "D007");
+  assert.equal(matrix.entries.length, inventory.length);
+
+  const expected = new Map(inventory.map((entry) => [entry.capability, entry.historicalState]));
+  const seen = new Set();
+  for (const entry of matrix.entries) {
+    assert.equal(typeof entry.capability, "string");
+    assert.equal(seen.has(entry.capability), false, `duplicate D007 capability: ${entry.capability}`);
+    seen.add(entry.capability);
+
+    assert.equal(expected.has(entry.capability), true, `unknown D007 capability: ${entry.capability}`);
+    assert.equal(entry.historicalState, expected.get(entry.capability));
+    assert.match(entry.classification, /^(?:unaffected|existing-blocker|not-pursued|retained-requires-standalone-evidence|redesigned-requires-evidence)$/);
+    assert.equal(typeof entry.evidenceGroup, "string");
+    assert.notEqual(entry.evidenceGroup.length, 0);
+    assert.equal(typeof entry.reason, "string");
+    assert.notEqual(entry.reason.length, 0);
+
+    if (
+      entry.classification === "retained-requires-standalone-evidence" ||
+      entry.classification === "redesigned-requires-evidence"
+    ) {
+      assert.equal(
+        entry.currentClaim,
+        "pending-d007",
+        `${entry.capability} must not reuse historical evidence as a current standalone claim`,
+      );
+      assert.equal(
+        Array.isArray(entry.requiredEvidence) && entry.requiredEvidence.length > 0,
+        true,
+        `${entry.capability} must name exact D007 evidence`,
+      );
+      assert.equal(
+        entry.requiredEvidence.some((requirement) =>
+          requirement?.source === "unmapped-d007-evidence"
+        ),
+        false,
+        `${entry.capability} must not use an unmapped D007 evidence placeholder`,
+      );
+    }
+    if (entry.classification === "existing-blocker") {
+      assert.equal(entry.currentClaim, entry.historicalState);
+    }
+    if (entry.classification === "not-pursued") {
+      assert.equal(entry.currentClaim, "not-pursued");
+    }
+  }
+
+  assert.deepEqual([...seen].sort(), [...expected.keys()].sort());
+});
+
+test("D007 explicitly classifies the private-Java dependent redesigns", () => {
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+  const byCapability = new Map(matrix.entries.map((entry) => [entry.capability, entry]));
+
+  for (const capability of [
+    "Executable Boot projects discovery",
+    "Spring XML config support",
+    "Embedded Spring Tools MCP server",
+    "Start Spring Boot Language Server on demand",
+    "Spring Java type/index resolution",
+    "Spring project/index synchronization",
+    "Spring runtime Java requirement diagnostic",
+  ]) {
+    assert.equal(
+      byCapability.get(capability)?.classification,
+      "redesigned-requires-evidence",
+      capability,
+    );
+    assert.equal(byCapability.get(capability)?.currentClaim, "pending-d007");
+  }
+
+  assert.equal(
+    byCapability.get("References and implementations")?.classification,
+    "unaffected",
+  );
+  assert.equal(
+    byCapability.get("References and implementations")?.currentClaim,
+    "verified",
+  );
+
+  assert.equal(
+    byCapability.get("Spring-specific document highlights")?.currentClaim,
+    "blocked-zed-api",
+  );
+  assert.equal(
+    byCapability.get("Inlay-hint label commands (pom \"Upgrade to the Latest Patch\")")?.currentClaim,
+    "blocked-zed-api",
+  );
+  assert.equal(
+    byCapability.get("Explain SpEL / queries / AOP (AI assistant)")?.currentClaim,
+    "blocked-zed-api",
+  );
+});
+
+
+test("D007 live and external-page acceptance consumes the produced standalone regression evidence", () => {
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+  const byCapability = new Map(matrix.entries.map((entry) => [entry.capability, entry]));
+
+  for (const capability of [
+    "Connect / disconnect to a local Boot process",
+    "Remote connect",
+    "Live hover data",
+    "Show / hide / refresh live data",
+    "Metrics",
+    "Loggers and log levels",
+    "Automatic connection",
+    "Live-data highlight CodeLens",
+    "Open Boot app page URL",
+  ]) {
+    const requirements = byCapability.get(capability)?.requiredEvidence ?? [];
+    assert.equal(requirements.length > 0, true, capability);
+    assert.equal(
+      requirements.every((requirement) =>
+        requirement.source === "standalone-capability-regression"
+      ),
+      true,
+      `${capability} must consume evidence emitted by the standalone regression runner`,
+    );
+  }
+});
+
+
+test("D007 evidence sources are all produced by the exact-head desktop harness", () => {
+  const matrix = JSON.parse(fs.readFileSync(matrixFile, "utf8"));
+  const harness = fs.readFileSync(desktopHarnessFile, "utf8");
+  const sources = [...new Set(
+    matrix.entries.flatMap((entry) =>
+      (entry.requiredEvidence ?? []).map((requirement) => requirement.source)
+    ),
+  )].sort();
+
+  assert.deepEqual(sources, [
+    "desktop-dap-regression",
+    "desktop-gate",
+    "standalone-capability-regression",
+    "standalone-offline-regression",
+  ]);
+  for (const source of sources) {
+    assert.equal(
+      harness.includes(`"${source}.json"`),
+      true,
+      `D007 matrix source ${source} must have a concrete evidence producer`,
+    );
+  }
+});
+
+
+test("D007 completion probes target the actual incomplete fixture lines", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const properties = fs.readFileSync(basicPropertiesFixture, "utf8");
+  const yaml = fs.readFileSync(basicYamlFixture, "utf8");
+
+  assert.equal(
+    properties.split("\n").filter((line) => line === "ser").length,
+    1,
+    "properties fixture must contain exactly one incomplete ser probe line",
+  );
+  assert.equal(
+    yaml.split("\n").filter((line) => line === "ser").length,
+    1,
+    "YAML fixture must contain exactly one incomplete ser probe line",
+  );
+  assert.equal(
+    regression.includes('positionAfter(props.text, "ser")'),
+    false,
+    "properties completion must not use first-substring lookup because the fixture comments also contain ser",
+  );
+  assert.equal(
+    regression.includes('positionAfter(yaml.text, "ser")'),
+    false,
+    "YAML completion should use the same exact-line targeting contract",
+  );
+  assert.equal(
+    regression.includes('positionAtExactLineEnd(props.text, "ser")'),
+    true,
+  );
+  assert.equal(
+    regression.includes('positionAtExactLineEnd(yaml.text, "ser")'),
+    true,
+  );
+});
+
+
+test("D007 fixture language ids match the production Spring server mapping", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const extensionManifest = fs.readFileSync(extensionManifestFile, "utf8");
+
+  assert.equal(
+    extensionManifest.includes('YAML = "spring-boot-properties-yaml"'),
+    true,
+    "production YAML mapping must remain explicit",
+  );
+  assert.equal(
+    regression.includes('["src/main/resources/application.yaml", "spring-boot-properties-yaml"]'),
+    true,
+    "standalone regression must send the same YAML language id as production",
+  );
+  assert.equal(
+    regression.includes('["src/main/resources/application.yaml", "spring-boot-yaml"]'),
+    false,
+    "retired harness-only YAML id must not reappear",
+  );
+});
+
+
+test("D007 fixture explicitly enables configuration metadata processing on JDK 23+", () => {
+  const pom = fs.readFileSync(basicPomFixture, "utf8");
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    pom.includes("org.springframework.boot.configurationprocessor.ConfigurationMetadataAnnotationProcessor"),
+    true,
+    "fixture must explicitly list the Spring Boot configuration metadata processor",
+  );
+  assert.equal(
+    regression.includes("fixture compile must generate spring-configuration-metadata.json before project-property capability checks"),
+    true,
+    "standalone regression must fail at compile time if project metadata was not generated",
+  );
+});
+
+
+test("D007 ambiguous capability probes use exact fixture lines", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const properties = fs.readFileSync(basicPropertiesFixture, "utf8");
+  const repository = fs.readFileSync(greetingRepositoryFixture, "utf8");
+  const spel = fs.readFileSync(spelFixture, "utf8");
+
+  assert.equal((properties.match(/server\.port/g) ?? []).length > 1, true);
+  assert.equal((properties.match(/fixture\.greeting\.salutation/g) ?? []).length > 1, true);
+  assert.equal((repository.match(/findByMessageAnd/g) ?? []).length > 1, true);
+  assert.equal((spel.match(/greetingPrefix/g) ?? []).length > 1, true);
+
+  for (const forbidden of [
+    'positionInside(props.text, "server.port", 3)',
+    'positionInside(props.text, "fixture.greeting.salutation", 12)',
+    'positionAfter(repositoryJava.text, "findByMessageAnd")',
+    'positionInside(spel.text, "greetingPrefix", 3)',
+  ]) {
+    assert.equal(
+      regression.includes(forbidden),
+      false,
+      `ambiguous first-substring probe must not reappear: ${forbidden}`,
+    );
+  }
+
+  for (const required of [
+    '"server.port=8080"',
+    '"fixture.greeting.salutation=hi"',
+    '"    List<Greeting> findByMessageAndId(String message, Long id);"',
+    "'    @Value(\"#{@greetingPrefix}\")'",
+  ]) {
+    assert.equal(
+      regression.includes(required),
+      true,
+      `exact fixture anchor must remain present: ${required}`,
+    );
+  }
+});
+
+
+test("D007 request-mapping acceptance selects the Spring snippet item, not a plain GetMapping completion", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('String(item?.label ?? "").startsWith("@GetMapping")'),
+    true,
+    "request-mapping acceptance must identify the Spring snippet label",
+  );
+  assert.equal(
+    regression.includes("item?.insertTextFormat === 2"),
+    true,
+    "request-mapping acceptance must require LSP snippet format",
+  );
+  assert.equal(
+    regression.includes('/GetMapping/.test(String(item?.label ?? item?.insertText ?? ""))'),
+    false,
+    "broad first-match selection must not reappear",
+  );
+});
+
+test("D007 standalone completion client advertises snippets and keeps bounded completion failure evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    (regression.match(/completionItem: \{ snippetSupport: true \}/g) ?? []).length,
+    2,
+    "both standalone client capability declarations must advertise LSP snippet support",
+  );
+  assert.equal(
+    regression.includes(
+      "lastItemSummary=${JSON.stringify(boundedCompletionItemSummary(lastItems))}",
+    ),
+    true,
+    "completion timeout must retain a bounded summary of the actual returned items",
+  );
+  for (const field of [
+    "label:",
+    "kind:",
+    "insertText:",
+    "insertTextFormat:",
+    "textEditNewText:",
+    "detail:",
+    "data:",
+  ]) {
+    assert.equal(
+      regression.includes(field),
+      true,
+      `bounded completion diagnostics must retain ${field}`,
+    );
+  }
+});
+
+test("D007 diagnostic waits retain bounded latest and history evidence on failure", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("this.diagnosticHistory = new Map()"),
+    true,
+    "client must retain bounded publishDiagnostics history per URI",
+  );
+  assert.equal(
+    regression.includes("latestDiagnostics=${JSON.stringify(boundedDiagnosticSummary(latest))}"),
+    true,
+    "diagnostic timeout must report the latest bounded diagnostic set",
+  );
+  assert.equal(
+    regression.includes("diagnosticHistory=${JSON.stringify(history)}"),
+    true,
+    "diagnostic timeout must report bounded diagnostic history",
+  );
+  assert.equal(
+    regression.includes("if (history.length > 8) history.shift()"),
+    true,
+    "diagnostic history must remain bounded",
+  );
+});
+
+test("D007 named-query fixture uses the proven HQL syntax failure and requires project-aware HQL diagnostics", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const namedQueries = fs.readFileSync(namedQueriesFixture, "utf8");
+
+  assert.equal(
+    namedQueries.includes("Greeting.broken=select g from Greeting g where"),
+    true,
+    "named-query fixture must use the same trailing-where syntax failure already proven by the Java HQL probe",
+  );
+  assert.equal(
+    namedQueries.includes("select g form Greeting g"),
+    false,
+    "the unverified form-typo fixture must not return",
+  );
+  assert.equal(
+    regression.includes('String(diagnostic.code ?? "") === "HQL_SYNTAX"'),
+    true,
+    "standalone acceptance must prove project-aware HQL reconciliation for the spring-data-jpa fixture",
+  );
+});
+
+test("D007 static CodeLens acceptance targets an authentic isolated WebConfig provider", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const probe = fs.readFileSync(codeLensProbeFixture, "utf8");
+
+  assert.equal(
+    probe.includes("HandlerTypePredicate.forAssignableType(CodeLensProbeController.class)"),
+    true,
+    "CodeLens path-prefix configuration must target only the dedicated probe controller",
+  );
+  assert.equal(
+    probe.includes('configurer.addPathPrefix(') && probe.includes('"/d007"'),
+    true,
+    "probe must expose a WebConfig path-prefix index element",
+  );
+  assert.equal(
+    regression.includes('fileBy(files, "CodeLensProbeController.java")'),
+    true,
+    "standalone regression must request CodeLens on the dedicated provider target",
+  );
+  assert.equal(
+    regression.includes('lens?.command?.command === "vscode.open"') &&
+      regression.includes('includes("Path Prefix: /d007")'),
+    true,
+    "acceptance must require the actual WebConfig lens command and path-prefix title",
+  );
+});
+
+test("D007 version validation uses deterministic loopback metadata and the Spring Tools 5.3 upgrade command", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("startDeterministicVersionMetadataServer()"),
+    true,
+    "version validation must not depend on mutable live Maven/Spring release metadata",
+  );
+  assert.equal(
+    regression.includes('"use-project-build-file": false'),
+    true,
+    "version validation must force the deterministic Spring projects provider path",
+  );
+  assert.equal(
+    regression.includes('String(diagnostic.code ?? "") === "BOOT_VERSION_VALIDATION_CODE"') &&
+      regression.includes("Newer patch version of Spring Boot available: 3\\.5\\.6"),
+    true,
+    "5.3 version acceptance must use Spring's generic version code plus the exact patch message",
+  );
+  assert.equal(
+    regression.includes("canonicalDocumentUri(uri)") &&
+      regression.includes("canonicalDocumentUri(targetUri)"),
+    true,
+    "published Java file:/ URIs and Node file:/// target URIs must share one diagnostic key",
+  );
+  assert.equal(
+    regression.includes('version: "3.5.6"') &&
+      regression.includes('assert.equal(targetVersion, "3.5.6")'),
+    true,
+    "the patch-upgrade target must be fixed by the local metadata fixture",
+  );
+  assert.equal(
+    regression.includes('action?.command?.command === "sts/upgrade/spring-boot"'),
+    true,
+    "5.3 patch diagnostics must use the current SpringBootUpgrade command",
+  );
+  assert.equal(
+    regression.includes('sts/upgrade/spring-boot-patch'),
+    false,
+    "the retired 5.2-era patch command must not reappear",
+  );
+});
+
+test("D007 MCP coexistence establishes completion before and after tool calls", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("LSP server.port completion before MCP requests") &&
+      regression.includes("LSP server.port completion after MCP requests"),
+    true,
+    "MCP coexistence must compare an indexed pre-MCP completion baseline with the post-MCP result",
+  );
+  assert.equal(
+    regression.includes('textDocument: {\n        uri: pathToFileURL(propertiesFile).href,\n        version: 2') &&
+      regression.includes('contentChanges: [{ text: fs.readFileSync(propertiesFile, "utf8") }]'),
+    true,
+    "the MCP sub-run must re-reconcile the open properties buffer after project index readiness",
+  );
+  assert.equal(
+    regression.includes("lspCompletionBeforeMcp: true") &&
+      regression.includes("lspCompletionAfterMcp: true"),
+    true,
+    "MCP evidence must preserve both sides of the coexistence comparison",
+  );
+});
+
+test("D007 MCP coexistence completion probes track the exact ser fixture line", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('{ line: 0, character: 3 }'),
+    false,
+    "MCP completion must not use the stale top-of-file coordinate after fixture comments were added",
+  );
+  const exactMcpProbe =
+    'positionAtExactLineEnd(fs.readFileSync(propertiesFile, "utf8"), "ser")';
+  assert.equal(
+    regression.split(exactMcpProbe).length - 1,
+    2,
+    "both pre-MCP and post-MCP completion probes must target the exact incomplete ser line",
+  );
+});
+
+test("D007 live regression proves mappings and Hover before merged live CodeLens", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  const mappingsIndex = regression.indexOf("const liveMappings = await waitForLiveRequestMappings(");
+  const hoverIndex = regression.indexOf("const liveHover = await waitForLiveHover(");
+  const lensIndex = regression.indexOf("const liveLens = await waitForLiveUrlCodeLens(");
+  assert.equal(mappingsIndex >= 0, true, "live mappings must be established");
+  assert.equal(hoverIndex > mappingsIndex, true, "source matching Hover must follow authentic mappings");
+  assert.equal(lensIndex > hoverIndex, true, "merged live CodeLens must be checked after Hover");
+
+  assert.equal(
+    regression.includes('command: "sts/livedata/get"') &&
+      regression.includes('arguments: [{ processKey, endpoint: "mappings" }]'),
+    true,
+    "live mapping evidence must use Spring Tools public sts/livedata/get contract",
+  );
+  assert.equal(
+    regression.includes("live /greeting mapping must identify GreetingController before source matching"),
+    true,
+    "live mapping evidence must bind the runtime mapping to the fixture controller",
+  );
+  assert.equal(
+    regression.includes("lastCodeLenses="),
+    true,
+    "live CodeLens timeout must preserve a bounded final result for diagnosis",
+  );
+});
+
+test("D007 live regression records gated Spring highlight protocol evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const coordinator = fs.readFileSync(path.join(root, "coordinator", "src", "main.mjs"), "utf8");
+
+  assert.equal(
+    regression.includes('ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1"'),
+    true,
+    "live coordinator child must enable the existing D007-only protocol evidence channel",
+  );
+  assert.equal(
+    coordinator.includes('event: "spring-highlight"') &&
+      coordinator.includes("codeLensCount: codeLenses.length"),
+    true,
+    "D007 protocol evidence must record whether Spring emitted live highlight lenses",
+  );
+  assert.equal(
+    regression.includes('".d007",') &&
+      regression.includes('"coordinator-protocol.jsonl"') &&
+      regression.includes("protocolTail="),
+    true,
+    "live regression failures must surface bounded coordinator protocol evidence",
+  );
+});
+
+test("D007 live Hover probe targets the exact GetMapping annotation", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("'    @GetMapping(\"/greeting\")'") &&
+      regression.includes('"GetMapping",') &&
+      regression.includes("positionInExactLine("),
+    true,
+    "live Hover must target the exact request-mapping annotation identifier",
+  );
+  assert.equal(
+    regression.includes('positionInside(controller.text, "GetMapping", 3)'),
+    false,
+    "live Hover must not resolve the first GetMapping occurrence, which is the import",
+  );
+  assert.equal(
+    regression.includes("lastHover="),
+    true,
+    "live Hover failures must preserve the bounded final payload",
+  );
+});
+
+test("D007 local live connection selects the exact Boot application PID", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes("Starting FixtureApplication .* with PID (\\d+)") &&
+      regression.includes("const appProcessKey = appPidMatch[1]"),
+    true,
+    "live regression must derive the target process key from the Boot application's own startup PID",
+  );
+  assert.equal(
+    regression.includes('String(entry?.processKey ?? "") === appProcessKey'),
+    true,
+    "local live descriptor selection must match Spring Tools processKey to that exact JVM PID",
+  );
+  assert.equal(
+    regression.includes('/FixtureApplication|zed-spring-tools-fixture/.test(String(entry?.label ?? ""))'),
+    false,
+    "broad label matching must not select a Maven parent or unrelated JVM",
+  );
+});
+
+test("D007 live fixture launches with production live-data VM arguments", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const coordinator = fs.readFileSync(path.join(root, "coordinator", "src", "main.mjs"), "utf8");
+
+  const requiredArgs = [
+    "-Dspring.jmx.enabled=true",
+    "-Dmanagement.endpoints.jmx.exposure.include=*",
+    "-Dspring.application.admin.enabled=true",
+    "-Dspring.boot.project.name=zed-spring-tools-fixture",
+  ];
+  for (const arg of requiredArgs) {
+    assert.equal(
+      regression.includes(JSON.stringify(arg)),
+      true,
+      `live fixture must launch with production argument ${arg}`,
+    );
+  }
+  assert.equal(
+    regression.includes(
+      '"-Dspring-boot.run.jvmArguments=" + liveLaunchVmArgs.join(" ")',
+    ),
+    true,
+    "Maven live fixture must pass those values as child-JVM arguments, not Maven-only properties",
+  );
+  assert.equal(
+    coordinator.includes('"-Dspring.application.admin.enabled=true"'),
+    true,
+    "production generated debug configuration must retain the admin MBean argument",
+  );
+  assert.equal(
+    regression.includes('"spring.application.admin.enabled=true",'),
+    false,
+    "admin enablement must not be hidden in fixture application.properties; the proof is launch parity",
+  );
+});
+
+test("D007 client records window showMessage notifications for notices and error-popup evidence", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  const notificationBranch = regression.slice(
+    regression.indexOf('if (typeof message.method === "string") {'),
+    regression.indexOf('if (message.method === "textDocument/publishDiagnostics")'),
+  );
+  assert.equal(
+    notificationBranch.includes('message.method === "window/showMessage"'),
+    true,
+    "notification-form window/showMessage must be retained in windowMessages",
+  );
+  assert.equal(
+    notificationBranch.includes("this.windowMessages.push({"),
+    true,
+    "refresh notices and notification-form error popups must be observable by D007",
+  );
+  assert.equal(
+    regression.includes("evidence.unexpectedWindowErrors = client.windowMessages.filter("),
+    true,
+    "the strengthened windowMessages stream must feed the existing error-popup gate",
+  );
+});
+
+test("D007 automatic live arm keeps CLI and workspace settings consistent", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+
+  assert.equal(
+    regression.includes('"automatic-connection": { on: true }'),
+    true,
+    "automatic live acceptance must forward the same opt-in through workspace configuration",
+  );
+  const helperStart = regression.indexOf("async function startCoordinatorRegressionClient({");
+  const helperEnd = regression.indexOf("function liveControllerFile(", helperStart);
+  const helper = regression.slice(helperStart, helperEnd);
+  const mcpStart = regression.indexOf("async function runEmbeddedMcpRegression(");
+  const mcpEnd = regression.indexOf("async function runStandaloneLiveRegression(", mcpStart);
+  const mcp = regression.slice(mcpStart, mcpEnd);
+
+  assert.equal(
+    helper.includes(
+      '"D007 coordinator CLI automatic-live flag must match forwarded workspace configuration"',
+    ),
+    true,
+    "harness must fail closed inside startCoordinatorRegressionClient when CLI and didChangeConfiguration disagree",
+  );
+  assert.equal(
+    mcp.includes("configuredAutomatic"),
+    false,
+    "automatic live configuration assertion must not leak into unrelated MCP regression setup",
+  );
+  assert.equal(
+    regression.includes("configuration: automaticConfiguration"),
+    true,
+    "automatic arm must launch with the configuration carrying automatic-connection.on=true",
+  );
+});
+
+test("D007 Modulith regression proves the standalone capability on a compiled Maven fixture", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const pom = fs.readFileSync(modulithMavenPom, "utf8");
+
+  assert.equal(
+    pom.includes("<artifactId>spring-boot-starter-parent</artifactId>") &&
+      pom.includes("<version>3.5.5</version>") &&
+      pom.includes("<artifactId>spring-modulith-starter-core</artifactId>") &&
+      pom.includes("<version>1.4.12</version>"),
+    true,
+    "Maven Modulith fixture must pin the same Boot/Modulith generations as the historical Gradle probe",
+  );
+  assert.equal(
+    regression.includes("const MODULITH_MAVEN_FIXTURE = path.join(") &&
+      regression.includes('"spring-modulith-maven"') &&
+      regression.includes("fs.cpSync(MODULITH_MAVEN_FIXTURE, worktree"),
+    true,
+    "standalone Modulith proof must use the dedicated Maven fixture",
+  );
+  assert.equal(
+    regression.includes('["-q", "-DskipTests", "compile"]') &&
+      regression.includes('"target", "classes"') &&
+      regression.includes("Maven Modulith fixture must contain compiled classes before metadata refresh"),
+    true,
+    "standalone proof must compile and verify the exact Maven output before metadata refresh",
+  );
+  assert.equal(
+    regression.includes('name === "inventory-app-maven"'),
+    true,
+    "Modulith project selection must fail closed on the exact fixture project",
+  );
+  assert.equal(
+    regression.includes("ensurePinnedGradleWrapper("),
+    false,
+    "standalone capability proof must not fake Gradle output through wrapper bootstrap",
+  );
+});
+
+test("D007 final candidate removes the temporary draft-only platform runner", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "platform-validation.yml"), "utf8");
+
+  assert.equal(
+    workflow.includes("PR #160 draft-only standalone D007 runner") ||
+      workflow.includes("Run D007 standalone regression") ||
+      workflow.includes("Assert D007 exact PR HEAD"),
+    false,
+    "exact-final candidate must not retain the temporary draft-only D007 runner",
+  );
+  assert.equal(
+    workflow.includes("github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls'"),
+    false,
+    "platform validation must not retain a branch-specific D007 exception after standalone proof is complete",
+  );
+});
+
+test("D007 Modulith refresh is serialized before the violation reconcile", () => {
+  const regression = fs.readFileSync(standaloneRegressionFile, "utf8");
+  const start = regression.indexOf("async function runModulithRegression(");
+  const end = regression.indexOf(
+    "function boundedDiagnosticState(",
+    start,
+  );
+  const modulith = regression.slice(start, end);
+
+  assert.equal(start >= 0 && end > start, true);
+  const refreshIndex = modulith.indexOf('command: "sts/modulith/metadata/refresh"');
+  const orderServiceChangeIndex = modulith.indexOf(
+    'uri: pathToFileURL(orderService).href',
+  );
+  assert.equal(
+    refreshIndex >= 0 && orderServiceChangeIndex > refreshIndex,
+    true,
+    "the deliberate violation source must reconcile only after metadata refresh has completed",
+  );
+  assert.equal(
+    modulith.slice(0, refreshIndex).includes('textDocument/didChange'),
+    false,
+    "the Modulith arm must not flood didChange before metadata refresh and race validateWith",
+  );
+  assert.equal(
+    modulith.includes('"OrderService.java"') &&
+      modulith.includes('refresh === "true" || refresh === "false"'),
+    true,
+    "the arm must target the exact violation fixture and validate the refresh result",
+  );
+  assert.equal(
+    regression.includes("diagnosticState=${JSON.stringify(boundedDiagnosticState(client))}") &&
+      regression.includes("windowMessages=${JSON.stringify(client.windowMessages.slice(-8))}") &&
+      regression.includes("stderrTail="),
+    true,
+    "Modulith timeout evidence must retain bounded diagnostics, client messages, and server stderr",
+  );
+  assert.equal(
+    regression.includes("stderr.split(/\\r?\\n/).slice(-60)") &&
+      regression.includes('metadataChanged: refresh === "true"'),
+    true,
+    "Modulith failure/success evidence must preserve line-bounded stderr and the refresh result",
+  );
+});
+

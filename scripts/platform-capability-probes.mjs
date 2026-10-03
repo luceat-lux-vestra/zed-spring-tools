@@ -52,15 +52,11 @@ function nativeArgumentProbe() {
     const java = path.join(root, "jdk", "bin", process.platform === "win32" ? "java.exe" : "java");
     const springServer = path.join(root, "spring", "server.jar");
     const springHome = path.join(root, "spring");
-    const javaWorkDir = path.join(root, "extensions", "work", "java");
-    const compatibility = path.join(root, "runtime", "providers.json");
     const options = parseOptions([
       "--worktree", worktree,
       "--java", java,
       "--spring-server", springServer,
       "--spring-home", springHome,
-      "--java-work-dir", javaWorkDir,
-      "--compatibility", compatibility,
       "--host-os", hostOs(),
       "--extension-version", "0.1.0-platform-probe",
       "--automatic-live-connection", "true",
@@ -70,8 +66,6 @@ function nativeArgumentProbe() {
     assert.equal(options.java, path.resolve(java));
     assert.equal(options.springServer, path.resolve(springServer));
     assert.equal(options.springHome, path.resolve(springHome));
-    assert.equal(options.javaWorkDirectory, path.resolve(javaWorkDir));
-    assert.equal(options.compatibility, path.resolve(compatibility));
     assert.equal(path.isAbsolute(options.worktree), true);
     assert.equal(options.hostOs, hostOs());
     assert.equal(options.automaticLiveConnection, true);

@@ -2,12 +2,10 @@ mod artifacts;
 mod platform;
 mod runtime;
 
-use std::env;
 use std::path::Path;
 use zed_extension_api as zed;
 
 const SERVER_ID: &str = "spring-tools";
-const JAVA_SERVER_ID: &str = "jdtls";
 const EXTENSION_VERSION: &str = "0.1.0";
 
 struct SpringToolsExtension;
@@ -28,9 +26,6 @@ impl zed::Extension for SpringToolsExtension {
         let node = zed::node_binary_path()
             .map_err(|error| format!("Zed-managed Node is required: {error}"))?;
         let java = platform::resolve_java(worktree)?;
-        let extension_work = env::current_dir()
-            .map_err(|error| format!("resolve extension work directory: {error}"))?;
-        let java_work = platform::official_java_work_dir(&extension_work)?;
         let root = worktree.root_path();
         let user = zed::settings::LspSettings::for_worktree(SERVER_ID, worktree)
             .ok()
@@ -44,7 +39,6 @@ impl zed::Extension for SpringToolsExtension {
                 &spring,
                 &root,
                 &java,
-                &java_work,
                 zed::current_platform().0,
                 launch,
             )?,
@@ -75,27 +69,6 @@ impl zed::Extension for SpringToolsExtension {
             &worktree.root_path(),
         )))
     }
-
-    fn language_server_additional_initialization_options(
-        &mut self,
-        language_server_id: &zed::LanguageServerId,
-        target_language_server_id: &zed::LanguageServerId,
-        _worktree: &zed::Worktree,
-    ) -> zed::Result<Option<zed::serde_json::Value>> {
-        require_server(language_server_id)?;
-        if target_language_server_id.as_ref() != JAVA_SERVER_ID {
-            return Ok(None);
-        }
-        let runtime = runtime::materialize()?;
-        let spring = artifacts::ensure_installed(language_server_id)?;
-        let mut bundles = spring.bundles;
-        bundles.push(runtime.bridge);
-        let values: Result<Vec<_>, _> = bundles
-            .iter()
-            .map(|path| platform::path_string(path))
-            .collect();
-        Ok(Some(zed::serde_json::json!({ "bundles": values? })))
-    }
 }
 
 fn require_server(language_server_id: &zed::LanguageServerId) -> Result<(), String> {
@@ -107,9 +80,9 @@ fn require_server(language_server_id: &zed::LanguageServerId) -> Result<(), Stri
 }
 
 fn spring_initialization_options() -> zed::serde_json::Value {
-    // The coordinator enables this only after the official Java route is
-    // ready. This keeps Spring LS startup independent of editor tab order.
-    zed::serde_json::json!({ "enableJdtClasspath": false })
+    // Standalone Spring Tools owns its Maven/Gradle project model and Jandex
+    // index. Do not opt it into JDT classpath callbacks.
+    zed::serde_json::json!({})
 }
 
 // VS Code contributes these defaults through its settings schema. Zed has no
@@ -360,7 +333,6 @@ fn coordinator_arguments(
     spring: &artifacts::SpringPaths,
     root: &str,
     java: &str,
-    java_work: &Path,
     os: zed::Os,
     launch: LaunchSettings,
 ) -> Result<Vec<String>, String> {
@@ -374,10 +346,6 @@ fn coordinator_arguments(
         platform::path_string(&spring.server)?,
         "--spring-home".to_owned(),
         platform::path_string(&spring.root)?,
-        "--java-work-dir".to_owned(),
-        platform::path_string(java_work)?,
-        "--compatibility".to_owned(),
-        platform::path_string(&runtime.compatibility)?,
         "--host-os".to_owned(),
         match os {
             zed::Os::Mac => "macos",
@@ -409,20 +377,16 @@ mod tests {
     fn coordinator_arguments_are_shell_independent() {
         let runtime = runtime::RuntimePaths {
             coordinator: "/extension work/runtime/main.mjs".into(),
-            bridge: "/extension work/runtime/bridge.jar".into(),
-            compatibility: "/extension work/runtime/providers.json".into(),
         };
         let spring = artifacts::SpringPaths {
             root: "/extension work/spring".into(),
             server: "/extension work/spring/server.jar".into(),
-            bundles: Vec::new(),
         };
         let arguments = coordinator_arguments(
             &runtime,
             &spring,
             "/work tree/프로젝트",
             "/jdks/temurin 25/bin/java",
-            Path::new("/extensions/work/java"),
             zed::Os::Mac,
             LaunchSettings {
                 automatic_live_connection: false,
@@ -433,11 +397,12 @@ mod tests {
         assert_eq!(arguments[0], "/extension work/runtime/main.mjs");
         assert_eq!(arguments[2], "/work tree/프로젝트");
         assert_eq!(arguments[4], "/jdks/temurin 25/bin/java");
-        assert_eq!(arguments[10], "/extensions/work/java");
-        assert_eq!(arguments[16], EXTENSION_VERSION);
-        assert_eq!(arguments[18], "false");
-        assert_eq!(arguments[19], "--mcp-server-port");
-        assert_eq!(arguments[20], "off");
+        assert_eq!(arguments[11], "--extension-version");
+        assert_eq!(arguments[12], EXTENSION_VERSION);
+        assert_eq!(arguments[13], "--automatic-live-connection");
+        assert_eq!(arguments[14], "false");
+        assert_eq!(arguments[15], "--mcp-server-port");
+        assert_eq!(arguments[16], "off");
         assert!(!arguments.iter().any(|argument| argument == "sh"));
         assert!(
             include_str!("../extension.toml")
@@ -521,20 +486,16 @@ mod tests {
     fn an_opted_in_mcp_port_reaches_the_coordinator_contract() {
         let runtime = runtime::RuntimePaths {
             coordinator: "/extension work/runtime/main.mjs".into(),
-            bridge: "/extension work/runtime/bridge.jar".into(),
-            compatibility: "/extension work/runtime/providers.json".into(),
         };
         let spring = artifacts::SpringPaths {
             root: "/extension work/spring".into(),
             server: "/extension work/spring/server.jar".into(),
-            bundles: Vec::new(),
         };
         let arguments = coordinator_arguments(
             &runtime,
             &spring,
             "/work",
             "/jdk/bin/java",
-            Path::new("/extensions/work/java"),
             zed::Os::Linux,
             LaunchSettings {
                 automatic_live_connection: false,
@@ -542,8 +503,8 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(arguments[19], "--mcp-server-port");
-        assert_eq!(arguments[20], "50627");
+        assert_eq!(arguments[15], "--mcp-server-port");
+        assert_eq!(arguments[16], "50627");
     }
 
     #[test]
@@ -570,11 +531,8 @@ mod tests {
     }
 
     #[test]
-    fn spring_initialization_does_not_race_the_official_java_server() {
-        assert_eq!(
-            spring_initialization_options(),
-            zed::serde_json::json!({ "enableJdtClasspath": false })
-        );
+    fn standalone_spring_initialization_has_no_jdt_classpath_contract() {
+        assert_eq!(spring_initialization_options(), zed::serde_json::json!({}));
     }
 
     #[test]

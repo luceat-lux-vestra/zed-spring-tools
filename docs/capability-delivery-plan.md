@@ -4,11 +4,15 @@
   and M4 closed on 2026-07-26. All three rows that awaited a direction decision
   were decided on 2026-07-29 — the embedded MCP server was built and verified
   the same day — leaving only the four that name a missing Zed client surface.
-  Every route is now evidenced on Gradle as well as Maven except the Boot
-  upgrade, which upstream gates on Maven. This document stays the route
-  record — read it to learn why a capability is delivered the way it is, and
-  update it if a new Zed release reopens one
-- Last updated: 2026-07-29
+  The Maven/Gradle observations in the route rows are the historical JDT-fed M4
+  evidence baseline. D007 replaces that project-model boundary: current
+  standalone release claims come from the capability inventory's D007 overlay
+  and acceptance matrix. In particular, Spring Tools 5.3 standalone Gradle
+  Modulith refresh is not carried forward because its Eclipse-model output
+  (`bin` / `bin/main`) does not match normal Gradle class output; D007 proves
+  the Modulith route on Maven instead. This document stays the route record —
+  read it to learn why a capability is delivered the way it is.
+- Last updated: 2026-10-03
 - Decision: [D005](decisions/005-lsp-first-capability-delivery.md)
 - Evidence: [R013](research/013-zed-native-capability-delivery-surfaces.md),
   [R014](research/014-final-upstream-capability-surface-audit.md), and

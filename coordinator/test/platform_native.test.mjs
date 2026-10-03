@@ -5,7 +5,6 @@ import path from "node:path";
 import test from "node:test";
 
 import { Coordinator, parseOptions } from "../src/main.mjs";
-import { routeId } from "../src/java_transport.mjs";
 import { LspDecoder } from "../src/lsp.mjs";
 
 const hostOs = process.env.EXPECTED_OS ?? nativeHostOs();
@@ -53,8 +52,6 @@ test("native product paths stay absolute and shell independent", () => {
     "--java", path.join(root, "jdk", "bin", process.platform === "win32" ? "java.exe" : "java"),
     "--spring-server", path.join(root, "spring", "server.jar"),
     "--spring-home", path.join(root, "spring"),
-    "--java-work-dir", path.join(root, "extensions", "work", "java"),
-    "--compatibility", path.join(root, "runtime", "providers.json"),
     "--host-os", hostOs,
     "--extension-version", "0.1.0-alpha.1",
     "--automatic-live-connection", "false",
@@ -66,11 +63,6 @@ test("native product paths stay absolute and shell independent", () => {
   assert.equal(options.hostOs, hostOs);
 });
 
-test("official Java route ID follows the native normalized worktree path", () => {
-  const worktree = path.join(os.tmpdir(), "zed spring 프로젝트");
-  const normalized = path.resolve(worktree).replace(/[\\/]$/, "");
-  assert.equal(routeId(`${worktree}${path.sep}`), Buffer.from(normalized, "utf8").toString("hex"));
-});
 
 test("Maven build task selects the native wrapper beside the build file", () => {
   const worktree = makeWorktree("zed-spring-native-maven-");

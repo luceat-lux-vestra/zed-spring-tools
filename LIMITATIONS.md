@@ -1,8 +1,11 @@
 # Known limitations
 
-This repository is ready to be reviewed as experimental source with one working
-vertical slice. It is not ready to be relied on as a Spring development
-extension.
+This repository is experimental source and is not yet Registry-published. The
+2026-09-25 D007 migration replaces the former private JDT/bridge coordination
+with Spring Tools' official standalone language server. Historical observations
+from the retired architecture remain useful regression evidence, but they do not
+establish release support for the standalone runtime until revalidated on the
+exact submitted commit.
 
 - The Spring Boot upgrade is delivered only in the shape the pinned Spring Tools
   release actually implements, and that shape is narrow. It upgrades the **patch
@@ -19,32 +22,25 @@ extension.
   run at all; the extension reports that as a visible error naming the remedy
   rather than failing silently, but it does not create or modify Maven
   configuration on the user's behalf.
-- 48 of 59 tracked capabilities are proven on the tested tuple, and part of the
-  VS Code Spring Tools surface is still unimplemented or unverified. The proven
-  set is the properties/YAML line (completion, hover, validation, definition,
-  `.properties`↔`.yaml` conversion, shared-metadata reload, and the
-  `spring-factories` / `jpa-query-properties` languages), Spring workspace
-  symbols with bean and request-mapping navigation, static and live CodeLens,
-  inlay hints, quick fixes, Boot run/debug configuration generation, the
-  Structure document, and explicit plus automatic
-  live-process/metrics/logger workflows, remote live-data targets, the
-  patch-level Boot upgrade described above, Boot version/support validation,
-  embedded query syntax highlighting under the setting described below, and
-  Spring Modulith metadata refresh with application-module structure. Modulith
-  metadata generation runs Spring Modulith's own exporter against the compiled
-  classes, so an uncompiled project is refused whatever the build system; a
-  2026-07-29 Gradle gate confirmed the precondition is the compiled classes and
-  not Maven. See the
-  [capability inventory](docs/capability-inventory.md) for the per-row evidence.
-  Corrected 2026-07-18: Zed 1.11.3 can use the server's LSP
-  Document Symbols for Outline and Breadcrumbs when the default-off Java
-  `document_symbols` setting is enabled. The earlier zero-request run was the
-  default tree-sitter control. S015 found a clear nested JDT/Spring merge and
-  correct Spring navigation after both servers were ready, but Refuted the route
-  on restart: Spring answered before JDT's later dynamic registration, and Zed
-  cached a Spring-only Outline that omitted ordinary Java symbols until a source
-  edit forced recollection. The verified Project Symbols workflow remains the
-  fallback; the opt-in Structure document is the verified grouping companion.
+- The inventory still tracks 59 user outcomes, but the former count of 48
+  `verified` rows belongs to the pre-D007 runtime evidence baseline. Any row whose
+  proof depended on JDT-delivered classpath state, the private Java data route, or
+  the injected bridge must be revalidated before it is release-facing
+  `verified` on the standalone architecture. Rows whose outcome is independent
+  of that boundary retain their historical evidence with the exact release/tuple
+  named. See the [capability inventory](docs/capability-inventory.md) and the
+  machine-readable
+  [D007 acceptance matrix](protocol/d007-capability-acceptance.json) rather than
+  relying on the old aggregate count. A matrix row with
+  `currentClaim: pending-d007` is explicitly **not** a current support claim.
+- D007 acceptance now separates direct standalone-server regression from Zed
+  desktop integration. The direct regression re-drives the rich Spring Boot
+  fixture; the desktop layer proves JDTLS/standalone coexistence, Maven/Gradle
+  editor flows and generated configuration. It also executes the exact generated
+  Maven/Gradle Boot run tasks. Any Spring-originated error-level window message
+  makes that run fail; a visible Spring error popup is never compatible with a
+  passing acceptance result. This still does not turn an untested matrix row
+  into `verified`.
 - **Embedded query highlighting needs one Zed setting that no extension can set
   for you.** The JPQL, HQL, SQL and SpEL text inside a `@Query` or `@Value` is
   highlighted by Spring's LSP semantic tokens, and Zed's `semantic_tokens`
@@ -65,20 +61,23 @@ extension.
   answers null and **Zed caches that per buffer and does not ask again on
   refocus**. Any edit, or opening a different Java file, restores it in well
   under a second.
-- **Gradle is driven, with exactly one exception: the Boot upgrade.** Until
-  2026-07-29 every capability gate had used a Maven fixture and the whole build
-  system axis was unobserved. It was then driven end to end against two Gradle
-  fixtures — a Boot 3.5.0 web app and a Spring Modulith 1.4.12 app — and the
-  outcome is that the build system is not a dividing line anywhere except that
-  one row. Property completion and validation, the Java reconcilers, Spring Data
-  query and SpEL diagnostics, cron, CodeLens and every product code action, Boot
-  project info (reporting `gradle build`), Boot version and support validation
-  (anchored on `build.gradle`), run/debug generation *and execution*, Modulith
-  metadata refresh, the module-violation diagnostic, and the embedded MCP
-  server's index-backed tools were all observed working on Gradle. The generated
-  `./gradlew bootRun` entries were run verbatim and served the application, with
-  the profile entry moving the port exactly as its profile file specifies, so
-  the Gradle profile form is verified rather than merely written.
+- **The 2026-07-29 Gradle evidence is historical for D007.** Under the retired
+  JDT-fed architecture, the Gradle axis was driven end to end against a Boot
+  3.5.0 web app and a Spring Modulith 1.4.12 app: property/Java intelligence,
+  run/debug generation and execution, version validation, Modulith metadata and
+  its violation diagnostic, and MCP index-backed tools were all observed.
+  D007 cannot reuse that project-model evidence. The pinned Spring Tools
+  5.3.0 standalone Gradle model reports each source set's Eclipse output
+  directory (normally `bin` / `bin/main`) as the Java class output, while a
+  normal `./gradlew classes` build writes application classes to
+  `build/classes/java/main`. `ModulithService` checks only the reported source
+  output folders before running its exporter, so the D007 standalone Gradle
+  fixture is rejected as uncompiled even after a successful Gradle build.
+  D007 therefore proves the retained Modulith capability on the equivalent
+  Maven fixture, whose project model points at the actual compiled output, and
+  does **not** claim current standalone Gradle Modulith refresh/violation support.
+  General Gradle editor, project-discovery, version-validation, and run/debug
+  paths remain subject to their own D007 evidence.
   **The Boot upgrade is genuinely Maven-only**, in upstream's code rather than
   in this extension: the pinned release attaches its upgrade quick fix only when
   the project's build type is Maven, and the command behind it asserts the same
@@ -95,27 +94,19 @@ extension.
   build reaches this extension through Spring at all — that is an absent upstream
   surface, not a gap here. Evidence and the per-row detail are in the
   [Gradle axis resolution](docs/gradle-axis-resolution.md).
-- The official Java language server starts only when a Java file is open, and
-  this extension cannot start it. Zed's extension API exposes no call for
-  starting another extension's language server, and `languages.<Language>.
-  language_servers` only orders the servers already declared for that language:
-  a 2026-07-20 driven run added `jdtls` to `languages.Properties.language_servers`
-  and opened only `application.properties`, and Zed started this extension's
-  coordinator alone; opening one `.java` file in the same session immediately
-  started the official Java proxy. Until that server runs, Spring has no project
-  classpath, so property support is limited to syntax — unknown-property
-  validation, metadata completion and hover all need the classpath. The
-  coordinator now says so once, naming the action that works (open a Java file),
-  instead of reporting a compatibility failure; a genuine handshake failure
-  after a Java file is open still raises the bounded compatibility report.
-  **The reach is wider than properties**, and a 2026-07-26 run measured one case
-  precisely: Spring resolves a document to a project by containment against the
-  projects the classpath listener has delivered, so with none delivered
-  *everything* project-scoped is silent for every file in the worktree.
-  `spring.factories` validation is the sharpest example — its reconciler collects
-  problems only inside `projectFinder.find(uri).ifPresent(…)`, so before a Java
-  file is open it publishes no diagnostic array at all, which is
-  indistinguishable from a clean file. Opening one Java file first restores it.
+- Spring runtime project discovery no longer waits for the official Java/JDT
+  server. The standalone Spring Tools server builds its project model from
+  Maven/Gradle and Jandex while `enableJdtClasspath` stays false. The official
+  Java extension is still required for Zed's Java language/editing experience,
+  but opening a Java file is not the activation mechanism for Spring's project
+  classpath. The old "open a Java file first" workaround and Java-route
+  compatibility report are retired.
+- Spring XML Java type/package completion is reduced in the standalone boundary.
+  Spring asks the client for `sts/javaCodeComplete`, but Zed exposes no public
+  cross-extension request surface that can delegate that request to JDT LS. The
+  coordinator fails closed with an empty completion result instead of using the
+  official Java extension's private proxy. Other XML features that do not depend
+  on that callback require standalone revalidation before a release claim.
 - Stock Zed extensions cannot contribute a custom Spring tree/dashboard panel,
   webview, arbitrary editor item, or arbitrary command-palette action. D005
   therefore selects standard LSP/DAP/task surfaces first and explicitly requested
@@ -164,8 +155,14 @@ extension.
   `vmArgs`, `args`, and `env` slots. The official Java 6.8.21 debug helper uses an
   HTTP `localhost` callback, so a system HTTP proxy must bypass `localhost` and
   `127.0.0.1`; otherwise main-class resolution times out before launch. The
-  isolated-profile DAP helper path remains an S016 caveat. Maven multi-project
-  selection is verified. **Gradle is verified too, as of 2026-07-29**: the action
+  isolated-profile DAP helper path remains an S016 caveat in the historical
+  evidence. D007 now adds an exact-candidate regression that starts the generated
+  base Maven Java configuration through Zed's public `debugger::Start` picker,
+  requires a new JVM for the exact staged worktree/main class with JDWP enabled,
+  then requires `debugger::Stop` to terminate it. That standalone-era DAP claim
+  remains pending until the final candidate emits `desktop-dap-regression.json`
+  with `debugLaunch: PASS`. Maven multi-project selection is verified.
+  **Gradle is verified too, as of 2026-07-29**: the action
   generated `./gradlew bootRun` with the profile forwarded as
   `--args=--spring.profiles.active=<p>`, and both the base and `dev` commands
   were run verbatim and served `GET /greeting`, the `dev` one on the port its
@@ -221,32 +218,24 @@ extension.
   build. Installation today means a local development extension.
 - The disposable code under `spikes/` is evidence harness code. It is not a
   product implementation and will not be promoted directly into one.
-- Only one macOS arm64/JDK 25 tuple has completed the integrated PoC. The native
-  CI substrate is separately verified on Linux, macOS, and Windows across
-  x86_64/arm64 for runner identity, JDK 25, Node 24, Rust 1.98.0, native
-  filesystem/path and wrapper contracts, Java bridge self-test, and native Rust
-  tests. That matrix is not an integrated Zed + official Java/JDT + Spring Tools
-  runtime gate: every desktop/runtime tuple other than the driven macOS arm64 PoC
-  remains runtime-unverified. The declared Java floor is the one exception:
-  Temurin 21.0.11 ran the M5 portability core on macOS arm64 on 2026-07-26. JDK
-  22, 23 and 24 remain untested, and 24 is not interpolation — official Java
-  changes the JDT LS command line at 24 or newer.
-- The compatibility notification is still a one-shot claim about the whole
-  official Java route, so it names the requirement rather than the request that
-  failed. It now waits for evidence that the requirement is genuinely unmet — a
-  data-route failure is only reported once it outlives the sixty-second
-  handshake window, and never after the route has already answered — which is
-  what the notice was already doing for the classpath route. A route that stays
-  broken is still reported; a bounded import-time timeout no longer is.
-- The product requires the official Zed Java extension. It does not replace Java
-  debugging, tests, tasks, project import, or other Java ownership, and it will
-  not offer a reduced standalone JDT fallback.
-- Official Java 6.8.23 passed S016's versioned bridge, callbacks, product-owned
-  cleanup, warm-cache, and ordinary-profile Maven Boot main-runnable gates on
-  macOS arm64/JDK 25. D006 no longer treats an exact release string as the
-  compatibility gate; the known route and bridge capabilities are attempted
-  optimistically. Gradle/vanilla task execution, test runnables, and debugging
-  remain untested.
+- Driven Zed desktop evidence predating D007 is centered on macOS arm64/JDK 25
+  and used the retired JDT/bridge architecture. It is retained as historical
+  product evidence, not standalone support evidence. Current CI separately runs
+  the standalone Spring runtime smoke on Linux, macOS, and Windows across
+  x86_64/arm64 and runs the real standalone runtime again on the JDK 21 floor.
+  Those jobs prove headless portability/runtime behavior only. Exact-final-HEAD
+  Zed development-extension validation is still required before Registry
+  refresh and release-facing support claims.
+- The product requires the official Zed Java extension for Java language
+  registration/editing, debugging, tests, tasks, and the ordinary Java
+  experience. Spring analysis no longer depends on the Java extension's private
+  work directory, proxy, version string, or bridge commands. There is no reduced
+  or private JDT fallback: D007 selects the official standalone Spring server
+  beside the official Java server.
+- S016's official-Java 6.8.23 bridge/callback gates remain historical evidence
+  for the architecture D007 superseded. They must not be used as proof that the
+  standalone Spring runtime works, and exact official-Java release admission is
+  no longer a Spring runtime concept.
 - Zed's Java 6.8.23 generated runnable resolves `java-task-helper` below the
   default Zed data directory. It works in the ordinary profile but fails under
   a custom `--user-data-dir`; this affects isolated evidence profiles.
@@ -255,41 +244,31 @@ extension.
   coordinators, Spring servers, routes, and extension state were already gone.
   This official-Java/Zed lifecycle uncertainty remains open and must not be
   mistaken for a product uninstall failure.
-- The coordinator depends on a private Java-provider transport that the official
-  Java extension does not document as public API. A future Java extension release
-  may change it and break this project. The versioned adapter narrows that risk
-  but cannot remove it. Exact release pre-admission is not required; an actual
-  capability failure must be visible and easy to report.
+- The former private Java-provider transport is removed by D007. Production code
+  must not rediscover another extension's work directory, read
+  `java/proxy/<worktree>`, call `java-lsp-proxy`, inject a bridge into JDT LS,
+  or map Spring callbacks to private `sts.java.*` commands. Reintroducing any of
+  those requires a new recorded architecture decision and cannot be a silent
+  fallback.
 - The PoC and the M2 slice prove attributable Spring Boot property completion and
   the cleanup path. They do not prove the rest of VS Code Spring Tools capability
   parity.
-- **Installing the extension with a Java project already open needs a Zed
-  restart.** The bridge that carries Spring's classpath information into the Java
-  language server is contributed when that server starts. If the Java server is
-  already running when the extension is installed, it is not re-queried and runs
-  without the bridge, so Spring features that need the classpath (completion,
-  validation) stay dead until Zed is restarted. Installing the extension before
-  opening a Java project avoids this, and it works on a cold cache. Confirmed in
-  `docs/spikes/014-jdtls-bundle-startup-ordering.md`.
-- **First-use Spring artifact acquisition hangs, and it reproduces.** After a
-  fresh `install dev extension`, the first download stalls with no bytes
-  transferred, no open connection to the release host, no timeout, and Zed idle
-  at roughly zero CPU, showing only an indefinite `Downloading
-  zed-spring-tools...`. Quitting and relaunching Zed makes the same download
-  complete in seconds. Observed twice on 2026-07-17: once stalling 24 minutes,
-  then finishing in under 12 seconds after a restart; and once stalling over 3
-  minutes, then delivering 79 MB within 10 seconds of a restart. The network was
-  healthy both times, verified independently at about 4.9 MB/s.
-  **Workaround: if acquisition appears stuck, quit and reopen Zed.** Zed's
-  `download_file` API accepts no timeout, so the extension cannot currently bound
-  or retry it. The cause is not established.
-- The missing/incompatible-Java diagnostic is implemented and, as of 2026-07-18,
-  observed at runtime: the coordinator refuses to start on an incompatible JDK or
-  structurally invalid adapter contract, naming the reason, instead of entering
-  a reduced mode. D006 removes the embedded self-declared `extensionVersion`
-  comparison while retaining structural validation; that policy change has
-  contract coverage but has not yet had its own driven Zed run. Only the single
-  macOS arm64 tuple has been exercised.
+- The old "install while JDT LS is already running, then restart Zed" requirement
+  was caused by bridge-bundle injection and is retired with D007. A restart is
+  still a valid generic troubleshooting step during development-extension
+  testing, but it is no longer a product initialization requirement.
+- A first-use download hang was reproducibly observed in 2026-07 on the old VSIX
+  acquisition path. D007 downloads a different artifact from Spring's CDN, so
+  that observation is not automatically a current defect. The exact-HEAD D007
+  harness now drives the standalone path through warm-cache offline startup,
+  first-install offline failure/recovery, checksum-corruption offline
+  failure/recovery, and partial-staging cleanup. Those remain release-blocking
+  until the final candidate produces `standalone-offline-regression.json` with
+  `offlineLifecycle: PASS`; historical VSIX evidence is not substituted.
+- The extension checks its configured Java executable before starting Spring
+  Tools and requires JDK 21 or newer. The former "missing/incompatible official
+  Java route" diagnostic and structural provider-schema check were part of the
+  retired private transport and no longer describe the standalone runtime.
 - GitHub Issues cannot be submitted anonymously, and Zed's GitHub sign-in grants
   only `read:user` and exposes no issue-write token to extensions. The product
   now shows a clickable Markdown notification containing a bounded title/body-
@@ -299,44 +278,33 @@ extension.
   session; no issue was submitted. It is not automatic telemetry and must never include
   raw logs, paths, classpaths, source, environment variables, or credentials,
   and must direct suspected vulnerabilities to private reporting.
-- `sts/javaType`, its eight sibling `sts/java*` server→client requests, and the
-  Boot-project `sts/project/gav` request are handled by the coordinator, which
-  routes them to the official Java extension.
-  As of 2026-07-18 `sts/javaType` is observed at runtime — the Spring server
-  issued a real request during indexing and the coordinator routed it to the
-  official Java `sts.java.type` command and answered it — so it is `verified`;
-  the eight siblings and `sts/project/gav` share that path and its contract test
-  but were not each exercised individually. The GAV route removes a transport
-  prerequisite for executable Boot-project discovery; it does not yet provide a
-  user-facing Zed discovery workflow. `vscode-spring-boot.ls.start` is a VS Code
-  client command, not a coordinator request: Zed owns language-server
-  start/restart and the coordinator already wires the classpath bridge, the
-  Java-data route, and classpath listening that command's callback performs.
-- No Spring VSIX, JAR, JDT LS distribution, Zed application, or other third-party
-  binary is stored in Git. Reproduction requires separately acquired, pinned,
-  checksum-verified inputs.
-- The extension downloads the pinned, checksum-verified Spring Tools
-  `5.3.0.RELEASE` VSIX from its official GitHub release on first use. It requires
-  network access for that download and does not mirror or repackage the artifact.
-  The pin moved from `5.2.0.RELEASE` on 2026-08-01 through the refresh gate; most
-  capability evidence below and in the inventory was recorded against
-  `5.2.0.RELEASE` and each row names the release its evidence belongs to.
-- Offline behaviour is verified on macOS arm64/Zed 1.12.0/JDK 25 (2026-07-26),
-  with outbound network denied to Zed, the coordinator, and the JVMs alike. A
-  first install without network **fails closed**: the error names the pinned
-  release and the exact artifact URL, no partial archive or installation is left
-  behind, and no reduced mode starts. A warm installation needs no network for
-  anything except Spring's version and support validation, which degrades to an
-  empty diagnostic set — you lose the update/support advice, you are never shown
-  stale advice. A corrupted installed jar is repaired offline from the cached,
-  checksum-verified VSIX; if that archive is also damaged it is deleted rather
-  than used and the existing installation is left untouched, because a new
-  installation is only ever activated by renaming a validated staging directory
-  into place. Offline *installation* therefore remains impossible by design (the
-  VSIX must be fetched once), and rollback between two different pinned Spring
-  Tools releases is untested because only one release is pinned. Project-operated
-  redistribution remains undecided; repackaging or mirroring stays blocked on a
-  complete third-party license inventory and an appropriate review.
+- The standalone server's remaining client-side Java callbacks are bounded
+  explicitly. `sts/project/gav` receives one `null` enrichment per project,
+  which preserves the standalone executable-project result without inventing
+  coordinates. `sts/javaCodeComplete` receives an empty result, which is the
+  known Spring XML Java type/package-completion reduction described above. The
+  former `sts/javaType`, sibling `sts/java*`, classpath-listener, and
+  `zed.spring.bridge.v1.*` routes are not product contracts.
+- No Spring Tools binary, JDT LS distribution, Zed application, or other
+  third-party binary is stored in Git. Reproduction acquires the separately
+  published standalone Spring artifact using its pinned identity.
+- The extension downloads the official
+  `spring-boot-language-server-standalone-exec.jar` for Spring Tools
+  `5.3.0.RELEASE` / artifact version `2.3.0` from Spring's CDN. Exact size and
+  SHA-256 are pinned in `protocol/spring-artifacts.json`; activation rejects a
+  mismatched file. The project does not mirror or repackage the artifact.
+- The detailed 2026-07 offline gate was run against the retired VSIX/JDT bridge
+  installation path. Its result is not standalone evidence. The current D007
+  gate therefore applies a loopback-only macOS sandbox to the isolated Zed
+  process and proves the direct-JAR lifecycle instead: a validated warm cache
+  still supplies authentic `server.port` completion with external network
+  denied; a missing artifact fails closed without starting the coordinator or
+  leaving a usable/partial download and recovers when network access returns; a
+  same-size checksum-corrupted artifact also fails closed offline without being
+  replaced by unverified bytes, then is re-downloaded to the pinned SHA-256
+  online. Network-dependent Spring version/support diagnostics are revalidated
+  separately rather than assumed from the old gate. This claim becomes current
+  only when the exact final candidate records that D007 evidence.
 - SSH remote development and WSL-hosted remote projects are not in the initial
   product scope.
 

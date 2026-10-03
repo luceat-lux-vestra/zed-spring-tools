@@ -1,0 +1,3806 @@
+#!/usr/bin/env node
+
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const fixtureSources = {
+  maven: path.join(repository, "tests", "fixtures", "spring-boot-basic"),
+  gradle: path.join(repository, "tests", "fixtures", "spring-boot-gradle"),
+};
+const FORBIDDEN = ["work/java", "java/proxy", "java-lsp-proxy", "zed.spring.bridge"];
+
+const [command, ...args] = process.argv.slice(2);
+
+if (command === "--self-test") {
+  selfTest();
+} else if (command === "--stage" && args.length === 3) {
+  const [officialJavaProfile, freshRoot, javaHome] = args;
+  process.stdout.write(JSON.stringify(stage(path.resolve(officialJavaProfile), path.resolve(freshRoot), path.resolve(javaHome)), null, 2) + "\n");
+} else if (command === "--run-macos" && args.length === 3) {
+  runMacos(path.resolve(args[0]), path.resolve(args[1]), path.resolve(args[2]), { manualDevInstall: false });
+} else if (command === "--run-macos-manual-install" && args.length === 3) {
+  runMacos(path.resolve(args[0]), path.resolve(args[1]), path.resolve(args[2]), { manualDevInstall: true });
+} else if (command === "--launch-macos" && (args.length === 2 || args.length === 3)) {
+  launchMacos(path.resolve(args[0]), args[1], args[2] ? path.resolve(args[2]) : undefined);
+} else if (command === "--stop-macos" && args.length === 1) {
+  const root = path.resolve(args[0]);
+  stopAndWaitZed(root, readManifest(root), 10_000, 5_000);
+} else if (command === "--install-dev-extension-macos" && args.length === 1) {
+  installDevExtensionMacos(path.resolve(args[0]));
+} else if (command === "--summarize" && args.length === 1) {
+  process.stdout.write(JSON.stringify(summarize(path.resolve(args[0])), null, 2) + "\n");
+} else {
+  process.stderr.write(
+    "usage:\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --stage <official-java-profile> <fresh-root> <java-home>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --run-macos <official-java-profile> <fresh-root> <java-home>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --run-macos-manual-install <official-java-profile> <fresh-root> <java-home>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --launch-macos <staged-root> <maven|gradle> [zed-cli]\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --stop-macos <staged-root>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --install-dev-extension-macos <staged-root>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --summarize <staged-root>\n" +
+      "  node scripts/d007-zed-desktop-validation.mjs --self-test\n",
+  );
+  process.exit(2);
+}
+
+function stage(javaProfile, root, javaHome) {
+  requireDirectory(javaProfile, "official Java source profile");
+  requireDirectory(javaHome, "JAVA_HOME");
+  for (const source of Object.values(fixtureSources)) requireDirectory(source, "fixture");
+  requireFreshRoot(root);
+
+  const sourceHead = git(["rev-parse", "HEAD"]).trim();
+  assert.match(sourceHead, /^[0-9a-f]{40}$/);
+  assert.equal(git(["status", "--porcelain"]), "", "source checkout must be clean");
+
+  const javaExtension = path.join(javaProfile, "extensions", "installed", "java");
+  const javaIndex = path.join(javaProfile, "extensions", "index.json");
+  requireDirectory(javaExtension, "official Java extension");
+  requireFile(javaIndex, "official Java extension index");
+
+  const javaManifest = fs.readFileSync(path.join(javaExtension, "extension.toml"), "utf8");
+  assert.match(javaManifest, /^id = "java"$/m);
+  const javaVersion = /^version = "([^"]+)"$/m.exec(javaManifest)?.[1];
+  assert.ok(javaVersion, "official Java version must be declared");
+
+  const profile = path.join(root, "profile");
+  const worktrees = path.join(root, "worktrees");
+  const evidence = path.join(root, "evidence");
+  const xdgCache = path.join(root, "xdg-cache");
+  const xdgData = path.join(root, "xdg-data");
+  const xdgState = path.join(root, "xdg-state");
+
+  for (const directory of [
+    path.join(profile, "extensions", "installed"),
+    path.join(profile, "config"),
+    worktrees,
+    evidence,
+    xdgCache,
+    xdgData,
+    xdgState,
+  ]) fs.mkdirSync(directory, { recursive: true });
+
+  fs.cpSync(javaExtension, path.join(profile, "extensions", "installed", "java"), {
+    recursive: true,
+    dereference: false,
+  });
+
+  const index = JSON.parse(fs.readFileSync(javaIndex, "utf8"));
+  assert.ok(index.extensions?.java, "official Java index entry must exist");
+  index.extensions = { java: index.extensions.java };
+  fs.writeFileSync(path.join(profile, "extensions", "index.json"), JSON.stringify(index, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+
+  for (const [kind, source] of Object.entries(fixtureSources)) {
+    fs.cpSync(source, path.join(worktrees, kind), { recursive: true, dereference: false });
+  }
+
+  for (const kind of Object.keys(fixtureSources)) {
+    const probe = path.join(worktrees, kind, "src", "main", "resources", "application-d007.properties");
+    fs.writeFileSync(probe, "ser", { encoding: "utf8", mode: 0o600 });
+  }
+
+  fs.writeFileSync(path.join(profile, "config", "settings.json"), JSON.stringify(settings(javaHome), null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  fs.writeFileSync(path.join(profile, "config", "keymap.json"), JSON.stringify(d007Keymap(), null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+
+  const manifest = {
+    schemaVersion: 1,
+    status: "staged",
+    decision: "D007",
+    sourceHead,
+    repository,
+    javaExtensionVersion: javaVersion,
+    runtimeJdk: javaVersionFromHome(javaHome),
+    profile,
+    extensionSource: repository,
+    worktrees: {
+      maven: path.join(worktrees, "maven"),
+      gradle: path.join(worktrees, "gradle"),
+    },
+    evidence,
+    xdgCache,
+    xdgData,
+    xdgState,
+    fixtureSha256: {
+      maven: treeDigest(path.join(worktrees, "maven")),
+      gradle: treeDigest(path.join(worktrees, "gradle")),
+    },
+    forbiddenPrivateBoundaryMarkers: FORBIDDEN,
+  };
+  fs.writeFileSync(path.join(evidence, "staged.json"), JSON.stringify(manifest, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  return manifest;
+}
+
+function d007Keymap() {
+  const workspaceBindings = {
+    "ctrl-cmd-alt-i": "zed::InstallDevExtension",
+    "ctrl-cmd-alt-r": "lsp_command_selector::Toggle",
+    "ctrl-cmd-alt-d": "debugger::Start",
+    "ctrl-cmd-alt-s": "debugger::Stop",
+  };
+  const editorBindings = {
+    "ctrl-cmd-alt-x": "editor::ToggleCodeActions",
+    "ctrl-cmd-alt-z": "editor::ShowCompletions",
+  };
+  return [
+    { context: "Workspace", bindings: workspaceBindings },
+    { context: "Editor", bindings: editorBindings },
+  ];
+}
+
+
+
+function settings(jdk) {
+  return {
+    disable_ai: true,
+    session: { restore_unsaved_buffers: false, trust_all_worktrees: true },
+    auto_install_extensions: { html: false },
+    auto_update_extensions: { java: false, "spring-tools": false },
+    log: { lsp: "trace", project: "warn" },
+    languages: {
+      Java: { language_servers: ["jdtls", "spring-tools"] },
+      Properties: { language_servers: ["spring-tools"] },
+      YAML: { language_servers: ["spring-tools"] },
+    },
+    lsp: {
+      jdtls: {
+        settings: {
+          java_home: jdk,
+          lombok_support: false,
+          jdk_auto_download: false,
+          check_updates: "once",
+        },
+      },
+    },
+  };
+}
+
+function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}) {
+  assert.equal(process.platform, "darwin", "macOS desktop gate is required");
+  const manifest = stage(javaProfile, root, javaHome);
+  const sharedLog = path.join(os.homedir(), "Library", "Logs", "Zed", "Zed.log");
+  const sharedStart = fileSize(sharedLog);
+
+  const results = [];
+  let phase = null;
+  const setPhase = (nextPhase) => {
+    phase = nextPhase;
+    recordRunPhase(manifest, phase);
+  };
+  let primaryError;
+  setPhase("maven-install-launch");
+  try {
+    launchMacos(root, "maven", { role: "install" });
+    setPhase("maven-install-zed-readiness");
+    waitForZedReady(manifest, "maven", 45_000);
+
+    setPhase("dev-extension-install");
+    if (manualDevInstall) {
+      process.stdout.write(
+        [
+          "",
+          "MANUAL STEP REQUIRED:",
+          "  In the isolated Zed window, run: zed: install dev extension",
+          `  Select this exact directory: ${repository}`,
+          "  Do not open a different checkout.",
+          "  The harness will continue automatically after Zed writes extension.wasm and registers spring-tools.",
+          "",
+        ].join("\n"),
+      );
+      fs.writeFileSync(path.join(manifest.evidence, "dev-extension-install.json"), JSON.stringify({
+        attemptedAt: new Date().toISOString(),
+        sourceHead: manifest.sourceHead,
+        mode: "manual-zed-ui",
+        repository,
+        status: "awaiting-user-install",
+      }, null, 2) + "\n", { mode: 0o600 });
+    } else {
+      installDevExtensionMacos(root);
+    }
+
+    setPhase("dev-extension-readiness");
+    waitForDevExtensionInstalled(manifest, manualDevInstall ? 600_000 : 180_000);
+    setPhase("maven-install-shutdown");
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+    const preflightJavaRelative =
+      "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+    setPhase("language-server-preflight-launch");
+    launchMacos(root, "maven", {
+      role: "preflight",
+      relativeTarget: preflightJavaRelative,
+    });
+    setPhase("language-server-preflight-zed-readiness");
+    waitForZedReady(manifest, "maven", 45_000);
+    setPhase("language-server-preflight-readiness");
+    waitForLanguageServerPreflightMacos(
+      manifest,
+      "maven",
+      preflightJavaRelative,
+      180_000,
+    );
+    setPhase("language-server-preflight-shutdown");
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+    setPhase("standalone-capability-regression");
+    runStandaloneCapabilityRegression(manifest, javaHome);
+
+    for (const fixtureKind of ["maven", "gradle"]) {
+      const propertiesRelative = "src/main/resources/application-d007.properties";
+      const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+
+      setPhase(`${fixtureKind}-extension-activation-and-completion-launch`);
+      launchMacos(root, fixtureKind, {
+        role: "completion",
+        relativeTarget: propertiesRelative,
+        row: 1,
+        column: 4,
+      });
+      setPhase(`${fixtureKind}-extension-activation-zed-readiness`);
+      waitForZedReady(manifest, fixtureKind, 45_000);
+      setPhase(`${fixtureKind}-extension-activation-and-completion-interaction`);
+      runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart);
+      setPhase(`${fixtureKind}-completion-shutdown`);
+      stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+      setPhase(`${fixtureKind}-run-debug-launch`);
+      launchMacos(root, fixtureKind, {
+        role: "run-debug",
+        relativeTarget: javaRelative,
+      });
+      setPhase(`${fixtureKind}-run-debug-zed-readiness`);
+      waitForZedReady(manifest, fixtureKind, 45_000);
+      setPhase(`${fixtureKind}-run-debug-interaction`);
+      const fixtureResult = runDebugPhaseMacos(root, fixtureKind);
+      setPhase(`${fixtureKind}-run-debug-shutdown`);
+      stopAndWaitZed(root, manifest, 10_000, 5_000);
+      setPhase(`${fixtureKind}-generated-run-task-execution`);
+      fixtureResult.runTaskExecution = executeGeneratedRunTask(
+        manifest,
+        fixtureKind,
+        javaHome,
+        180_000,
+      );
+      results.push(fixtureResult);
+    }
+
+    const dapJavaRelative =
+      "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+    setPhase("maven-dap-launch");
+    launchMacos(root, "maven", {
+      role: "dap",
+      relativeTarget: dapJavaRelative,
+    });
+    setPhase("maven-dap-zed-readiness");
+    waitForZedReady(manifest, "maven", 45_000);
+    setPhase("maven-dap-java-readiness");
+    waitForJavaDapReadinessMacos(
+      manifest,
+      "maven",
+      dapJavaRelative,
+      120_000,
+    );
+    setPhase("maven-dap-interaction");
+    runDesktopDapRegressionMacos(root, "maven", 180_000);
+    setPhase("maven-dap-shutdown");
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+
+    setPhase("standalone-offline-regression");
+    runStandaloneOfflineRegressionMacos(root, "maven", 180_000);
+  } catch (error) {
+    primaryError = error;
+    writeGateFailure(manifest, phase, error);
+    recordRunFinal(manifest, "FAIL", phase, error);
+    throw error;
+  } finally {
+    let cleanupError;
+    try {
+      ensureZedStopped(root, manifest, 5_000, 5_000);
+    } catch (error) {
+      cleanupError = error;
+      writeCleanupFailure(manifest, error);
+      if (primaryError) {
+        process.stderr.write(`D007 cleanup failure after primary ${phase} failure: ${errorText(error)}\n`);
+      }
+    }
+    try {
+      harvestSharedZedLog(manifest, sharedLog, sharedStart);
+    } catch (error) {
+      writeCleanupFailure(manifest, error, "shared-log-harvest");
+      if (!cleanupError) cleanupError = error;
+      if (primaryError) {
+        process.stderr.write(`D007 log-harvest failure after primary ${phase} failure: ${errorText(error)}\n`);
+      }
+    }
+    if (!primaryError && cleanupError) {
+      recordRunFinal(manifest, "FAIL", phase ?? "cleanup", cleanupError);
+      throw cleanupError;
+    }
+  }
+
+  const summary = summarize(root);
+  const acceptance = runCapabilityAcceptanceSummary(manifest);
+  const outcome = {
+    sourceHead: manifest.sourceHead,
+    gateScope: "architecture-smoke",
+    releaseAcceptance: acceptance.releaseAcceptance,
+    capabilityAcceptance: {
+      acceptedCount: acceptance.acceptedCount,
+      terminalCount: acceptance.terminalCount,
+      pendingCount: acceptance.pendingCount,
+      failedCount: acceptance.failedCount,
+      unresolvedCapabilities: acceptance.unresolvedCapabilities,
+      failedCapabilities: acceptance.failedCapabilities,
+    },
+    fixtures: results,
+    privateBoundary: summary.privateBoundary,
+    completionEvidence: summary.completionEvidence,
+    unexpectedRuntimeErrorEvidence: summary.unexpectedRuntimeErrorEvidence,
+    standaloneCapabilityRegression:
+      fs.existsSync(path.join(manifest.evidence, "standalone-capability-regression.json"))
+        ? JSON.parse(
+            fs.readFileSync(
+              path.join(manifest.evidence, "standalone-capability-regression.json"),
+              "utf8",
+            ),
+          ).status === "pass"
+          ? "PASS"
+          : "FAIL"
+        : "MISSING",
+    architectureSmokeStatus: results.every(
+      (entry) =>
+        entry.debugConfig === "PASS" &&
+        entry.runTask === "PASS" &&
+        entry.runTaskExecution === "PASS",
+    ) &&
+      summary.privateBoundary === "PASS" &&
+      summary.completionEvidence === "PASS" &&
+      summary.unexpectedRuntimeErrorEvidence === "PASS" &&
+      fs.existsSync(path.join(manifest.evidence, "standalone-capability-regression.json")) &&
+      JSON.parse(
+        fs.readFileSync(
+          path.join(manifest.evidence, "standalone-capability-regression.json"),
+          "utf8",
+        ),
+      ).status === "pass"
+      ? "PASS"
+      : "FAIL_OR_REVIEW_REQUIRED",
+    status: null,
+  };
+  outcome.status =
+    outcome.architectureSmokeStatus === "PASS" &&
+    outcome.releaseAcceptance === "PASS"
+      ? "PASS"
+      : outcome.architectureSmokeStatus !== "PASS"
+        ? "FAIL_OR_REVIEW_REQUIRED"
+        : "PENDING_CAPABILITY_ACCEPTANCE";
+  fs.writeFileSync(path.join(manifest.evidence, "desktop-gate.json"), JSON.stringify(outcome, null, 2) + "\n", { mode: 0o600 });
+  process.stdout.write(JSON.stringify(outcome, null, 2) + "\n");
+  recordRunFinal(
+    manifest,
+    outcome.status === "PASS" ? "PASS" : outcome.status,
+    "complete",
+    outcome.status === "PASS"
+      ? null
+      : new Error(
+          outcome.status === "PENDING_CAPABILITY_ACCEPTANCE"
+            ? "architecture smoke passed but D007 capability acceptance is incomplete"
+            : "desktop gate requires review",
+        ),
+  );
+}
+
+function runCapabilityAcceptanceSummary(manifest) {
+  const script = path.join(
+    repository,
+    "scripts",
+    "d007-capability-acceptance-summary.mjs",
+  );
+  requireFile(script, "D007 capability acceptance summary");
+  const output = path.join(
+    manifest.evidence,
+    "d007-capability-acceptance-summary.json",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, manifest.evidence, output],
+    {
+      cwd: repository,
+      encoding: "utf8",
+      shell: false,
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `D007 capability acceptance summary failed: ${bounded(result.stderr || result.stdout)}`,
+    );
+  }
+  requireFile(output, "D007 capability acceptance summary evidence");
+  const acceptance = JSON.parse(fs.readFileSync(output, "utf8"));
+  assert.equal(
+    acceptance.sourceHead,
+    manifest.sourceHead,
+    "capability acceptance summary must bind the staged exact HEAD",
+  );
+  assert.equal(acceptance.totalCapabilities, 59);
+  return acceptance;
+}
+
+function runStandaloneCapabilityRegression(manifest, javaHome) {
+  const script = path.join(
+    repository,
+    "scripts",
+    "d007-standalone-capability-regression.mjs",
+  );
+  requireFile(script, "D007 standalone capability regression runner");
+  const evidenceFile = path.join(
+    manifest.evidence,
+    "standalone-capability-regression.json",
+  );
+  const logFile = path.join(
+    manifest.evidence,
+    "standalone-capability-regression.log",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, evidenceFile, javaHome],
+    {
+      cwd: repository,
+      encoding: "utf8",
+      shell: false,
+      timeout: 12 * 60_000,
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
+  fs.writeFileSync(
+    logFile,
+    [
+      `exitCode=${result.status}`,
+      `signal=${result.signal ?? ""}`,
+      "--- stdout ---",
+      result.stdout ?? "",
+      "--- stderr ---",
+      result.stderr ?? "",
+    ].join("\n"),
+    { mode: 0o600 },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    let inner = null;
+    try {
+      const failedEvidence = JSON.parse(fs.readFileSync(evidenceFile, "utf8"));
+      inner = failedEvidence?.error ?? null;
+    } catch {}
+    throw new Error(
+      `standalone capability regression failed with exit ${result.status}${inner ? `: ${inner}` : ""}; inspect ${evidenceFile} and ${logFile}`,
+    );
+  }
+  requireFile(evidenceFile, "standalone capability regression evidence");
+  const evidence = JSON.parse(fs.readFileSync(evidenceFile, "utf8"));
+  assert.equal(
+    evidence.sourceHead,
+    manifest.sourceHead,
+    "standalone capability regression must bind the staged exact HEAD",
+  );
+  assert.equal(evidence.status, "pass");
+  return evidence;
+}
+
+function runCompletionPhaseMacos(root, fixtureKind, sharedLog, sharedStart) {
+  const manifest = readManifest(root);
+  const completionBaseline = runtimeSnapshot(manifest, sharedLog, sharedStart);
+  waitForSpringCompletion(
+    manifest,
+    sharedLog,
+    sharedStart,
+    fixtureKind,
+    completionBaseline,
+    120_000,
+    3,
+  );
+  captureScreen(path.join(manifest.evidence, `${fixtureKind}-completion.png`));
+}
+
+function runStandaloneOfflineRegressionMacos(
+  root,
+  fixtureKind,
+  timeoutMs,
+) {
+  assert.equal(process.platform, "darwin", "offline desktop gate is macOS-only");
+  const manifest = readManifest(root);
+  const pin = springArtifactPin();
+  const artifact = locateInstalledSpringArtifact(manifest, pin);
+  assert.equal(fs.statSync(artifact).size, pin.size);
+  assert.equal(sha256File(artifact), pin.sha256);
+
+  const sandboxProfile = loopbackOnlySandboxProfile();
+  const denialProbe = spawnSync(
+    "/usr/bin/sandbox-exec",
+    [
+      "-p",
+      sandboxProfile,
+      "/usr/bin/curl",
+      "--silent",
+      "--show-error",
+      "--connect-timeout",
+      "3",
+      "https://example.com/",
+    ],
+    { encoding: "utf8", timeout: 8_000 },
+  );
+  assert.notEqual(
+    denialProbe.status,
+    0,
+    "offline sandbox must deny a real non-loopback outbound connection",
+  );
+
+  const propertiesRelative = "src/main/resources/application-d007.properties";
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+
+  let warmLaunchStarted = false;
+  let missingLaunchStarted = false;
+  let firstRecoveryLaunchStarted = false;
+  let corruptLaunchStarted = false;
+  let repairLaunchStarted = false;
+  try {
+    const warmProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-warm",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    warmLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const warm = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      warmProtocolStart,
+      timeoutMs,
+      "offline-warm",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    warmLaunchStarted = false;
+
+    fs.rmSync(artifact);
+    assert.equal(fs.existsSync(artifact), false);
+
+    const missingProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-first-install",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    missingLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const missingFailure = observeOfflineSpringFailClosedMacos({
+      manifest,
+      fixtureKind,
+      protocolFile,
+      protocolStart: missingProtocolStart,
+      artifact,
+      expectedArtifact: "missing",
+      evidenceName: "offline-first-install-fail-closed",
+      timeoutMs: 30_000,
+    });
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    missingLaunchStarted = false;
+
+    const firstRecoveryProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-first-install-recovery",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "normal",
+    });
+    firstRecoveryLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const firstRecovery = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      firstRecoveryProtocolStart,
+      timeoutMs,
+      "offline-first-install-recovery",
+    );
+    assert.equal(fs.statSync(artifact).size, pin.size);
+    assert.equal(sha256File(artifact), pin.sha256);
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    firstRecoveryLaunchStarted = false;
+
+    const originalDigest = sha256File(artifact);
+    corruptFileByte(artifact);
+    const corruptDigest = sha256File(artifact);
+    assert.notEqual(corruptDigest, originalDigest);
+    assert.equal(fs.statSync(artifact).size, pin.size);
+
+    const corruptProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-corrupt",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "loopback-only",
+    });
+    corruptLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const failure = observeOfflineSpringFailClosedMacos({
+      manifest,
+      fixtureKind,
+      protocolFile,
+      protocolStart: corruptProtocolStart,
+      artifact,
+      expectedArtifact: "corrupt",
+      expectedDigest: corruptDigest,
+      evidenceName: "offline-corrupt-fail-closed",
+      timeoutMs: 30_000,
+    });
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    corruptLaunchStarted = false;
+
+    const repairProtocolStart = fileSize(protocolFile);
+    launchMacos(root, fixtureKind, {
+      role: "offline-repair-online",
+      relativeTarget: propertiesRelative,
+      row: 1,
+      column: 4,
+      networkPolicy: "normal",
+    });
+    repairLaunchStarted = true;
+    waitForZedReady(manifest, fixtureKind, 45_000);
+    const repair = waitForFreshSpringCompletionMacos(
+      manifest,
+      fixtureKind,
+      propertiesRelative,
+      repairProtocolStart,
+      timeoutMs,
+      "offline-repair-online",
+    );
+    assert.equal(fs.statSync(artifact).size, pin.size);
+    assert.equal(
+      sha256File(artifact),
+      pin.sha256,
+      "online recovery must restore the exact pinned standalone checksum",
+    );
+    stopAndWaitZed(root, manifest, 10_000, 5_000);
+    repairLaunchStarted = false;
+
+    const evidence = {
+      sourceHead: manifest.sourceHead,
+      observedAt: new Date().toISOString(),
+      checks: {
+        offlineLifecycle: {
+          status: "PASS",
+          networkDenialProbe: "PASS",
+          warmCachedStartup: warm.status,
+          firstInstallOfflineFailClosed: "PASS",
+          firstInstallOfflineProof: missingFailure,
+          firstInstallOnlineRecovery: firstRecovery.status,
+          corruptOfflineFailClosed: "PASS",
+          corruptOfflineProof: failure,
+          partialDownloadAbsent: true,
+          onlineRepair: repair.status,
+          repairedPinnedChecksum: true,
+        },
+      },
+      status: "PASS",
+    };
+    fs.writeFileSync(
+      path.join(manifest.evidence, "standalone-offline-regression.json"),
+      JSON.stringify(evidence, null, 2) + "\n",
+      { mode: 0o600 },
+    );
+    return evidence;
+  } finally {
+    if (
+      warmLaunchStarted ||
+      missingLaunchStarted ||
+      firstRecoveryLaunchStarted ||
+      corruptLaunchStarted ||
+      repairLaunchStarted
+    ) {
+      ensureZedStopped(root, manifest, 5_000, 5_000);
+    }
+  }
+}
+
+function springArtifactPin() {
+  const file = path.join(repository, "protocol", "spring-artifacts.json");
+  requireFile(file, "Spring artifact pin manifest");
+  const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+  const pin = manifest.springTools;
+  assert.equal(pin?.mode, "standalone");
+  assert.equal(typeof pin?.asset, "string");
+  assert.equal(Number.isInteger(pin?.size), true);
+  assert.match(pin?.sha256 ?? "", /^[0-9a-f]{64}$/);
+  assert.equal(typeof pin?.tag, "string");
+  return pin;
+}
+
+function locateInstalledSpringArtifact(manifest, pin) {
+  const ownWorkRoot = path.join(
+    manifest.profile,
+    "extensions",
+    "work",
+    "spring-tools",
+  );
+  requireDirectory(ownWorkRoot, "spring-tools own extension work directory");
+  const matches = findFilesNamed(ownWorkRoot, pin.asset, 6);
+  assert.equal(
+    matches.length,
+    1,
+    "exactly one pinned standalone artifact must exist in spring-tools own work directory",
+  );
+  return matches[0];
+}
+
+function findFilesNamed(directory, name, depth) {
+  if (depth < 0 || !fs.existsSync(directory)) return [];
+  const matches = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isFile() && entry.name === name) {
+      matches.push(absolute);
+    } else if (entry.isDirectory()) {
+      matches.push(...findFilesNamed(absolute, name, depth - 1));
+    }
+  }
+  return matches;
+}
+
+function corruptFileByte(file) {
+  const fd = fs.openSync(file, "r+");
+  try {
+    const size = fs.fstatSync(fd).size;
+    assert.equal(size > 0, true, "artifact selected for corruption must be non-empty");
+    const offset = Math.floor(size / 2);
+    const byte = Buffer.alloc(1);
+    fs.readSync(fd, byte, 0, 1, offset);
+    byte[0] ^= 0xff;
+    fs.writeSync(fd, byte, 0, 1, offset);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function loopbackOnlySandboxProfile() {
+  return [
+    "(version 1)",
+    "(allow default)",
+    "(deny network-outbound)",
+    '(allow network-bind (local ip "localhost:*"))',
+    '(allow network-inbound (local ip "localhost:*"))',
+    '(allow network-outbound (remote ip "localhost:*"))',
+  ].join("\n");
+}
+
+function waitForFreshSpringCompletionMacos(
+  manifest,
+  fixtureKind,
+  relativePath,
+  protocolStart,
+  timeoutMs,
+  evidenceName,
+) {
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const target = path.join(manifest.worktrees[fixtureKind], relativePath);
+  const targetUri = pathToFileURL(target).href;
+  const started = Date.now();
+
+  let readiness = {
+    coordinatorStarted: false,
+    targetDocumentOpened: false,
+    indexReady: false,
+  };
+  waitUntil(
+    () => {
+      readiness = springTargetReadiness(
+        readFileDelta(protocolFile, protocolStart),
+        targetUri,
+      );
+      return readiness.coordinatorStarted &&
+        readiness.targetDocumentOpened &&
+        readiness.indexReady;
+    },
+    evidenceName + " fresh Spring runtime readiness",
+    Math.min(timeoutMs, 120_000),
+  );
+
+  const completionStart = fileSize(protocolFile);
+  triggerCompletionMacos(
+    manifest,
+    fixtureKind,
+    evidenceName + "-completion",
+  );
+  const expectedRequest = { uri: targetUri, line: 0, character: 3 };
+  let observation;
+  waitUntil(
+    () => {
+      observation = completionObservation(
+        readFileDelta(protocolFile, completionStart),
+        expectedRequest,
+      );
+      return observation.expectedRequestObserved &&
+        observation.expectedResponseObserved &&
+        observation.serverPortObserved;
+    },
+    evidenceName + " exact server.port completion",
+    Math.min(timeoutMs, 60_000),
+  );
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    targetRelativePath: relativePath,
+    targetUri,
+    readiness,
+    completion: observation,
+    networkPolicy: JSON.parse(
+      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+    ).networkPolicy,
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, evidenceName + "-completion.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
+}
+
+function observeOfflineSpringFailClosedMacos({
+  manifest,
+  fixtureKind,
+  protocolFile,
+  protocolStart,
+  artifact,
+  expectedArtifact,
+  expectedDigest = null,
+  evidenceName,
+  timeoutMs,
+}) {
+  assert.ok(
+    expectedArtifact === "missing" || expectedArtifact === "corrupt",
+    "offline artifact expectation must be missing or corrupt",
+  );
+  if (expectedArtifact === "missing") {
+    assert.equal(
+      fs.existsSync(artifact),
+      false,
+      "offline first-install proof must begin without a standalone artifact",
+    );
+  } else {
+    requireFile(artifact, "corrupt standalone artifact before offline repair");
+    assert.equal(
+      sha256File(artifact),
+      expectedDigest,
+      "offline corrupt-repair proof must begin from the expected corrupt digest",
+    );
+  }
+
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.networkPolicy,
+    "loopback-only",
+    "offline fail-closed proof requires the loopback-only sandbox",
+  );
+  const stagedSettings = JSON.parse(
+    fs.readFileSync(path.join(manifest.profile, "config", "settings.json"), "utf8"),
+  );
+  assert.deepEqual(
+    stagedSettings.languages?.Properties?.language_servers,
+    ["spring-tools"],
+    "offline activation probe must target a document owned only by spring-tools",
+  );
+
+  // The target is a Properties document whose staged language-server list is
+  // spring-tools only. Drive a real public completion action so this proof does
+  // not rely on a passive document-open race or on Zed's internal error strings.
+  triggerCompletionMacos(
+    manifest,
+    fixtureKind,
+    evidenceName + "-activation-probe",
+  );
+
+  const started = Date.now();
+  let coordinatorStarted = false;
+  let artifactObserved = fs.existsSync(artifact);
+  let stagingObserved = fs.existsSync(artifact + ".download");
+  let finalDigest = artifactObserved ? sha256File(artifact) : null;
+
+  while (Date.now() - started < timeoutMs) {
+    const delta = readFileDelta(protocolFile, protocolStart);
+    coordinatorStarted = protocolEvidenceEvents(delta)
+      .some((event) => event.event === "coordinator-start");
+    if (coordinatorStarted) {
+      throw new Error(
+        evidenceName +
+          ": Spring coordinator started under outbound network denial",
+      );
+    }
+
+    artifactObserved = fs.existsSync(artifact);
+    stagingObserved = stagingObserved || fs.existsSync(artifact + ".download");
+
+    if (expectedArtifact === "missing" && artifactObserved) {
+      throw new Error(
+        evidenceName +
+          ": standalone artifact became usable under outbound network denial",
+      );
+    }
+    if (expectedArtifact === "corrupt" && artifactObserved) {
+      finalDigest = sha256File(artifact);
+      if (finalDigest !== expectedDigest) {
+        throw new Error(
+          evidenceName +
+            ": corrupt standalone artifact changed under outbound network denial",
+        );
+      }
+    }
+
+    sleepMs(250);
+  }
+
+  const stagingPresentAtEnd = fs.existsSync(artifact + ".download");
+  assert.equal(
+    stagingPresentAtEnd,
+    false,
+    evidenceName + ": failed offline acquisition must not leave a staging artifact",
+  );
+
+  const artifactPresentAtEnd = fs.existsSync(artifact);
+  if (expectedArtifact === "missing") {
+    assert.equal(
+      artifactPresentAtEnd,
+      false,
+      evidenceName + ": offline first install must remain fail-closed",
+    );
+  } else {
+    assert.equal(
+      artifactPresentAtEnd,
+      true,
+      evidenceName + ": corrupt artifact must remain in place until verified online repair",
+    );
+    finalDigest = sha256File(artifact);
+    assert.equal(
+      finalDigest,
+      expectedDigest,
+      evidenceName + ": offline repair must not replace corrupt bytes",
+    );
+  }
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    networkPolicy: processRecord.networkPolicy,
+    activationProbe: "editor::ShowCompletions",
+    targetLanguageServers: ["spring-tools"],
+    observationMs: timeoutMs,
+    coordinatorStarted,
+    expectedArtifact,
+    artifactPresentAtEnd,
+    stagingObservedTransiently: stagingObserved,
+    stagingPresentAtEnd,
+    finalDigest,
+    proof:
+      "explicit Spring-only completion stimulus + no coordinator + no usable offline replacement; paired online recovery follows in the same lifecycle gate",
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, evidenceName + ".json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
+}
+
+function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
+  const manifest = readManifest(root);
+  const worktree = manifest.worktrees[fixtureKind];
+  const debugFile = path.join(worktree, ".zed", "debug.json");
+  requireFile(debugFile, fixtureKind + " generated debug config");
+  const configs = JSON.parse(fs.readFileSync(debugFile, "utf8"));
+  assert.equal(Array.isArray(configs), true, ".zed/debug.json must contain an array");
+  const config = configs.find((entry) =>
+    entry?.adapter === "Java" &&
+    entry?.request === "launch" &&
+    entry?.mainClass === "dev.zed.spring.fixture.FixtureApplication" &&
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools): ") &&
+    entry.label.endsWith(" (debug)")
+  );
+  assert.ok(config, fixtureKind + " base Spring Boot Java debug config must exist");
+
+  const sourceFile = path.join(
+    worktree,
+    "src",
+    "main",
+    "java",
+    "dev",
+    "zed",
+    "spring",
+    "fixture",
+    "FixtureApplication.java",
+  );
+  requireFile(sourceFile, fixtureKind + " DAP Java source");
+  const sourceDigestBefore = sha256File(sourceFile);
+
+  const before = new Set(
+    javaDebugProcessCandidates(
+      processSnapshot(),
+      worktree,
+      config.mainClass,
+    ).map((entry) => entry.pid),
+  );
+
+  const started = Date.now();
+  let attempts = 0;
+  let observed;
+  const maxAttempts = 3;
+  while (
+    observed === undefined &&
+    attempts < maxAttempts &&
+    Date.now() - started < timeoutMs
+  ) {
+    attempts += 1;
+    const sourceDigestAttemptStart = sha256File(sourceFile);
+    assert.equal(
+      sourceDigestAttemptStart,
+      sourceDigestBefore,
+      fixtureKind + " Java source changed before DAP picker attempt",
+    );
+
+    sendD007ActionKeyMacos(
+      manifest,
+      "d",
+      fixtureKind + "-dap-start-action-" + attempts,
+    );
+    sleepMs(900);
+    typeD007PickerQueryMacos(
+      manifest,
+      config.label,
+      fixtureKind + "-dap-debug-config-query-" + attempts,
+    );
+    sleepMs(900);
+
+    const sourceDigestAfterQuery = sha256File(sourceFile);
+    if (sourceDigestAfterQuery !== sourceDigestBefore) {
+      throw new Error(
+        fixtureKind +
+          " DAP picker query modified the Java source; debugger::Start did not own text focus",
+      );
+    }
+
+    captureScreen(
+      path.join(
+        manifest.evidence,
+        fixtureKind + "-dap-picker-attempt-" + attempts + ".png",
+      ),
+    );
+    confirmD007PickerMacos(
+      manifest,
+      fixtureKind + "-dap-confirm-" + attempts,
+    );
+
+    const attemptDeadline = Math.min(
+      started + timeoutMs,
+      Date.now() + 30_000,
+    );
+    while (Date.now() < attemptDeadline) {
+      observed = javaDebugProcessCandidates(
+        processSnapshot(),
+        worktree,
+        config.mainClass,
+      ).find((entry) => !before.has(entry.pid));
+      if (observed !== undefined) break;
+      sleepMs(250);
+    }
+
+    const sourceDigestAfterAttempt = sha256File(sourceFile);
+    if (sourceDigestAfterAttempt !== sourceDigestBefore) {
+      throw new Error(
+        fixtureKind + " Java source changed during DAP picker automation",
+      );
+    }
+
+    if (observed === undefined) {
+      cancelTransientUiMacos(
+        manifest,
+        fixtureKind + "-dap-cancel-after-attempt-" + attempts,
+      );
+      sleepMs(750);
+    }
+  }
+
+  if (observed === undefined) {
+    captureScreen(path.join(manifest.evidence, fixtureKind + "-dap-failure.png"));
+    throw new Error(
+      fixtureKind +
+        " generated Java debug configuration did not launch a new JDWP application process after " +
+        attempts +
+        " fresh debugger modal attempt(s)",
+    );
+  }
+
+  captureScreen(path.join(manifest.evidence, fixtureKind + "-dap-running.png"));
+  sendD007ActionKeyMacos(
+    manifest,
+    "s",
+    fixtureKind + "-dap-stop-action",
+  );
+  waitUntil(
+    () => !processPidIsLive(observed.pid),
+    fixtureKind + " debuggee shutdown after debugger::Stop",
+    30_000,
+  );
+
+  const sourceDigestAfter = sha256File(sourceFile);
+  assert.equal(
+    sourceDigestAfter,
+    sourceDigestBefore,
+    fixtureKind + " Java source must remain unchanged across DAP regression",
+  );
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    checks: {
+      debugLaunch: {
+        status: "PASS",
+        adapter: config.adapter,
+        request: config.request,
+        mainClass: config.mainClass,
+        generatedLabel: config.label,
+        newDebuggeePid: observed.pid,
+        jdwpObserved: observed.jdwpObserved,
+        exactWorktreeObserved: observed.exactWorktreeObserved,
+        pickerConfirmAttempts: attempts,
+        freshModalPerAttempt: true,
+        sourceIntegrityObserved: true,
+        stoppedViaPublicDebuggerAction: true,
+      },
+    },
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, "desktop-dap-regression.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
+}
+
+function processSnapshot() {
+  const result = spawnSync(
+    "/bin/ps",
+    ["-axo", "pid=,ppid=,pgid=,stat=,command="],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    throw new Error("ps failed while checking debug process: " + bounded(result.stderr));
+  }
+  return result.stdout;
+}
+
+function javaDebugProcessCandidates(psOutput, worktree, mainClass) {
+  const candidates = [];
+  for (const line of String(psOutput).split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const [, pidText, ppidText, pgidText, state, command] = match;
+    if (state.startsWith("Z")) continue;
+    const mainClassObserved = command.includes(mainClass);
+    const exactWorktreeObserved = command.includes(worktree);
+    const jdwpObserved =
+      command.includes("-agentlib:jdwp=") ||
+      command.includes("-agentpath:") && command.includes("jdwp");
+    if (!mainClassObserved || !exactWorktreeObserved || !jdwpObserved) continue;
+    candidates.push({
+      pid: Number(pidText),
+      ppid: Number(ppidText),
+      pgid: Number(pgidText),
+      jdwpObserved,
+      exactWorktreeObserved,
+    });
+  }
+  return candidates;
+}
+
+function processPidIsLive(pid) {
+  const result = spawnSync(
+    "/bin/ps",
+    ["-p", String(pid), "-o", "stat="],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) return false;
+  const state = String(result.stdout).trim();
+  return state.length > 0 && !state.startsWith("Z");
+}
+
+function typeD007PickerQueryMacos(manifest, query, evidenceName) {
+  const script = [
+    `set queryText to "${escapeAppleScript(query)}"`,
+    "set previousClipboard to the clipboard",
+    "try",
+    "  set the clipboard to queryText",
+    '  tell application "Zed" to activate',
+    '  tell application "System Events"',
+    '    tell process "Zed" to set frontmost to true',
+    '    keystroke "a" using {command down}',
+    '    keystroke "v" using {command down}',
+    "  end tell",
+    "  delay 0.2",
+    "  set the clipboard to previousClipboard",
+    "on error errorMessage number errorNumber",
+    "  set the clipboard to previousClipboard",
+    "  error errorMessage number errorNumber",
+    "end try",
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
+}
+
+function confirmD007PickerMacos(manifest, evidenceName) {
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    '  key code 36',
+    'end tell',
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
+}
+
+function runDebugPhaseMacos(root, fixtureKind) {
+  const manifest = readManifest(root);
+  const probeRelative = "src/main/resources/application-d007.properties";
+  const debugFile = path.join(manifest.worktrees[fixtureKind], ".zed", "debug.json");
+  const tasksFile = path.join(manifest.worktrees[fixtureKind], ".zed", "tasks.json");
+
+  triggerRunDebugMacos(manifest, fixtureKind, `${fixtureKind}-run-debug-1`);
+  waitForFileWithRetry(
+    debugFile,
+    `${fixtureKind} generated .zed/debug.json`,
+    90_000,
+    null,
+  );
+  waitForFileWithRetry(
+    tasksFile,
+    `${fixtureKind} generated .zed/tasks.json`,
+    30_000,
+    null,
+  );
+  captureScreen(path.join(manifest.evidence, `${fixtureKind}-run-debug.png`));
+
+  const generated = validateGeneratedRunDebug(fixtureKind, debugFile, tasksFile);
+  const debugContent = fs.readFileSync(debugFile, "utf8");
+  const tasksContent = fs.readFileSync(tasksFile, "utf8");
+  const evidence = {
+    fixture: fixtureKind,
+    probe: probeRelative,
+    completionScreenshot: `${fixtureKind}-completion.png`,
+    debugConfig: generated.debugConfig,
+    runTask: generated.runTask,
+    expectedRunCommand: generated.expectedRunCommand,
+    debugFile: path.relative(manifest.worktrees[fixtureKind], debugFile),
+    tasksFile: path.relative(manifest.worktrees[fixtureKind], tasksFile),
+    debugDigest: createHash("sha256").update(debugContent).digest("hex"),
+    tasksDigest: createHash("sha256").update(tasksContent).digest("hex"),
+  };
+  fs.writeFileSync(path.join(manifest.evidence, `${fixtureKind}-result.json`), JSON.stringify(evidence, null, 2) + "\n", { mode: 0o600 });
+  return evidence;
+}
+
+function executeGeneratedRunTask(
+  manifest,
+  fixtureKind,
+  javaHome,
+  timeoutMs,
+) {
+  const worktree = manifest.worktrees[fixtureKind];
+  const tasksFile = path.join(worktree, ".zed", "tasks.json");
+  requireFile(tasksFile, `${fixtureKind} generated tasks`);
+  const tasks = JSON.parse(fs.readFileSync(tasksFile, "utf8"));
+  assert.equal(Array.isArray(tasks), true, ".zed/tasks.json must contain an array");
+  const task = tasks.find((entry) =>
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools): ") &&
+    entry.label.endsWith(" (run)")
+  );
+  assert.ok(task, `${fixtureKind} generated Spring Boot run task must exist`);
+  const expectedCommand = fixtureKind === "maven" ? "mvn" : "./gradlew";
+  const expectedArgs = fixtureKind === "maven" ? ["spring-boot:run"] : ["bootRun"];
+  assert.equal(task.command, expectedCommand);
+  assert.deepEqual(task.args, expectedArgs);
+  assert.equal(task.cwd, "$ZED_WORKTREE_ROOT");
+
+  const applicationProperties = path.join(
+    worktree,
+    "src",
+    "main",
+    "resources",
+    "application.properties",
+  );
+  requireFile(applicationProperties, `${fixtureKind} application.properties`);
+  const originalProperties = fs.readFileSync(applicationProperties, "utf8");
+  const randomizedProperties = originalProperties.replace(
+    /^server\.port\s*=.*$/m,
+    "server.port=0",
+  );
+  assert.notEqual(
+    randomizedProperties,
+    originalProperties,
+    `${fixtureKind} fixture must expose a server.port line for collision-free execution`,
+  );
+  fs.writeFileSync(applicationProperties, randomizedProperties);
+
+  const logFile = path.join(
+    manifest.evidence,
+    `${fixtureKind}-generated-run-task-execution.log`,
+  );
+  const fd = fs.openSync(logFile, "w", 0o600);
+  const child = spawn(task.command, task.args, {
+    cwd: worktree,
+    detached: true,
+    stdio: ["ignore", fd, fd],
+    shell: false,
+    env: {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: path.join(javaHome, "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+  });
+  child.unref();
+  fs.closeSync(fd);
+
+  const started = Date.now();
+  let bootStarted = false;
+  let exitBeforeReady = false;
+  try {
+    while (Date.now() - started < timeoutMs) {
+      const text = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "";
+      bootStarted =
+        /Started\s+FixtureApplication\b/.test(text) &&
+        /Tomcat started on port/i.test(text);
+      if (bootStarted) break;
+      if (!processGroupAlive(child.pid)) {
+        exitBeforeReady = true;
+        break;
+      }
+      sleepMs(500);
+    }
+  } finally {
+    if (processGroupAlive(child.pid)) {
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+      const stopDeadline = Date.now() + 10_000;
+      while (Date.now() < stopDeadline && processGroupAlive(child.pid)) {
+        sleepMs(250);
+      }
+      if (processGroupAlive(child.pid)) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (error) {
+          if (error?.code !== "ESRCH") throw error;
+        }
+      }
+    }
+    fs.writeFileSync(applicationProperties, originalProperties);
+  }
+
+  const tail = fs.existsSync(logFile)
+    ? fs.readFileSync(logFile, "utf8").slice(-24_000)
+    : "";
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    command: task.command,
+    args: task.args,
+    cwd: "$ZED_WORKTREE_ROOT",
+    serverPortOverride: 0,
+    bootStarted,
+    exitBeforeReady,
+    status: bootStarted ? "PASS" : "FAIL",
+    logTail: tail,
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-generated-run-task-execution.json`),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  if (!bootStarted) {
+    throw new Error(
+      `${fixtureKind} generated run task did not start FixtureApplication within ${timeoutMs}ms`,
+    );
+  }
+  return "PASS";
+}
+
+function triggerRunDebugMacos(manifest, fixtureKind, evidenceName) {
+  const javaRelative = "src/main/java/dev/zed/spring/fixture/FixtureApplication.java";
+  const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
+  requireFile(javaFile, `${fixtureKind} Java run/debug target`);
+  const sourceDigestBefore = sha256File(javaFile);
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+
+  waitForLaunchTargetDocumentOpen(
+    manifest,
+    fixtureKind,
+    javaRelative,
+    45_000,
+    `${evidenceName}-java`,
+  );
+
+  let offer;
+  let codeActionAttempts = 0;
+  const maxCodeActionAttempts = 3;
+  while (offer === undefined && codeActionAttempts < maxCodeActionAttempts) {
+    codeActionAttempts += 1;
+    const protocolStart = fileSize(protocolFile);
+    sendD007ActionKeyMacos(
+      manifest,
+      "x",
+      `${evidenceName}-toggle-code-actions-${codeActionAttempts}`,
+    );
+
+    let sawResponse = false;
+    const deadline = Date.now() + 7_500;
+    do {
+      const events = protocolEvidenceEvents(readFileDelta(protocolFile, protocolStart));
+      offer = events.find(
+        (event) =>
+          event.event === "code-action-response" &&
+          event.configureBootRunPresent === true,
+      );
+      if (offer !== undefined) break;
+      if (events.some((event) => event.event === "code-action-response")) {
+        sawResponse = true;
+        break;
+      }
+      sleepMs(200);
+    } while (Date.now() < deadline);
+
+    if (offer === undefined) {
+      cancelTransientUiMacos(
+        manifest,
+        `${evidenceName}-cancel-code-actions-${codeActionAttempts}`,
+      );
+      if (sawResponse && codeActionAttempts === maxCodeActionAttempts) break;
+      sleepMs(500);
+    }
+  }
+
+  if (offer === undefined) {
+    throw new Error(
+      `${fixtureKind} configure run/debug Code Action was not found after exact Java file targeting`,
+    );
+  }
+
+  assert.equal(
+    Number.isInteger(offer.configureBootRunIndex),
+    true,
+    "configure run/debug Code Action must have an integer provider response index",
+  );
+  assert.equal(
+    offer.configureBootRunCommand,
+    "zed-spring-tools.configure-boot-run",
+    "configure run/debug Code Action must carry the exact coordinator command",
+  );
+  assert.equal(
+    offer.configureBootRunArgumentUriMatchesRequest,
+    true,
+    "configure run/debug Code Action must target the exact Java request URI",
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-configure-code-action-ready.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      itemCount: offer.itemCount,
+      providerConfigureBootRunIndex: offer.configureBootRunIndex,
+      configureBootRunCommand: offer.configureBootRunCommand,
+      configureBootRunArgumentUriMatchesRequest:
+        offer.configureBootRunArgumentUriMatchesRequest,
+      codeActionAttempts,
+      targetRelativePath: javaRelative,
+      targeting: "fresh-foreground-cli-launch-target",
+      status: "PASS",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+
+  // Zed's Code Actions menu prepends local runnables/tasks and can merge actions
+  // from multiple language servers. The coordinator's response index therefore
+  // is not a stable merged Code Actions menu item index. We have already proven
+  // that the exact action payload is surfaced; close that mixed menu, then
+  // execute the same registered command through Zed's public LSP command
+  // selector, whose identity is the command string rather than a transient menu
+  // position.
+  cancelTransientUiMacos(
+    manifest,
+    `${evidenceName}-cancel-code-actions-after-evidence`,
+  );
+  sleepMs(250);
+
+  const commandBaseline = fileSize(protocolFile);
+  dispatchConfigureBootRunMacos(
+    manifest,
+    fixtureKind,
+    evidenceName,
+    offer,
+    commandBaseline,
+    10_000,
+  );
+
+  const sourceDigestAfter = sha256File(javaFile);
+  if (sourceDigestAfter !== sourceDigestBefore) {
+    throw new Error(
+      `${fixtureKind} Java source changed during run/debug UI automation`,
+    );
+  }
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${evidenceName}-source-integrity.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      relativePath: javaRelative,
+      targeting: "fresh-foreground-cli-launch-target",
+      sourceDigestBefore,
+      sourceDigestAfter,
+      status: "PASS",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+}
+
+function dispatchConfigureBootRunMacos(
+  manifest,
+  fixtureKind,
+  evidenceName,
+  offer,
+  protocolStart,
+  timeoutMs,
+) {
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  sendD007ActionKeyMacos(
+    manifest,
+    "r",
+    `${evidenceName}-toggle-lsp-command-selector`,
+  );
+  sleepMs(250);
+
+  const command = offer.configureBootRunCommand;
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    `  keystroke "${escapeAppleScript(command)}"`,
+    '  key code 36',
+    'end tell',
+  ].join("\n");
+  runOsa(
+    script,
+    `${evidenceName}-execute-lsp-command-selector`,
+    manifest.evidence,
+  );
+
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const events = protocolEvidenceEvents(readFileDelta(protocolFile, protocolStart));
+    if (events.some((event) => event.event === "configure-boot-run-command")) {
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${evidenceName}-selection.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          selectedAt: new Date().toISOString(),
+          selection: "zed-public-lsp-command-selector",
+          command,
+          coordinatorItemCount: offer.itemCount,
+          providerConfigureBootRunIndex: offer.configureBootRunIndex,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      return;
+    }
+    sleepMs(100);
+  }
+  throw new Error(
+    `${fixtureKind} configure run/debug command was not dispatched through Zed's public LSP command selector`,
+  );
+}
+
+function cancelTransientUiMacos(manifest, evidenceName) {
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    '  key code 53',
+    'end tell',
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
+}
+
+function sendD007ActionKeyMacos(manifest, key, evidenceName) {
+  const script = [
+    'tell application "Zed" to activate',
+    'tell application "System Events"',
+    '  tell process "Zed" to set frontmost to true',
+    `  keystroke "${escapeAppleScript(key)}" using {control down, command down, option down}`,
+    'end tell',
+  ].join("\n");
+  runOsa(script, evidenceName, manifest.evidence);
+}
+
+function waitForLaunchTargetDocumentOpen(
+  manifest,
+  fixtureKind,
+  relativePath,
+  timeoutMs,
+  evidenceName,
+) {
+  const target = path.join(manifest.worktrees[fixtureKind], relativePath);
+  requireFile(target, `${fixtureKind} launch target`);
+  const targetUri = pathToFileURL(target).href;
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+
+  const started = Date.now();
+  let opened = false;
+  while (Date.now() - started < timeoutMs) {
+    const events = protocolEvidenceEvents(
+      fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
+    );
+    opened = events.some(
+      (event) => event.event === "document-open" && event.uri === targetUri,
+    );
+    if (opened) break;
+    sleepMs(100);
+  }
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    role: processRecord.role,
+    relativePath,
+    absolutePath: target,
+    targetUri,
+    launchTargets: processRecord.launchTargets,
+    targeting: "fresh-foreground-cli-launch-target",
+    exactDidOpenObserved: opened,
+    status: opened ? "PASS" : "FAIL",
+    protocolTail: !opened && fs.existsSync(protocolFile)
+      ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+      : undefined,
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${evidenceName}-launch-target.json`),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+
+  if (!opened) {
+    throw new Error(
+      `${fixtureKind} fresh Zed launch did not open exact target ${relativePath}`,
+    );
+  }
+  return { targetUri, targeting: "fresh-foreground-cli-launch-target", attempts: 1 };
+}
+
+function validateGeneratedRunDebug(fixtureKind, debugFile, tasksFile) {
+  const debug = JSON.parse(fs.readFileSync(debugFile, "utf8"));
+  const tasks = JSON.parse(fs.readFileSync(tasksFile, "utf8"));
+  assert.equal(Array.isArray(debug), true, ".zed/debug.json must contain an array");
+  assert.equal(Array.isArray(tasks), true, ".zed/tasks.json must contain an array");
+
+  const expectedRunCommand = fixtureKind === "maven" ? "mvn" : "./gradlew";
+  const expectedRunArgs = fixtureKind === "maven" ? ["spring-boot:run"] : ["bootRun"];
+  const runTask = tasks.find((entry) =>
+    typeof entry?.label === "string" &&
+    entry.label.startsWith("Spring Boot (zed-spring-tools): ") &&
+    entry.label.endsWith(" (run)")
+  );
+  const debugConfig = debug.find((entry) =>
+    entry?.adapter === "Java" &&
+    entry?.request === "launch" &&
+    entry?.mainClass === "dev.zed.spring.fixture.FixtureApplication" &&
+    entry?.cwd === "$ZED_WORKTREE_ROOT"
+  );
+
+  const runTaskPass = runTask?.command === expectedRunCommand &&
+    JSON.stringify(runTask?.args) === JSON.stringify(expectedRunArgs) &&
+    runTask?.cwd === "$ZED_WORKTREE_ROOT";
+
+  return {
+    expectedRunCommand,
+    runTask: runTaskPass ? "PASS" : "FAIL",
+    debugConfig: debugConfig === undefined ? "FAIL" : "PASS",
+  };
+}
+
+function waitForZedReady(manifest, fixtureKind, timeoutMs) {
+  const processFile = path.join(manifest.evidence, "zed-process.json");
+  const record = JSON.parse(fs.readFileSync(processFile, "utf8"));
+  assert.equal(record.fixture, fixtureKind, "Zed process record must match the fixture being gated");
+  assert.equal(record.userDataDir, manifest.profile, "Zed process record must bind the isolated profile");
+  let observed;
+  waitUntil(
+    () => {
+      observed = isolatedZedProcess(record);
+      return observed !== undefined;
+    },
+    `${fixtureKind} isolated Zed app process`,
+    timeoutMs,
+  );
+  fs.writeFileSync(path.join(manifest.evidence, `zed-${fixtureKind}-ready.json`), JSON.stringify({
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    launcherPid: record.pid,
+    appProcess: observed,
+  }, null, 2) + "\n", { mode: 0o600 });
+}
+
+function zedReady(record) {
+  return isolatedZedProcess(record) !== undefined;
+}
+
+function waitForLanguageServerPreflightMacos(
+  manifest,
+  fixtureKind,
+  javaRelative,
+  timeoutMs,
+) {
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.role,
+    "preflight",
+    "language-server preflight must run in its dedicated foreground process",
+  );
+  const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
+  requireFile(javaFile, fixtureKind + " language-server preflight Java target");
+  const javaUri = pathToFileURL(javaFile).href;
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const started = Date.now();
+
+  let processes = {
+    jdtls: { observed: false, pid: null },
+    springTools: { observed: false, pid: null },
+  };
+  let spring = {
+    coordinatorStarted: false,
+    targetDocumentOpened: false,
+    indexReady: false,
+  };
+
+  while (Date.now() - started < timeoutMs) {
+    const ps = spawnSync(
+      "/bin/ps",
+      ["-axo", "pid=,pgid=,stat=,command="],
+      { encoding: "utf8" },
+    );
+    if (ps.status !== 0) {
+      throw new Error(
+        "ps failed while checking language-server preflight: " + bounded(ps.stderr),
+      );
+    }
+    processes = languageServerProcessReadiness(ps.stdout, processRecord.pid);
+    const protocolText = fs.existsSync(protocolFile)
+      ? fs.readFileSync(protocolFile, "utf8")
+      : "";
+    spring = springTargetReadiness(protocolText, javaUri);
+
+    if (
+      processes.jdtls.observed &&
+      processes.springTools.observed &&
+      spring.coordinatorStarted &&
+      spring.targetDocumentOpened &&
+      spring.indexReady
+    ) {
+      const evidence = {
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        targetRelativePath: javaRelative,
+        targetUri: javaUri,
+        readiness: {
+          jdtlsProcess: processes.jdtls,
+          springToolsStandaloneProcess: processes.springTools,
+          springCoordinatorStarted: spring.coordinatorStarted,
+          springTargetDocumentOpened: spring.targetDocumentOpened,
+          springIndexReady: spring.indexReady,
+        },
+        semantics: {
+          jdtls:
+            "process launch proves the official Java extension finished materializing a runnable JDT LS before functional validation",
+          springTools:
+            "standalone process + coordinator/index evidence proves the pinned Spring Tools artifact is runnable and initialized before functional validation",
+        },
+        privateRuntimePathInspected: false,
+        status: "PASS",
+      };
+      fs.writeFileSync(
+        path.join(manifest.evidence, "language-server-preflight-ready.json"),
+        JSON.stringify(evidence, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      process.stdout.write(
+        "[D007] language-server preflight ready: JDT LS + standalone Spring Tools are materialized and running; main validation starts only after this process is stopped.\n",
+      );
+      return evidence;
+    }
+    sleepMs(250);
+  }
+
+  fs.writeFileSync(
+    path.join(manifest.evidence, "language-server-preflight-failure.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      targetRelativePath: javaRelative,
+      targetUri: javaUri,
+      readiness: {
+        jdtlsProcess: processes.jdtls,
+        springToolsStandaloneProcess: processes.springTools,
+        springCoordinatorStarted: spring.coordinatorStarted,
+        springTargetDocumentOpened: spring.targetDocumentOpened,
+        springIndexReady: spring.indexReady,
+      },
+      classification: !processes.jdtls.observed
+        ? "jdtls-process-not-ready"
+        : !processes.springTools.observed
+          ? "spring-tools-standalone-process-not-ready"
+          : !spring.coordinatorStarted
+            ? "spring-coordinator-not-started"
+            : !spring.targetDocumentOpened
+              ? "spring-preflight-target-not-opened"
+              : "spring-index-not-ready",
+      privateRuntimePathInspected: false,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    "language-server preflight did not prove both JDT LS and standalone Spring Tools ready before functional validation",
+  );
+}
+
+function waitForJavaDapReadinessMacos(
+  manifest,
+  fixtureKind,
+  javaRelative,
+  timeoutMs,
+) {
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.role,
+    "dap",
+    "Java DAP readiness must run in the dedicated DAP foreground process",
+  );
+  const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
+  requireFile(javaFile, fixtureKind + " DAP Java target");
+
+  const started = Date.now();
+  let processes = {
+    jdtls: { observed: false, pid: null },
+    springTools: { observed: false, pid: null },
+  };
+  while (Date.now() - started < timeoutMs) {
+    const ps = spawnSync(
+      "/bin/ps",
+      ["-axo", "pid=,pgid=,stat=,command="],
+      { encoding: "utf8" },
+    );
+    if (ps.status !== 0) {
+      throw new Error(
+        "ps failed while checking Java DAP readiness: " + bounded(ps.stderr),
+      );
+    }
+    processes = languageServerProcessReadiness(ps.stdout, processRecord.pid);
+    if (processes.jdtls.observed) {
+      const evidence = {
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        targetRelativePath: javaRelative,
+        jdtlsProcess: processes.jdtls,
+        semantics: {
+          sameForegroundProcess: true,
+          javaExtensionActivated:
+            "the official Java extension has started JDT LS in the same cold Zed process that will open the debugger picker",
+          dapRegistryBarrier:
+            "Java DAP registration belongs to the Java extension load transaction, so debugger picker automation starts only after that extension is demonstrably active",
+        },
+        status: "PASS",
+      };
+      fs.writeFileSync(
+        path.join(manifest.evidence, fixtureKind + "-dap-java-readiness.json"),
+        JSON.stringify(evidence, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      process.stdout.write(
+        "[D007] Java DAP readiness: official Java extension/JDT LS is active in the same DAP Zed process.\n",
+      );
+      return evidence;
+    }
+    sleepMs(250);
+  }
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    targetRelativePath: javaRelative,
+    jdtlsProcess: processes.jdtls,
+    classification: "java-extension-dap-registry-not-ready",
+    status: "FAIL",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, fixtureKind + "-dap-java-readiness-failure.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    "official Java extension/JDT LS did not become ready in the DAP Zed process; do not open the debugger picker before Java DAP registration",
+  );
+}
+
+function languageServerProcessReadiness(psOutput, expectedPgid) {
+  let jdtlsPid = null;
+  let springToolsPid = null;
+  for (const line of String(psOutput).split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const [, pidText, pgidText, state, command] = match;
+    if (Number(pgidText) !== Number(expectedPgid) || state.startsWith("Z")) {
+      continue;
+    }
+    if (
+      jdtlsPid === null &&
+      (
+        command.includes("org.eclipse.jdt.ls.core") ||
+        command.includes("org.eclipse.equinox.launcher")
+      )
+    ) {
+      jdtlsPid = Number(pidText);
+    }
+    if (
+      springToolsPid === null &&
+      command.includes("spring-boot-language-server") &&
+      command.includes("standalone-exec.jar")
+    ) {
+      springToolsPid = Number(pidText);
+    }
+  }
+  return {
+    jdtls: {
+      observed: jdtlsPid !== null,
+      pid: jdtlsPid,
+      signature: "org.eclipse.jdt.ls.core|org.eclipse.equinox.launcher",
+    },
+    springTools: {
+      observed: springToolsPid !== null,
+      pid: springToolsPid,
+      signature: "spring-boot-language-server + standalone-exec.jar",
+    },
+  };
+}
+
+function isolatedZedProcess(record) {
+  const result = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,stat=,command="], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`ps failed while checking isolated Zed process: ${bounded(result.stderr)}`);
+  }
+  return findIsolatedZedProcess(result.stdout, record);
+}
+
+function findIsolatedZedProcess(psOutput, record) {
+  const userDataNeedle = `--user-data-dir ${record.userDataDir}`;
+  for (const line of String(psOutput).split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const [, pidText, pgidText, state, command] = match;
+    if (Number(pgidText) !== record.pid || state.startsWith("Z")) continue;
+    if (!command.includes(userDataNeedle)) continue;
+    if (/\/Contents\/MacOS\/zed(?:\s|$)/.test(command)) {
+      return {
+        pid: Number(pidText),
+        pgid: Number(pgidText),
+        state,
+        command: bounded(command),
+      };
+    }
+  }
+  return undefined;
+}
+
+function waitForDevExtensionInstalled(manifest, timeoutMs) {
+  const indexFile = path.join(manifest.profile, "extensions", "index.json");
+  const installedLink = path.join(
+    manifest.profile,
+    "extensions",
+    "installed",
+    "spring-tools",
+  );
+  const wasmFile = path.join(repository, "extension.wasm");
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  const foreground = processRecord.logPath;
+
+  try {
+    waitUntil(
+      () => devExtensionPersisted(manifest, indexFile, installedLink, wasmFile, foreground),
+      "spring-tools dev extension persisted install state",
+      timeoutMs,
+      () => {
+        const text = fs.existsSync(foreground) ? fs.readFileSync(foreground, "utf8") : "";
+        const fatal = [
+          "Failed to install dev extension",
+          "failed to build extension",
+          "failed to install the `wasm32-wasip2` target",
+          "failed to retrieve the `wasm32-wasip2` target libdir",
+        ].find((marker) => text.includes(marker));
+        if (fatal) {
+          throw new Error(`Zed reported dev-extension installation failure: ${fatal}`);
+        }
+      },
+    );
+  } catch (error) {
+    const state = devExtensionState(
+      manifest,
+      indexFile,
+      installedLink,
+      wasmFile,
+      foreground,
+    );
+    fs.writeFileSync(
+      path.join(manifest.evidence, "dev-extension-readiness-failure.json"),
+      JSON.stringify({
+        sourceHead: manifest.sourceHead,
+        observedAt: new Date().toISOString(),
+        ...state,
+        error: errorText(error),
+      }, null, 2) + "\n",
+      { mode: 0o600 },
+    );
+    throw new Error(
+      `${errorText(error)}; wasmExists=${state.wasmExists}, wasmSize=${state.wasmSize}, indexRegistered=${state.indexRegistered}, indexDev=${state.indexDev}, installedLinkIsSymlink=${state.installedLinkIsSymlink}, installedLinkTargetMatches=${state.installedLinkTargetMatches}; inspect evidence/dev-extension-readiness-failure.json and the install foreground log`,
+      { cause: error },
+    );
+  }
+
+  const state = devExtensionState(
+    manifest,
+    indexFile,
+    installedLink,
+    wasmFile,
+    foreground,
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "dev-extension-ready.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      observedAt: new Date().toISOString(),
+      readiness: "persisted-install",
+      ...state,
+      wasmSha256: createHash("sha256").update(fs.readFileSync(wasmFile)).digest("hex"),
+      status: "PASS",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  process.stdout.write(
+    "[D007] dev extension persisted: compiled WASM + dev index + exact source symlink; activation will be proven by the next cold launch.\n",
+  );
+}
+
+function devExtensionState(manifest, indexFile, installedLink, wasmFile, foreground) {
+  let indexRegistered = false;
+  let indexDev = false;
+  let indexIdMatches = false;
+  try {
+    if (fs.existsSync(indexFile)) {
+      const index = JSON.parse(fs.readFileSync(indexFile, "utf8"));
+      const entry = index.extensions?.["spring-tools"];
+      indexRegistered = Boolean(entry);
+      indexDev = entry?.dev === true;
+      indexIdMatches = entry?.manifest?.id === "spring-tools";
+    }
+  } catch {}
+
+  let installedLinkExists = false;
+  let installedLinkIsSymlink = false;
+  let installedLinkTarget = null;
+  let installedLinkTargetMatches = false;
+  try {
+    const stat = fs.lstatSync(installedLink);
+    installedLinkExists = true;
+    installedLinkIsSymlink = stat.isSymbolicLink();
+    if (installedLinkIsSymlink) {
+      installedLinkTarget = fs.realpathSync(installedLink);
+      installedLinkTargetMatches =
+        fs.realpathSync(repository) === installedLinkTarget;
+    }
+  } catch {}
+
+  const foregroundText = fs.existsSync(foreground)
+    ? fs.readFileSync(foreground, "utf8")
+    : "";
+  return {
+    wasmExists: fs.existsSync(wasmFile),
+    wasmSize: fileSize(wasmFile),
+    indexRegistered,
+    indexDev,
+    indexIdMatches,
+    installedLink,
+    installedLinkExists,
+    installedLinkIsSymlink,
+    installedLinkTarget,
+    installedLinkTargetMatches,
+    foregroundTail: foregroundText.slice(-12_000),
+  };
+}
+
+function devExtensionPersisted(manifest, indexFile, installedLink, wasmFile, foreground) {
+  const state = devExtensionState(
+    manifest,
+    indexFile,
+    installedLink,
+    wasmFile,
+    foreground,
+  );
+  return (
+    state.wasmExists &&
+    state.wasmSize > 0 &&
+    state.indexRegistered &&
+    state.indexDev &&
+    state.indexIdMatches &&
+    state.installedLinkExists &&
+    state.installedLinkIsSymlink &&
+    state.installedLinkTargetMatches
+  );
+}
+
+function triggerCompletionMacos(manifest, fixtureKind, evidenceName) {
+  sendD007ActionKeyMacos(manifest, "z", evidenceName);
+}
+
+function completionObservation(text, expectedRequest = null) {
+  const events = protocolEvidenceEvents(text);
+  const requests = events.filter((event) => event.event === "completion-request");
+  const responses = events.filter((event) => event.event === "completion-response");
+  const matchesTarget = (event) => expectedRequest === null || (
+    event.uri === expectedRequest.uri &&
+    event.line === expectedRequest.line &&
+    event.character === expectedRequest.character
+  );
+  const matchingRequest = [...requests].reverse().find(matchesTarget);
+  const matchingResponses = responses.filter(matchesTarget);
+  const lastMatchingResponse = matchingResponses.at(-1);
+  return {
+    requestObserved: requests.length > 0,
+    expectedRequestObserved: matchingRequest !== undefined,
+    requestUri: matchingRequest?.uri ?? null,
+    requestLine: Number.isInteger(matchingRequest?.line) ? matchingRequest.line : null,
+    requestCharacter: Number.isInteger(matchingRequest?.character) ? matchingRequest.character : null,
+    responseObserved: responses.length > 0,
+    expectedResponseObserved: lastMatchingResponse !== undefined,
+    itemCount: typeof lastMatchingResponse?.itemCount === "number"
+      ? lastMatchingResponse.itemCount
+      : null,
+    serverPortObserved: matchingResponses.some((event) => event.serverPort === true),
+  };
+}
+
+function protocolEvidenceEvents(text) {
+  const events = [];
+  for (const line of String(text).split("\n")) {
+    if (!line.startsWith("{")) continue;
+    try {
+      const value = JSON.parse(line);
+      if (typeof value?.event === "string") events.push(value);
+    } catch {}
+  }
+  return events;
+}
+
+function springTargetReadiness(text, expectedUri) {
+  const events = protocolEvidenceEvents(text);
+  return {
+    coordinatorStarted: events.some((event) => event.event === "coordinator-start"),
+    targetDocumentOpened: events.some(
+      (event) => event.event === "document-open" && event.uri === expectedUri,
+    ),
+    indexReady: events.some(
+      (event) =>
+        event.event === "spring-index-updated" &&
+        Number.isInteger(event.affectedProjectCount) &&
+        event.affectedProjectCount > 0,
+    ),
+  };
+}
+
+function waitForSpringTargetReadyMacos(
+  manifest,
+  fixtureKind,
+  protocolFile,
+  expectedRelativePath,
+  expectedUri,
+  started,
+  timeoutMs,
+) {
+  const launchEvidence = waitForLaunchTargetDocumentOpen(
+    manifest,
+    fixtureKind,
+    expectedRelativePath,
+    Math.min(45_000, timeoutMs),
+    `${fixtureKind}-completion-target`,
+  );
+
+  let readiness = springTargetReadiness(
+    fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
+    expectedUri,
+  );
+  const readinessDeadline = Math.min(started + timeoutMs, Date.now() + 60_000);
+  do {
+    const allText = fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "";
+    readiness = springTargetReadiness(allText, expectedUri);
+    if (
+      readiness.coordinatorStarted &&
+      readiness.targetDocumentOpened &&
+      readiness.indexReady
+    ) {
+      const targetEvidence = {
+        targetRelativePath: expectedRelativePath,
+        targetUri: expectedUri,
+        targeting: launchEvidence.targeting,
+        requestedLaunchPosition: { row: 1, column: 4 },
+        targetDocumentOpened: true,
+      };
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${fixtureKind}-spring-runtime-ready.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          observedAt: new Date().toISOString(),
+          requiredEvidence: ["coordinator-start", "document-open exact URI"],
+          ...targetEvidence,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${fixtureKind}-spring-index-ready.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          observedAt: new Date().toISOString(),
+          requiredEvidence: ["spring-index-updated affectedProjectCount>0"],
+          ...targetEvidence,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      return { attempts: 1, ...readiness };
+    }
+    sleepMs(250);
+  } while (Date.now() < readinessDeadline);
+
+  const classification = !readiness.targetDocumentOpened
+    ? "completion-target-document-not-opened"
+    : !readiness.coordinatorStarted
+      ? "completion-coordinator-not-started"
+      : "completion-spring-index-not-ready";
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-completion-target-failure.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      targetRelativePath: expectedRelativePath,
+      targetUri: expectedUri,
+      requestedLaunchPosition: { row: 1, column: 4 },
+      targeting: launchEvidence.targeting,
+      classification,
+      ...readiness,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    `${fixtureKind} launch target opened but runtime readiness was not proven: ${classification}`,
+  );
+}
+
+function waitForSpringCompletion(
+  manifest,
+  sharedLog,
+  sharedStart,
+  fixtureKind,
+  baseline,
+  timeoutMs,
+  maxAttempts,
+) {
+  void sharedLog;
+  void sharedStart;
+  void baseline;
+  const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+  const started = Date.now();
+  let attempts = 0;
+  const expectedRelativePath = "src/main/resources/application-d007.properties";
+  const expectedPath = path.join(
+    manifest.worktrees[fixtureKind],
+    expectedRelativePath,
+  );
+  const expectedRequest = {
+    uri: pathToFileURL(expectedPath).href,
+    line: 0,
+    character: 3,
+  };
+  let finalObservation = {
+    requestObserved: false,
+    expectedRequestObserved: false,
+    requestUri: null,
+    requestLine: null,
+    requestCharacter: null,
+    responseObserved: false,
+    expectedResponseObserved: false,
+    itemCount: null,
+    serverPortObserved: false,
+  };
+  let text = "";
+
+  const targetReadiness = waitForSpringTargetReadyMacos(
+    manifest,
+    fixtureKind,
+    protocolFile,
+    expectedRelativePath,
+    expectedRequest.uri,
+    started,
+    timeoutMs,
+  );
+
+  for (
+    let localAttempt = 0;
+    localAttempt < maxAttempts && Date.now() - started < timeoutMs;
+    localAttempt += 1
+  ) {
+    attempts += 1;
+    // The picker was confirmed only after exact didOpen proved its selected
+    // absolute-path match. Completion retries stay on that proven editor.
+    const protocolStart = fileSize(protocolFile);
+    triggerCompletionMacos(
+      manifest,
+      fixtureKind,
+      `${fixtureKind}-completion-attempt-${localAttempt + 1}`,
+    );
+
+    let observation = {
+      requestObserved: false,
+      expectedRequestObserved: false,
+      requestUri: null,
+      requestLine: null,
+      requestCharacter: null,
+      responseObserved: false,
+      expectedResponseObserved: false,
+      itemCount: null,
+      serverPortObserved: false,
+    };
+    const requestDeadline = Math.min(started + timeoutMs, Date.now() + 20_000);
+    do {
+      text = readFileDelta(protocolFile, protocolStart);
+      observation = completionObservation(text, expectedRequest);
+      if (observation.requestObserved) break;
+      sleepMs(250);
+    } while (Date.now() < requestDeadline);
+
+    if (!observation.requestObserved) {
+      cancelTransientUiMacos(
+        manifest,
+        `${fixtureKind}-completion-cancel-${localAttempt + 1}`,
+      );
+      continue;
+    }
+
+    const responseDeadline = Math.min(started + timeoutMs, Date.now() + 30_000);
+    do {
+      text = readFileDelta(protocolFile, protocolStart);
+      observation = completionObservation(text, expectedRequest);
+      if (observation.expectedResponseObserved || observation.responseObserved) break;
+      sleepMs(250);
+    } while (Date.now() < responseDeadline);
+
+    finalObservation = {
+      requestObserved: finalObservation.requestObserved || observation.requestObserved,
+      expectedRequestObserved:
+        finalObservation.expectedRequestObserved || observation.expectedRequestObserved,
+      requestUri: observation.requestUri ?? finalObservation.requestUri,
+      requestLine: observation.requestLine ?? finalObservation.requestLine,
+      requestCharacter:
+        observation.requestCharacter ?? finalObservation.requestCharacter,
+      responseObserved: finalObservation.responseObserved || observation.responseObserved,
+      expectedResponseObserved:
+        finalObservation.expectedResponseObserved || observation.expectedResponseObserved,
+      itemCount: observation.itemCount ?? finalObservation.itemCount,
+      serverPortObserved:
+        finalObservation.serverPortObserved || observation.serverPortObserved,
+    };
+
+    if (
+      observation.expectedRequestObserved &&
+      observation.expectedResponseObserved &&
+      observation.serverPortObserved
+    ) {
+      fs.writeFileSync(
+        path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`),
+        JSON.stringify({
+          sourceHead: manifest.sourceHead,
+          fixture: fixtureKind,
+          observedAt: new Date().toISOString(),
+          attempts,
+          readinessAttempts: targetReadiness.attempts,
+          targetRelativePath: expectedRelativePath,
+          targetUri: expectedRequest.uri,
+          targeting: "fresh-foreground-cli-launch-target",
+          requestedLaunchPosition: { row: 1, column: 4 },
+          ...observation,
+          status: "PASS",
+        }, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      return expectedRelativePath;
+    }
+
+    cancelTransientUiMacos(
+      manifest,
+      `${fixtureKind}-completion-cancel-${localAttempt + 1}`,
+    );
+    if (observation.requestObserved && !observation.expectedRequestObserved) break;
+    if (observation.responseObserved) break;
+  }
+
+  const classification = !finalObservation.requestObserved
+    ? "completion-request-not-observed"
+    : !finalObservation.expectedRequestObserved
+      ? "completion-request-target-mismatch"
+      : !finalObservation.responseObserved
+        ? "completion-response-not-observed"
+        : !finalObservation.expectedResponseObserved
+          ? "completion-response-target-mismatch"
+          : "completion-response-missing-server-port";
+  fs.writeFileSync(
+    path.join(manifest.evidence, `${fixtureKind}-completion-failure.json`),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      fixture: fixtureKind,
+      observedAt: new Date().toISOString(),
+      attempts,
+      readinessAttempts: targetReadiness.attempts,
+      targetRelativePath: expectedRelativePath,
+      targetUri: expectedRequest.uri,
+      targeting: "fresh-foreground-cli-launch-target",
+      requestedLaunchPosition: { row: 1, column: 4 },
+      classification,
+      ...finalObservation,
+      protocolTail: fs.existsSync(protocolFile)
+        ? fs.readFileSync(protocolFile, "utf8").slice(-16_000)
+        : "",
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    `${fixtureKind} Spring completion failed after ${attempts} exact-file attempts: ${classification}`,
+  );
+}
+
+function waitForRuntimeEvidence(
+  manifest,
+  sharedLog,
+  sharedStart,
+  baseline,
+  needles,
+  label,
+  timeoutMs,
+  retry,
+  retryIntervalMs = 10_000,
+  pollIntervalMs = 500,
+) {
+  const started = Date.now();
+  let nextRetry = started + retryIntervalMs;
+  while (Date.now() - started < timeoutMs) {
+    const text = runtimeTextSince(manifest, sharedLog, sharedStart, baseline);
+    if (needles.every((needle) => text.includes(needle))) return;
+    if (retry && Date.now() >= nextRetry) {
+      retry();
+      nextRetry = Date.now() + retryIntervalMs;
+    }
+    sleepMs(pollIntervalMs);
+  }
+  throw new Error(`timed out waiting for ${label}: required evidence ${needles.join(", ")}`);
+}
+
+function waitForFileWithRetry(
+  file,
+  label,
+  timeoutMs,
+  retry,
+  retryIntervalMs = 10_000,
+  pollIntervalMs = 500,
+) {
+  const started = Date.now();
+  let nextRetry = started + retryIntervalMs;
+  while (Date.now() - started < timeoutMs) {
+    if (fs.existsSync(file) && fs.statSync(file).size > 0) return;
+    if (retry && Date.now() >= nextRetry) {
+      retry();
+      nextRetry = Date.now() + retryIntervalMs;
+    }
+    sleepMs(pollIntervalMs);
+  }
+  throw new Error(`timed out waiting for ${label}`);
+}
+
+function waitForZedStopped(manifest, timeoutMs) {
+  const processFile = path.join(manifest.evidence, "zed-process.json");
+  const record = JSON.parse(fs.readFileSync(processFile, "utf8"));
+  waitUntil(() => !processGroupAlive(record.pid), "isolated Zed process-group shutdown", timeoutMs);
+}
+
+function stopAndWaitZed(root, manifest, termTimeoutMs, killTimeoutMs) {
+  const processFile = path.join(manifest.evidence, "zed-process.json");
+  requireFile(processFile, "Zed process record");
+  const record = JSON.parse(fs.readFileSync(processFile, "utf8"));
+  if (!processGroupAlive(record.pid)) return { status: "already-stopped", pid: record.pid };
+
+  stopMacos(root, "SIGTERM");
+  try {
+    waitForZedStopped(manifest, termTimeoutMs);
+    return { status: "terminated", pid: record.pid };
+  } catch (termError) {
+    stopMacos(root, "SIGKILL");
+    try {
+      waitForZedStopped(manifest, killTimeoutMs);
+      return { status: "killed", pid: record.pid, termError: errorText(termError) };
+    } catch (killError) {
+      throw new Error(
+        `isolated Zed process group ${record.pid} survived SIGTERM and SIGKILL: ${errorText(killError)}`,
+        { cause: termError },
+      );
+    }
+  }
+}
+
+function ensureZedStopped(root, manifest, termTimeoutMs, killTimeoutMs) {
+  const processFile = path.join(manifest.evidence, "zed-process.json");
+  if (!fs.existsSync(processFile)) return;
+  const record = JSON.parse(fs.readFileSync(processFile, "utf8"));
+  if (!processGroupAlive(record.pid)) return;
+  stopAndWaitZed(root, manifest, termTimeoutMs, killTimeoutMs);
+}
+
+function processGroupAlive(pid) {
+  const result = spawnSync("/bin/ps", ["-axo", "pgid=,stat="], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`ps failed while checking process group ${pid}: ${bounded(result.stderr)}`);
+  }
+  return processGroupHasLiveMember(result.stdout, pid);
+}
+
+function processGroupHasLiveMember(psOutput, pid) {
+  return String(psOutput).split("\n").some((line) => {
+    const match = /^\s*(\d+)\s+(\S+)/.exec(line);
+    if (!match || Number(match[1]) !== pid) return false;
+    return !match[2].startsWith("Z");
+  });
+}
+
+function waitUntil(predicate, label, timeoutMs, observe) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (predicate()) return;
+    if (observe) observe();
+    sleepMs(250);
+  }
+  throw new Error(`timed out waiting for ${label} after ${timeoutMs}ms`);
+}
+
+function processAlive(pid) {
+  const result = spawnSync("/bin/ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" });
+  if (result.status === 1 || result.stdout.trim() === "") return false;
+  if (result.status !== 0) {
+    throw new Error(`ps failed while checking pid ${pid}: ${bounded(result.stderr)}`);
+  }
+  const state = result.stdout.trim().split(/\s+/)[0] ?? "";
+  return !state.startsWith("Z");
+}
+
+function coordinatorProtocolFile(manifest, fixtureKind) {
+  return path.join(
+    manifest.worktrees[fixtureKind],
+    ".d007",
+    "coordinator-protocol.jsonl",
+  );
+}
+
+function runtimeSnapshot(manifest, sharedLog, sharedStart) {
+  const foreground = {};
+  const protocol = {};
+  for (const fixtureKind of ["maven", "gradle"]) {
+    const file = path.join(manifest.evidence, `zed-${fixtureKind}-foreground.log`);
+    foreground[fixtureKind] = fileSize(file);
+    protocol[fixtureKind] = fileSize(coordinatorProtocolFile(manifest, fixtureKind));
+  }
+  return {
+    foreground,
+    protocol,
+    shared: Math.max(sharedStart, fileSize(sharedLog)),
+  };
+}
+
+function runtimeTextSince(manifest, sharedLog, sharedStart, baseline) {
+  const parts = [];
+  for (const fixtureKind of ["maven", "gradle"]) {
+    const file = path.join(manifest.evidence, `zed-${fixtureKind}-foreground.log`);
+    const start = baseline.foreground?.[fixtureKind] ?? 0;
+    parts.push(readFileDelta(file, start));
+
+    const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+    const protocolStart = baseline.protocol?.[fixtureKind] ?? 0;
+    parts.push(readFileDelta(protocolFile, protocolStart));
+  }
+  parts.push(readFileDelta(sharedLog, Math.max(sharedStart, baseline.shared ?? sharedStart)));
+  return parts.join("\n");
+}
+
+function readFileDelta(file, start) {
+  if (!fs.existsSync(file)) return "";
+  const fd = fs.openSync(file, "r");
+  try {
+    const end = fs.fstatSync(fd).size;
+    if (end <= start) return "";
+    const buffer = Buffer.alloc(end - start);
+    fs.readSync(fd, buffer, 0, buffer.length, start);
+    return buffer.toString("utf8");
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function runtimeText(manifest, sharedLog, sharedStart) {
+  const parts = [];
+  for (const fixtureKind of ["maven", "gradle"]) {
+    const file = path.join(manifest.evidence, `zed-${fixtureKind}-foreground.log`);
+    if (fs.existsSync(file)) parts.push(fs.readFileSync(file, "utf8"));
+  }
+  if (fs.existsSync(sharedLog)) {
+    const fd = fs.openSync(sharedLog, "r");
+    try {
+      const end = fs.fstatSync(fd).size;
+      if (end > sharedStart) {
+        const buffer = Buffer.alloc(end - sharedStart);
+        fs.readSync(fd, buffer, 0, buffer.length, sharedStart);
+        parts.push(buffer.toString("utf8"));
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+  return parts.join("\n");
+}
+
+function runOsa(script, name, evidence) {
+  const result = spawnSync("osascript", ["-e", script], {
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  fs.writeFileSync(path.join(evidence, `${name}-automation.json`), JSON.stringify({
+    at: new Date().toISOString(),
+    exitCode: result.status,
+    signal: result.signal ?? null,
+    timedOut: result.error?.code === "ETIMEDOUT",
+    stdout: bounded(result.stdout),
+    stderr: bounded(result.stderr),
+  }, null, 2) + "\n", { mode: 0o600 });
+  if (result.error) {
+    throw new Error(`${name} UI automation failed: ${errorText(result.error)}`);
+  }
+  if (result.status !== 0) throw new Error(`${name} UI automation failed`);
+}
+
+function captureScreen(destination) {
+  const result = spawnSync("/usr/sbin/screencapture", ["-x", destination], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`screencapture failed: ${bounded(result.stderr)}`);
+}
+
+function harvestSharedZedLog(manifest, source, start) {
+  if (!fs.existsSync(source)) return;
+  const fd = fs.openSync(source, "r");
+  try {
+    const end = fs.fstatSync(fd).size;
+    const length = Math.max(0, end - start);
+    const buffer = Buffer.alloc(length);
+    fs.readSync(fd, buffer, 0, length, start);
+    fs.writeFileSync(path.join(manifest.evidence, "zed-shared-log-delta.log"), buffer, { mode: 0o600 });
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function sha256File(file) {
+  return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+function fileSize(file) {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return 0;
+  }
+}
+
+function sleepMs(ms) {
+  const sab = new SharedArrayBuffer(4);
+  Atomics.wait(new Int32Array(sab), 0, 0, ms);
+}
+
+
+function launchMacos(
+  root,
+  fixtureKind,
+  {
+    role = "root",
+    relativeTarget = null,
+    row = null,
+    column = null,
+    zedCli = null,
+    networkPolicy = "normal",
+  } = {},
+) {
+  assert.equal(process.platform, "darwin", "macOS launch is required");
+  assert.ok(["maven", "gradle"].includes(fixtureKind), "fixture must be maven or gradle");
+  const manifest = readManifest(root);
+  assert.equal(manifest.sourceHead, git(["rev-parse", "HEAD"]).trim(), "staged HEAD must still equal checkout HEAD");
+  assert.equal(git(["status", "--porcelain"]), "", "source checkout must remain clean");
+
+  const cli = zedCli ?? "/Applications/Zed.app/Contents/MacOS/cli";
+  requireFile(cli, "Zed CLI");
+  const logPath = path.join(manifest.evidence, `zed-${fixtureKind}-${role}-foreground.log`);
+  const logStartOffset = fileSize(logPath);
+  const fd = fs.openSync(logPath, "a", 0o600);
+
+  const worktree = manifest.worktrees[fixtureKind];
+  const launchTargets = [worktree];
+  let target = null;
+  let targetArgument = null;
+  if (relativeTarget !== null) {
+    target = path.join(worktree, relativeTarget);
+    requireFile(target, `${fixtureKind} ${role} launch target`);
+    if (row !== null || column !== null) {
+      assert.equal(Number.isInteger(row) && row > 0, true, "launch row must be a positive integer");
+      assert.equal(Number.isInteger(column) && column > 0, true, "launch column must be a positive integer");
+      targetArgument = `${target}:${row}:${column}`;
+    } else {
+      targetArgument = target;
+    }
+    launchTargets.push(targetArgument);
+  }
+
+  assert.ok(
+    ["normal", "loopback-only"].includes(networkPolicy),
+    "network policy must be normal or loopback-only",
+  );
+  const cliArgs = [
+    "--foreground",
+    "--user-data-dir",
+    manifest.profile,
+    ...launchTargets,
+  ];
+  const executable = networkPolicy === "loopback-only"
+    ? "/usr/bin/sandbox-exec"
+    : cli;
+  if (networkPolicy === "loopback-only") requireFile(executable, "sandbox-exec");
+  const launchArgs = networkPolicy === "loopback-only"
+    ? ["-p", loopbackOnlySandboxProfile(), cli, ...cliArgs]
+    : cliArgs;
+
+  const child = spawn(executable, launchArgs, {
+    detached: true,
+    stdio: ["ignore", fd, fd],
+    env: {
+      ...process.env,
+      XDG_CACHE_HOME: manifest.xdgCache,
+      XDG_DATA_HOME: manifest.xdgData,
+      XDG_STATE_HOME: manifest.xdgState,
+      ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1",
+      PATH: path.join(os.homedir(), ".cargo", "bin") + path.delimiter + (process.env.PATH ?? ""),
+    },
+  });
+  child.unref();
+  fs.closeSync(fd);
+  fs.writeFileSync(path.join(manifest.evidence, "zed-process.json"), JSON.stringify({
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    role,
+    pid: child.pid,
+    launchedAt: new Date().toISOString(),
+    cli,
+    userDataDir: manifest.profile,
+    worktree,
+    relativeTarget,
+    target,
+    targetArgument,
+    requestedPosition: relativeTarget !== null && row !== null ? { row, column } : null,
+    launchTargets,
+    controlPlane: "fresh-foreground-cli-per-phase",
+    networkPolicy,
+    logPath,
+    logStartOffset,
+  }, null, 2) + "\n", { mode: 0o600 });
+  process.stdout.write(
+    `Launched isolated Zed pid ${child.pid} for ${fixtureKind}/${role}; targets: ${launchTargets.join(" | ")}; log: ${logPath}\n`,
+  );
+}
+
+function stopMacos(root, signal = "SIGTERM") {
+  const manifest = readManifest(root);
+  const processFile = path.join(manifest.evidence, "zed-process.json");
+  requireFile(processFile, "Zed process record");
+  const record = JSON.parse(fs.readFileSync(processFile, "utf8"));
+  let signaled = false;
+  try {
+    process.kill(-record.pid, signal);
+    signaled = true;
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
+  const evidenceFile = signal === "SIGTERM" ? "zed-stop.json" : "zed-force-stop.json";
+  fs.writeFileSync(path.join(manifest.evidence, evidenceFile), JSON.stringify({
+    sourceHead: manifest.sourceHead,
+    pid: record.pid,
+    requestedAt: new Date().toISOString(),
+    signal,
+    scope: "process-group",
+    processGroupWasLive: signaled,
+  }, null, 2) + "\n", { mode: 0o600 });
+  process.stdout.write(
+    signaled
+      ? `Requested ${signal} for isolated Zed process group ${record.pid}.\n`
+      : "Isolated Zed process group was already absent.\n",
+  );
+}
+
+function installDevExtensionMacos(root) {
+  assert.equal(process.platform, "darwin", "macOS UI automation is required");
+  const manifest = readManifest(root);
+  assert.equal(manifest.sourceHead, git(["rev-parse", "HEAD"]).trim(), "staged HEAD must still equal checkout HEAD");
+  assert.equal(git(["status", "--porcelain"]), "", "source checkout must remain clean");
+
+  const wasmFile = path.join(repository, "extension.wasm");
+  const staleWasmRemoved = fs.existsSync(wasmFile);
+  fs.rmSync(wasmFile, { force: true });
+
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  const foreground = processRecord.logPath;
+  const foregroundStart = fileSize(foreground);
+  const sharedLog = path.join(os.homedir(), "Library", "Logs", "Zed", "Zed.log");
+  const sharedStart = fileSize(sharedLog);
+  const extensionPath = repository + path.sep;
+
+  sendD007ActionKeyMacos(
+    manifest,
+    "i",
+    "dev-extension-install-action",
+  );
+
+  const pasteScript = [
+    `set extensionPath to "${escapeAppleScript(extensionPath)}"`,
+    "set previousClipboard to the clipboard",
+    "try",
+    "  set the clipboard to extensionPath",
+    '  tell application "Zed" to activate',
+    '  tell application "System Events"',
+    '    tell process "Zed" to set frontmost to true',
+    "    delay 0.5",
+    '    keystroke "a" using {command down}',
+    '    keystroke "v" using {command down}',
+    "  end tell",
+    "  delay 0.2",
+    "  set the clipboard to previousClipboard",
+    "on error errorMessage number errorNumber",
+    "  set the clipboard to previousClipboard",
+    "  error errorMessage number errorNumber",
+    "end try",
+  ].join("\n");
+  runOsa(pasteScript, "dev-extension-install-path", manifest.evidence);
+
+  const started = Date.now();
+  const timeoutMs = 45_000;
+  let attempts = 0;
+  let buildStartObserved = false;
+  let fatal = null;
+
+  while (Date.now() - started < timeoutMs) {
+    attempts += 1;
+    const confirmScript = [
+      'tell application "Zed" to activate',
+      'tell application "System Events"',
+      '  tell process "Zed" to set frontmost to true',
+      '  key code 36',
+      'end tell',
+    ].join("\n");
+    runOsa(
+      confirmScript,
+      `dev-extension-install-confirm-${attempts}`,
+      manifest.evidence,
+    );
+
+    const probeDeadline = Math.min(started + timeoutMs, Date.now() + 2_000);
+    do {
+      const foregroundDelta = readFileDelta(foreground, foregroundStart);
+      const sharedDelta = readFileDelta(sharedLog, sharedStart);
+      const installText = `${foregroundDelta}\n${sharedDelta}`;
+      fatal = [
+        "Failed to install dev extension",
+        "failed to build extension",
+      ].find((marker) => installText.includes(marker)) ?? null;
+      if (fatal !== null) break;
+
+      buildStartObserved =
+        installText.includes("compiling Rust extension") &&
+        installText.includes(repository);
+      if (buildStartObserved) break;
+      sleepMs(100);
+    } while (Date.now() < probeDeadline);
+
+    if (fatal !== null || buildStartObserved) break;
+  }
+
+  const installEvidence = {
+    attemptedAt: new Date().toISOString(),
+    sourceHead: manifest.sourceHead,
+    staleWasmRemoved,
+    automation: "direct-action-open-path-prompt-bounded-confirm",
+    action: "zed::InstallDevExtension",
+    repository,
+    promptQuery: extensionPath,
+    promptQueryStrategy: "absolute-directory-with-trailing-separator",
+    attempts,
+    buildStartObserved,
+    buildStartEvidence: "compiling Rust extension <exact repository>",
+    fatal,
+    foregroundTail: readFileDelta(foreground, foregroundStart).slice(-12_000),
+    sharedLogTail: readFileDelta(sharedLog, sharedStart).slice(-12_000),
+    status: fatal !== null
+      ? "failed"
+      : buildStartObserved
+        ? "install-started"
+        : "install-not-started",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, "dev-extension-install.json"),
+    JSON.stringify(installEvidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+
+  if (fatal !== null) {
+    throw new Error(
+      `Zed reported dev-extension installation failure after prompt confirmation: ${fatal}`,
+    );
+  }
+  if (!buildStartObserved) {
+    throw new Error(
+      `Zed dev-extension OpenPathPrompt never started installation after ${attempts} bounded confirms; inspect evidence/dev-extension-install.json`,
+    );
+  }
+
+  process.stdout.write(
+    `Zed Install Dev Extension started after ${attempts} bounded OpenPathPrompt confirm attempt(s); waiting for registration/build readiness.\n`,
+  );
+}
+
+function summarize(root) {
+  const manifest = readManifest(root);
+  const controlFiles = new Set(["staged.json", "summary.json"]);
+  const files = findTextFiles(manifest.evidence).filter(
+    (file) => !controlFiles.has(path.relative(manifest.evidence, file)),
+  );
+  const content = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+  const forbidden = FORBIDDEN.filter((marker) => content.includes(marker));
+  const completionFixtures = Object.fromEntries(["maven", "gradle"].map((fixtureKind) => {
+    const file = path.join(manifest.evidence, `${fixtureKind}-completion-ready.json`);
+    if (!fs.existsSync(file)) return [fixtureKind, { status: "MISSING" }];
+    try {
+      const evidence = JSON.parse(fs.readFileSync(file, "utf8"));
+      return [fixtureKind, {
+        status: evidence.status,
+        requestObserved: evidence.requestObserved === true,
+        responseObserved: evidence.responseObserved === true,
+        itemCount: evidence.itemCount,
+        serverPortObserved: evidence.serverPortObserved === true,
+        attempts: evidence.attempts,
+      }];
+    } catch {
+      return [fixtureKind, { status: "INVALID" }];
+    }
+  }));
+  const completionEvidence = Object.values(completionFixtures).every(
+    (entry) => entry.status === "PASS" &&
+      entry.requestObserved === true &&
+      entry.responseObserved === true &&
+      entry.serverPortObserved === true,
+  ) ? "PASS" : "REVIEW_REQUIRED";
+  const springWindowMessages = [];
+  for (const fixtureKind of ["maven", "gradle"]) {
+    const protocolFile = coordinatorProtocolFile(manifest, fixtureKind);
+    const events = protocolEvidenceEvents(
+      fs.existsSync(protocolFile) ? fs.readFileSync(protocolFile, "utf8") : "",
+    );
+    for (const event of events) {
+      if (event.event !== "spring-window-message") continue;
+      springWindowMessages.push({
+        fixture: fixtureKind,
+        method: event.method ?? null,
+        type: Number.isInteger(event.type) ? event.type : null,
+        severity: event.severity ?? "unknown",
+      });
+    }
+  }
+  const unexpectedSpringWindowErrors = springWindowMessages.filter(
+    (entry) => entry.severity === "error" || entry.type === 1,
+  );
+  const result = {
+    sourceHead: manifest.sourceHead,
+    gateScope: "architecture-smoke",
+    releaseAcceptance: "PENDING_CAPABILITY_REGRESSION",
+    evidenceFiles: files.map((file) => path.relative(manifest.evidence, file)),
+    forbiddenPrivateBoundaryMarkersObserved: forbidden,
+    privateBoundary: forbidden.length === 0 ? "PASS" : "FAIL",
+    completionFixtures,
+    completionEvidence,
+    springWindowMessages,
+    unexpectedSpringWindowErrors,
+    unexpectedRuntimeErrorEvidence:
+      unexpectedSpringWindowErrors.length === 0 ? "PASS" : "FAIL",
+  };
+  fs.writeFileSync(path.join(manifest.evidence, "summary.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
+  return result;
+}
+
+function writeGateFailure(manifest, phase, error) {
+  fs.writeFileSync(path.join(manifest.evidence, "gate-failure.json"), JSON.stringify({
+    sourceHead: manifest.sourceHead,
+    phase,
+    observedAt: new Date().toISOString(),
+    name: error?.name ?? "Error",
+    message: errorText(error),
+    stack: bounded(error?.stack),
+  }, null, 2) + "\n", { mode: 0o600 });
+}
+
+function recordRunPhase(manifest, phase) {
+  const event = {
+    type: "phase",
+    sourceHead: manifest.sourceHead,
+    phase,
+    observedAt: new Date().toISOString(),
+  };
+  fs.appendFileSync(
+    path.join(manifest.evidence, "d007-run.log"),
+    JSON.stringify(event) + "\n",
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "run-status.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      status: "RUNNING",
+      phase,
+      updatedAt: event.observedAt,
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  process.stdout.write(`[D007] PHASE: ${phase}\n`);
+}
+
+function recordRunFinal(manifest, status, phase, error = null) {
+  const event = {
+    type: "final",
+    sourceHead: manifest.sourceHead,
+    status,
+    phase,
+    observedAt: new Date().toISOString(),
+    error: error === null ? null : errorText(error),
+  };
+  fs.appendFileSync(
+    path.join(manifest.evidence, "d007-run.log"),
+    JSON.stringify(event) + "\n",
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(manifest.evidence, "run-status.json"),
+    JSON.stringify({
+      sourceHead: manifest.sourceHead,
+      status,
+      phase,
+      updatedAt: event.observedAt,
+      error: event.error,
+    }, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  const stream = status === "PASS" ? process.stdout : process.stderr;
+  stream.write(
+    `\n========== D007 ${status} ==========\nphase=${phase}\nevidence=${manifest.evidence}\n`,
+  );
+  if (event.error !== null) stream.write(`error=${event.error}\n`);
+}
+
+function writeCleanupFailure(manifest, error, phase = "zed-cleanup") {
+  fs.writeFileSync(path.join(manifest.evidence, "cleanup-failure.json"), JSON.stringify({
+    sourceHead: manifest.sourceHead,
+    phase,
+    observedAt: new Date().toISOString(),
+    name: error?.name ?? "Error",
+    message: errorText(error),
+    stack: bounded(error?.stack),
+  }, null, 2) + "\n", { mode: 0o600 });
+}
+
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function readManifest(root) {
+  const file = path.join(root, "evidence", "staged.json");
+  requireFile(file, "staged manifest");
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function requireFreshRoot(root) {
+  assert.equal(fs.existsSync(root), false, "D007 validation root must be fresh");
+  assert.equal(path.dirname(root), path.join(repository, "tmp"), "root must be a direct child of repository tmp/");
+  assert.equal(path.basename(root).startsWith("d007-zed-"), true, 'root basename must start with "d007-zed-"');
+}
+
+function requireDirectory(directory, label) {
+  assert.equal(fs.existsSync(directory) && fs.statSync(directory).isDirectory(), true, `${label} must be a directory`);
+}
+
+function requireFile(file, label) {
+  assert.equal(fs.existsSync(file) && fs.statSync(file).isFile(), true, `${label} must be a file`);
+}
+
+function javaVersionFromHome(home) {
+  const release = fs.readFileSync(path.join(home, "release"), "utf8");
+  return /^JAVA_VERSION="([^"]+)"$/m.exec(release)?.[1] ?? "unknown";
+}
+
+function git(args) {
+  const result = spawnSync("git", ["-C", repository, ...args], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || `git ${args.join(" ")} failed`);
+  return result.stdout;
+}
+
+function treeDigest(directory) {
+  const digest = createHash("sha256");
+  for (const relative of walk(directory)) {
+    digest.update(relative).update("\0").update(fs.readFileSync(path.join(directory, relative))).update("\n");
+  }
+  return digest.digest("hex");
+}
+
+function walk(directory, prefix = "", current = directory) {
+  return fs.readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.join(prefix, entry.name);
+    return entry.isDirectory() ? walk(directory, relative, path.join(current, entry.name)) : [relative];
+  }).sort();
+}
+
+function findTextFiles(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return walk(directory).map((relative) => path.join(directory, relative)).filter((file) => {
+    try {
+      fs.readFileSync(file, "utf8");
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function bounded(value) {
+  return String(value ?? "").slice(0, 4000);
+}
+
+function escapeAppleScript(value) {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function selfTest() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "d007-zed-selftest-"));
+  const roots = [];
+  try {
+    const javaHome = path.join(scratch, "jdk");
+    fs.mkdirSync(javaHome, { recursive: true });
+    fs.writeFileSync(path.join(javaHome, "release"), 'JAVA_VERSION="25.0.3"\n');
+
+    const javaProfile = path.join(scratch, "java-profile");
+    const javaDir = path.join(javaProfile, "extensions", "installed", "java");
+    fs.mkdirSync(javaDir, { recursive: true });
+    fs.writeFileSync(path.join(javaDir, "extension.toml"), 'id = "java"\nversion = "6.8.23"\n');
+    fs.writeFileSync(path.join(javaProfile, "extensions", "index.json"), JSON.stringify({
+      extensions: { java: { manifest: { id: "java", version: "6.8.23" } } },
+    }));
+
+    const root = path.join(repository, "tmp", `d007-zed-selftest-${process.pid}-${Date.now()}`);
+    roots.push(root);
+    const manifest = stage(javaProfile, root, javaHome);
+    assert.equal(manifest.decision, "D007");
+    assert.match(manifest.sourceHead, /^[0-9a-f]{40}$/);
+    assert.equal(manifest.javaExtensionVersion, "6.8.23");
+    assert.equal(manifest.runtimeJdk, "25.0.3");
+    assert.equal(fs.existsSync(path.join(manifest.worktrees.maven, "pom.xml")), true);
+    assert.equal(fs.existsSync(path.join(manifest.worktrees.gradle, "build.gradle")), true);
+    assert.equal(fs.readFileSync(path.join(manifest.worktrees.maven, "src", "main", "resources", "application-d007.properties"), "utf8"), "ser");
+    assert.equal(fs.readFileSync(path.join(manifest.worktrees.gradle, "src", "main", "resources", "application-d007.properties"), "utf8"), "ser");
+    const devIndex = path.join(manifest.profile, "extensions", "index.json");
+    const devLink = path.join(manifest.profile, "extensions", "installed", "spring-tools");
+    const devWasm = path.join(scratch, "dev-extension.wasm");
+    const devForeground = path.join(scratch, "dev-install.log");
+    fs.writeFileSync(devWasm, "wasm");
+    fs.writeFileSync(devForeground, "");
+    fs.symlinkSync(repository, devLink, "dir");
+    const devIndexJson = JSON.parse(fs.readFileSync(devIndex, "utf8"));
+    devIndexJson.extensions["spring-tools"] = {
+      dev: true,
+      manifest: { id: "spring-tools", version: "0.0.0-dev" },
+    };
+    fs.writeFileSync(devIndex, JSON.stringify(devIndexJson, null, 2) + "\n");
+    assert.equal(
+      devExtensionPersisted(manifest, devIndex, devLink, devWasm, devForeground),
+      true,
+      "dev extension persisted readiness requires exact source symlink + dev index + WASM",
+    );
+    fs.rmSync(devLink);
+    fs.symlinkSync(manifest.worktrees.maven, devLink, "dir");
+    assert.equal(
+      devExtensionPersisted(manifest, devIndex, devLink, devWasm, devForeground),
+      false,
+      "dev extension readiness must reject a symlink to the wrong checkout",
+    );
+    fs.rmSync(devLink);
+
+    const stagedSettings = JSON.parse(fs.readFileSync(path.join(manifest.profile, "config", "settings.json"), "utf8"));
+    assert.deepEqual(stagedSettings.languages.Java.language_servers, ["jdtls", "spring-tools"]);
+    assert.equal(stagedSettings.lsp.jdtls.settings.java_home, javaHome);
+    assert.equal(stagedSettings.lsp.jdtls.settings.check_updates, "once");
+    const stagedKeymap = JSON.parse(fs.readFileSync(path.join(manifest.profile, "config", "keymap.json"), "utf8"));
+    assert.equal(stagedKeymap[0].context, "Workspace");
+    assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-i"],
+      "zed::InstallDevExtension",
+    );
+    assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-r"],
+      "lsp_command_selector::Toggle",
+    );
+    assert.equal(
+      stagedKeymap[0].bindings["ctrl-cmd-alt-v"],
+      undefined,
+    );
+    assert.equal(stagedKeymap[1].context, "Editor");
+    assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-x"], "editor::ToggleCodeActions");
+    assert.equal(stagedKeymap[1].bindings["ctrl-cmd-alt-z"], "editor::ShowCompletions");
+    const retiredConfirmCodeAction = ["editor", "ConfirmCodeAction"].join("::");
+    assert.equal(
+      Object.values(stagedKeymap[1].bindings).some((binding) =>
+        JSON.stringify(binding).includes(retiredConfirmCodeAction)
+      ),
+      false,
+      "D007 must not confuse a provider-local Code Action index with Zed's merged menu index",
+    );
+
+    const harnessSource = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+    const retiredPaneAction = ["pane", "ActivateItem"].join("::");
+    assert.equal(
+      harnessSource.includes(retiredPaneAction),
+      false,
+      "D007 must not guess editor identity through pane indices",
+    );
+    const retiredFocusHelper = ["openFixture", "FileWithCli"].join("");
+    assert.equal(
+      harnessSource.includes(`function ${retiredFocusHelper}`),
+      false,
+      "D007 must not use a secondary macOS Zed CLI invocation for file focus",
+    );
+    assert.equal(
+      harnessSource.includes('controlPlane: "fresh-foreground-cli-per-phase"'),
+      true,
+      "D007 launch evidence must record the fresh per-phase foreground control plane",
+    );
+    assert.equal(
+      harnessSource.includes('path.join(manifest.evidence, "d007-run.log")'),
+      true,
+      "D007 must persist phase/final execution logs independently of terminal lifetime",
+    );
+    const recursivePhaseCall = ["setPhase", "(nextPhase);"].join("");
+    const directPhaseAssignment = ["phase = ", "nextPhase;"].join("");
+    assert.equal(
+      harnessSource.includes(recursivePhaseCall),
+      false,
+      "D007 phase logger must not recursively call itself",
+    );
+    assert.equal(
+      harnessSource.includes(directPhaseAssignment),
+      true,
+      "D007 phase logger must directly assign the next phase",
+    );
+    assert.equal(
+      harnessSource.includes('path.join(manifest.evidence, "run-status.json")'),
+      true,
+      "D007 must persist a recoverable final status",
+    );
+    assert.equal(
+      d007Keymap().some((entry) =>
+        Object.values(entry.bindings).some((binding) =>
+          JSON.stringify(binding).includes("file_finder")
+        )
+      ),
+      false,
+      "D007 target navigation must not depend on File Finder",
+    );
+    assert.equal(
+      harnessSource.includes('"zed::InstallDevExtension"'),
+      true,
+      "D007 dev-extension installation must dispatch the public action directly",
+    );
+    assert.equal(
+      harnessSource.includes('"lsp_command_selector::Toggle"'),
+      true,
+      "D007 run/debug dispatch must use Zed's public LSP command selector",
+    );
+    assert.equal(
+      harnessSource.includes(retiredConfirmCodeAction),
+      false,
+      "D007 must not select Code Actions by a provider-local response index",
+    );
+    const retiredInstallPaletteLiteral = ['set installAction to ', '"zed: install dev extension"'].join("");
+    assert.equal(
+      harnessSource.includes(retiredInstallPaletteLiteral),
+      false,
+      "D007 dev-extension installation must not depend on command-palette search",
+    );
+    assert.equal(
+      harnessSource.includes('targeting: "fresh-foreground-cli-launch-target"'),
+      true,
+      "D007 exact-file targeting must use a fresh foreground CLI launch target",
+    );
+    assert.equal(fs.existsSync(path.join(manifest.profile, "extensions", "work", "java")), false,
+      "D007 staging must not copy the Java extension work directory");
+
+    fs.writeFileSync(path.join(manifest.evidence, "runtime.log"), "standalone spring ok\n");
+    assert.equal(summarize(root).privateBoundary, "PASS");
+    fs.appendFileSync(path.join(manifest.evidence, "runtime.log"), "java/proxy forbidden\n");
+    assert.equal(summarize(root).privateBoundary, "FAIL");
+
+    const popupProtocol = coordinatorProtocolFile(manifest, "maven");
+    fs.mkdirSync(path.dirname(popupProtocol), { recursive: true });
+    fs.writeFileSync(
+      popupProtocol,
+      [
+        JSON.stringify({
+          event: "spring-window-message",
+          method: "window/showMessage",
+          type: 1,
+          severity: "error",
+        }),
+        JSON.stringify({
+          event: "spring-window-message",
+          method: "window/showMessageRequest",
+          type: 3,
+          severity: "info",
+        }),
+      ].join("\n") + "\n",
+    );
+    const popupSummary = summarize(root);
+    assert.equal(
+      popupSummary.unexpectedRuntimeErrorEvidence,
+      "FAIL",
+      "D007 must not pass when Spring emits an error popup",
+    );
+    assert.equal(popupSummary.unexpectedSpringWindowErrors.length, 1);
+    fs.rmSync(popupProtocol, { force: true });
+
+    const readinessLog = path.join(manifest.evidence, "readiness.log");
+    fs.writeFileSync(readinessLog, "old-log\n");
+    const readinessRecord = {
+      pid: process.pid,
+      userDataDir: manifest.profile,
+      logPath: readinessLog,
+      logStartOffset: fileSize(readinessLog),
+    };
+    // Foreground output is diagnostic only. Readiness is bound to the actual
+    // isolated app process, so stale/new log bytes cannot satisfy it by themselves.
+    assert.equal(fileSize(readinessLog) > readinessRecord.logStartOffset, false);
+    fs.appendFileSync(readinessLog, "new-log\n");
+    assert.equal(fileSize(readinessLog) > readinessRecord.logStartOffset, true);
+
+    const fakeIndex = path.join(scratch, "dev-extension-index.json");
+    const fakeWasm = path.join(scratch, "extension.wasm");
+    const fakeLink = path.join(scratch, "spring-tools-link");
+    fs.writeFileSync(
+      fakeIndex,
+      JSON.stringify({
+        extensions: {
+          "spring-tools": {
+            dev: true,
+            manifest: { id: "spring-tools", version: "0.0.0-dev" },
+          },
+        },
+      }),
+    );
+    fs.symlinkSync(repository, fakeLink, "dir");
+    assert.equal(
+      devExtensionPersisted(manifest, fakeIndex, fakeLink, fakeWasm, readinessLog),
+      false,
+      "dev registration and exact source symlink without a fresh WASM must not be persisted",
+    );
+    fs.writeFileSync(fakeWasm, "wasm");
+    assert.equal(
+      devExtensionPersisted(manifest, fakeIndex, fakeLink, fakeWasm, readinessLog),
+      true,
+      "dev extension persistence requires index + exact source symlink + non-empty WASM",
+    );
+
+    assert.deepEqual(
+      completionObservation("no completion evidence"),
+      {
+        requestObserved: false,
+        expectedRequestObserved: false,
+        requestUri: null,
+        requestLine: null,
+        requestCharacter: null,
+        responseObserved: false,
+        expectedResponseObserved: false,
+        itemCount: null,
+        serverPortObserved: false,
+      },
+    );
+    assert.deepEqual(
+      completionObservation('{"event":"completion-request"}'),
+      {
+        requestObserved: true,
+        expectedRequestObserved: true,
+        requestUri: null,
+        requestLine: null,
+        requestCharacter: null,
+        responseObserved: false,
+        expectedResponseObserved: false,
+        itemCount: null,
+        serverPortObserved: false,
+      },
+    );
+    assert.deepEqual(
+      springTargetReadiness([
+        '{"event":"coordinator-start"}',
+        '{"event":"document-open","uri":"file:///fixture/application-d007.properties"}',
+        '{"event":"spring-index-updated","affectedProjectCount":1}',
+      ].join("\n"), "file:///fixture/application-d007.properties"),
+      {
+        coordinatorStarted: true,
+        targetDocumentOpened: true,
+        indexReady: true,
+      },
+    );
+    assert.deepEqual(
+      completionObservation([
+        '{"event":"completion-request"}',
+        '{"event":"completion-response","itemCount":12,"serverPort":false}',
+      ].join("\n")),
+      {
+        requestObserved: true,
+        expectedRequestObserved: true,
+        requestUri: null,
+        requestLine: null,
+        requestCharacter: null,
+        responseObserved: true,
+        expectedResponseObserved: true,
+        itemCount: 12,
+        serverPortObserved: false,
+      },
+    );
+    assert.deepEqual(
+      completionObservation([
+        '{"event":"completion-request"}',
+        '{"event":"completion-response","itemCount":37,"serverPort":true}',
+      ].join("\n")),
+      {
+        requestObserved: true,
+        expectedRequestObserved: true,
+        requestUri: null,
+        requestLine: null,
+        requestCharacter: null,
+        responseObserved: true,
+        expectedResponseObserved: true,
+        itemCount: 37,
+        serverPortObserved: true,
+      },
+    );
+
+    const sharedLog = path.join(scratch, "shared-zed.log");
+    const foreground = path.join(manifest.evidence, "zed-maven-foreground.log");
+    fs.writeFileSync(sharedLog, "");
+    fs.writeFileSync(foreground, "textDocument/completion server.port\n");
+    const staleBaseline = runtimeSnapshot(manifest, sharedLog, 0);
+    assert.throws(
+      () => waitForRuntimeEvidence(
+        manifest,
+        sharedLog,
+        0,
+        staleBaseline,
+        ["textDocument/completion", "server.port"],
+        "fresh completion evidence",
+        20,
+        null,
+        5,
+        2,
+      ),
+      /timed out waiting for fresh completion evidence/,
+      "pre-baseline completion evidence must not satisfy a new probe",
+    );
+
+    let evidenceRetries = 0;
+    waitForRuntimeEvidence(
+      manifest,
+      sharedLog,
+      0,
+      runtimeSnapshot(manifest, sharedLog, 0),
+      ["textDocument/completion", "server.port"],
+      "retried completion evidence",
+      100,
+      () => {
+        evidenceRetries += 1;
+        fs.appendFileSync(foreground, "textDocument/completion server.port\n");
+      },
+      10,
+      2,
+    );
+    assert.equal(evidenceRetries >= 1, true, "runtime evidence wait must exercise bounded retry");
+
+    const retriedFile = path.join(scratch, "debug.json");
+    let fileRetries = 0;
+    waitForFileWithRetry(
+      retriedFile,
+      "retried debug config",
+      100,
+      () => {
+        fileRetries += 1;
+        fs.writeFileSync(retriedFile, "{}\n");
+      },
+      10,
+      2,
+    );
+    assert.equal(fileRetries >= 1, true, "file wait must exercise bounded retry");
+
+    const generatedDebug = path.join(scratch, "generated-debug.json");
+    const generatedTasks = path.join(scratch, "generated-tasks.json");
+    fs.writeFileSync(generatedDebug, JSON.stringify([{
+      adapter: "Java",
+      request: "launch",
+      mainClass: "dev.zed.spring.fixture.FixtureApplication",
+      cwd: "$ZED_WORKTREE_ROOT",
+    }]));
+    fs.writeFileSync(generatedTasks, JSON.stringify([{
+      label: "Spring Boot (zed-spring-tools): fixture (run)",
+      command: "./gradlew",
+      args: ["bootRun"],
+      cwd: "$ZED_WORKTREE_ROOT",
+      env: {},
+    }]));
+    assert.deepEqual(
+      validateGeneratedRunDebug("gradle", generatedDebug, generatedTasks),
+      { expectedRunCommand: "./gradlew", runTask: "PASS", debugConfig: "PASS" },
+    );
+    fs.writeFileSync(generatedTasks, JSON.stringify([{
+      label: "Spring Boot (zed-spring-tools): fixture (run)",
+      command: "gradle",
+      args: ["bootRun"],
+      cwd: "$ZED_WORKTREE_ROOT",
+      env: {},
+    }]));
+    assert.equal(
+      validateGeneratedRunDebug("gradle", generatedDebug, generatedTasks).runTask,
+      "FAIL",
+      "D007 must reject a Gradle fixture that bypasses its checked-in wrapper",
+    );
+
+    const fakeReadyRecord = { pid: 4242, userDataDir: "/tmp/d007-profile" };
+    const fakePs = [
+      "  4242  4242 S /Applications/Zed.app/Contents/MacOS/cli --foreground --user-data-dir /tmp/d007-profile",
+      "  4243  4242 S /Applications/Zed.app/Contents/MacOS/zed zed://cli/fake --user-data-dir /tmp/other-profile",
+      "  4244  4242 Z /Applications/Zed.app/Contents/MacOS/zed zed://cli/fake --user-data-dir /tmp/d007-profile",
+      "  4245  4242 S /Applications/Zed.app/Contents/MacOS/zed zed://cli/fake --user-data-dir /tmp/d007-profile",
+    ].join("\n");
+    assert.deepEqual(
+      findIsolatedZedProcess(fakePs, fakeReadyRecord),
+      {
+        pid: 4245,
+        pgid: 4242,
+        state: "S",
+        command: "/Applications/Zed.app/Contents/MacOS/zed zed://cli/fake --user-data-dir /tmp/d007-profile",
+      },
+      "D007 readiness must bind to the live Zed app in the launch process group and exact isolated profile",
+    );
+    assert.equal(
+      findIsolatedZedProcess(
+        "  4242  4242 S /Applications/Zed.app/Contents/MacOS/cli --foreground --user-data-dir /tmp/d007-profile\n",
+        fakeReadyRecord,
+      ),
+      undefined,
+      "the CLI launcher alone must not satisfy Zed app readiness",
+    );
+
+    const fakeSpringToolsAsset = [
+      "spring-boot-language-server",
+      "standalone-exec.jar",
+    ].join("-");
+    const fakeLanguageServers = [
+      "  5001  4242 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /opaque/equinox.jar",
+      `  5002  4242 S /jdk/bin/java -jar /opaque/${fakeSpringToolsAsset}`,
+      "  5003  9999 S /jdk/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -jar /other/equinox.jar",
+    ].join("\n");
+    assert.deepEqual(
+      languageServerProcessReadiness(fakeLanguageServers, 4242),
+      {
+        jdtls: {
+          observed: true,
+          pid: 5001,
+          signature: "org.eclipse.jdt.ls.core|org.eclipse.equinox.launcher",
+        },
+        springTools: {
+          observed: true,
+          pid: 5002,
+          signature: "spring-boot-language-server + standalone-exec.jar",
+        },
+      },
+      "D007 preflight must prove both language servers in the isolated Zed process group without recording private install paths",
+    );
+
+    const fakeDebugPs = [
+      "  6101  6000  6000 S /jdk/bin/java -agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:5005 -cp /tmp/d007-fixture/target/classes dev.zed.spring.fixture.FixtureApplication",
+      "  6102  6000  6000 S /jdk/bin/java -cp /tmp/d007-fixture/target/classes dev.zed.spring.fixture.FixtureApplication",
+      "  6103  6000  6000 S /jdk/bin/java -agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=localhost:5006 -cp /tmp/other/target/classes dev.zed.spring.fixture.FixtureApplication",
+    ].join("\n");
+    assert.deepEqual(
+      javaDebugProcessCandidates(
+        fakeDebugPs,
+        "/tmp/d007-fixture",
+        "dev.zed.spring.fixture.FixtureApplication",
+      ),
+      [{
+        pid: 6101,
+        ppid: 6000,
+        pgid: 6000,
+        jdwpObserved: true,
+        exactWorktreeObserved: true,
+      }],
+      "D007 DAP readiness must require a new JDWP process for the exact staged worktree and main class",
+    );
+
+    const sandboxProfile = loopbackOnlySandboxProfile();
+    assert.match(sandboxProfile, /\(deny network-outbound\)/);
+    assert.match(
+      sandboxProfile,
+      /\(allow network-outbound \(remote ip "localhost:\*"\)\)/,
+    );
+
+    const fakeArtifactRoot = path.join(scratch, "own-work");
+    const fakeArtifactDir = path.join(fakeArtifactRoot, "spring-tools", "test");
+    fs.mkdirSync(fakeArtifactDir, { recursive: true });
+    const fakeArtifact = path.join(fakeArtifactDir, "standalone.jar");
+    fs.writeFileSync(fakeArtifact, Buffer.from("0123456789abcdef"));
+    assert.deepEqual(
+      findFilesNamed(fakeArtifactRoot, "standalone.jar", 4),
+      [fakeArtifact],
+    );
+    const fakeArtifactSize = fs.statSync(fakeArtifact).size;
+    const fakeArtifactDigest = sha256File(fakeArtifact);
+    corruptFileByte(fakeArtifact);
+    assert.equal(fs.statSync(fakeArtifact).size, fakeArtifactSize);
+    assert.notEqual(sha256File(fakeArtifact), fakeArtifactDigest);
+
+    const primaryFailure = new Error("primary failure");
+    writeGateFailure(manifest, "self-test-primary", primaryFailure);
+    const recordedFailure = JSON.parse(
+      fs.readFileSync(path.join(manifest.evidence, "gate-failure.json"), "utf8"),
+    );
+    assert.equal(recordedFailure.phase, "self-test-primary");
+    assert.equal(recordedFailure.message, "primary failure");
+
+    assert.equal(
+      processGroupHasLiveMember("  101 S\n  101 Z\n  202 S\n", 101),
+      true,
+      "a process group with a live member must remain live even if another member is zombie",
+    );
+    assert.equal(
+      processGroupHasLiveMember("  101 Z\n  101 Z+\n  202 S\n", 101),
+      false,
+      "a zombie-only process group must count as stopped",
+    );
+
+    assert.throws(() => stage(javaProfile, root, javaHome), /must be fresh/);
+    process.stdout.write("D007 Zed desktop validation self-test: ok\n");
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+    for (const root of roots) fs.rmSync(root, { recursive: true, force: true });
+  }
+}

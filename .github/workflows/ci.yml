@@ -294,6 +294,9 @@ jobs:
       - name: Repository check tests
         if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
         run: node --test scripts/test/*.test.mjs
+      - name: Case-insensitive path collisions
+        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        run: node scripts/check-case-collisions.mjs
       - name: Contributors list is current
         if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
         run: node scripts/generate-contributors.mjs --check

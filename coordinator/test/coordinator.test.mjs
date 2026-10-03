@@ -8,8 +8,10 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
-  compatibilityReportUrl,
   Coordinator,
+  completionResultEvidence,
+  codeActionResultEvidence,
+  d007ProtocolEvidenceFile,
   javaMajor,
   javaVersion,
   monitorZedInput,
@@ -17,10 +19,9 @@ import {
   run,
   sanitizedEnvironment,
   springArguments,
-  validateCompatibility,
+  standaloneProjectGavs,
 } from "../src/main.mjs";
 import { LspDecoder } from "../src/lsp.mjs";
-import compatibility from "../../protocol/java-providers.json" with { type: "json" };
 
 function decodeSingle(bytes) {
   const messages = new LspDecoder().push(bytes);
@@ -34,8 +35,6 @@ test("product arguments are positional, absolute, and shell independent", () => 
     "--java", "/tmp/jdk/bin/java",
     "--spring-server", "/tmp/spring/server.jar",
     "--spring-home", "/tmp/spring",
-    "--java-work-dir", "/tmp/extensions/work/java",
-    "--compatibility", "/tmp/runtime/providers.json",
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
     "--automatic-live-connection", "true",
@@ -55,8 +54,6 @@ test("the embedded MCP server port is a port or nothing", () => {
       "--java", "/tmp/jdk/bin/java",
       "--spring-server", "/tmp/spring/server.jar",
       "--spring-home", "/tmp/spring",
-      "--java-work-dir", "/tmp/extensions/work/java",
-      "--compatibility", "/tmp/runtime/providers.json",
       "--host-os", "macos",
       "--extension-version", "0.1.0-alpha.1",
       "--automatic-live-connection", "false",
@@ -74,8 +71,8 @@ test("the embedded MCP server port is a port or nothing", () => {
 });
 
 test("the MCP port is the only thing that changes the Spring launch vector", () => {
-  const off = springArguments("/tmp/spring/server.jar", null);
-  const on = springArguments("/tmp/spring/server.jar", 50627);
+  const off = springArguments("/tmp/spring/server.jar", "/tmp/project", null);
+  const on = springArguments("/tmp/spring/server.jar", "/tmp/project", 50627);
 
   // Default launch: unchanged from every release before this capability, which
   // is what keeps the embedded server absent unless a user asks for it.
@@ -95,6 +92,50 @@ test("the MCP port is the only thing that changes the Spring launch vector", () 
   );
 });
 
+test("standalone project-dir JVM argument preserves host path identity", () => {
+  const windowsProject = "C:\\tmp\\workspace space 한글";
+  const windowsArgs = springArguments(
+    "C:\\tmp\\spring\\server.jar",
+    windowsProject,
+    null,
+    "win32",
+  );
+  assert.ok(windowsArgs.includes("-Dspring.boot.ls.project.dir=."));
+  assert.equal(
+    windowsArgs.some((argument) => argument.includes(windowsProject)),
+    false,
+    "Windows must keep the Unicode absolute worktree out of JVM argv",
+  );
+
+  const macProject = "/var/folders/demo/workspace";
+  const macArgs = springArguments(
+    "/tmp/spring/server.jar",
+    macProject,
+    null,
+    "darwin",
+  );
+  assert.ok(macArgs.includes(`-Dspring.boot.ls.project.dir=${macProject}`));
+  assert.equal(
+    macArgs.includes("-Dspring.boot.ls.project.dir=."),
+    false,
+    "POSIX must keep the exact workspace identity instead of cwd canonicalization",
+  );
+
+  const linuxProject = "/tmp/workspace space 한글";
+  const linuxArgs = springArguments(
+    "/tmp/spring/server.jar",
+    linuxProject,
+    null,
+    "linux",
+  );
+  assert.ok(linuxArgs.includes(`-Dspring.boot.ls.project.dir=${linuxProject}`));
+
+  assert.throws(
+    () => springArguments("/tmp/spring/server.jar", "", null),
+    /standalone Spring Tools project directory is required/,
+  );
+});
+
 test("environment allowlist excludes unrelated secrets", () => {
   assert.deepEqual(sanitizedEnvironment({ PATH: "/bin", SECRET_TOKEN: "no" }), { PATH: "/bin" });
 });
@@ -106,127 +147,35 @@ test("Java requirement accepts 21 and the configured Java 25 default", () => {
   assert.equal(javaVersion('openjdk version "25.0.3" 2026-04-21'), "25.0.3");
 });
 
-test("compatibility report URL contains only bounded allowlisted fields", () => {
-  const report = compatibilityReportUrl({
-    failureKind: "classpath-registration-failed-v1",
-    hostOs: "macos",
-    hostArch: "arm64",
-    jdkVersion: "25.0.3",
-    extensionVersion: "0.1.0-alpha.1",
-  });
-  const url = new URL(report);
-  assert.equal(url.origin, "https://github.com");
-  assert.equal(url.pathname, "/luceat-lux-vestra/zed-spring-tools/issues/new");
-  assert.equal(url.searchParams.get("title"), "[Compatibility] classpath-registration-failed-v1");
-  const body = url.searchParams.get("body");
-  assert.match(body, /Failure: Official Java classpath registration failed/);
-  assert.match(body, /Fingerprint: `classpath-registration-failed-v1`/);
-  assert.match(body, /Spring Tools: `5\.3\.0\.RELEASE`/);
-  assert.match(body, /JDK: `25\.0\.3`/);
-  assert.match(body, /Host: `macOS arm64`/);
-  assert.match(body, /Zed Spring Tools: `0\.1\.0-alpha\.1`/);
-  assert.match(body, /Zed: `not observable by this extension`/);
-  assert.match(body, /Official Java extension: `not observable by this extension`/);
-  assert.equal(url.searchParams.has("zed-version"), false);
-  assert.equal(url.searchParams.has("official-java-version"), false);
-  assert.deepEqual([...url.searchParams.keys()], ["title", "body"]);
-  assert.ok(report.length < 2_000);
-  assert.throws(() => compatibilityReportUrl({
-    failureKind: "arbitrary-error",
-    hostOs: "macos",
-    hostArch: "arm64",
-    jdkVersion: "25.0.3",
-    extensionVersion: "0.1.0-alpha.1",
-  }));
-  assert.throws(() => compatibilityReportUrl({
-    failureKind: "java-data-route-failed-v1",
-    hostOs: "macos",
-    hostArch: "arm64",
-    jdkVersion: "/Users/private/project",
-    extensionVersion: "0.1.0-alpha.1",
-  }));
-});
-
-test("official Java provider admission is structural, not release-pinned", () => {
-  assert.equal(validateCompatibility(compatibility).id, "zed-java");
-  assert.equal(validateCompatibility({
-    ...compatibility,
-    providers: [{ ...compatibility.providers[0], extensionVersion: "future-metadata" }],
-  }).id, "zed-java");
-  assert.throws(() =>
-    validateCompatibility({
-      ...compatibility,
-      providers: [{ ...compatibility.providers[0], targetLanguageServerId: "other" }],
-    }),
+test("standalone project GAV fallback preserves project cardinality without Java transport", () => {
+  assert.deepEqual(
+    standaloneProjectGavs({ projectUris: ["file:///a", "file:///b"] }),
+    [null, null],
   );
+  assert.throws(() => standaloneProjectGavs({}), /project GAV request is invalid/);
 });
 
-test("Spring Java client requests are answered through the official Java transport", async () => {
+test("standalone Java completion callback fails closed to an empty result", async () => {
   const springWrites = [];
   const zedWrites = [];
   const coordinator = new Coordinator({
     sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
     sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: (method) =>
-        method === "sts/javaType" || method === "sts/project/gav",
-      executeSpringClientMethod: async (method, params) => ({ method, params }),
-    },
     worktree: "/tmp/project",
   });
   await coordinator.handleSpringMessage({
     jsonrpc: "2.0",
-    id: 7,
-    method: "sts/javaType",
-    params: { typeName: "example.Demo" },
+    id: 77,
+    method: "sts/javaCodeComplete",
+    params: { projectUri: "file:///tmp/project", query: "dev.ex" },
   });
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "gav",
-    method: "sts/project/gav",
-    params: { projectUris: ["file:///tmp/project"] },
-  });
-  assert.deepEqual(springWrites, [
-    {
-      jsonrpc: "2.0",
-      id: 7,
-      result: { method: "sts/javaType", params: { typeName: "example.Demo" } },
-    },
-    {
-      jsonrpc: "2.0",
-      id: "gav",
-      result: {
-        method: "sts/project/gav",
-        params: { projectUris: ["file:///tmp/project"] },
-      },
-    },
-  ]);
+  assert.deepEqual(springWrites, [{ jsonrpc: "2.0", id: 77, result: [] }]);
   assert.deepEqual(zedWrites, []);
 });
 
-test("an answered Java data request is logged once per method, with no parameters", async () => {
-  const logs = [];
-  const coordinator = new Coordinator({
-    sendSpring() {},
-    sendZed() {},
-    javaTransport: {
-      supportsSpringClientMethod: (method) => method === "sts/javaType",
-      executeSpringClientMethod: async () => ({ name: "example.Demo" }),
-    },
-    worktree: "/tmp/project",
-    logger: (message) => logs.push(message),
-  });
-  const request = (id) => ({
-    jsonrpc: "2.0",
-    id,
-    method: "sts/javaType",
-    params: { bindingKey: "Ljava/lang/Integer;", projectUri: "file:///tmp/project" },
-  });
-  await coordinator.handleSpringMessage(request(1));
-  await coordinator.handleSpringMessage(request(2));
-  assert.deepEqual(logs, ["official Java data request sts/javaType answered"]);
-  assert.ok(!logs[0].includes("Integer"), "route log must not carry request parameters");
-});
+
+
+
 
 // A failing data route is built the same way in every case below: only the
 // session state around it changes, which is the whole point of the fix.
@@ -274,57 +223,9 @@ function failingDataRouteCoordinator({ javaHandshakeGraceMs, answerFirst = false
   return { coordinator, logs, springWrites, zedWrites, request, openJavaDocument };
 }
 
-test("a data route that fails inside the handshake grace window claims no incompatibility", async () => {
-  // The M5 JDK 21 gate's defect: one `sts.java.type` exceeded official Java's
-  // own five-second command timeout ten seconds after the Java document opened,
-  // and three seconds before the same route answered normally.
-  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 60_000 });
-  gate.openJavaDocument();
-  await gate.request(9);
-  assert.deepEqual(gate.zedWrites, [], "a transient failure must not claim the JDK is unusable");
-  assert.ok(gate.logs.includes("an official Java data request failed inside the handshake grace window"));
-  // Suppressing the notice is presentation-only: Spring is still told it failed.
-  assert.equal(gate.springWrites.length, 1);
-  assert.equal(gate.springWrites[0].id, 9);
-  assert.match(gate.springWrites[0].error.message, /official Java rejected command/);
-});
 
-test("a data route that keeps failing past the grace window reports the requirement", async () => {
-  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0 });
-  gate.openJavaDocument();
-  await gate.request(9);
-  assert.equal(gate.zedWrites.length, 1);
-  assert.equal(gate.zedWrites[0].method, "window/showMessageRequest");
-  assert.match(gate.zedWrites[0].params.message, /requires a working official Java extension/);
-  assert.match(gate.zedWrites[0].params.message, /java-data-route-failed-v1/);
-  assert.match(gate.zedWrites[0].params.message, /Nothing is submitted/);
-  assert.deepEqual(gate.zedWrites[0].params.actions, [{ title: "Not now" }]);
-});
 
-test("a data route that has answered never claims the requirement is unmet", async () => {
-  // The notice states that a working official Java extension and JDK are
-  // required. A route that already answered proves both, whatever fails later.
-  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0, answerFirst: true });
-  gate.openJavaDocument();
-  await gate.request(1);
-  await gate.request(2);
-  assert.deepEqual(gate.zedWrites, []);
-  assert.deepEqual(gate.logs, [
-    "a Java document was opened; the official Java route is now expected",
-    "official Java data request sts/javaType answered",
-    "an official Java data request failed after the route had answered",
-  ]);
-});
 
-test("a data route failure before any Java document is not an incompatibility", async () => {
-  // Nothing has started the official Java server yet, so there is no route to
-  // be incompatible with; `#showJavaNotStarted` owns this case.
-  const gate = failingDataRouteCoordinator({ javaHandshakeGraceMs: 0 });
-  await gate.request(9);
-  assert.deepEqual(gate.zedWrites, []);
-  assert.ok(gate.logs.includes("an official Java data request failed before any Java document opened"));
-  assert.equal(gate.springWrites.length, 1);
-});
 
 test("ordinary LSP traffic remains visible to Zed", async () => {
   const zedWrites = [];
@@ -337,6 +238,58 @@ test("ordinary LSP traffic remains visible to Zed", async () => {
   const request = { jsonrpc: "2.0", id: "configuration", method: "workspace/configuration" };
   await coordinator.handleSpringMessage(request);
   assert.deepEqual(zedWrites, [request]);
+});
+
+test("D007 evidence records Spring window-message severity without persisting message text", async () => {
+  const zedWrites = [];
+  const evidence = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    javaTransport: { supportsSpringClientMethod: () => false },
+    worktree: "/tmp/project",
+    protocolEvidence: (entry) => evidence.push(entry),
+  });
+
+  const errorPopup = {
+    jsonrpc: "2.0",
+    method: "window/showMessage",
+    params: {
+      type: 1,
+      message: "sensitive project path /tmp/project must not reach D007 evidence",
+    },
+  };
+  await coordinator.handleSpringMessage(errorPopup);
+
+  const warningPrompt = {
+    jsonrpc: "2.0",
+    id: "warning-prompt",
+    method: "window/showMessageRequest",
+    params: {
+      type: 2,
+      message: "warning detail must also stay out of D007 evidence",
+      actions: [{ title: "Close" }],
+    },
+  };
+  await coordinator.handleSpringMessage(warningPrompt);
+
+  assert.deepEqual(zedWrites, [errorPopup, warningPrompt]);
+  assert.deepEqual(evidence, [
+    {
+      event: "spring-window-message",
+      method: "window/showMessage",
+      type: 1,
+      severity: "error",
+    },
+    {
+      event: "spring-window-message",
+      method: "window/showMessageRequest",
+      type: 2,
+      severity: "warning",
+    },
+  ]);
+  assert.equal(JSON.stringify(evidence).includes("/tmp/project"), false);
+  assert.equal(JSON.stringify(evidence).includes("warning detail"), false);
 });
 
 test("Spring initialize advertises the coordinator-owned commands", async () => {
@@ -1057,291 +1010,11 @@ test("an authoritative empty pre-warm clears carried-over inlay hints once the h
   await coordinator.close();
 });
 
-test("classpath enable waits for initialized and the official Java route", async () => {
-  const springWrites = [];
-  const zedWrites = [];
-  let routeReady;
-  const ready = new Promise((resolve) => {
-    routeReady = resolve;
-  });
-  const coordinator = new Coordinator({
-    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: () => false,
-      waitUntilReady: async () => await ready,
-    },
-    worktree: "/tmp/project",
-  });
 
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(springWrites, []);
-  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
-  while (springWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
 
-  const enableCodeLenses = springWrites.shift();
-  assert.equal(enableCodeLenses.method, "workspace/executeCommand");
-  assert.deepEqual(enableCodeLenses.params, {
-    command: "sts/enable/copilot/features",
-    arguments: [true],
-  });
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: enableCodeLenses.id,
-    result: "OK",
-  });
-  while (zedWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(zedWrites[0].method, "workspace/codeLens/refresh");
-  assert.equal(
-    coordinator.observeZedMessage({ jsonrpc: "2.0", id: zedWrites.shift().id, result: null }),
-    false,
-  );
-  assert.deepEqual(springWrites, []);
 
-  routeReady();
-  while (springWrites.length === 0) await new Promise((resolve) => setImmediate(resolve));
 
-  const enable = springWrites.shift();
-  assert.equal(enable.method, "workspace/executeCommand");
-  assert.deepEqual(enable.params, {
-    command: "sts.vscode-spring-boot.enableClasspathListening",
-    arguments: [true],
-  });
-  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: enable.id, result: "OK" });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(zedWrites, []);
-  await coordinator.close();
-});
 
-test("an absent Java route is logged without showing a false failure popup", async () => {
-  const logs = [];
-  const zedWrites = [];
-  const coordinator = new Coordinator({
-    sendSpring() {},
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: () => false,
-      waitUntilReady: async () => {
-        throw new Error("official Java route is not ready");
-      },
-    },
-    worktree: "/tmp/project",
-    logger: (message) => logs.push(message),
-  });
-
-  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
-  while (!logs.includes("official Java route is not ready; continuing to wait")) {
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-
-  assert.deepEqual(zedWrites, []);
-  await coordinator.close();
-});
-
-test("a classpath registration that times out is re-driven until the Java server is ready", async () => {
-  const springWrites = [];
-  const zedWrites = [];
-  let addAttempts = 0;
-  const transport = {
-    supportsSpringClientMethod: () => false,
-    async execute(command) {
-      if (command === "zed.spring.bridge.v1.addClasspathListener") {
-        addAttempts += 1;
-        if (addAttempts === 1) {
-          throw new Error("official Java rejected command: timed out after 5000ms");
-        }
-      }
-      return "ok";
-    },
-  };
-  const coordinator = new Coordinator({
-    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: transport,
-    worktree: "/tmp/project",
-    javaHandshakeGraceMs: 10_000,
-    classpathRetryMs: 1,
-  });
-
-  const callbackId = "sts4.classpath.AbCdEfGh";
-  const isEnable = (message) =>
-    message.method === "workspace/executeCommand" &&
-    message.params?.command === "sts.vscode-spring-boot.enableClasspathListening";
-
-  // The Java server is still importing, so the first registration times out.
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "add-1",
-    method: "sts/addClasspathListener",
-    params: { callbackCommandId: callbackId, batched: true },
-  });
-  const firstResponse = springWrites.shift();
-  assert.ok(firstResponse.error, "the failed registration is reported to Spring as an error");
-
-  // Spring gives up, so the coordinator re-drives the enable handshake itself.
-  // Answer each re-drive; once one has been driven, the Java server becomes
-  // ready and the next registration attempt succeeds.
-  let reDrove = false;
-  let registered = false;
-  for (let step = 0; step < 2000 && !registered; step += 1) {
-    await new Promise((resolve) => setImmediate(resolve));
-    while (springWrites.length > 0) {
-      const message = springWrites.shift();
-      if (isEnable(message)) {
-        reDrove = true;
-        await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: message.id, result: "OK" });
-      } else if (message.id === "add-2" && message.result === "ok") {
-        registered = true;
-      }
-    }
-    if (reDrove && addAttempts < 2) {
-      await coordinator.handleSpringMessage({
-        jsonrpc: "2.0",
-        id: "add-2",
-        method: "sts/addClasspathListener",
-        params: { callbackCommandId: callbackId, batched: true },
-      });
-    }
-  }
-
-  assert.ok(reDrove, "the coordinator re-drove the enable handshake after the timeout");
-  assert.ok(registered, "the retried registration eventually succeeded");
-  assert.equal(addAttempts, 2);
-  // The transient failure raised no requirement popup.
-  assert.equal(
-    zedWrites.some((message) => message.method === "window/showMessage"),
-    false,
-  );
-  await coordinator.close();
-});
-
-test("a classpath registration that keeps failing past the grace window surfaces the Java requirement", async () => {
-  const springWrites = [];
-  const zedWrites = [];
-  const transport = {
-    supportsSpringClientMethod: () => false,
-    async execute() {
-      throw new Error("official Java rejected command: timed out after 5000ms");
-    },
-  };
-  const coordinator = new Coordinator({
-    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: transport,
-    worktree: "/tmp/project",
-    javaHandshakeGraceMs: 0,
-    classpathRetryMs: 1,
-  });
-
-  // The grace window only starts once a Java file is open, so the notice
-  // describes a route the session actually needs.
-  coordinator.observeZedMessage({
-    jsonrpc: "2.0",
-    method: "textDocument/didOpen",
-    params: {
-      textDocument: { uri: "file:///tmp/project/App.java", languageId: "java", version: 0, text: "" },
-    },
-  });
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "add",
-    method: "sts/addClasspathListener",
-    params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: true },
-  });
-
-  const popup = zedWrites.find((message) => message.method === "window/showMessageRequest");
-  assert.ok(popup);
-  assert.equal(popup.params.type, 1);
-  assert.match(popup.params.message, /requires a working official Java extension/);
-  assert.match(popup.params.message, /classpath-registration-failed-v1/);
-  await coordinator.close();
-});
-
-test("a session that never opens a Java file is not told the Java route failed", async () => {
-  // Zed starts the official Java server lazily. Opening only properties/YAML
-  // leaves its route legitimately absent, and `window/showMessageRequest`
-  // cannot be retracted, so a premature notice would be permanent.
-  const zedWrites = [];
-  const coordinator = new Coordinator({
-    sendSpring: () => {},
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: () => false,
-      async execute() {
-        throw new Error("official Java rejected command: timed out after 5000ms");
-      },
-    },
-    worktree: "/tmp/project",
-    javaHandshakeGraceMs: 0,
-    classpathRetryMs: 1,
-  });
-
-  coordinator.observeZedMessage({
-    jsonrpc: "2.0",
-    method: "textDocument/didOpen",
-    params: {
-      textDocument: {
-        uri: "file:///tmp/project/application.properties",
-        languageId: "spring-boot-properties",
-        version: 0,
-        text: "server.port=8080\n",
-      },
-    },
-  });
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "add",
-    method: "sts/addClasspathListener",
-    params: { callbackCommandId: "sts4.classpath.AbCdEfGh", batched: true },
-  });
-
-  assert.ok(
-    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
-    "no Java requirement notice without a Java file",
-  );
-  await coordinator.close();
-});
-
-test("an absent Java route without a Java file is explained, not reported as a failure", async () => {
-  // Nothing this extension can do starts the official Java server, so the user
-  // gets the one instruction that works instead of a compatibility report.
-  const zedWrites = [];
-  const coordinator = new Coordinator({
-    sendSpring: () => {},
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: () => false,
-      async waitUntilReady() {
-        throw new Error("The official Zed Java extension is required and its route was not found");
-      },
-      async execute() {
-        throw new Error("official Java rejected command");
-      },
-    },
-    worktree: "/tmp/project",
-    javaHandshakeGraceMs: 0,
-    classpathRetryMs: 1,
-  });
-
-  coordinator.observeZedMessage({ jsonrpc: "2.0", method: "initialized", params: {} });
-
-  const notice = await waitFor(
-    zedWrites,
-    (message) => message.method === "window/showMessage",
-    "java not started notice",
-  );
-  assert.match(notice.params.message, /has not started/);
-  assert.match(notice.params.message, /Open any \.java file/);
-  // It must not borrow the compatibility-failure framing.
-  assert.ok(!/compatibility report/.test(notice.params.message));
-  assert.ok(
-    !zedWrites.some((message) => message.method === "window/showMessageRequest"),
-    "no compatibility report popup",
-  );
-  await coordinator.close();
-});
 
 test("Spring shutdown result is normalized to the LSP null contract", async () => {
   const zedWrites = [];
@@ -1354,6 +1027,114 @@ test("Spring shutdown result is normalized to the LSP null contract", async () =
   coordinator.observeZedMessage({ jsonrpc: "2.0", id: 9, method: "shutdown" });
   await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: 9, result: "OK" });
   assert.deepEqual(zedWrites, [{ jsonrpc: "2.0", id: 9, result: null }]);
+});
+
+test("configure run/debug dispatch emits bounded D007 protocol evidence", async () => {
+  const evidence = [];
+  const zedWrites = [];
+  const coordinator = new Coordinator({
+    sendSpring() {},
+    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
+    worktree: "/tmp/project",
+    requestTimeoutMs: 5,
+    protocolEvidence: (event) => evidence.push(event),
+  });
+  assert.equal(coordinator.observeZedMessage({ ...CONFIGURE_COMMAND }), false);
+  assert.deepEqual(evidence, [{ event: "configure-boot-run-command" }]);
+  assert.deepEqual(zedWrites[0], { jsonrpc: "2.0", id: "cmd-1", result: null });
+  coordinator.beginClose();
+  await coordinator.close();
+});
+
+test("code-action evidence identifies the exact configure run/debug command payload", () => {
+  const uri = "file:///tmp/project/FixtureApplication.java";
+  assert.deepEqual(
+    codeActionResultEvidence([
+      { title: "Existing quick fix" },
+      {
+        title: "Spring Boot: Configure run/debug for a project…",
+        command: {
+          command: "zed-spring-tools.configure-boot-run",
+          arguments: [{ uri }],
+        },
+      },
+      { title: "Spring Boot: Show this file's Boot project info" },
+    ], uri),
+    {
+      itemCount: 3,
+      configureBootRunPresent: true,
+      configureBootRunIndex: 1,
+      configureBootRunCommand: "zed-spring-tools.configure-boot-run",
+      configureBootRunArgumentUriMatchesRequest: true,
+    },
+  );
+  assert.deepEqual(
+    codeActionResultEvidence([{ title: "Existing quick fix" }], uri),
+    {
+      itemCount: 1,
+      configureBootRunPresent: false,
+      configureBootRunIndex: null,
+      configureBootRunCommand: null,
+      configureBootRunArgumentUriMatchesRequest: false,
+    },
+  );
+  assert.equal(
+    codeActionResultEvidence([{
+      title: "Spring Boot: Configure run/debug for a project…",
+      command: {
+        command: "zed-spring-tools.configure-boot-run",
+        arguments: [{ uri: "file:///wrong.java" }],
+      },
+    }], uri).configureBootRunArgumentUriMatchesRequest,
+    false,
+  );
+});
+
+test("completion evidence reports only authentic completion items", () => {
+  assert.deepEqual(
+    completionResultEvidence([
+      { label: "server.address" },
+      { label: "server.port" },
+    ]),
+    { itemCount: 2, serverPort: true },
+  );
+  assert.deepEqual(
+    completionResultEvidence({
+      isIncomplete: false,
+      items: [{ label: "server.error.include-message" }],
+    }),
+    { itemCount: 1, serverPort: false },
+  );
+  assert.deepEqual(
+    completionResultEvidence({ items: [{ label: "other", insertText: "server.port" }] }),
+    { itemCount: 1, serverPort: true },
+  );
+  assert.deepEqual(completionResultEvidence(null), { itemCount: 0, serverPort: false });
+});
+
+test("Zed input observer sees completion before forwarding", async () => {
+  const input = new PassThrough();
+  const observed = [];
+  const forwarded = [];
+  let stopped = 0;
+  monitorZedInput(
+    input,
+    { observeZedMessage: () => true },
+    (bytes) => forwarded.push(decodeSingle(bytes)),
+    () => { stopped += 1; },
+    () => {},
+    (message) => observed.push(message),
+  );
+  input.end(encodeForTest({
+    jsonrpc: "2.0",
+    id: "completion-1",
+    method: "textDocument/completion",
+    params: { textDocument: { uri: "file:///tmp/project/application.properties" } },
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(observed[0].method, "textDocument/completion");
+  assert.equal(forwarded[0].method, "textDocument/completion");
+  assert.equal(stopped, 1);
 });
 
 test("Zed input EOF requests coordinator shutdown", async () => {
@@ -1381,21 +1162,221 @@ test("Zed input EOF requests coordinator shutdown", async () => {
   assert.equal(stopped, 1);
 });
 
+test("D007 protocol evidence is opt-in and confined to the disposable worktree", () => {
+  assert.equal(d007ProtocolEvidenceFile("/tmp/worktree", {}), null);
+  assert.equal(
+    d007ProtocolEvidenceFile("/tmp/worktree", {
+      ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1",
+    }),
+    path.join("/tmp/worktree", ".d007", "coordinator-protocol.jsonl"),
+  );
+});
+
+test("coordinator rejects a single-file worktree with an explicit boundary error", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-single-file-root-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const worktreeFile = path.join(root, "FixtureApplication.java");
+  const springHome = path.join(root, "spring");
+  fs.writeFileSync(worktreeFile, "class FixtureApplication {}\n");
+  fs.mkdirSync(springHome);
+  const java = path.join(root, "java");
+  const springServer = path.join(springHome, "spring-boot-language-server-standalone-exec.jar");
+  fs.writeFileSync(java, "fake");
+  fs.writeFileSync(springServer, "fake");
+
+  await assert.rejects(
+    run([
+      "--worktree", worktreeFile,
+      "--java", java,
+      "--spring-server", springServer,
+      "--spring-home", springHome,
+      "--host-os", "macos",
+      "--extension-version", "0.1.0-alpha.1",
+      "--automatic-live-connection", "false",
+      "--mcp-server-port", "off",
+    ], {
+      input: new PassThrough(),
+      output: new PassThrough(),
+      errorOutput: new PassThrough(),
+      spawnSync: () => ({ status: 0, stdout: "", stderr: 'openjdk version "25.0.3"' }),
+      spawn: () => { throw new Error("Spring child must not start for a single-file worktree"); },
+    }),
+    /single-file worktrees are unsupported by the standalone Spring project model/,
+  );
+});
+
+test("coordinator run records bounded D007 completion and index evidence", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-d007-protocol-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const worktree = path.join(root, "worktree");
+  const springHome = path.join(root, "spring");
+  fs.mkdirSync(worktree);
+  fs.mkdirSync(springHome);
+  const java = path.join(root, "java");
+  const springServer = path.join(springHome, "spring-boot-language-server-standalone-exec.jar");
+  fs.writeFileSync(java, "fake");
+  fs.writeFileSync(springServer, "fake");
+
+  const child = new EventEmitter();
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.exitCode = null;
+  child.kill = () => {
+    child.exitCode = 0;
+    child.emit("exit", 0);
+  };
+  const forwarded = [];
+  child.stdin.on("data", (chunk) => forwarded.push(...new LspDecoder().push(chunk)));
+
+  const input = new PassThrough();
+  await run([
+    "--worktree", worktree,
+    "--java", java,
+    "--spring-server", springServer,
+    "--spring-home", springHome,
+    "--host-os", "macos",
+    "--extension-version", "0.1.0-alpha.1",
+    "--automatic-live-connection", "false",
+    "--mcp-server-port", "off",
+  ], {
+    input,
+    output: new PassThrough(),
+    errorOutput: new PassThrough(),
+    environment: { ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1" },
+    spawnSync: () => ({ status: 0, stdout: "", stderr: 'openjdk version "25.0.3"' }),
+    spawn: () => child,
+  });
+
+  input.write(encodeForTest({
+    jsonrpc: "2.0",
+    id: "completion-d007",
+    method: "textDocument/completion",
+    params: {
+      textDocument: { uri: "file:///tmp/application.properties" },
+      position: { line: 0, character: 3 },
+    },
+  }));
+  await waitFor(
+    forwarded,
+    (message) => message.method === "textDocument/completion",
+    "forwarded D007 completion request",
+  );
+
+  child.stdout.write(encodeForTest({
+    jsonrpc: "2.0",
+    id: "completion-d007",
+    result: {
+      isIncomplete: false,
+      items: [{ label: "server.port" }, { label: "server.address" }],
+    },
+  }));
+  child.stdout.write(encodeForTest({
+    jsonrpc: "2.0",
+    method: "spring/index/updated",
+    params: { affectedProjects: ["fixture"] },
+  }));
+
+  const evidenceFile = path.join(worktree, ".d007", "coordinator-protocol.jsonl");
+  const deadline = Date.now() + 1000;
+  while ((!fs.existsSync(evidenceFile) || fs.readFileSync(evidenceFile, "utf8").trim().split("\n").length < 4) && Date.now() < deadline) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  const events = fs.readFileSync(evidenceFile, "utf8").trim().split("\n").map(JSON.parse);
+  assert.deepEqual(events.map((event) => event.event), [
+    "coordinator-start",
+    "completion-request",
+    "completion-response",
+    "spring-index-updated",
+  ]);
+  assert.equal(events[0].coordinatorPid, process.pid);
+  assert.equal(typeof events[0].coordinatorSession, "string");
+  assert.equal(events[1].uri, "file:///tmp/application.properties");
+  assert.equal(events[1].line, 0);
+  assert.equal(events[1].character, 3);
+  assert.equal(events[2].uri, "file:///tmp/application.properties");
+  assert.equal(events[2].line, 0);
+  assert.equal(events[2].character, 3);
+  assert.equal(events[2].itemCount, 2);
+  assert.equal(events[2].serverPort, true);
+  assert.equal(events[2].error, false);
+  assert.equal(events[3].affectedProjectCount, 1);
+
+  input.end();
+});
+
+test("D007 lifecycle evidence distinguishes Zed shutdown from Spring child exit", async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-d007-lifecycle-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const worktree = path.join(root, "worktree");
+  const springHome = path.join(root, "spring");
+  fs.mkdirSync(worktree);
+  fs.mkdirSync(springHome);
+  const java = path.join(root, "java");
+  const springServer = path.join(springHome, "spring-boot-language-server-standalone-exec.jar");
+  fs.writeFileSync(java, "fake");
+  fs.writeFileSync(springServer, "fake");
+
+  const child = new EventEmitter();
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.exitCode = null;
+  child.pid = 4242;
+  child.kill = () => {
+    child.exitCode = 0;
+    child.emit("exit", 0);
+  };
+  const input = new PassThrough();
+  await run([
+    "--worktree", worktree,
+    "--java", java,
+    "--spring-server", springServer,
+    "--spring-home", springHome,
+    "--host-os", "macos",
+    "--extension-version", "0.1.0-alpha.1",
+    "--automatic-live-connection", "false",
+    "--mcp-server-port", "off",
+  ], {
+    input,
+    output: new PassThrough(),
+    errorOutput: new PassThrough(),
+    environment: { ZED_SPRING_TOOLS_D007_PROTOCOL_EVIDENCE: "1" },
+    spawnSync: () => ({ status: 0, stdout: "", stderr: 'openjdk version "25.0.3"' }),
+    spawn: () => child,
+  });
+
+  input.end();
+
+  const evidenceFile = path.join(worktree, ".d007", "coordinator-protocol.jsonl");
+  const deadline = Date.now() + 1000;
+  let events = [];
+  while (Date.now() < deadline) {
+    if (fs.existsSync(evidenceFile)) {
+      events = fs.readFileSync(evidenceFile, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+      if (events.some((event) => event.event === "spring-child-exit")) break;
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  const names = events.map((event) => event.event);
+  assert.deepEqual(names, ["coordinator-start", "coordinator-stop", "spring-child-exit"]);
+  assert.equal(events[1].reason, "zed-input-end");
+  assert.equal(events[1].killChild, true);
+  assert.equal(events[2].springPid, 4242);
+  assert.equal(events[2].exitCode, 0);
+});
+
 test("coordinator run kills the Spring child when Zed stdin reaches EOF", async (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zed-spring-lifecycle-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const worktree = path.join(root, "worktree");
   const springHome = path.join(root, "spring");
-  const javaWork = path.join(root, "java-work");
   fs.mkdirSync(worktree);
   fs.mkdirSync(springHome);
-  fs.mkdirSync(javaWork);
   const java = path.join(root, "java");
-  const springServer = path.join(springHome, "spring-boot-language-server-2.3.0-SNAPSHOT-exec.jar");
-  const compatibilityFile = path.join(root, "java-providers.json");
+  const springServer = path.join(springHome, "spring-boot-language-server-standalone-exec.jar");
   fs.writeFileSync(java, "fake");
   fs.writeFileSync(springServer, "fake");
-  fs.writeFileSync(compatibilityFile, JSON.stringify(compatibility));
 
   const child = new EventEmitter();
   child.stdin = new PassThrough();
@@ -1414,8 +1395,6 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
     "--java", java,
     "--spring-server", springServer,
     "--spring-home", springHome,
-    "--java-work-dir", javaWork,
-    "--compatibility", compatibilityFile,
     "--host-os", "macos",
     "--extension-version", "0.1.0-alpha.1",
     "--automatic-live-connection", "false",
@@ -1433,170 +1412,21 @@ test("coordinator run kills the Spring child when Zed stdin reaches EOF", async 
   assert.equal(child.killCount, 1);
 });
 
-test("classpath bridge registers, relays one real callback, and removes", async () => {
-  const springWrites = [];
-  const javaCalls = [];
-  const transport = {
-    supportsSpringClientMethod: () => false,
-    async execute(command, arguments_) {
-      javaCalls.push({ command, arguments: arguments_ });
-      return "ok";
-    },
-  };
-  const coordinator = new Coordinator({
-    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed() {},
-    javaTransport: transport,
-    worktree: "/tmp/product fixture",
-  });
-  const callbackId = "sts4.classpath.AbCdEfGh";
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "add",
-    method: "sts/addClasspathListener",
-    params: { callbackCommandId: callbackId, batched: true },
-  });
-  assert.equal(springWrites.shift().result, "ok");
-  assert.equal(javaCalls[0].command, "zed.spring.bridge.v1.addClasspathListener");
-  const registration = javaCalls[0].arguments[0];
 
-  const callback = fetch(registration.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${registration.credential}`,
-      "Content-Type": "application/json",
-      "X-Zed-Spring-Worktree": registration.worktreeId,
-    },
-    body: JSON.stringify({
-      schemaVersion: 1,
-      requestId: 1,
-      callbackId,
-      worktreeId: registration.worktreeId,
-      arguments: ["project", "name", [], [], [], "java-21"],
-    }),
-  });
-  while (springWrites.length === 0) {
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  const internal = springWrites.shift();
-  assert.equal(internal.method, "workspace/executeCommand");
-  assert.equal(internal.params.command, callbackId);
-  await coordinator.handleSpringMessage({ jsonrpc: "2.0", id: internal.id, result: "accepted" });
-  const callbackResponse = await callback;
-  assert.equal(callbackResponse.status, 200);
-  assert.deepEqual(await callbackResponse.json(), { result: "ok" });
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "remove",
-    method: "sts/removeClasspathListener",
-    params: { callbackCommandId: callbackId, batched: false },
-  });
-  assert.equal(springWrites.shift().result, "ok");
-  assert.equal(javaCalls[1].command, "zed.spring.bridge.v1.removeClasspathListener");
-  assert.deepEqual(javaCalls[1].arguments[0], registration);
-});
-
-test("owned classpath capability registration stays internal to preserve Spring commands", async () => {
-  const springWrites = [];
-  const zedWrites = [];
-  const coordinator = new Coordinator({
-    sendSpring: (bytes) => springWrites.push(decodeSingle(bytes)),
-    sendZed: (bytes) => zedWrites.push(decodeSingle(bytes)),
-    javaTransport: {
-      supportsSpringClientMethod: () => false,
-      async execute() {
-        return "ok";
-      },
-    },
-    worktree: "/tmp/project",
-  });
-  const callbackId = "sts4.classpath.AbCdEfGh";
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "register",
-    method: "client/registerCapability",
-    params: {
-      registrations: [
-        {
-          id: "classpath-registration",
-          method: "workspace/executeCommand",
-          registerOptions: { commands: [callbackId] },
-        },
-      ],
-    },
-  });
-  assert.deepEqual(zedWrites, []);
-  assert.deepEqual(springWrites.shift(), {
-    jsonrpc: "2.0",
-    id: "register",
-    result: null,
-  });
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "unregister",
-    method: "client/unregisterCapability",
-    params: {
-      unregisterations: [
-        { id: "classpath-registration", method: "workspace/executeCommand" },
-      ],
-    },
-  });
-  assert.deepEqual(zedWrites, []);
-  assert.deepEqual(springWrites.shift(), {
-    jsonrpc: "2.0",
-    id: "unregister",
-    result: null,
-  });
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "other-registration",
-    method: "client/registerCapability",
-    params: {
-      registrations: [
-        {
-          id: "watched-files",
-          method: "workspace/didChangeWatchedFiles",
-          registerOptions: { watchers: [] },
-        },
-      ],
-    },
-  });
-  assert.equal(zedWrites.length, 1);
-  assert.equal(zedWrites[0].id, "other-registration");
-
-  await coordinator.handleSpringMessage({
-    jsonrpc: "2.0",
-    id: "lookalike-registration",
-    method: "client/registerCapability",
-    params: {
-      registrations: [
-        {
-          id: "numeric-classpath-callback",
-          method: "workspace/executeCommand",
-          registerOptions: { commands: ["sts4.classpath.12345678"] },
-        },
-      ],
-    },
-  });
-  assert.equal(zedWrites.length, 2);
-  assert.equal(zedWrites[1].id, "lookalike-registration");
-});
 
 function encodeForTest(message) {
   const body = Buffer.from(JSON.stringify(message), "utf8");
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]);
 }
 
-async function waitFor(list, predicate, label) {
-  for (let attempt = 0; attempt < 1000; attempt += 1) {
+async function waitFor(list, predicate, label, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs;
+  do {
     const found = list.find(predicate);
     if (found !== undefined) return found;
     await new Promise((resolve) => setImmediate(resolve));
-  }
-  throw new Error(`timed out waiting for ${label}`);
+  } while (Date.now() < deadline);
+  throw new Error(`timed out waiting for ${label} after ${timeoutMs}ms`);
 }
 
 function makeWorktree() {

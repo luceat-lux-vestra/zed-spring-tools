@@ -8,7 +8,7 @@ Tools section below.
 
 ## No third-party runtime binaries in Git
 
-The repository does not contain the Spring Tools VSIX or extracted JARs, JDT LS,
+The repository does not contain the Spring Tools standalone JAR or extracted JARs, JDT LS,
 the official Zed Java extension or proxy binary, a Zed application, generated
 WASM, or other acquired runtime artifacts. Local experiments keep those inputs
 and their evidence under ignored `tmp/` paths.
@@ -32,9 +32,9 @@ included, and the accepted product architecture does not use either patch.
 
 ## Spring Tools experiment inputs
 
-This extension downloads the unchanged official Spring Tools VSIX as a separately
+This extension downloads the unchanged official Spring Tools standalone JAR as a separately
 acquired, pinned, checksum-verified input. The pin is **`5.3.0.RELEASE`**
-(`vscode-spring-boot-2.3.0-RC2.vsix`) since 2026-08-01; the local PoC and every
+(`spring-boot-language-server-standalone-exec.jar`) since 2026-08-01; the local PoC and every
 gate before that date used `5.2.0.RELEASE` (`vscode-spring-boot-2.2.0-RC1.vsix`).
 Neither VSIX nor its extracted content is committed here, and this repository's
 eventual project license will not relicense it.
@@ -51,13 +51,13 @@ language server jar carries `META-INF/third-party-open-source-licenses.txt`, a
 per-artifact list naming groupId, artifactId, version and license: **243
 artifacts in `5.3.0.RELEASE`** and 244 in `5.2.0.RELEASE`, the difference being
 the dependency movement the refresh audit recorded. An earlier version of this
-file said no such inventory existed; that was read from the VSIX tree, which has
+file said no such inventory existed; that was read from the standalone JAR tree, which has
 no package-level notice file, and it missed the one inside the jar.
 
 What is still missing is coverage of the rest of the package: the seven other
 bundled jars — `commons-lsp-extensions`, `jdt-ls-commons`, `jdt-ls-extension`,
 `xml-ls-extension`, `sts-gradle-tooling`, `reactor-core` and
-`reactive-streams` — carry no notice or license file of their own, and the VSIX
+`reactive-streams` — carry no notice or license file of their own, and the standalone JAR
 has none at the package level. So the inventory is real but partial, which is
 not the same as absent and still not enough to approve project-operated
 repackaging or mirroring. The current low-risk boundary is user-supplied or
