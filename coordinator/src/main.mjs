@@ -3798,10 +3798,17 @@ export async function run(arguments_, dependencies = {}) {
 // The extension resolves both user settings into this single value, so the
 // decision lives in one place: a number means the user opted in, and `null`
 // means the default, which keeps this vector byte-identical to the pre-MCP one.
-export function springArguments(server, projectDirectory, mcpServerPort = null) {
+export function springArguments(
+  server,
+  projectDirectory,
+  mcpServerPort = null,
+  hostPlatform = process.platform,
+) {
   if (typeof projectDirectory !== "string" || projectDirectory.length === 0) {
     throw new Error("standalone Spring Tools project directory is required");
   }
+  const standaloneProjectDirectory =
+    hostPlatform === "win32" ? "." : projectDirectory;
   return [
     "-Xmx1024m",
     "-Dspring.config.location=classpath:/application.properties",
@@ -3810,15 +3817,12 @@ export function springArguments(server, projectDirectory, mcpServerPort = null) 
       ? "-Dspring.main.web-application-type=NONE"
       : `-Dserver.port=${mcpServerPort}`,
     "-Xlog:jni+resolve=off",
-    // The Java process is always spawned with cwd = the exact worktree. Keep the
-    // standalone project-dir property cwd-relative rather than duplicating the
-    // absolute path into JVM argv: on Windows the launcher can lossy-convert
-    // non-ASCII command-line text, turning a Unicode worktree into literal '?'
-    // characters before Spring's StandaloneSettingsLoader calls Paths.get().
-    // "." preserves the same project root for both LegacyJavaProjectsService and
-    // .claude settings loading while the LSP workspace URI remains the original
-    // exact worktree path.
-    "-Dspring.boot.ls.project.dir=.",
+    // Windows CI proved that a non-ASCII absolute worktree can be lossy in JVM
+    // argv before Spring reads this system property, so Windows anchors it to
+    // the exact child cwd. POSIX keeps the exact absolute path: on macOS a cwd
+    // under /var is exposed by Java as /private/var, and "." would let Spring
+    // import the same physical project twice under those two URI identities.
+    `-Dspring.boot.ls.project.dir=${standaloneProjectDirectory}`,
     "-jar",
     server,
   ];
