@@ -1905,16 +1905,17 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
     };
 
     let promptMode = "none";
+    let exactLocalProcessLabel;
     const responder = (message) => {
       const actions = message.params?.actions ?? [];
       const titles = actions.map((action) => String(action?.title ?? ""));
       let selected = null;
-      if (promptMode === "connect-local") {
-        selected = titles.find((title) => title.startsWith("Connect — "));
-      } else if (promptMode === "refresh-local") {
-        selected = titles.find((title) => title.startsWith("Refresh — "));
-      } else if (promptMode === "disconnect-local") {
-        selected = titles.find((title) => title.startsWith("Disconnect — "));
+      if (promptMode === "connect-local" && exactLocalProcessLabel !== undefined) {
+        selected = titles.find((title) => title === `Connect — ${exactLocalProcessLabel}`);
+      } else if (promptMode === "refresh-local" && exactLocalProcessLabel !== undefined) {
+        selected = titles.find((title) => title === `Refresh — ${exactLocalProcessLabel}`);
+      } else if (promptMode === "disconnect-local" && exactLocalProcessLabel !== undefined) {
+        selected = titles.find((title) => title === `Disconnect — ${exactLocalProcessLabel}`);
       } else if (promptMode === "connect-remote") {
         selected = titles.find(
           (title) => title.startsWith("Connect — ") && title.includes("d007-remote"),
@@ -1958,6 +1959,12 @@ async function runStandaloneLiveRegression(jar, javaHome, runRoot) {
       "zed-spring-tools-fixture",
       "exact Boot JVM must carry the production spring.boot.project.name launch argument",
     );
+    assert.equal(
+      String(localDescriptor.label).includes(`(pid: ${appProcessKey})`),
+      true,
+      "local live-process prompt label must identify the exact spawned Boot JVM",
+    );
+    exactLocalProcessLabel = localDescriptor.label;
 
     promptMode = "connect-local";
     const notificationStart = client.notifications.length;
