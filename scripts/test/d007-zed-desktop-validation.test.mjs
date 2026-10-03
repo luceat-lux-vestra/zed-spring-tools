@@ -48,4 +48,16 @@ test("D007 desktop DAP retries with fresh modal and preserves source integrity",
   assert.equal(source.includes("DAP picker query modified the Java source"), true);
   assert.equal(source.includes("timeout: 15_000"), true);
   assert.equal(source.includes("timedOut: result.error?.code === \"ETIMEDOUT\""), true);
+  assert.equal(source.includes('setPhase("maven-dap-java-readiness")'), true);
+  assert.equal(source.includes("waitForJavaDapReadinessMacos("), true);
+  assert.equal(
+    source.includes("java-extension-dap-registry-not-ready"),
+    true,
+    "DAP automation must fail closed instead of opening the picker before Java is active",
+  );
+  assert.equal(
+    source.includes("same DAP Zed process"),
+    true,
+    "DAP readiness must be proven in the cold process that owns the picker",
+  );
 });
