@@ -92,6 +92,23 @@ test("the MCP port is the only thing that changes the Spring launch vector", () 
   );
 });
 
+test("standalone project-dir JVM argument is cwd-relative and Unicode-safe", () => {
+  const project = process.platform === "win32"
+    ? "C:\\tmp\\workspace space 한글"
+    : "/tmp/workspace space 한글";
+  const args = springArguments("/tmp/spring/server.jar", project, null);
+  assert.ok(args.includes("-Dspring.boot.ls.project.dir=."));
+  assert.equal(
+    args.some((argument) => argument.includes(project)),
+    false,
+    "the absolute worktree must stay out of JVM argv; run() carries it as child cwd",
+  );
+  assert.throws(
+    () => springArguments("/tmp/spring/server.jar", "", null),
+    /standalone Spring Tools project directory is required/,
+  );
+});
+
 test("environment allowlist excludes unrelated secrets", () => {
   assert.deepEqual(sanitizedEnvironment({ PATH: "/bin", SECRET_TOKEN: "no" }), { PATH: "/bin" });
 });
