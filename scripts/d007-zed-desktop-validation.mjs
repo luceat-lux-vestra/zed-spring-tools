@@ -311,6 +311,13 @@ function runMacos(javaProfile, root, javaHome, { manualDevInstall = false } = {}
     });
     setPhase("maven-dap-zed-readiness");
     waitForZedReady(manifest, "maven", 45_000);
+    setPhase("maven-dap-java-readiness");
+    waitForJavaDapReadinessMacos(
+      manifest,
+      "maven",
+      dapJavaRelative,
+      120_000,
+    );
     setPhase("maven-dap-interaction");
     runDesktopDapRegressionMacos(root, "maven", 180_000);
     setPhase("maven-dap-shutdown");
@@ -1820,6 +1827,88 @@ function waitForLanguageServerPreflightMacos(
   );
   throw new Error(
     "language-server preflight did not prove both JDT LS and standalone Spring Tools ready before functional validation",
+  );
+}
+
+function waitForJavaDapReadinessMacos(
+  manifest,
+  fixtureKind,
+  javaRelative,
+  timeoutMs,
+) {
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.role,
+    "dap",
+    "Java DAP readiness must run in the dedicated DAP foreground process",
+  );
+  const javaFile = path.join(manifest.worktrees[fixtureKind], javaRelative);
+  requireFile(javaFile, fixtureKind + " DAP Java target");
+
+  const started = Date.now();
+  let processes = {
+    jdtls: { observed: false, pid: null },
+    springTools: { observed: false, pid: null },
+  };
+  while (Date.now() - started < timeoutMs) {
+    const ps = spawnSync(
+      "/bin/ps",
+      ["-axo", "pid=,pgid=,stat=,command="],
+      { encoding: "utf8" },
+    );
+    if (ps.status !== 0) {
+      throw new Error(
+        "ps failed while checking Java DAP readiness: " + bounded(ps.stderr),
+      );
+    }
+    processes = languageServerProcessReadiness(ps.stdout, processRecord.pid);
+    if (processes.jdtls.observed) {
+      const evidence = {
+        sourceHead: manifest.sourceHead,
+        fixture: fixtureKind,
+        observedAt: new Date().toISOString(),
+        targetRelativePath: javaRelative,
+        jdtlsProcess: processes.jdtls,
+        semantics: {
+          sameForegroundProcess: true,
+          javaExtensionActivated:
+            "the official Java extension has started JDT LS in the same cold Zed process that will open the debugger picker",
+          dapRegistryBarrier:
+            "Java DAP registration belongs to the Java extension load transaction, so debugger picker automation starts only after that extension is demonstrably active",
+        },
+        status: "PASS",
+      };
+      fs.writeFileSync(
+        path.join(manifest.evidence, fixtureKind + "-dap-java-readiness.json"),
+        JSON.stringify(evidence, null, 2) + "\n",
+        { mode: 0o600 },
+      );
+      process.stdout.write(
+        "[D007] Java DAP readiness: official Java extension/JDT LS is active in the same DAP Zed process.\n",
+      );
+      return evidence;
+    }
+    sleepMs(250);
+  }
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    targetRelativePath: javaRelative,
+    jdtlsProcess: processes.jdtls,
+    classification: "java-extension-dap-registry-not-ready",
+    status: "FAIL",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, fixtureKind + "-dap-java-readiness-failure.json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  throw new Error(
+    "official Java extension/JDT LS did not become ready in the DAP Zed process; do not open the debugger picker before Java DAP registration",
   );
 }
 
