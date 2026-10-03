@@ -145,7 +145,12 @@ inside this extension's own work directory.
    alone; and
 10. the exact source commit intended for Registry submission is loaded and
    exercised as a Zed dev extension through the isolated D007 acceptance gate in
-   [`docs/d007-zed-desktop-validation.md`](../d007-zed-desktop-validation.md).
+   [`docs/d007-zed-desktop-validation.md`](../d007-zed-desktop-validation.md);
+   and
+11. the standalone launch remains functional when the worktree path contains
+   spaces and non-ASCII characters. The exact worktree is the Java child's
+   native working directory; `spring.boot.ls.project.dir` is cwd-relative so
+   Windows does not have to round-trip that Unicode path through JVM argv.
 
 The six-platform CI matrix is headless portability/runtime evidence. It is not a
 substitute for item 5 and must not be described as full Zed desktop evidence.
