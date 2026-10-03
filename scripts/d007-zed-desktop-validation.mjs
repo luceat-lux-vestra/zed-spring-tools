@@ -618,32 +618,16 @@ function runStandaloneOfflineRegressionMacos(
     });
     missingLaunchStarted = true;
     waitForZedReady(manifest, fixtureKind, 45_000);
-    const missingRecord = JSON.parse(
-      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
-    );
-    const missingFailure = waitForOfflineDownloadFailure(
-      missingRecord.logPath,
-      missingRecord.logStartOffset,
-      pin.tag,
-      60_000,
-    );
-    const missingProtocolDelta = readFileDelta(protocolFile, missingProtocolStart);
-    assert.equal(
-      protocolEvidenceEvents(missingProtocolDelta)
-        .some((event) => event.event === "coordinator-start"),
-      false,
-      "first install without network must not enter a reduced coordinator mode",
-    );
-    assert.equal(
-      fs.existsSync(artifact),
-      false,
-      "first-install offline failure must not create a usable artifact",
-    );
-    assert.equal(
-      fs.existsSync(artifact + ".download"),
-      false,
-      "first-install offline failure must not leave a partial staging artifact",
-    );
+    const missingFailure = observeOfflineSpringFailClosedMacos({
+      manifest,
+      fixtureKind,
+      protocolFile,
+      protocolStart: missingProtocolStart,
+      artifact,
+      expectedArtifact: "missing",
+      evidenceName: "offline-first-install-fail-closed",
+      timeoutMs: 30_000,
+    });
     stopAndWaitZed(root, manifest, 10_000, 5_000);
     missingLaunchStarted = false;
 
@@ -686,32 +670,17 @@ function runStandaloneOfflineRegressionMacos(
     });
     corruptLaunchStarted = true;
     waitForZedReady(manifest, fixtureKind, 45_000);
-    const corruptRecord = JSON.parse(
-      fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
-    );
-    const failure = waitForOfflineDownloadFailure(
-      corruptRecord.logPath,
-      corruptRecord.logStartOffset,
-      pin.tag,
-      60_000,
-    );
-    const corruptProtocolDelta = readFileDelta(protocolFile, corruptProtocolStart);
-    assert.equal(
-      protocolEvidenceEvents(corruptProtocolDelta)
-        .some((event) => event.event === "coordinator-start"),
-      false,
-      "corrupt standalone artifact must not enter a reduced coordinator mode offline",
-    );
-    assert.equal(
-      sha256File(artifact),
-      corruptDigest,
-      "failed offline repair must not replace the corrupt installation with unverified bytes",
-    );
-    assert.equal(
-      fs.existsSync(artifact + ".download"),
-      false,
-      "failed standalone download must not leave a partial staging artifact",
-    );
+    const failure = observeOfflineSpringFailClosedMacos({
+      manifest,
+      fixtureKind,
+      protocolFile,
+      protocolStart: corruptProtocolStart,
+      artifact,
+      expectedArtifact: "corrupt",
+      expectedDigest: corruptDigest,
+      evidenceName: "offline-corrupt-fail-closed",
+      timeoutMs: 30_000,
+    });
     stopAndWaitZed(root, manifest, 10_000, 5_000);
     corruptLaunchStarted = false;
 
@@ -751,10 +720,10 @@ function runStandaloneOfflineRegressionMacos(
           networkDenialProbe: "PASS",
           warmCachedStartup: warm.status,
           firstInstallOfflineFailClosed: "PASS",
-          firstInstallFailureMarker: missingFailure.marker,
+          firstInstallOfflineProof: missingFailure,
           firstInstallOnlineRecovery: firstRecovery.status,
           corruptOfflineFailClosed: "PASS",
-          corruptFailureMarker: failure.marker,
+          corruptOfflineProof: failure,
           partialDownloadAbsent: true,
           onlineRepair: repair.status,
           repairedPinnedChecksum: true,
@@ -927,23 +896,145 @@ function waitForFreshSpringCompletionMacos(
   return evidence;
 }
 
-function waitForOfflineDownloadFailure(logFile, start, tag, timeoutMs) {
-  const markers = [
-    "download pinned Spring Tools " + tag,
-    "Failed to run spring-tools",
-    "Operation not permitted",
-  ];
-  let marker = null;
-  waitUntil(
-    () => {
-      const text = readFileDelta(logFile, start);
-      marker = markers.find((candidate) => text.includes(candidate)) ?? null;
-      return marker !== null;
-    },
-    "fail-closed standalone download error under outbound network denial",
-    timeoutMs,
+function observeOfflineSpringFailClosedMacos({
+  manifest,
+  fixtureKind,
+  protocolFile,
+  protocolStart,
+  artifact,
+  expectedArtifact,
+  expectedDigest = null,
+  evidenceName,
+  timeoutMs,
+}) {
+  assert.ok(
+    expectedArtifact === "missing" || expectedArtifact === "corrupt",
+    "offline artifact expectation must be missing or corrupt",
   );
-  return { marker };
+  if (expectedArtifact === "missing") {
+    assert.equal(
+      fs.existsSync(artifact),
+      false,
+      "offline first-install proof must begin without a standalone artifact",
+    );
+  } else {
+    requireFile(artifact, "corrupt standalone artifact before offline repair");
+    assert.equal(
+      sha256File(artifact),
+      expectedDigest,
+      "offline corrupt-repair proof must begin from the expected corrupt digest",
+    );
+  }
+
+  const processRecord = JSON.parse(
+    fs.readFileSync(path.join(manifest.evidence, "zed-process.json"), "utf8"),
+  );
+  assert.equal(
+    processRecord.networkPolicy,
+    "loopback-only",
+    "offline fail-closed proof requires the loopback-only sandbox",
+  );
+
+  // The target is a Properties document whose staged language-server list is
+  // spring-tools only. Drive a real public completion action so this proof does
+  // not rely on a passive document-open race or on Zed's internal error strings.
+  triggerCompletionMacos(
+    manifest,
+    fixtureKind,
+    evidenceName + "-activation-probe",
+  );
+
+  const started = Date.now();
+  let coordinatorStarted = false;
+  let artifactObserved = fs.existsSync(artifact);
+  let stagingObserved = fs.existsSync(artifact + ".download");
+  let finalDigest = artifactObserved ? sha256File(artifact) : null;
+
+  while (Date.now() - started < timeoutMs) {
+    const delta = readFileDelta(protocolFile, protocolStart);
+    coordinatorStarted = protocolEvidenceEvents(delta)
+      .some((event) => event.event === "coordinator-start");
+    if (coordinatorStarted) {
+      throw new Error(
+        evidenceName +
+          ": Spring coordinator started under outbound network denial",
+      );
+    }
+
+    artifactObserved = fs.existsSync(artifact);
+    stagingObserved = stagingObserved || fs.existsSync(artifact + ".download");
+
+    if (expectedArtifact === "missing" && artifactObserved) {
+      throw new Error(
+        evidenceName +
+          ": standalone artifact became usable under outbound network denial",
+      );
+    }
+    if (expectedArtifact === "corrupt" && artifactObserved) {
+      finalDigest = sha256File(artifact);
+      if (finalDigest !== expectedDigest) {
+        throw new Error(
+          evidenceName +
+            ": corrupt standalone artifact changed under outbound network denial",
+        );
+      }
+    }
+
+    sleepMs(250);
+  }
+
+  const stagingPresentAtEnd = fs.existsSync(artifact + ".download");
+  assert.equal(
+    stagingPresentAtEnd,
+    false,
+    evidenceName + ": failed offline acquisition must not leave a staging artifact",
+  );
+
+  const artifactPresentAtEnd = fs.existsSync(artifact);
+  if (expectedArtifact === "missing") {
+    assert.equal(
+      artifactPresentAtEnd,
+      false,
+      evidenceName + ": offline first install must remain fail-closed",
+    );
+  } else {
+    assert.equal(
+      artifactPresentAtEnd,
+      true,
+      evidenceName + ": corrupt artifact must remain in place until verified online repair",
+    );
+    finalDigest = sha256File(artifact);
+    assert.equal(
+      finalDigest,
+      expectedDigest,
+      evidenceName + ": offline repair must not replace corrupt bytes",
+    );
+  }
+
+  const evidence = {
+    sourceHead: manifest.sourceHead,
+    fixture: fixtureKind,
+    observedAt: new Date().toISOString(),
+    networkPolicy: processRecord.networkPolicy,
+    activationProbe: "editor::ShowCompletions",
+    targetLanguageServers: ["spring-tools"],
+    observationMs: timeoutMs,
+    coordinatorStarted,
+    expectedArtifact,
+    artifactPresentAtEnd,
+    stagingObservedTransiently: stagingObserved,
+    stagingPresentAtEnd,
+    finalDigest,
+    proof:
+      "explicit Spring-only completion stimulus + no coordinator + no usable offline replacement; paired online recovery follows in the same lifecycle gate",
+    status: "PASS",
+  };
+  fs.writeFileSync(
+    path.join(manifest.evidence, evidenceName + ".json"),
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  return evidence;
 }
 
 function runDesktopDapRegressionMacos(root, fixtureKind, timeoutMs) {
