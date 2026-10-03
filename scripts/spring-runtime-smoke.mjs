@@ -150,13 +150,29 @@ public class StandaloneSmokeApplication {}
     assert.equal(client.serverRequests.some(m=>FORBIDDEN_PRIVATE_CALLBACKS.has(m)),false,"standalone runtime must not request the removed private Java bridge");
 
     await client.request("shutdown",null); client.notify("exit",null);
+    const exit=await waitForChildExit(child,15_000);
+    assert.equal(exit.code,0,"standalone Spring LS must exit cleanly after shutdown");
     evidence.status="pass";evidence.finishedAt=new Date().toISOString();evidence.stderrTail=stderr.split(/\r?\n/).slice(-50);
     writeEvidence(evidencePath,evidence);
     process.stdout.write(JSON.stringify(evidence,null,2)+"\n");
   }catch(error){
-    if(child&&child.exitCode===null)child.kill();
+    if(child&&child.exitCode===null){
+      child.kill();
+      await waitForChildExit(child,10_000).catch(()=>{});
+    }
     evidence.status="fail";evidence.error=error instanceof Error?`${error.name}: ${error.message}`:String(error);evidence.stderrTail=stderr.split(/\r?\n/).slice(-100);evidence.finishedAt=new Date().toISOString();writeEvidence(evidencePath,evidence);throw error;
-  }finally{fs.rmSync(runRoot,{recursive:true,force:true});}
+  }finally{fs.rmSync(runRoot,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+}
+function waitForChildExit(child,timeoutMs){
+  if(child.exitCode!==null)return Promise.resolve({code:child.exitCode,signal:child.signalCode});
+  return new Promise((resolve,reject)=>{
+    let timer;
+    const cleanup=()=>{clearTimeout(timer);child.off("exit",onExit);child.off("error",onError);};
+    const onExit=(code,signal)=>{cleanup();resolve({code,signal});};
+    const onError=(error)=>{cleanup();reject(error);};
+    timer=setTimeout(()=>{cleanup();reject(new Error("standalone Spring LS did not exit after shutdown"));},timeoutMs);
+    child.once("exit",onExit);child.once("error",onError);
+  });
 }
 function sha256(file){return createHash("sha256").update(fs.readFileSync(file)).digest("hex");}
 function directoryUri(dir){return pathToFileURL(dir.endsWith(path.sep)?dir:dir+path.sep).href;}
