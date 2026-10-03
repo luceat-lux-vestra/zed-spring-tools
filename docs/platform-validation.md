@@ -42,9 +42,13 @@ Every native tuple reads `protocol/spring-artifacts.json` and requires
 `spring-boot-language-server-standalone-exec.jar`, then verifies both the
 declared byte size and SHA-256 before launch.
 
-The smoke creates a real Maven Spring Boot fixture, starts the pinned server with
-the production standalone JVM vector (including the worktree project root), and
-drives an LSP session. It requires the server to:
+The smoke creates a real Maven Spring Boot fixture under a path containing both
+spaces and non-ASCII characters, starts the pinned server with the production
+standalone JVM vector, and drives an LSP session. The Java child is launched with
+the exact worktree as its native `cwd`; Spring's
+`spring.boot.ls.project.dir` property is deliberately `.` so Windows does not
+duplicate a Unicode worktree through a lossy JVM command-line boundary. It
+requires the server to:
 
 1. initialize successfully;
 2. open both a Java document and a `spring-boot-properties` document;
