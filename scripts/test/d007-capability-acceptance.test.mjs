@@ -747,19 +747,20 @@ test("D007 Modulith regression proves the standalone capability on a compiled Ma
   );
 });
 
-test("D007 draft platform gate checks out and asserts the exact PR head", () => {
+test("D007 final candidate removes the temporary draft-only platform runner", () => {
   const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "platform-validation.yml"), "utf8");
 
   assert.equal(
-    workflow.includes("ref: ${{ env.SOURCE_HEAD_SHA }}"),
-    true,
-    "draft D007 checkout must use the immutable PR head SHA rather than GitHub's synthetic merge ref",
+    workflow.includes("PR #160 draft-only standalone D007 runner") ||
+      workflow.includes("Run D007 standalone regression") ||
+      workflow.includes("Assert D007 exact PR HEAD"),
+    false,
+    "exact-final candidate must not retain the temporary draft-only D007 runner",
   );
   assert.equal(
-    workflow.includes('actual="$(git rev-parse HEAD)"') &&
-      workflow.includes('test "$actual" = "$SOURCE_HEAD_SHA"'),
-    true,
-    "draft D007 gate must fail closed when the checked-out commit differs from SOURCE_HEAD_SHA",
+    workflow.includes("github.event.pull_request.head.ref == 'fix-159-standalone-spring-ls'"),
+    false,
+    "platform validation must not retain a branch-specific D007 exception after standalone proof is complete",
   );
 });
 
