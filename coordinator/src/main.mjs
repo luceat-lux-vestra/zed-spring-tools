@@ -3810,7 +3810,15 @@ export function springArguments(server, projectDirectory, mcpServerPort = null) 
       ? "-Dspring.main.web-application-type=NONE"
       : `-Dserver.port=${mcpServerPort}`,
     "-Xlog:jni+resolve=off",
-    `-Dspring.boot.ls.project.dir=${projectDirectory}`,
+    // The Java process is always spawned with cwd = the exact worktree. Keep the
+    // standalone project-dir property cwd-relative rather than duplicating the
+    // absolute path into JVM argv: on Windows the launcher can lossy-convert
+    // non-ASCII command-line text, turning a Unicode worktree into literal '?'
+    // characters before Spring's StandaloneSettingsLoader calls Paths.get().
+    // "." preserves the same project root for both LegacyJavaProjectsService and
+    // .claude settings loading while the LSP workspace URI remains the original
+    // exact worktree path.
+    "-Dspring.boot.ls.project.dir=.",
     "-jar",
     server,
   ];
