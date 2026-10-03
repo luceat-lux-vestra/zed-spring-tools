@@ -149,8 +149,10 @@ inside this extension's own work directory.
    and
 11. the standalone launch remains functional when the worktree path contains
    spaces and non-ASCII characters. The exact worktree is the Java child's
-   native working directory; `spring.boot.ls.project.dir` is cwd-relative so
-   Windows does not have to round-trip that Unicode path through JVM argv.
+   native working directory. Windows uses cwd-relative
+   `spring.boot.ls.project.dir=.` so the Unicode path does not round-trip through
+   JVM argv; POSIX uses the exact absolute worktree so filesystem aliases such as
+   macOS `/var` and `/private/var` do not create duplicate project identities.
 
 The six-platform CI matrix is headless portability/runtime evidence. It is not a
 substitute for item 5 and must not be described as full Zed desktop evidence.
