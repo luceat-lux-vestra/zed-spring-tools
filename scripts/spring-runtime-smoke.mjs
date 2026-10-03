@@ -119,7 +119,7 @@ public class StandaloneSmokeApplication {}
     assert.equal(sha256(jar),pin.sha256,"standalone JAR SHA-256");
 
     const args=springArguments(jar,worktree,null);
-    assert.ok(args.includes(`-Dspring.boot.ls.project.dir=${worktree}`),"production launch vector carries standalone project root");
+    assert.ok(args.includes("-Dspring.boot.ls.project.dir=."),"production launch vector anchors standalone project root to child cwd");
     child=spawn(javaTool("java"),args,{cwd:worktree,env:process.env,shell:false,windowsHide:true,stdio:["pipe","pipe","pipe"]});
     child.stderr.on("data",c=>{stderr=(stderr+c.toString("utf8")).slice(-256*1024);});
     const workspaceUri=directoryUri(worktree);
