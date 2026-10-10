@@ -106,7 +106,7 @@
       "class": "advisory",
       "workflow": "codeql.yml",
       "job": "analyze",
-      "proves": "CodeQL findings for one language reach the Security tab. Deliberately never required: `codeql.yml` ignores documentation-only changes, so the context legitimately disappears on the bulk of this repository's traffic, and a required check that vanishes is a gate in name only."
+      "proves": "Advisory PR and weekly default-branch security analysis for one language. CodeQL PR results do not immediately update the default-branch alert baseline: Monday scheduled scans normally refresh it, and delayed, skipped or failed scans can extend staleness beyond a week. Deliberately never required: `codeql.yml` ignores documentation-only PR changes, so the context legitimately disappears on much repository traffic. A path-filtered required check would not be a reliable merge gate."
     },
     {
       "context": "label",
