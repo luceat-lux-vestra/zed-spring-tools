@@ -26,7 +26,7 @@ concurrency:
 # silently weaken the live merge contract.
 jobs:
   rust:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Detect documentation-only scope
@@ -170,7 +170,7 @@ jobs:
         run: cargo build --locked --release --target wasm32-wasip2
 
   coordinator:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Detect documentation-only scope
@@ -324,7 +324,7 @@ jobs:
   # ordinary pull request. That is a precondition for promoting it to a required
   # context later; see `.github/merge-gate-policy.json`.
   workflow-security:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -340,19 +340,19 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         env:
           ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
           ZIZMOR_VERSION: 1.30.0
-          ZIZMOR_SHA256: 018a024d6b6d09733b07f6ef42838d984c23ec04bc9b2acd55f7d67826aeafe5
+          ZIZMOR_SHA256: ec8c95cd800845abb9bbc5f377ec7c57d2eb8e2386a00a201d3a74ee4092e5ed
         run: |
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/policy-tools"
           cd "${RUNNER_TEMP}/policy-tools"
           curl --fail --silent --show-error --location --output actionlint.tar.gz \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_arm64.tar.gz"
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
           tar -xzf actionlint.tar.gz actionlint
           curl --fail --silent --show-error --location --output zizmor.tar.gz \
-            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           echo "${ZIZMOR_SHA256}  zizmor.tar.gz" | sha256sum --check --strict
           tar -xzf zizmor.tar.gz zizmor
           echo "${RUNNER_TEMP}/policy-tools" >> "${GITHUB_PATH}"
@@ -375,7 +375,7 @@ jobs:
 
 
   review:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -391,7 +391,7 @@ jobs:
     name: Merge Gate
     needs: [rust, coordinator, review, workflow-security]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every merge-gate component to succeed
