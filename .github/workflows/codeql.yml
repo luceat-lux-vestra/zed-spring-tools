@@ -14,8 +14,7 @@ name: CodeQL
 # Findings land in the repository's Security tab, not as a merge gate.
 
 on:
-  push:
-    branches: [main]
+  # Default-branch code-scanning alerts are refreshed weekly, not per merge.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     # A documentation-only pull request changes no analysed source. Research,
