@@ -127,6 +127,9 @@ jobs:
   # Keep the declared JDK 21 floor continuously exercised against both real
   # pinned Java runtimes. One Linux x86_64 arm is sufficient here: the six-way
   # matrix above owns host portability while this job owns the JVM floor.
+  # Intentionally preserve native Linux x86_64 JDK 21 runtime evidence as a
+  # cross-architecture oracle: the six-tuple matrix runs x64 on JDK 25 only.
+  # Changing this job to ARM64 would silently remove the x64 JDK 21 proof.
   spring-runtime-floor:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -165,7 +168,7 @@ jobs:
   # consumer from accidentally treating one successful matrix leg as six-way
   # evidence. Promotion into the repository ruleset is a separate policy step.
   platform-gate:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     needs:
       - platform
