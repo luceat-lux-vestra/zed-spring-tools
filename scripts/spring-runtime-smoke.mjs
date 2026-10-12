@@ -112,11 +112,19 @@ public class StandaloneSmokeApplication {}
   const evidence={schemaVersion:2,sourceHead,testedCommit,platform:{os:process.platform,arch:process.arch,release:os.release()},springTools:{tag:pin.tag,sourceCommit:pin.sourceCommit,asset:pin.asset,sha256:pin.sha256,mode:pin.mode},lsp:{serverRequests:[],executableProject:null,completion:null},status:"running"};
   let child,stderr="";
   try{
+    // Benchmark the actual remote acquisition rather than assuming the pinned
+    // 98 MB asset justifies a new Actions cache/producer.
+    const acquireStart=performance.now();
     const response=await fetch(pin.url,{redirect:"follow",signal:AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),headers:{"user-agent":"zed-spring-tools-platform-validation"}});
     if(!response.ok)throw new Error(`download failed: HTTP ${response.status}`);
-    fs.writeFileSync(jar,Buffer.from(await response.arrayBuffer()));
+    const content=Buffer.from(await response.arrayBuffer());
+    const networkReadMs=Math.round(performance.now()-acquireStart);
+    const verificationStart=performance.now();
+    fs.writeFileSync(jar,content);
     assert.equal(fs.statSync(jar).size,pin.size,"standalone JAR size");
     assert.equal(sha256(jar),pin.sha256,"standalone JAR SHA-256");
+    evidence.artifactAcquisition={mode:"network",sizeBytes:pin.size,networkReadMs,writeAndVerifyMs:Math.round(performance.now()-verificationStart)};
+    const runtimeStart=performance.now();
 
     const args=springArguments(jar,worktree,null);
     if(process.platform==="win32"){
@@ -167,6 +175,7 @@ public class StandaloneSmokeApplication {}
     await client.request("shutdown",null); client.notify("exit",null);
     const exit=await waitForChildExit(child,15_000);
     assert.equal(exit.code,0,"standalone Spring LS must exit cleanly after shutdown");
+    evidence.lspRuntimeMs=Math.round(performance.now()-runtimeStart);
     evidence.status="pass";evidence.finishedAt=new Date().toISOString();evidence.stderrTail=stderr.split(/\r?\n/).slice(-50);
     writeEvidence(evidencePath,evidence);
     process.stdout.write(JSON.stringify(evidence,null,2)+"\n");
