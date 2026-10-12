@@ -220,6 +220,25 @@ or another premise of the reviewed revision, invalidate the affected evidence.
 Re-run the relevant targeted validation and repository-required checks on the
 new exact final PR HEAD before merge.
 
+## CI cache ownership
+
+Rust caches are written only from trusted protected `main` producers. Pull-request
+jobs restore them read-only and must still compile successfully after a miss.
+
+- `.github/workflows/rust-main-cache-seed.yml` owns the required Linux ARM64
+  `main-ci-rust-arm64` cache used by the required Rust job and the Linux ARM64
+  platform leg.
+  Those consumers and the producer must expose the same `RUST_TOOLCHAIN` environment
+  before `Swatinem/rust-cache`; the action hashes `RUST*` variables into cache identity.
+- `.github/workflows/rust-platform-main-cache-seed.yml` owns the other five
+  native platform cache families and runs only when Cargo/toolchain/cache-contract
+  inputs change, or by explicit manual recovery.
+- `platform-validation.yml` never publishes PR-controlled Rust caches. The real
+  six-platform tests, Spring runtime smoke, Java floor, CodeQL, and merge gate
+  remain authoritative regardless of cache hit or miss.
+- Do not add another cache producer for the same OS/architecture/key without
+  measured evidence that the existing ownership is insufficient.
+
 ## Documentation-only CI fast path
 
 A pull request may use the documentation-only fast path only when every changed

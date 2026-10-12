@@ -22,6 +22,10 @@ concurrency:
   group: rust-main-cache-seed
   cancel-in-progress: false
 
+env:
+  # Must match CI/rust and platform-validation Linux ARM64 before rust-cache.
+  RUST_TOOLCHAIN: "1.98.0"
+
 jobs:
   rust:
     name: Prime main Rust compiler dependencies
@@ -39,7 +43,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
-          toolchain: "1.98.0"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
           targets: wasm32-wasip2
       - name: Restore and prime shared Rust dependency cache
