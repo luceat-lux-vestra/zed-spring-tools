@@ -28,26 +28,34 @@ jobs:
             runner: ubuntu-24.04
             expected_os: linux
             expected_arch: x86_64
+            rust_cache_key: platform-linux-x86_64
           - id: linux-arm64
             runner: ubuntu-24.04-arm
             expected_os: linux
             expected_arch: arm64
+            # Reuse the already-proven required-CI main producer instead of
+            # maintaining a duplicate Linux ARM64 platform cache.
+            rust_cache_key: main-ci-rust-arm64
           - id: macos-x86_64
             runner: macos-15-intel
             expected_os: macos
             expected_arch: x86_64
+            rust_cache_key: platform-macos-x86_64
           - id: macos-arm64
             runner: macos-15
             expected_os: macos
             expected_arch: arm64
+            rust_cache_key: platform-macos-arm64
           - id: windows-x86_64
             runner: windows-2025
             expected_os: windows
             expected_arch: x86_64
+            rust_cache_key: platform-windows-x86_64
           - id: windows-arm64
             runner: windows-11-arm
             expected_os: windows
             expected_arch: arm64
+            rust_cache_key: platform-windows-arm64
     runs-on: ${{ matrix.runner }}
     env:
       EXPECTED_OS: ${{ matrix.expected_os }}
@@ -79,7 +87,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
-          shared-key: platform-${{ matrix.id }}
+          # Pull requests consume only protected-main caches. Writing
+          # PR-scoped platform caches repeats archive work that the next PR
+          # cannot reliably reuse.
+          shared-key: ${{ matrix.rust_cache_key }}
+          save-if: false
       - name: Record and verify native runner
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/platform-validation.mjs
