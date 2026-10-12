@@ -156,6 +156,11 @@ jobs:
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        with:
+          # Reuse the same Cargo/toolchain cache family produced on protected
+          # main. A pull request is strictly restore-only.
+          shared-key: main-ci-rust-arm64
+          save-if: false
       - name: Format
         if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
         run: cargo fmt --check

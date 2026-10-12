@@ -1,0 +1,55 @@
+name: Rust main cache seed
+
+# A trusted-main writer for the already-required Linux ARM64 Rust job.
+# Do not prime six separate platform cache families without measured ROI.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'rust-toolchain'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/rust-main-cache-seed.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-main-cache-seed
+  cancel-in-progress: false
+
+jobs:
+  rust:
+    name: Prime main Rust compiler dependencies
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify exact trusted main SHA
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        with:
+          toolchain: "1.98.0"
+          components: rustfmt, clippy
+          targets: wasm32-wasip2
+      - name: Restore and prime shared Rust dependency cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # Exactly the same action, toolchain and cache identity as CI/rust.
+          shared-key: main-ci-rust-arm64
+      - name: Compile the exact required Rust dependency graph
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --locked
+          cargo build --locked --release --target wasm32-wasip2
