@@ -10,7 +10,7 @@ authority is `.github/merge-gate-policy.json` plus the live `main` ruleset.
 
 > **2026-09-28 CI scope update.** `rust` and `coordinator` remain authoritative component jobs but skip product/toolchain work only for a mechanically bounded documentation-only path set. `review` (Dependency Review) and `workflow-security` remain active; mixed/unreadable/unlisted scope falls back to full validation. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` remain full-validation inputs.
 >
-> **2026-09-28 required-gate aggregation.** The live merge contract is collapsed to one fail-closed `Merge Gate` context. It depends directly on `rust`, `coordinator`, `review`, and `workflow-security` and fails unless every component concludes successfully. Platform Validation and CodeQL keep their existing staged/advisory roles.
+> **2026-09-28 required-gate aggregation.** The live merge contract is collapsed to one fail-closed `Merge Gate` context. It depends directly on `rust`, `coordinator`, `review`, and `workflow-security` and fails unless every component concludes successfully. Platform Validation and CodeQL remain outside the required merge authority.
 
 > **Post-rollout proof protocol.** A documentation-only proof PR must keep the `rust` and `coordinator` required jobs present and successful while their product/toolchain steps are skipped, and must still pass `workflow-security` and Dependency Review on the same exact PR HEAD.
 
@@ -48,9 +48,9 @@ The repository already runs custom CodeQL across Actions, JavaScript/TypeScript,
 
 CodeQL remains advisory because its PR trigger intentionally ignores documentation-only changes. A disappearing context must not be made required.
 
-### STAGED — platform-gate
+### ADVISORY — platform-gate
 
-The existing `platform-gate` classification remains staged. This reassessment does not promote it merely because other hardening work is occurring; its own ordinary-PR/merged-main reliability proof and live ruleset promotion contract remain separate.
+`platform-gate` is intentionally advisory. The full six-platform/JDK-floor workflow is path-scoped to inputs that can affect the native/runtime evidence it owns, so the context legitimately does not exist on unrelated pull requests and must not be promoted into the always-present required ruleset. `workflow_dispatch` retains an explicit full-matrix verification path.
 
 ## Closure evidence
 

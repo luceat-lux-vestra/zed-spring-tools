@@ -96,10 +96,10 @@
     },
     {
       "context": "platform-gate",
-      "class": "staged",
+      "class": "advisory",
       "workflow": "platform-validation.yml",
       "job": "platform-gate",
-      "proves": "All six native `platform` matrix legs and the independent JDK 21 `spring-runtime-floor` job completed successfully for the same workflow revision. This is the stable aggregate context intended for later ruleset promotion after it has demonstrated ordinary-PR and merged-main stability."
+      "proves": "When Platform Validation is applicable, all six native `platform` matrix legs and the independent JDK 21 `spring-runtime-floor` job completed successfully for the same workflow revision. The workflow is intentionally pull-request path-scoped to platform/runtime-impacting inputs, so this aggregate is advisory and is not eligible for ruleset promotion as an always-present required context."
     },
     {
       "context": "Analyze ${{ matrix.language }}",
