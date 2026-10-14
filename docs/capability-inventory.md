@@ -44,6 +44,14 @@ before D007 unless a row explicitly says it has been revalidated on the
 standalone runtime. They are not, by themselves, release-facing proof for the
 2026-09-25 standalone architecture.
 
+**Final D007 review status (2026-10-03):** [#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159)
+closed after exact-candidate acceptance of 52 evidence-required capability rows
+and 7 terminal classifications, with 0 pending and 0 failed. The acceptance
+JSON below remains a static declaration of evidence obligations; the accepted
+run summary is attached to #159 instead of changing the reviewed candidate
+source. This does not establish the later Registry-installed lifecycle, which
+remains [#112](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/112).
+
 For #159 and the Registry release gate, apply this overlay:
 
 - **Unaffected by the retired private Java transport:** capabilities served by

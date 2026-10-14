@@ -1,6 +1,6 @@
 # D007: Standalone Spring language server and publishing boundary
 
-- Status: Accepted for implementation under #159; release acceptance still requires exact-final-HEAD Zed validation
+- Status: Accepted and implemented; exact-candidate D007 validation passed under closed #159 (Registry lifecycle still pending)
 - Date: 2026-09-25
 - Decision owner: Project owner
 - Supersedes: D002/D003/D004/D006 only where they require or describe private cross-extension Java coordination
