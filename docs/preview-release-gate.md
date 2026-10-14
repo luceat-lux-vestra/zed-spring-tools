@@ -1,7 +1,7 @@
 # Release gate and registry lifecycle
 
 - Status: Current release policy
-- Updated: 2026-09-28
+- Updated: 2026-10-14
 - Authoritative release tracker: [release Epic #108](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/108)
 - Native release milestone: `Registry publication & v1.0 readiness`
 - Related: [capability inventory](capability-inventory.md),
@@ -34,14 +34,14 @@ The release program uses GitHub's native planning surfaces for different jobs:
   milestone while they are non-blocking validation work;
 - #113 is release-blocked by #112 and should use the native GitHub issue
   dependency relationship in addition to prose references;
-- #159 is the current repository-side release blocker: the submitted Registry
-  candidate must not be refreshed or promoted until the private
-  cross-extension Java transport is removed or replaced by an accepted public
-  boundary with exact-candidate evidence.
-- #112 remains externally blocked until #159 is resolved, the refreshed
+- #159 is closed: #160 removed the private Java transport and passed the
+  exact-candidate D007 gate, with release evidence attached to that issue.
+- #109 is waiting on upstream maintainer review/merge of the refreshed
   [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875)
-  candidate is accepted, and the extension is actually visible through the Zed
-  Registry.
+  at `0.1.0`.
+- #112 remains blocked until the extension is actually visible through
+  the Zed Registry; development-extension validation is not a substitute
+  for the Registry-installed lifecycle.
 
 Do not add an arbitrary milestone due date. Add one only when there is a real
 external or project delivery commitment that the repository can cite.
@@ -56,14 +56,13 @@ platform validation may remain open independently.
 
 The current path is intentionally narrow:
 
-1. Resolve #159 on an exact candidate and reconcile the affected capability,
-   compatibility, limitation, and architecture evidence. A draft remediation is
-   not release evidence.
-2. Keep the submitted Zed Registry version at `0.1.0`; only after #159 closes
-   may the upstream Registry contribution be refreshed for renewed review.
-3. After actual Registry publication, verify a fresh install through the
-   **real Zed Registry path**, including first-run artifact acquisition and the
-   maintained Java/Spring runtime boundary.
+1. **Complete:** #159 / #160 resolved the private transport and passed
+   exact-candidate D007 capability, desktop development-extension, and CI gates.
+2. **Waiting on upstream:** keep the refreshed initial Registry submission at
+   `0.1.0` pending maintainer review/merge; do not claim it is published.
+3. **After publication:** verify a fresh install through the
+   **real Zed Registry path**, including first-run artifact acquisition and
+   maintained Java/Spring runtime coexistence.
 4. Fix and re-run the bounded gate if that install reveals a release-blocking
    defect.
 5. If the Registry lifecycle succeeds and release-facing claims still match the
@@ -82,17 +81,17 @@ risk/defect.
 
 ## Distribution model
 
-The product is distributed through the Zed extension registry. This repository
-contains source; it does not publish a standalone application binary or its own
-Spring Tools distribution.
+The product is intended to be distributed through the Zed extension registry.
+It is not yet published there. This repository contains source; it does not
+publish a standalone application binary or its own Spring Tools distribution.
 
 The initial registry submission is
 [zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875).
-It remains open. Current repository issue #159 blocks refreshing that submission
-to a new candidate until the publishing-boundary remediation and exact-candidate
-evidence pass. Until an accepted submission is actually installable from the
-Registry, the supported installation path for testing remains a Zed development
-extension checkout.
+It remains open after refresh to the reviewed D007 source commit
+`f23dcc99d4ab40f9b53ec33fb646dac2109efeef`, with upstream review/merge
+pending. The #159 publishing-boundary blocker is resolved. Until the extension
+is actually installable from the Registry, the supported testing path remains
+a Zed development extension checkout.
 
 `extension.toml` is the Registry-visible extension version. A release operation
 must keep source commit, registry pointer/version, release notes, and any Git tag
@@ -114,10 +113,13 @@ is the fail-closed overlay for the standalone migration. As of inventory version
 `blocked-zed-api`, 6 `zed-native-equivalent`, and 2 `not-pursued`, but
 those numbers are **not a current standalone release-facing verified count**.
 
-For #159, any matrix row whose `currentClaim` is `pending-d007` blocks release
-acceptance until exact-final-candidate evidence closes its assigned group or the
-capability is explicitly narrowed/reclassified. A desktop architecture-smoke
-PASS cannot promote those rows by itself.
+The source-controlled D007 acceptance matrix defines evidence obligations,
+not the latest execution result: its 52 `currentClaim: pending-d007` entries
+were assessed by the exact-candidate acceptance run attached to #159. That
+release record reports 52 accepted evidence-required rows, 7 explicitly
+terminal rows, and 0 pending/failed. The matrix was intentionally not
+rewritten after the accepted run, since that would create a new source HEAD.
+A desktop architecture-smoke PASS alone cannot promote rows.
 
 A capability is never promoted merely because code exists or because a
 historical tuple passed under the retired Java-transport architecture.
@@ -165,7 +167,7 @@ The bounded lifecycle gate covers at least:
 
 - clean Registry installation;
 - first-run pinned Spring Tools acquisition and checksum verification;
-- official Java/coordinator handshake;
+- coexistence of the official Java extension and standalone Spring runtime;
 - representative Spring completion and diagnostics;
 - no unexpected Spring error-level window messages during acceptance probes;
 - actual execution of generated Maven/Gradle Boot run tasks where the release
@@ -174,9 +176,9 @@ The bounded lifecycle gate covers at least:
 - uninstall and owned-process/resource cleanup; and
 - actionable failure behavior rather than partial startup.
 
-For the initial publication, #159 must first clear the repository-side
-publishing boundary. The real Registry lifecycle is then tracked by #112 under
-release Epic #108.
+For initial publication, #159 already cleared the repository-side publishing
+boundary. The remaining real Registry lifecycle is tracked by #112 under
+release Epic #108 and begins after upstream Registry publication.
 
 ### 7. Rollback and withdrawal
 
