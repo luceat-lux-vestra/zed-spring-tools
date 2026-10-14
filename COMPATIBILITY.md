@@ -2,26 +2,32 @@
 
 ## Current D007 standalone runtime identity
 
-The release candidate architecture now pins Spring Tools **`5.3.0.RELEASE`**
-source commit `573f714dc76f178bfb2af392d03864f2a0a540ac` and runs the official
-`spring-boot-language-server-standalone-exec.jar` artifact. This identity is
-the current product runtime contract; it is **not** evidence that the historical
-desktop tuples below have already been revalidated on D007. Those observations
-remain attached to the runtime architecture under which they were collected.
+The current architecture pins Spring Tools **`5.3.0.RELEASE`** source commit
+`573f714dc76f178bfb2af392d03864f2a0a540ac` and runs the official
+`spring-boot-language-server-standalone-exec.jar`. Spring Tools owns the
+standalone Maven/Gradle project model and indexing; the official Zed Java
+extension continues to own normal Java/JDT editing. D007 removes the former
+private cross-extension Java route and injected JDT bridge.
 
-This repository records PoC and local product evidence, not product support. The
-words `verified` and `untested` below describe exact observed coverage on one
-host. An installable extension now exists, but nothing here promises that it
-works on any tuple other than the one verified below.
+The exact D007 release-candidate review completed under
+[#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159):
+52 evidence-required capability rows were accepted, 7 were explicitly
+terminal, and none were pending or failed. The exact-candidate Zed desktop
+development-extension gate passed; native headless CI separately covers Linux,
+macOS, and Windows on x86_64 and arm64 with a real standalone Spring runtime,
+plus an independent JDK 21 floor check. These are separate evidence layers:
+neither six-platform headless CI nor desktop development-extension proof
+establishes Registry-installed support or desktop support on every platform.
 
-Official-Java releases are not admitted through an exact runtime allowlist.
-Under D006, the product attempts its known route and bridge capability contract
-with the installed official Java extension and fails visibly when a required
-capability is absent or incompatible. Exact versions below remain evidence and
-regression anchors, not a claim that unlisted point releases are rejected or
-supported.
+The tuples below belong to the earlier JDT/bridge runtime unless specifically
+stated otherwise. They remain historical regression records rather than
+current D007 desktop support claims. Official-Java versions are not Spring
+runtime allowlisted under D007; the private D006 route/bridge compatibility
+contract is retired. See [D007](docs/decisions/007-standalone-spring-publishing-boundary.md),
+[platform validation](docs/platform-validation.md), and the
+[Registry lifecycle gate](docs/preview-release-gate.md) for current boundaries.
 
-## Verified PoC tuple
+## Historical verified PoC tuple (retired JDT/bridge architecture)
 
 S013 passed its stated functional and cleanup criteria on exactly this tuple:
 
