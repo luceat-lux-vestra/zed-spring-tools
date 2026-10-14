@@ -10,6 +10,24 @@ D007 changed the runtime boundary on 2026-09-25. This workflow now validates the
 official **standalone Spring Tools language server** from `5.3.0.RELEASE`. The former JDT/Spring/bridge
 layer is retired and is not part of current platform evidence.
 
+## Automatic pull-request scope
+
+The full platform workflow is intentionally **not** an every-PR check. A pull
+request launches it automatically only when the change can affect evidence this
+workflow actually owns: Rust/Cargo inputs, extension Rust sources, coordinator
+code/tests, protocol inputs, the platform/runtime scripts, or this workflow
+itself.
+
+Documentation, repository metadata, governance-only changes, and other inputs
+outside that evidence boundary do not fan out six native runners plus the JDK
+floor job. `workflow_dispatch` remains the explicit full-matrix recovery and
+verification path when a reviewer needs platform evidence for a change outside
+the automatic scope.
+
+Because a path-scoped context legitimately does not exist on many pull
+requests, `platform-gate` is advisory and is not a candidate required ruleset
+context. The repository's required merge authority remains `Merge Gate`.
+
 ## Native matrix
 
 | Host | Architecture | GitHub runner |

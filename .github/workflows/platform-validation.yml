@@ -3,6 +3,22 @@ name: Platform Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    # This workflow is six native runners plus an independent JDK-floor job.
+    # Run it automatically only when its actual platform/runtime evidence can change.
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'rust-toolchain'
+      - 'rust-toolchain.toml'
+      - 'src/**'
+      - 'coordinator/**'
+      - 'protocol/**'
+      - 'scripts/platform-validation.mjs'
+      - 'scripts/platform-capability-probes.mjs'
+      - 'scripts/run-coordinator-tests.mjs'
+      - 'scripts/spring-runtime-smoke.mjs'
+      - '.github/workflows/platform-validation.yml'
   workflow_dispatch:
 
 permissions:
@@ -175,10 +191,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # One stable context represents the complete automated platform gate. Keeping
-  # the fan-out matrix observable while depending on this aggregate prevents a
-  # consumer from accidentally treating one successful matrix leg as six-way
-  # evidence. Promotion into the repository ruleset is a separate policy step.
+  # One stable context represents a complete applicable platform run. The
+  # workflow is intentionally path-scoped, so this aggregate is advisory and
+  # must never become a required context that is expected on every PR.
   platform-gate:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
