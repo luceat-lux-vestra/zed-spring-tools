@@ -1,11 +1,12 @@
 # Known limitations
 
-This repository is experimental source and is not yet Registry-published. The
-2026-09-25 D007 migration replaces the former private JDT/bridge coordination
-with Spring Tools' official standalone language server. Historical observations
-from the retired architecture remain useful regression evidence, but they do not
-establish release support for the standalone runtime until revalidated on the
-exact submitted commit.
+This repository is not yet Registry-published. The 2026-09-25 D007 migration
+replaced private JDT/bridge coordination with the official standalone Spring
+Tools language server. Historical observations remain bounded regression
+evidence; the exact-candidate standalone and development-extension validation
+has since passed under [#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159).
+The real Registry-installed lifecycle remains unverified under
+[#112](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/112).
 
 - The Spring Boot upgrade is delivered only in the shape the pinned Spring Tools
   release actually implements, and that shape is narrow. It upgrades the **patch
@@ -31,8 +32,13 @@ exact submitted commit.
   named. See the [capability inventory](docs/capability-inventory.md) and the
   machine-readable
   [D007 acceptance matrix](protocol/d007-capability-acceptance.json) rather than
-  relying on the old aggregate count. A matrix row with
-  `currentClaim: pending-d007` is explicitly **not** a current support claim.
+  relying on the old aggregate count. The source-controlled matrix preserves
+  evidence obligations, including `currentClaim: pending-d007` entries;
+  exact-candidate execution under
+  [#159](https://github.com/luceat-lux-vestra/zed-spring-tools/issues/159)
+  accepted 52 evidence-required rows with 7 terminal classifications and
+  0 pending/failed. Neither a static classification nor a prior passing run
+  automatically proves a changed release HEAD.
 - D007 acceptance now separates direct standalone-server regression from Zed
   desktop integration. The direct regression re-drives the rich Spring Boot
   fixture; the desktop layer proves JDTLS/standalone coexistence, Maven/Gradle
@@ -223,9 +229,10 @@ exact submitted commit.
   product evidence, not standalone support evidence. Current CI separately runs
   the standalone Spring runtime smoke on Linux, macOS, and Windows across
   x86_64/arm64 and runs the real standalone runtime again on the JDK 21 floor.
-  Those jobs prove headless portability/runtime behavior only. Exact-final-HEAD
-  Zed development-extension validation is still required before Registry
-  refresh and release-facing support claims.
+  Those jobs prove headless portability/runtime behavior only. Exact-candidate
+  Zed development-extension validation passed for the reviewed D007 Registry
+  submission; that does not establish Registry-installed lifecycle evidence
+  or desktop support on all six platforms.
 - The product requires the official Zed Java extension for Java language
   registration/editing, debugging, tests, tasks, and the ordinary Java
   experience. Spring analysis no longer depends on the Java extension's private
@@ -263,8 +270,9 @@ exact submitted commit.
   harness now drives the standalone path through warm-cache offline startup,
   first-install offline failure/recovery, checksum-corruption offline
   failure/recovery, and partial-staging cleanup. Those remain release-blocking
-  until the final candidate produces `standalone-offline-regression.json` with
-  `offlineLifecycle: PASS`; historical VSIX evidence is not substituted.
+  for a candidate without passing `standalone-offline-regression.json`
+  evidence; the reviewed D007 candidate satisfied this gate under #159.
+  Historical VSIX evidence is not substituted.
 - The extension checks its configured Java executable before starting Spring
   Tools and requires JDK 21 or newer. The former "missing/incompatible official
   Java route" diagnostic and structural provider-schema check were part of the
@@ -303,8 +311,9 @@ exact submitted commit.
   same-size checksum-corrupted artifact also fails closed offline without being
   replaced by unverified bytes, then is re-downloaded to the pinned SHA-256
   online. Network-dependent Spring version/support diagnostics are revalidated
-  separately rather than assumed from the old gate. This claim becomes current
-  only when the exact final candidate records that D007 evidence.
+  separately rather than assumed from the old gate. The reviewed D007
+  candidate recorded this evidence under #159; future release candidates
+  must preserve an exact-HEAD evidence trail.
 - SSH remote development and WSL-hosted remote projects are not in the initial
   product scope.
 
