@@ -102,3 +102,14 @@ test("Java fixture extraction scope cannot silently shrink", () => {
     assert.match(check.output, /Java release CodeQL source scope drifted/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("publisher cannot always-run around failed preflight", () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, ".github/workflows/release.yml"),
+      publisher.replace("    needs: [codeql-preflight]", "    needs: [codeql-preflight]\n    if: always()"));
+    const check = run(root);
+    assert.equal(check.status, 1);
+    assert.match(check.output, /must depend directly on codeql-preflight/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
