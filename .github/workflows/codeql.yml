@@ -147,6 +147,8 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          # Only the Java buildless leg has overlapping historical fixture FQCNs.
+          config-file: ${{ matrix.language == 'java-kotlin' && './.github/codeql-java-config.yml' || '' }}
 
       - name: Analyze CodeQL
         id: analyze
