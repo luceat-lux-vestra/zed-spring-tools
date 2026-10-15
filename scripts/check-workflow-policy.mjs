@@ -440,6 +440,25 @@ function checkReleaseCodeqlPreflight() {
   ]) {
     if (!scanner.text.includes(required)) fail("CodeQL source provenance / historical-main assurance missing: " + required);
   }
+  // The Java-only configuration is a reviewed source boundary. Do not let a
+  // one-line scope shrink turn a previously full extraction into green evidence.
+  const configPath = join(ROOT, ".github/codeql-java-config.yml");
+  const approvedJavaLines = [
+    "name: Zed active Java fixture security corpus",
+    "paths:",
+    "- tests/fixtures/spring-boot-basic/src/main/java/**",
+    "- tests/fixtures/spring-codelens-showcase/src/main/java/**",
+    "- tests/fixtures/spring-modulith-gradle/src/main/java/**",
+  ];
+  const configLines = existsSync(configPath)
+    ? readFileSync(configPath, "utf8").split("\n").map((line) => line.trim())
+        .filter((line) => line !== "" && !line.startsWith("#"))
+    : [];
+  if (JSON.stringify(configLines) !== JSON.stringify(approvedJavaLines) ||
+      !scanner.text.includes("codeql-java-config.yml") ||
+      !scanner.text.includes("runner.temp")) {
+    fail("Java release CodeQL source scope drifted from the reviewed fixture corpus.");
+  }
   if (!gate.triggers.has("workflow_dispatch") || gate.triggers.size !== 1) {
     fail("release CodeQL preflight must be manual-only.");
   }
