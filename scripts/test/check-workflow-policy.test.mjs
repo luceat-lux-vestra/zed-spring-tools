@@ -137,8 +137,8 @@ test("docs-only full-validation guard cannot disappear", () => {
   edit(
     root,
     ".github/workflows/ci.yml",
-    "if: ${{ steps.scope.outputs.docs_only != 'true' && github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}",
-    "if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}",
+    "if: ${{ steps.scope.outputs.docs_only != 'true' }}",
+    "if: ${{ github.event_name == 'pull_request' }}",
   );
   const result = run(root);
   assert.equal(result.code, 1, result.output);
@@ -210,4 +210,44 @@ test("workflow-level write-all is rejected", () => {
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /unsupported workflow-level permissions syntax/);
+});
+
+test("CodeQL cannot be silently restored on pull requests", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/codeql.yml", "on:\n  workflow_dispatch:", "on:\n  pull_request:\n  workflow_dispatch:");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /CodeQL must not trigger on pull_request/);
+});
+
+test("CodeQL manual exact-SHA dispatch cannot disappear", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/codeql.yml", "  workflow_dispatch:", "  dispatch_retired:");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /CodeQL must support both scheduled and manual analysis/);
+});
+
+test("the Merge Gate cannot lose local needs JSON evaluation", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/ci.yml", "toJSON(needs)", "needs.rust.result");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /Merge Gate lost local needs-result aggregation/);
+});
+
+test("a remote workflow-run polling step cannot return", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/ci.yml", "  merge-gate:\n", "  merge-gate:\n    # Reintroduced: actions/workflows/ci.yml/runs\n");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /obsolete workflow-run\/Jobs evidence reuse/);
+});
+
+test("CodeQL Kotlin coverage refusal cannot disappear", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/codeql.yml", "Reject unscanned Kotlin sources", "Skip unscanned Kotlin sources");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /CodeQL language, Kotlin, exact-SHA or raw SARIF assurance drifted/);
 });
