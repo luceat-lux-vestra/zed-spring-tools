@@ -1,0 +1,56 @@
+name: Release CodeQL preflight
+
+# Nonpublishing release-candidate gate. This workflow has no GitHub Release,
+# Zed Registry, signing, or artifact-publication capability.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: "Exact protected-main candidate SHA to preflight"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-codeql-preflight-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Release CodeQL preflight
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 75
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Verify trusted current-main preflight source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::Preflight must originate on main"; exit 1; }
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Malformed workflow source SHA"; exit 1; }
+          remote_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [ "$remote_main" = "$GITHUB_SHA" ] || { echo "::error::Preflight workflow source is stale"; exit 1; }
+
+      - name: Check out trusted preflight implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Reuse, join, or dispatch exact-source CodeQL
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/release_codeql_preflight.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --sha "$CANDIDATE_SHA" \
+            --timeout-seconds 4200 \
+            --poll-seconds 15
