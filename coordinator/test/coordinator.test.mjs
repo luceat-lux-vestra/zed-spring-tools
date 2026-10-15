@@ -218,7 +218,7 @@ test("springArguments injects proxy JVM properties from environment", () => {
   );
   assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
   assert.ok(args.includes("-Dhttps.proxyPort=8080"));
-  assert.ok(args.includes("-Dhttp.nonProxyHosts=localhost"));
+  assert.ok(args.includes("-Dhttp.nonProxyHosts=localhost|127.*|[::1]|localhost"));
   assert.ok(args.includes("-jar"));
 });
 
