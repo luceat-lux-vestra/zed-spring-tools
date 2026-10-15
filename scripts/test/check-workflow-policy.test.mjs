@@ -31,9 +31,56 @@ function run(root) {
   return { code: result.status, output: result.stdout + result.stderr };
 }
 
+function writeEphemeralWorkflow(root, { owner = "issue #189", retire = "remove after bounded research concludes" } = {}) {
+  writeFileSync(
+    join(root, ".github/workflows/research-lifecycle-fixture.yml"),
+    [
+      `# lifecycle-owner: ${owner}`,
+      `# lifecycle-retire: ${retire}`,
+      "name: Research lifecycle fixture",
+      "",
+      "on:",
+      "  workflow_dispatch:",
+      "",
+      "permissions: {}",
+      "",
+      "jobs:",
+      "  probe:",
+      "    runs-on: ubuntu-latest",
+      "    timeout-minutes: 5",
+      "    steps:",
+      "      - run: echo fixture",
+      "",
+    ].join("\n"),
+  );
+}
+
 test("the real workflow tree satisfies the offline policy", () => {
   const result = run(REPOSITORY);
   assert.equal(result.code, 0, result.output);
+});
+
+test("ephemeral workflow with lifecycle metadata is accepted", () => {
+  const root = fixture();
+  writeEphemeralWorkflow(root);
+  const result = run(root);
+  assert.equal(result.code, 0, result.output);
+});
+
+test("ephemeral workflow without lifecycle owner is rejected", () => {
+  const root = fixture();
+  writeEphemeralWorkflow(root, { owner: "" });
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /lacks non-empty # lifecycle-owner:/);
+});
+
+test("ephemeral workflow without retirement condition is rejected", () => {
+  const root = fixture();
+  writeEphemeralWorkflow(root, { retire: "" });
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /lacks non-empty # lifecycle-retire:/);
 });
 
 test("retired Actions event policy 5154 remains tracked", () => {
