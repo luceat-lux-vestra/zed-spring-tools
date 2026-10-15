@@ -88,3 +88,17 @@ test("preflight itself must remain nonpublishing", () => {
     assert.match(check.output, /gained a publication side effect/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("Java fixture extraction scope cannot silently shrink", () => {
+  const root = fixture();
+  try {
+    const path = join(root, ".github/codeql-java-config.yml");
+    const original = readFileSync(path, "utf8");
+    const excluded = "  - tests/fixtures/spring-boot-basic/src/main/java/**";
+    assert.ok(original.includes(excluded));
+    writeFileSync(path, original.replace(excluded + "\n", ""));
+    const check = run(root);
+    assert.equal(check.status, 1);
+    assert.match(check.output, /Java release CodeQL source scope drifted/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
