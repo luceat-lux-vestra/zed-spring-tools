@@ -17,6 +17,16 @@ from pathlib import Path
 LANGUAGES = {"actions", "java-kotlin", "javascript-typescript", "rust"}
 COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 
+# Reviewed minimum security rules in the canonical four-language query packs.
+REQUIRED_SECURITY_RULES = {
+    "actions": {"actions/code-injection/critical", "actions/untrusted-checkout/critical",
+                "actions/artifact-poisoning/critical"},
+    "javascript-typescript": {"js/redos", "js/polynomial-redos", "js/command-line-injection"},
+    "rust": {"rust/sql-injection", "rust/xss", "rust/command-line-injection"},
+    "java-kotlin": {"java/sql-injection", "java/xss", "java/redos"},
+}
+
+
 
 def check(directory: Path, language: str, candidate_sha: str) -> dict:
     if language not in LANGUAGES:
@@ -118,6 +128,13 @@ def check(directory: Path, language: str, candidate_sha: str) -> dict:
         if rule["id"] in by_id:
             raise ValueError("duplicate CodeQL rule ID")
         by_id[rule["id"]] = (index, rule)
+    missing_rules = REQUIRED_SECURITY_RULES[language] - set(by_id)
+    if missing_rules:
+        raise ValueError(f"required CodeQL security rules missing: {sorted(missing_rules)}")
+    for rule_id in REQUIRED_SECURITY_RULES[language]:
+        properties = by_id[rule_id][1].get("properties", {})
+        if not isinstance(properties, dict) or "security" not in properties.get("tags", []):
+            raise ValueError(f"required CodeQL security rule has no security classification: {rule_id}")
     results = run.get("results")
     if not isinstance(results, list):
         raise ValueError("missing or malformed result set")
@@ -182,9 +199,16 @@ def self_test() -> None:
             "tags": ["security"] if security else ["correctness"]}}
         if score is not None:
             rule["properties"]["security-severity"] = score
+        security_rules = [
+            {"id": rule_id, "properties": {"tags": ["security"], "security-severity": "7.0"}}
+            for rule_id in sorted(REQUIRED_SECURITY_RULES[language])
+        ]
         return {"version": "2.1.0", "runs": [{
             "tool": {"driver": {"name": "CodeQL"}, "extensions": [
-                {"name": "codeql/java-queries", "rules": [rule]}]},
+                {"name": {
+                    "actions": "codeql/actions-queries", "java-kotlin": "codeql/java-queries",
+                    "javascript-typescript": "codeql/javascript-queries", "rust": "codeql/rust-queries",
+                }[language], "rules": [rule, *security_rules]}]},
             "automationDetails": {"id": "/language:" + language + "/"},
             "invocations": [{"executionSuccessful": True, "toolExecutionNotifications": [
                 {"level": "none", "descriptor": {"id": "cli/expected-extracted-files/" +
@@ -226,6 +250,9 @@ def self_test() -> None:
             clean = fixture(language=language, results=False)
             clean["runs"][0]["tool"]["extensions"][0]["name"] = pack
             probe(clean, language=language)
+        no_required = fixture(results=False)
+        no_required["runs"][0]["tool"]["extensions"][0]["rules"] = no_required["runs"][0]["tool"]["extensions"][0]["rules"][:-1]
+        probe(no_required, "required CodeQL security rules missing")
         probe(fixture(score="7.0"), "High/Critical")
         probe(fixture(score="9.8"), "High/Critical")
         probe(fixture(score=None), "no severity")
