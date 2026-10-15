@@ -124,6 +124,21 @@ external maintainer/owner UI/API submissions cannot be technically blocked by
 this repository's Actions: this is an operator governance requirement, not an
 end-to-end enforcement claim.
 
+The canonical scanner uses four required language jobs. Its Java `build-mode:
+none` job deliberately analyzes the **reviewed release-relevant fixture corpus**
+(`tests/fixtures/spring-boot-basic`, `spring-codelens-showcase`,
+`spring-modulith-gradle`) defined in `.github/codeql-java-config.yml`.
+This is **not** a claim that every historical Java spike and every parallel
+same-FQCN Maven/Gradle fixture was extracted. The old all-tree Java mode on
+[CodeQL #38674364013](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/runs/38674364013)
+silently omitted 25 duplicate-class fixture sources and emitted 4 extractor
+errors, despite a green workflow. The reviewed Java fixture corpus must show
+at least 20 expected and **all** expected files extracted with no CodeQL
+tool/extraction warnings or errors. Actions (8), JS/TS (44), and Rust (11)
+retain their original required minimum extracted-source coverage, and all
+four language query packs must contain the reviewed security rules. Scope
+changes require reviewed CI policy changes and fresh original-evidence proof.
+
 The required `scripts/check-workflow-policy.mjs` policy also blocks any new
 **repository-managed** publisher workflow without a `codeql-preflight` job
 and an explicit publication-job dependency. It does not introduce an artificial
