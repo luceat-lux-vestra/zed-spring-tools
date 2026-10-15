@@ -100,6 +100,37 @@ published release tag.
 
 ## Security pre-publication operator hold — R2A #105
 
+The repository now provides an executable **nonpublishing** exact-SHA gate:
+`.github/workflows/release-codeql-preflight.yml`, backed by
+`tools/ci/release_codeql_preflight.py`. Dispatch it from trusted current
+`main` with the immutable reviewed candidate source SHA. It first reuses an
+eligible original four-language CodeQL scan or joins a matching active scan;
+if absent it dispatches the canonical scanner for that exact protected-main
+ancestor and waits for a bounded verification of original SARIF, four source
+manifests, run identity and security findings. This gate never mutates the
+external Zed Extension Registry.
+
+```bash
+repo=luceat-lux-vestra/zed-spring-tools
+candidate="$(gh api "repos/$repo/git/ref/heads/main" --jq '.object.sha')"
+gh workflow run release-codeql-preflight.yml -R "$repo" --ref main -f candidate_sha="$candidate"
+# Inspect the run and original proof before requesting the upstream operator action.
+```
+
+Before an **operator-requested** Registry submission/update or upstream merge,
+hold that step until this workflow has PASSED for the exact candidate SHA, plus
+the other D007/desktop/version gates. The existing upstream PR and arbitrary
+external maintainer/owner UI/API submissions cannot be technically blocked by
+this repository's Actions: this is an operator governance requirement, not an
+end-to-end enforcement claim.
+
+The required `scripts/check-workflow-policy.mjs` policy also blocks any new
+**repository-managed** publisher workflow without a `codeql-preflight` job
+and an explicit publication-job dependency. It does not introduce an artificial
+Registry automation merely to run the check.
+
+
+
 Routine PRs intentionally do **not** execute CodeQL. Weekly and deliberate
 manual runs analyze `actions`, `javascript-typescript`, `java-kotlin` (Java
 only using `build-mode: none`; Kotlin sources fail coverage), and `rust`.
