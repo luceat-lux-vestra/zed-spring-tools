@@ -69,6 +69,9 @@ jobs:
           ' <<<"$compare" >/dev/null || { echo "::error::Candidate is not a protected-main ancestor"; exit 1; }
           gh api "repos/$GITHUB_REPOSITORY/contents/.github/scripts/release-codeql-verdict.py?ref=$GITHUB_SHA" --jq '.content' | base64 --decode > "$RUNNER_TEMP/release-codeql-verdict.py"
           test -s "$RUNNER_TEMP/release-codeql-verdict.py" || { echo "::error::Trusted SARIF verifier missing"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/codeql-java-config.yml?ref=$GITHUB_SHA" \
+            --jq '.content' | base64 --decode > "$RUNNER_TEMP/codeql-java-config.yml"
+          test -s "$RUNNER_TEMP/codeql-java-config.yml" || { echo "::error::Trusted Java scope configuration missing"; exit 1; }
 
       - name: Check out exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -148,7 +151,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # Only the Java buildless leg has overlapping historical fixture FQCNs.
-          config-file: ${{ matrix.language == 'java-kotlin' && './.github/codeql-java-config.yml' || '' }}
+          config-file: ${{ matrix.language == 'java-kotlin' && format('{0}/codeql-java-config.yml', runner.temp) || '' }}
 
       - name: Analyze CodeQL
         id: analyze
