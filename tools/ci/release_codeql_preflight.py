@@ -229,6 +229,10 @@ def self_test() -> None:
         ("expired", lambda r, j, a: a["artifacts"][0].update(expired=True)),
         ("missing artifact", lambda r, j, a: a["artifacts"].pop()),
         ("wrong source", lambda r, j, a: r["head_repository"].update(full_name="other/repo")),
+        ("wrong workflow", lambda r, j, a: r.update(workflow_id=99)),
+        ("wrong workflow path", lambda r, j, a: r.update(path=".github/workflows/ci.yml")),
+        ("wrong source run", lambda r, j, a: r.update(head_branch="feature")),
+        ("malformed artifact", lambda r, j, a: a["artifacts"][0].pop("id")),
     ):
         r, j, a = json.loads(json.dumps(run)), json.loads(json.dumps(jobs)), json.loads(json.dumps(artifacts))
         mutate(r, j, a)
