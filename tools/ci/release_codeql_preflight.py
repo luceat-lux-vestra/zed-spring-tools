@@ -293,7 +293,7 @@ def self_test() -> None:
             mock.patch.object(time, "sleep", return_value=None),
         ):
             try:
-                verify_live(repo, sha, Path("verdict.py"), 10, 0)
+                verify_live(repo, sha, Path("verdict.py"), 10, 1)
             except ValueError as exc:
                 if not error or error not in str(exc):
                     raise
@@ -313,21 +313,21 @@ def self_test() -> None:
 
     with mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}), mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha), mock.patch.object(sys.modules[__name__], "workflow", return_value=wf), mock.patch.object(sys.modules[__name__], "candidates", return_value=[]), mock.patch.object(sys.modules[__name__], "gh", side_effect=subprocess.CalledProcessError(1, ["gh"])):
         try:
-            verify_live(repo, sha, Path("verdict.py"), 1, 0)
+            verify_live(repo, sha, Path("verdict.py"), 1, 1)
         except subprocess.CalledProcessError:
             pass
         else:
             raise AssertionError("dispatch failure did not fail closed")
     with mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}), mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha), mock.patch.object(sys.modules[__name__], "workflow", return_value=wf), mock.patch.object(sys.modules[__name__], "candidates", return_value=[candidate("in_progress")]), mock.patch.object(sys.modules[__name__], "api", side_effect=OSError("poll unavailable")), mock.patch.object(time, "monotonic", side_effect=[0, 0]):
         try:
-            verify_live(repo, sha, Path("verdict.py"), 1, 0)
+            verify_live(repo, sha, Path("verdict.py"), 1, 1)
         except ValueError as exc:
             assert "failed polling" in str(exc)
         else:
             raise AssertionError("poll API failure did not fail closed")
     with mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}), mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha), mock.patch.object(sys.modules[__name__], "workflow", return_value=wf), mock.patch.object(sys.modules[__name__], "candidates", return_value=[]), mock.patch.object(sys.modules[__name__], "gh", return_value=""), mock.patch.object(time, "monotonic", side_effect=[0, 2]):
         try:
-            verify_live(repo, sha, Path("verdict.py"), 1, 0)
+            verify_live(repo, sha, Path("verdict.py"), 1, 1)
         except ValueError as exc:
             assert "timed out" in str(exc)
         else:
