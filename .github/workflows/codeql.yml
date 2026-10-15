@@ -1,4 +1,5 @@
 name: CodeQL
+run-name: CodeQL source ${{ inputs.candidate_sha || github.sha }}
 
 # Routine PR/push CodeQL deliberately retired. Every manual/scheduled run analyzes
 # exact protected main; original per-language SARIF and High/Critical verdicts
@@ -16,8 +17,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: codeql-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
-  cancel-in-progress: true
+  group: codeql-${{ inputs.candidate_sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   analyze:
@@ -43,27 +44,88 @@ jobs:
     env:
       EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_sha || github.sha }}
     steps:
-      - name: Verify exact reviewed current-main source
+      - name: Verify exact reviewed protected-main source
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Exact 40-hex source SHA required"; exit 1; }
-          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::CodeQL evidence must originate on main"; exit 1; }
-          [ "$GITHUB_SHA" = "$EXPECTED_SHA" ] || { echo "::error::Event SHA must match candidate"; exit 1; }
-          case "$GITHUB_EVENT_NAME" in workflow_dispatch|schedule) ;; *) exit 1 ;; esac
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::CodeQL workflow must originate on main"; exit 1; }
+          case "$GITHUB_EVENT_NAME" in
+            schedule)
+              [ "$GITHUB_SHA" = "$EXPECTED_SHA" ] || { echo "::error::Scheduled source identity drift"; exit 1; }
+              ;;
+            workflow_dispatch) ;;
+            *) echo "::error::Untrusted CodeQL trigger"; exit 1 ;;
+          esac
           remote_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          [ "$remote_main" = "$EXPECTED_SHA" ] || { echo "::error::Main moved or candidate is stale"; exit 1; }
+          [[ "$remote_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Protected main identity missing"; exit 1; }
+          compare="$(gh api "repos/$GITHUB_REPOSITORY/compare/${EXPECTED_SHA}...${remote_main}")"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            (.status == "ahead" or .status == "identical")
+            and .base_commit.sha == $sha
+            and .merge_base_commit.sha == $sha
+          ' <<<"$compare" >/dev/null || { echo "::error::Candidate is not a protected-main ancestor"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/scripts/release-codeql-verdict.py?ref=$GITHUB_SHA" --jq '.content' | base64 --decode > "$RUNNER_TEMP/release-codeql-verdict.py"
+          test -s "$RUNNER_TEMP/release-codeql-verdict.py" || { echo "::error::Trusted SARIF verifier missing"; exit 1; }
 
       - name: Check out exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
           ref: ${{ env.EXPECTED_SHA }}
 
-      - name: Verify checked-out commit
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Verify checked-out commit and record source identity
+        env:
+          CODEQL_LANGUAGE: ${{ matrix.language }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_SHA" ] || { echo "::error::Checkout identity mismatch"; exit 1; }
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          def git(*args: str) -> str:
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          expected = os.environ["EXPECTED_SHA"]
+          actual = git("rev-parse", "HEAD")
+          if actual != expected:
+              raise SystemExit("checkout identity mismatch")
+          doc = {
+              "schema": 1,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow_path": ".github/workflows/codeql.yml",
+              "workflow_ref": os.environ["WORKFLOW_REF"],
+              "workflow_sha": os.environ["WORKFLOW_SHA"],
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "event_sha": os.environ["GITHUB_SHA"],
+              "candidate_sha": expected,
+              "checkout_sha": actual,
+              "candidate_tree": git("rev-parse", "HEAD^{tree}"),
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "language": os.environ["CODEQL_LANGUAGE"],
+          }
+          path = pathlib.Path(os.environ["RUNNER_TEMP"], "source-identity.json")
+          path.write_text(json.dumps(doc, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Retain exact source identity
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-source-${{ env.EXPECTED_SHA }}-${{ matrix.language }}
+          path: ${{ runner.temp }}/source-identity.json
+          if-no-files-found: error
+          retention-days: 90
+
 
       - name: Reject unscanned Kotlin sources
         if: matrix.language == 'java-kotlin'
@@ -76,6 +138,9 @@ jobs:
             echo "::error::Kotlin detected; switch java-kotlin to manual build mode with a real instrumented Java/Kotlin build"
             exit 1
           fi
+
+      - name: Verify SARIF verdict negative controls
+        run: python3 "$RUNNER_TEMP/release-codeql-verdict.py" --self-test
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
@@ -106,9 +171,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 .github/scripts/release-codeql-verdict.py \
+          python3 "$RUNNER_TEMP/release-codeql-verdict.py" \
             --sarif-dir "$SARIF_DIR" \
             --language "${{ matrix.language }}" \
             --candidate-sha "$EXPECTED_SHA"
           remote_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          [ "$remote_main" = "$EXPECTED_SHA" ] || { echo "::error::Protected main moved during scan"; exit 1; }
+          compare="$(gh api "repos/$GITHUB_REPOSITORY/compare/${EXPECTED_SHA}...${remote_main}")"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            (.status == "ahead" or .status == "identical")
+            and .base_commit.sha == $sha
+            and .merge_base_commit.sha == $sha
+          ' <<<"$compare" >/dev/null || { echo "::error::Protected-main ancestry drifted during analysis"; exit 1; }
