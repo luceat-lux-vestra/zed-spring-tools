@@ -372,7 +372,7 @@ checkDocsOnlyFastPath();
 // A second API-based evidence authority must not reappear alongside the local PR DAG.
 function checkCiAndCodeqlCadence() {
   const ci = workflows.get("ci.yml");
-  if (!ci || /fast-evidence|actions\\/workflows\\/ci\\.yml\\/runs|actions\\/runs\\/\\$run_id\\/jobs/.test(ci.text)) {
+  if (!ci || ["fast-evidence", "actions/workflows/ci.yml/runs", "actions/runs/$run_id/jobs"].some((fragment) => ci.text.includes(fragment))) {
     fail("ci.yml contains obsolete workflow-run/Jobs evidence reuse.");
   }
   if (ci && !ci.text.includes("toJSON(needs)")) {
