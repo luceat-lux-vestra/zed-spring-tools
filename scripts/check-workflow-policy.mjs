@@ -42,6 +42,22 @@ const POLICY_FILE = ".github/merge-gate-policy.json";
 const problems = [];
 const fail = (message) => problems.push(message);
 
+
+const EPHEMERAL_WORKFLOW = /^(?:research|temporary|tmp|experiment)(?:[-_].*)?\.ya?ml$/i;
+
+function checkEphemeralWorkflowLifecycle(workflow) {
+  if (!EPHEMERAL_WORKFLOW.test(workflow.file)) return;
+  const header = workflow.text.split(/\r?\n/).slice(0, 20);
+  const owner = header.some((line) => /^#\s*lifecycle-owner:[ \t]*\S[^\r\n]*$/i.test(line));
+  const retire = header.some((line) => /^#\s*lifecycle-retire:[ \t]*\S[^\r\n]*$/i.test(line));
+  if (!owner) {
+    fail(`${workflow.file} is ephemeral and lacks non-empty # lifecycle-owner: header metadata.`);
+  }
+  if (!retire) {
+    fail(`${workflow.file} is ephemeral and lacks non-empty # lifecycle-retire: header metadata.`);
+  }
+}
+
 // --- workflow scanning ---------------------------------------------------
 
 // Drop a trailing `#` comment without touching a `#` inside a quoted scalar.
@@ -155,6 +171,7 @@ const workflows = new Map(
 const IMMUTABLE_REF = /^[\w.-]+\/[\w.-]+(?:\/[\w.-]+)*@[0-9a-f]{40}$/;
 
 for (const workflow of workflows.values()) {
+  checkEphemeralWorkflowLifecycle(workflow);
   if (!workflow.hasTopLevelPermissions) {
     fail(`${workflow.file} declares no top-level \`permissions:\`; it inherits whatever the repository default becomes.`);
   } else {
