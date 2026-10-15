@@ -492,16 +492,16 @@ function checkReleaseCodeqlPreflight() {
         mutation.test(code)) {
       fail(wf.file + ": codeql-preflight must invoke nonpublishing reuse-or-auto-scan with scanner dispatch authority.");
     }
-    if (preflight.continueOnError || /continue-on-error:\\s*true/.test(code) ||
-        /(?:^|\\n)\\s*if:\\s*.*(?:always\\(|failure\\(|cancelled\\()/.test(code)) {
+    if (preflight.continueOnError || /continue-on-error:\s*true/.test(code) ||
+        /(?:^|\n)\s*if:\s*.*(?:always\(|failure\(|cancelled\()/.test(code)) {
       fail(wf.file + ": publication preflight cannot mask failures or run unconditionally.");
     }
     for (const [id, job] of mutators) {
       if (id === "codeql-preflight" ||
           !job.needs ||
-          !/\\bcodeql-preflight\\b/.test(job.needs.code) ||
+          !/\bcodeql-preflight\b/.test(job.needs.code) ||
           job.continueOnError ||
-          /(?:^|\\n)\\s*if:\\s*.*(?:always\\(|failure\\(|cancelled\\()/.test(job.body.map((line) => line.code).join("\\n"))) {
+          /(?:^|\n)\s*if:\s*.*(?:always\(|failure\(|cancelled\()/.test(job.body.map((line) => line.code).join("\n"))) {
         fail(wf.file + ": publication job " + id + " must depend directly on codeql-preflight.");
       }
     }
