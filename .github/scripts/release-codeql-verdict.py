@@ -28,6 +28,12 @@ REQUIRED_SECURITY_RULES = {
 
 
 
+# Floor values are captured from the reviewed main source inventory; a changed
+# source scope must intentionally revise these alongside policy and full scan.
+SOURCE_FLOORS = {
+    "actions": 8, "javascript-typescript": 44, "rust": 11, "java-kotlin": 20,
+}
+
 def check(directory: Path, language: str, candidate_sha: str) -> dict:
     if language not in LANGUAGES:
         raise ValueError("unexpected language")
@@ -101,6 +107,10 @@ def check(directory: Path, language: str, candidate_sha: str) -> dict:
         missing = sorted(expected_sources - extracted_sources)
         raise ValueError(f"insufficient CodeQL extraction coverage: {len(missing)} missing, e.g. {missing[:3]}")
 
+    if len(expected_sources) < SOURCE_FLOORS[language] or len(extracted_sources) < SOURCE_FLOORS[language]:
+        raise ValueError(f"CodeQL source coverage below required baseline for {language}: "
+                         f"expected={len(expected_sources)}, extracted={len(extracted_sources)}, "
+                         f"minimum={SOURCE_FLOORS[language]}")
     # CodeQL SARIF puts query rules in tool.extensions[].rules, not in
     # tool.driver.rules. A clean scan may contain zero results and no driver rules.
     tool = run.get("tool", {})
@@ -199,6 +209,10 @@ def self_test() -> None:
             "tags": ["security"] if security else ["correctness"]}}
         if score is not None:
             rule["properties"]["security-severity"] = score
+        source_locations = [
+            {"physicalLocation": {"artifactLocation": {"uri": f"fixture-{i}.source"}}}
+            for i in range(SOURCE_FLOORS[language])
+        ]
         security_rules = [
             {"id": rule_id, "properties": {"tags": ["security"], "security-severity": "7.0"}}
             for rule_id in sorted(REQUIRED_SECURITY_RULES[language])
@@ -213,11 +227,11 @@ def self_test() -> None:
             "invocations": [{"executionSuccessful": True, "toolExecutionNotifications": [
                 {"level": "none", "descriptor": {"id": "cli/expected-extracted-files/" +
                     ("javascript" if language == "javascript-typescript" else "java" if language == "java-kotlin" else language)},
-                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": "fixture.source"}}}]},
+                 "locations": source_locations},
                 {"level": "none", "descriptor": {"id":
                     ("js" if language == "javascript-typescript" else "java" if language == "java-kotlin" else language)
                     + "/diagnostics/successfully-extracted-files"},
-                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": "fixture.source"}}}]},
+                 "locations": source_locations},
             ]}],
             "results": [{"ruleId": "java/test", "rule": {
                 "id": "java/test", "index": 0, "toolComponent": {"index": 0}
@@ -250,6 +264,10 @@ def self_test() -> None:
             clean = fixture(language=language, results=False)
             clean["runs"][0]["tool"]["extensions"][0]["name"] = pack
             probe(clean, language=language)
+        low_coverage = fixture(results=False)
+        low_coverage["runs"][0]["invocations"][0]["toolExecutionNotifications"][0]["locations"].pop()
+        low_coverage["runs"][0]["invocations"][0]["toolExecutionNotifications"][1]["locations"].pop()
+        probe(low_coverage, "source coverage below required baseline")
         no_required = fixture(results=False)
         no_required["runs"][0]["tool"]["extensions"][0]["rules"] = no_required["runs"][0]["tool"]["extensions"][0]["rules"][:-1]
         probe(no_required, "required CodeQL security rules missing")
