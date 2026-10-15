@@ -106,7 +106,7 @@
       "class": "advisory",
       "workflow": "codeql.yml",
       "job": "analyze",
-      "proves": "Advisory PR and weekly default-branch security analysis for one language. CodeQL PR results do not immediately update the default-branch alert baseline: Monday scheduled scans normally refresh it, and delayed, skipped or failed scans can extend staleness beyond a week. Deliberately never required: `codeql.yml` ignores documentation-only PR changes, so the context legitimately disappears on much repository traffic. A path-filtered required check would not be a reliable merge gate."
+      "proves": "Scheduled weekly or deliberate manual four-language scan of exact protected-main SHA, original per-language SARIF, CodeQL query pack/analysis validation and a fail-closed High/Critical verdict. Java build-mode none does not cover Kotlin: detection fails if Kotlin sources appear. Deliberately not a PR context or merge blocker; Registry release operates under documented pre-publication operator hold."
     },
     {
       "context": "label",
@@ -154,5 +154,21 @@
   },
   "retired_actions_event_policy_ids": [
     5154
-  ]
+  ],
+  "codeql_cadence": {
+    "workflow": "codeql.yml",
+    "pr_trigger": false,
+    "push_trigger": false,
+    "weekly": true,
+    "manual_exact_main_sha": true,
+    "required_languages": [
+      "actions",
+      "javascript-typescript",
+      "java-kotlin",
+      "rust"
+    ],
+    "raw_sarif_artifacts": true,
+    "high_critical_fail_closed": true,
+    "registry_publication_gate": "external-registry-operator-hold"
+  }
 }

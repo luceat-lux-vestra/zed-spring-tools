@@ -98,6 +98,41 @@ must keep source commit, registry pointer/version, release notes, and any Git ta
 or GitHub Release used for project provenance coherent. Do not move or rewrite a
 published release tag.
 
+## Security pre-publication operator hold — R2A #105
+
+Routine PRs intentionally do **not** execute CodeQL. Weekly and deliberate
+manual runs analyze `actions`, `javascript-typescript`, `java-kotlin` (Java
+only using `build-mode: none`; Kotlin sources fail coverage), and `rust`.
+New security findings can therefore be discovered after a merge.
+
+**HOLD before a new or updated Registry submission, requested upstream merge,
+version release, public release tag, or change to a Registry source pointer:**
+the operator verifies the exact reviewed source SHA, `extension.toml`
+version, upstream Registry source pointer, and successful *four-language*
+CodeQL on that same protected-main SHA. Each language must have the original
+SHA-labelled SARIF artifact, valid invocation and expected CodeQL query pack,
+and zero High/Critical findings as checked by
+`.github/scripts/release-codeql-verdict.py`. Inspect the CodeQL workflow run
+ID, job conclusions, per-language verdicts and retained raw SARIF artifacts.
+Never use a green CI check or a different commit's scan as a substitute. If
+the candidate changed or artifacts are missing/expired (90-day retention),
+**do not publish**; scan the exact new candidate.
+
+To launch a nonpublishing scan of reviewed `main`:
+
+```bash
+repo=luceat-lux-vestra/zed-spring-tools
+sha="$(gh api "repos/$repo/commits/main" --jq .sha)"
+gh workflow run codeql.yml -R "$repo" --ref main -f candidate_sha="$sha"
+```
+
+The actual distribution path is external
+[zed-industries/extensions#6875](https://github.com/zed-industries/extensions/pull/6875).
+This is an **operator-enforced hold**, not an automatic upstream Registry
+publication veto: local Actions cannot block an external maintainer or
+owner-side UI/API action. Do not mutate that upstream PR, extension version,
+or published tags in the course of this security CI migration.
+
 ## Release-currency checks
 
 Every release candidate must pass the following checks against the exact final

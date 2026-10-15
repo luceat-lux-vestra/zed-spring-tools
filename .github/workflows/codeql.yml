@@ -1,72 +1,114 @@
 name: CodeQL
 
-# Code scanning is free for public repositories. Four of this repository's
-# languages are analysable and each one is real attack surface:
-#
-# - `actions`   the workflows themselves, which run with repository credentials;
-# - `javascript-typescript` the coordinator, which speaks LSP over stdio and
-#                   spawns the Spring language server;
-# - `java-kotlin`   the bridge that the official Java extension's JDT LS loads;
-# - `rust`        the extension adapter compiled into the distributed WASM.
-#
-# Every language uses `build-mode: none`: nothing here needs a build to be
-# analysed, and CodeQL must not become a second, divergent build of the product.
-# Findings land in the repository's Security tab, not as a merge gate.
-
+# Routine PR/push CodeQL deliberately retired. Every manual/scheduled run analyzes
+# exact protected main; original per-language SARIF and High/Critical verdicts
+# are preserved before external Registry operator approval.
 on:
-  # Default-branch code-scanning alerts are refreshed weekly, not per merge.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    # A documentation-only pull request changes no analysed source. Research,
-    # decision, and spike documents are the bulk of this repository's traffic.
-    paths-ignore:
-      - "**/*.md"
-      - docs/**
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: "Exact 40-character protected main SHA to scan"
+        required: true
+        type: string
   schedule:
-    # Weekly, so a newly published query or advisory reaches this code even
-    # during a stretch of documentation-only work.
-    - cron: "27 5 * * 1"
+    - cron: '27 5 * * 1'
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
   analyze:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       security-events: write
     strategy:
       fail-fast: false
       matrix:
-        language:
-          - actions
-          - javascript-typescript
-          - java-kotlin
-          - rust
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          # Keep validated extraction modes; Rust does not support autobuild.
+          - language: rust
+            build-mode: none
+          - language: java-kotlin
+            build-mode: none
+    env:
+      EXPECTED_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_sha || github.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify exact reviewed current-main source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Exact 40-hex source SHA required"; exit 1; }
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::CodeQL evidence must originate on main"; exit 1; }
+          [ "$GITHUB_SHA" = "$EXPECTED_SHA" ] || { echo "::error::Event SHA must match candidate"; exit 1; }
+          case "$GITHUB_EVENT_NAME" in workflow_dispatch|schedule) ;; *) exit 1 ;; esac
+          remote_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [ "$remote_main" = "$EXPECTED_SHA" ] || { echo "::error::Main moved or candidate is stale"; exit 1; }
+
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The Rust extractor requires `cargo` to resolve the manifest. The image
-      # ships a toolchain, but pinning it puts this job on the exact compiler the
-      # `rust` CI job uses instead of whatever the image happens to carry, so a
-      # CodeQL finding and a clippy finding refer to the same rustc.
-      - if: matrix.language == 'rust'
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: "1.98.0"
-      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Verify checked-out commit
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Reject unscanned Kotlin sources
+        if: matrix.language == 'java-kotlin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # build-mode=none analyzes Java, not Kotlin.
+          # Require an instrumented build if Kotlin sources are introduced.
+          if find . -type f \( -name '*.kt' -o -name '*.kts' \) -not -path './.git/*' -print -quit | grep -q .; then
+            echo "::error::Kotlin detected; switch java-kotlin to manual build mode with a real instrumented Java/Kotlin build"
+            exit 1
+          fi
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
-      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Analyze CodeQL
+        id: analyze
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
-          category: /language:${{ matrix.language }}
+          category: "/language:${{ matrix.language }}"
+          upload: always
+          output: ${{ runner.temp }}/codeql-${{ matrix.language }}
+
+      - name: Retain original per-language SARIF
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-${{ env.EXPECTED_SHA }}-${{ matrix.language }}
+          path: ${{ steps.analyze.outputs.sarif-output }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Validate exact-SHA SARIF and reject High/Critical findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SARIF_DIR: ${{ steps.analyze.outputs.sarif-output }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release-codeql-verdict.py \
+            --sarif-dir "$SARIF_DIR" \
+            --language "${{ matrix.language }}" \
+            --candidate-sha "$EXPECTED_SHA"
+          remote_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [ "$remote_main" = "$EXPECTED_SHA" ] || { echo "::error::Protected main moved during scan"; exit 1; }
