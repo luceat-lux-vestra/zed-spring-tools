@@ -63,6 +63,53 @@ The currently pinned Spring Tools runtime is the official standalone server from
 
 Registry installation instructions will replace this section after the extension is actually published.
 
+## Corporate proxies and TLS certificates
+
+The Zed launch environment is inherited by the Node coordinator. To reach
+network services through a corporate HTTP proxy, set `HTTP_PROXY`,
+`HTTPS_PROXY` (typically a URL such as
+`http://proxy.example.com:8080`), and optionally `NO_PROXY` **before
+starting or restarting Zed**. Their lowercase equivalents are supported.
+Spring Tools translates these into the Java HTTP/HTTPS proxy system properties.
+It does not automatically enable a proxy when no proxy is configured.
+
+- `HTTPS_PROXY` specifies the proxy used for HTTPS *destinations*, not an
+  HTTPS (TLS-to-proxy) transport. Only unauthenticated `http://` proxy URLs
+  are translated automatically. Proxy URL credentials, SOCKS and
+  HTTPS-to-proxy transports are **not** interpreted as Java HTTP proxy settings.
+- `NO_PROXY` accepts hostname patterns such as `localhost,*.internal,.corp.example`.
+  The Java translation preserves its default localhost/loopback bypasses.
+  CIDR and port-specific exclusions cannot be represented accurately by Java
+  `http.nonProxyHosts`; an unsupported rule produces a configuration error
+  rather than silently routing private destinations through the proxy.
+- The JVM does **not** automatically use a custom Node.js CA configuration.
+  For a custom Java truststore, configure standard `JAVA_TOOL_OPTIONS` or
+  `JDK_JAVA_OPTIONS` in Zed's launch environment, for example
+  `JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/path/to/company.p12 -Djavax.net.ssl.trustStoreType=PKCS12"`.
+  These options are forwarded to the Java process, but the extension never
+  forces a custom truststore. A Windows JDK with a suitable security provider
+  can opt into its `Windows-ROOT` keystore through standard JVM options;
+  no such override is applied to all Windows users.
+- Node.js may use `NODE_USE_SYSTEM_CA=1` on supported Node versions, or
+  `NODE_EXTRA_CA_CERTS=/path/to/company.pem` for an additional trusted CA.
+  Where a user explicitly sets `NODE_TLS_REJECT_UNAUTHORIZED=0`, **Node**
+  honors that inherited process setting; it disables Node's TLS certificate
+  validation and is unsafe outside a deliberate, controlled workaround.
+  The extension does not set that value itself or pass it to the Java child.
+  Node TLS settings do not override Java certificate validation.
+
+Corporate networks using authenticated proxy schemes, PAC files, SOCKS, or
+unrepresentable `NO_PROXY` CIDR patterns require environment-specific JDK
+configuration and real network validation. First-install Spring artifact
+acquisition is also performed by Zed's own download API; Java proxy flags do
+not configure that separate download path. None of these settings constitute
+a claim of successful testing behind every corporate network.
+
+Java proxy property semantics:
+[Oracle Java networking properties](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/doc-files/net-properties.html).
+Node trust configuration:
+[Node.js CLI environment options](https://nodejs.org/api/cli.html).
+
 ## Compatibility policy
 
 Zed Spring Tools distinguishes between implementation and support evidence.

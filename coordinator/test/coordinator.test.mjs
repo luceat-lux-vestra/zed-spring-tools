@@ -16,6 +16,7 @@ import {
   javaVersion,
   monitorZedInput,
   parseOptions,
+  proxyJvmArguments,
   run,
   sanitizedEnvironment,
   springArguments,
@@ -138,6 +139,185 @@ test("standalone project-dir JVM argument preserves host path identity", () => {
 
 test("environment allowlist excludes unrelated secrets", () => {
   assert.deepEqual(sanitizedEnvironment({ PATH: "/bin", SECRET_TOKEN: "no" }), { PATH: "/bin" });
+});
+test("environment allowlist passes proxy variables through", () => {
+  const env = {
+    HTTP_PROXY: "http://proxy.example.com:8080",
+    HTTPS_PROXY: "http://proxy.example.com:8443",
+    http_proxy: "http://proxy.example.com:8080",
+    https_proxy: "http://proxy.example.com:8443",
+    NO_PROXY: "localhost,127.0.0.1",
+    no_proxy: "localhost,127.0.0.1",
+    SECRET_TOKEN: "no",
+  };
+  const result = sanitizedEnvironment(env);
+  assert.equal(result.HTTP_PROXY, "http://proxy.example.com:8080");
+  assert.equal(result.HTTPS_PROXY, "http://proxy.example.com:8443");
+  assert.equal(result.http_proxy, "http://proxy.example.com:8080");
+  assert.equal(result.https_proxy, "http://proxy.example.com:8443");
+  assert.equal(result.NO_PROXY, "localhost,127.0.0.1");
+  assert.equal(result.no_proxy, "localhost,127.0.0.1");
+  assert.equal(result.SECRET_TOKEN, undefined);
+});
+
+test("proxyJvmArguments produces no args when no proxy is set", () => {
+  assert.deepEqual(proxyJvmArguments({}), []);
+  assert.deepEqual(proxyJvmArguments({ HTTP_PROXY: "", HTTPS_PROXY: "" }), []);
+});
+
+test("proxyJvmArguments translates HTTPS_PROXY into JVM https proxy properties", () => {
+  const args = proxyJvmArguments({ HTTPS_PROXY: "http://proxy.example.com:8080" });
+  assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
+  assert.ok(args.includes("-Dhttps.proxyPort=8080"));
+  assert.ok(!args.some((a) => a.startsWith("-Dhttp.proxyHost=")));
+});
+
+test("proxyJvmArguments translates HTTP_PROXY into JVM http proxy properties", () => {
+  const args = proxyJvmArguments({ HTTP_PROXY: "http://proxy.example.com:3128" });
+  assert.ok(args.includes("-Dhttp.proxyHost=proxy.example.com"));
+  assert.ok(args.includes("-Dhttp.proxyPort=3128"));
+  assert.ok(!args.some((a) => a.startsWith("-Dhttps.proxyHost=")));
+});
+
+test("proxyJvmArguments handles proxy URL without explicit port", () => {
+  const args = proxyJvmArguments({ HTTPS_PROXY: "http://proxy.example.com" });
+  assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
+  assert.ok(args.includes("-Dhttps.proxyPort=80"));
+});
+
+test("proxyJvmArguments handles bare host:port without scheme", () => {
+  const args = proxyJvmArguments({ HTTPS_PROXY: "proxy.example.com:8080" });
+  assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
+  assert.ok(args.includes("-Dhttps.proxyPort=8080"));
+});
+
+test("proxyJvmArguments translates NO_PROXY into http.nonProxyHosts", () => {
+  const args = proxyJvmArguments({
+    HTTPS_PROXY: "http://proxy.example.com:8080",
+    NO_PROXY: "localhost,127.0.0.1,*.internal",
+  });
+  assert.ok(args.includes("-Dhttp.nonProxyHosts=localhost|127.*|[::1]|localhost|127.0.0.1|*.internal"));
+});
+
+test("proxyJvmArguments prefers uppercase proxy variables over lowercase", () => {
+  const args = proxyJvmArguments({
+    HTTPS_PROXY: "http://upper.example.com:8080",
+    https_proxy: "http://lower.example.com:9090",
+  });
+  assert.ok(args.includes("-Dhttps.proxyHost=upper.example.com"));
+  assert.ok(args.includes("-Dhttps.proxyPort=8080"));
+});
+
+test("springArguments injects proxy JVM properties from environment", () => {
+  const args = springArguments(
+    "/tmp/spring/server.jar",
+    "/tmp/project",
+    null,
+    "linux",
+    { HTTPS_PROXY: "http://proxy.example.com:8080", NO_PROXY: "localhost" },
+  );
+  assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
+  assert.ok(args.includes("-Dhttps.proxyPort=8080"));
+  assert.ok(args.includes("-Dhttp.nonProxyHosts=localhost"));
+  assert.ok(args.includes("-jar"));
+});
+
+test("springArguments omits proxy properties when no proxy is set", () => {
+  const args = springArguments(
+    "/tmp/spring/server.jar",
+    "/tmp/project",
+    null,
+    "linux",
+    {},
+  );
+  assert.ok(!args.some((a) => a.startsWith("-Dhttp.proxyHost=")));
+  assert.ok(!args.some((a) => a.startsWith("-Dhttps.proxyHost=")));
+  assert.ok(!args.some((a) => a.startsWith("-Dhttp.nonProxyHosts=")));
+});
+
+test("springArguments never forces Windows trust roots without user opt-in", () => {
+  for (const platform of ["win32", "darwin", "linux"]) {
+    const args = springArguments(
+      "/tmp/spring/server.jar", "/tmp/project", null, platform,
+      { HTTPS_PROXY: "http://proxy.example.com:8080" },
+    );
+    assert.ok(args.includes("-Dhttps.proxyHost=proxy.example.com"));
+    assert.ok(!args.some((a) => a.startsWith("-Djavax.net.ssl.trustStore")));
+  }
+});
+
+test("the Java subprocess retains explicitly configured JVM TLS options only", () => {
+  const env = sanitizedEnvironment({
+    JAVA_TOOL_OPTIONS: "-Djavax.net.ssl.trustStoreType=Windows-ROOT",
+    JDK_JAVA_OPTIONS: "-Djavax.net.ssl.trustStore=/custom/ca.p12",
+    NODE_TLS_REJECT_UNAUTHORIZED: "0",
+    NODE_EXTRA_CA_CERTS: "/node/ca.pem",
+    NODE_USE_SYSTEM_CA: "1",
+    SECRET_TOKEN: "private",
+  });
+  assert.equal(env.JAVA_TOOL_OPTIONS, "-Djavax.net.ssl.trustStoreType=Windows-ROOT");
+  assert.equal(env.JDK_JAVA_OPTIONS, "-Djavax.net.ssl.trustStore=/custom/ca.p12");
+  // Node receives its own configuration from Zed on startup; these values
+  // must not be pointlessly forwarded to the Spring Tools JVM.
+  assert.equal(env.NODE_TLS_REJECT_UNAUTHORIZED, undefined);
+  assert.equal(env.NODE_EXTRA_CA_CERTS, undefined);
+  assert.equal(env.NODE_USE_SYSTEM_CA, undefined);
+  assert.equal(env.SECRET_TOKEN, undefined);
+});
+
+test("lowercase proxy variables and implicit HTTP port are honored", () => {
+  const args = proxyJvmArguments({
+    https_proxy: "http://proxy.internal",
+    http_proxy: "proxy.internal:3128",
+    no_proxy: ".internal",
+  });
+  assert.ok(args.includes("-Dhttps.proxyHost=proxy.internal"));
+  assert.ok(args.includes("-Dhttps.proxyPort=80"));
+  assert.ok(args.includes("-Dhttp.proxyPort=3128"));
+  assert.ok(args.includes("-Dhttp.nonProxyHosts=localhost|127.*|[::1]|internal|*.internal"));
+});
+
+test("malformed and unsupported proxies fail without printing credentials", () => {
+  for (const url of [
+    "https://proxy.example.com:8080",
+    "socks5://proxy.example.com:1080",
+    "http://admin:secret@proxy.example.com:8080",
+    "http://proxy.example.com:8080/unexpected",
+    "://invalid",
+  ]) {
+    assert.throws(() => proxyJvmArguments({ HTTPS_PROXY: url }), (error) => {
+      assert.match(error.message, /HTTPS_PROXY/);
+      assert.ok(!error.message.includes("secret"));
+      return true;
+    });
+  }
+});
+
+test("nonProxyHosts keeps loopback, supports wildcard and rejects CIDR", () => {
+  const args = proxyJvmArguments({
+    HTTPS_PROXY: "http://proxy.example.com:8080",
+    NO_PROXY: "*.internal,.example.com",
+  });
+  assert.ok(args.includes(
+    "-Dhttp.nonProxyHosts=localhost|127.*|[::1]|*.internal|example.com|*.example.com",
+  ));
+  assert.ok(proxyJvmArguments({
+    HTTPS_PROXY: "http://proxy.example.com:8080",
+    NO_PROXY: "*",
+  }).includes("-Dhttp.nonProxyHosts=*"));
+  assert.throws(
+    () => proxyJvmArguments({
+      HTTPS_PROXY: "http://proxy.example.com:8080",
+      NO_PROXY: "10.0.0.0/8",
+    }),
+    /NO_PROXY contains a rule Java cannot represent/,
+  );
+});
+
+test("Spring launch argument defaults ignore ambient test runner proxy environment", () => {
+  const args = springArguments("/tmp/spring/server.jar", "/tmp/project", null, "linux");
+  assert.ok(!args.some((arg) => arg.startsWith("-Dhttps.proxy")));
+  assert.ok(!args.some((arg) => arg.startsWith("-Dhttp.proxy")));
 });
 
 test("Java requirement accepts 21 and the configured Java 25 default", () => {
