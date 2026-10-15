@@ -1,0 +1,15 @@
+# CodeQL Java buildless source scope for Registry-candidate assurance.
+#
+# This repository ships Rust/WASM, not Java. Historical spikes and parallel
+# Maven/Gradle test fixtures deliberately declare identical Java FQCNs.
+# Scanning all Java together in build-mode:none silently drops 25 duplicate
+# sources and emitted javac extraction errors on the retired S003/S012 spikes.
+#
+# Scan representative active Java fixture families with unambiguous packages;
+# exercise other fixture variants separately through existing CI/platform tests.
+# Any change to this list requires explicit code-review and a new full scan.
+name: Zed active Java fixture security corpus
+paths:
+  - tests/fixtures/spring-boot-basic/src/main/java/**
+  - tests/fixtures/spring-codelens-showcase/src/main/java/**
+  - tests/fixtures/spring-modulith-gradle/src/main/java/**
