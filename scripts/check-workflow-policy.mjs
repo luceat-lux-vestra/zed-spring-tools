@@ -369,6 +369,41 @@ function checkDocsOnlyFastPath() {
 
 checkDocsOnlyFastPath();
 
+// A second API-based evidence authority must not reappear alongside the local PR DAG.
+function checkCiAndCodeqlCadence() {
+  const ci = workflows.get("ci.yml");
+  if (!ci || /fast-evidence|actions\\/workflows\\/ci\\.yml\\/runs|actions\\/runs\\/\\$run_id\\/jobs/.test(ci.text)) {
+    fail("ci.yml contains obsolete workflow-run/Jobs evidence reuse.");
+  }
+  if (ci && !ci.text.includes("toJSON(needs)")) {
+    fail("Merge Gate lost local needs-result aggregation.");
+  }
+  const codeql = workflows.get("codeql.yml");
+  const cadence = policy.codeql_cadence ?? {};
+  if (!codeql || cadence.workflow !== "codeql.yml") {
+    fail("CodeQL cadence workflow or recorded policy is missing.");
+    return;
+  }
+  for (const event of ["pull_request", "pull_request_target", "push"]) {
+    if (codeql.triggers.has(event)) fail("CodeQL must not trigger on " + event + ".");
+  }
+  if (!codeql.triggers.has("schedule") || !codeql.triggers.has("workflow_dispatch")) {
+    fail("CodeQL must support both scheduled and manual analysis.");
+  }
+  if ((cadence.required_languages ?? []).length !== 4 ||
+      (cadence.required_languages ?? []).some((language) => !codeql.text.includes("language: " + language)) ||
+      !codeql.text.includes("candidate_sha") ||
+      !codeql.text.includes("remote_main") ||
+      !codeql.text.includes("release-codeql-verdict.py") ||
+      !codeql.text.includes("actions/upload-artifact@") ||
+      !codeql.text.includes("Reject unscanned Kotlin sources") ||
+      !codeql.text.includes("build-mode: none")) {
+    fail("CodeQL language, Kotlin, exact-SHA or raw SARIF assurance drifted.");
+  }
+}
+checkCiAndCodeqlCadence();
+
+
 const claimed = new Set();
 for (const entry of contexts) {
   const workflow = workflows.get(entry.workflow);

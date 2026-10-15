@@ -7,7 +7,7 @@ on:
 # Least privilege: these checks only read the tree. Nothing here writes to the
 # repository, so this token cannot be used to change it.
 permissions:
-  actions: read # Needed to inspect the canonical exact-SHA ci.yml workflow run.
+  pull-requests: read # Needed to enumerate PR files for fail-closed docs-only routing.
   contents: read
 
 concurrency:
@@ -74,74 +74,14 @@ jobs:
         if: ${{ steps.scope.outputs.docs_only == 'true' }}
         run: echo "Documentation-only change; product build/test/toolchain work is not applicable."
 
-      - name: Reuse exact-SHA Fast evidence
-        id: fast-evidence
-        if: ${{ steps.scope.outputs.docs_only != 'true' && github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
-          EXPECTED_JOB: rust
-          SAME_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-        run: |
-          set -euo pipefail
-          if [ "$SAME_REPOSITORY" != "true" ]; then
-            echo "reuse=false" >> "$GITHUB_OUTPUT"
-            echo "Fork PR cannot reuse base-repository workflow evidence; Final will execute the local Fast checks."
-            exit 0
-          fi
-          base_workflow_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/ci.yml?ref=$BASE_SHA" --jq '.sha')"
-          head_workflow_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/ci.yml?ref=$EXPECTED_SHA" --jq '.sha')"
-          if [ "$base_workflow_sha" != "$head_workflow_sha" ]; then
-            echo "reuse=false" >> "$GITHUB_OUTPUT"
-            echo "Fast producer workflow changed on this PR; Final will execute the local Fast checks instead of trusting self-modified evidence."
-            exit 0
-          fi
-
-          for _ in $(seq 1 60); do
-            runs="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&head_sha=$EXPECTED_SHA&per_page=100")"
-            latest="$(jq -c --arg sha "$EXPECTED_SHA" --arg current "$GITHUB_RUN_ID" '
-              [.workflow_runs[]
-               | select(.head_sha == $sha and .event == "pull_request")
-               | select((.id | tostring) != $current)]
-              | if length == 0 then empty else max_by(.id) end
-            ' <<<"$runs")"
-            if [ -z "$latest" ]; then sleep 5; continue; fi
-            status="$(jq -r '.status' <<<"$latest")"
-            conclusion="$(jq -r '.conclusion // ""' <<<"$latest")"
-            if [ "$status" != "completed" ]; then sleep 5; continue; fi
-            if [ "$conclusion" != "success" ]; then
-              echo "::error::Canonical ci.yml workflow for exact HEAD $EXPECTED_SHA concluded '$conclusion'; refusing stale or failed evidence."
-              exit 1
-            fi
-            run_id="$(jq -r '.id' <<<"$latest")"
-            jobs="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
-            matching_jobs="$(jq --arg name "$EXPECTED_JOB" '[.jobs[] | select(.name == $name)] | length' <<<"$jobs")"
-            if [ "$matching_jobs" != "1" ]; then
-              echo "::error::Canonical run $run_id must contain exactly one '$EXPECTED_JOB' job; found $matching_jobs."
-              exit 1
-            fi
-            job_status="$(jq -r --arg name "$EXPECTED_JOB" '.jobs[] | select(.name == $name) | .status' <<<"$jobs")"
-            job_conclusion="$(jq -r --arg name "$EXPECTED_JOB" '.jobs[] | select(.name == $name) | (.conclusion // "")' <<<"$jobs")"
-            if [ "$job_status" != "completed" ] || [ "$job_conclusion" != "success" ]; then
-              echo "::error::Canonical '$EXPECTED_JOB' evidence for exact HEAD $EXPECTED_SHA is status=$job_status conclusion=$job_conclusion."
-              exit 1
-            fi
-            echo "reuse=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing canonical successful '$EXPECTED_JOB' evidence for exact HEAD $EXPECTED_SHA."
-            exit 0
-          done
-          echo "::error::Timed out waiting for canonical exact-SHA '$EXPECTED_JOB' evidence at $EXPECTED_SHA."
-          exit 1
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           persist-credentials: false
       # Java 21 is intentional here: this required job proves the declared JDK
       # floor. M5 platform validation separately drives the latest LTS, JDK 25.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           distribution: temurin
           java-version: "21"
@@ -152,29 +92,29 @@ jobs:
       # the shipped WASM on its own toolchain, so this pin governs CI only; move
       # it deliberately, with a run that proves the new compiler is clean.
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           # Reuse the same Cargo/toolchain cache family produced on protected
           # main. A pull request is strictly restore-only.
           shared-key: main-ci-rust-arm64
           save-if: false
       - name: Format
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: cargo fmt --check
       - name: Clippy
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: cargo test --locked
       - name: Build WASM release
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: cargo build --locked --release --target wasm32-wasip2
 
   coordinator:
@@ -223,104 +163,44 @@ jobs:
         if: ${{ steps.scope.outputs.docs_only == 'true' }}
         run: echo "Documentation-only change; product build/test/toolchain work is not applicable."
 
-      - name: Reuse exact-SHA Fast evidence
-        id: fast-evidence
-        if: ${{ steps.scope.outputs.docs_only != 'true' && github.event_name == 'pull_request' && github.event.action == 'ready_for_review' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
-          EXPECTED_JOB: coordinator
-          SAME_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-        run: |
-          set -euo pipefail
-          if [ "$SAME_REPOSITORY" != "true" ]; then
-            echo "reuse=false" >> "$GITHUB_OUTPUT"
-            echo "Fork PR cannot reuse base-repository workflow evidence; Final will execute the local Fast checks."
-            exit 0
-          fi
-          base_workflow_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/ci.yml?ref=$BASE_SHA" --jq '.sha')"
-          head_workflow_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/ci.yml?ref=$EXPECTED_SHA" --jq '.sha')"
-          if [ "$base_workflow_sha" != "$head_workflow_sha" ]; then
-            echo "reuse=false" >> "$GITHUB_OUTPUT"
-            echo "Fast producer workflow changed on this PR; Final will execute the local Fast checks instead of trusting self-modified evidence."
-            exit 0
-          fi
-
-          for _ in $(seq 1 60); do
-            runs="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&head_sha=$EXPECTED_SHA&per_page=100")"
-            latest="$(jq -c --arg sha "$EXPECTED_SHA" --arg current "$GITHUB_RUN_ID" '
-              [.workflow_runs[]
-               | select(.head_sha == $sha and .event == "pull_request")
-               | select((.id | tostring) != $current)]
-              | if length == 0 then empty else max_by(.id) end
-            ' <<<"$runs")"
-            if [ -z "$latest" ]; then sleep 5; continue; fi
-            status="$(jq -r '.status' <<<"$latest")"
-            conclusion="$(jq -r '.conclusion // ""' <<<"$latest")"
-            if [ "$status" != "completed" ]; then sleep 5; continue; fi
-            if [ "$conclusion" != "success" ]; then
-              echo "::error::Canonical ci.yml workflow for exact HEAD $EXPECTED_SHA concluded '$conclusion'; refusing stale or failed evidence."
-              exit 1
-            fi
-            run_id="$(jq -r '.id' <<<"$latest")"
-            jobs="$(gh api -H 'Accept: application/vnd.github+json' "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
-            matching_jobs="$(jq --arg name "$EXPECTED_JOB" '[.jobs[] | select(.name == $name)] | length' <<<"$jobs")"
-            if [ "$matching_jobs" != "1" ]; then
-              echo "::error::Canonical run $run_id must contain exactly one '$EXPECTED_JOB' job; found $matching_jobs."
-              exit 1
-            fi
-            job_status="$(jq -r --arg name "$EXPECTED_JOB" '.jobs[] | select(.name == $name) | .status' <<<"$jobs")"
-            job_conclusion="$(jq -r --arg name "$EXPECTED_JOB" '.jobs[] | select(.name == $name) | (.conclusion // "")' <<<"$jobs")"
-            if [ "$job_status" != "completed" ] || [ "$job_conclusion" != "success" ]; then
-              echo "::error::Canonical '$EXPECTED_JOB' evidence for exact HEAD $EXPECTED_SHA is status=$job_status conclusion=$job_conclusion."
-              exit 1
-            fi
-            echo "reuse=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing canonical successful '$EXPECTED_JOB' evidence for exact HEAD $EXPECTED_SHA."
-            exit 0
-          done
-          echo "::error::Timed out waiting for canonical exact-SHA '$EXPECTED_JOB' evidence at $EXPECTED_SHA."
-          exit 1
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           fetch-depth: 0
           persist-credentials: false
       # Node 24 is the current LTS line and is also the M5 platform baseline.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           node-version: 24
       # Use the same explicit cross-platform discovery path as the six-tuple
       # platform matrix so adding a new coordinator test cannot diverge between
       # required CI and portability CI.
       - name: Coordinator tests
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/run-coordinator-tests.mjs
       - name: Repository check tests
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node --test scripts/test/*.test.mjs
       - name: Case-insensitive path collisions
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/check-case-collisions.mjs
       - name: Contributors list is current
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/generate-contributors.mjs --check
       # A dependency bump changes the locked package count and the direct
       # dependency versions that THIRD_PARTY_NOTICES.md states, and the notice
       # is what a user reads about the redistributed WASM. Fail the bump, not
       # the release.
       - name: Third-party notices are current
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/check-third-party-notices.mjs
       # The pinned Spring Tools identity is retyped across the extension
       # manifest, the Rust adapter, the coordinator and the notices. This runs
       # inside an already-required context so a half-applied release pin cannot
       # merge, rather than surfacing at a user's install.
       - name: Spring Tools pin inventory reconciles
-        if: ${{ steps.scope.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || steps.fast-evidence.outputs.reuse != 'true') }}
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/check-pin-inventory.mjs
 
   # Fail-closed workflow policy. Both tools are fetched by exact version and
@@ -377,6 +257,9 @@ jobs:
       - name: Merge-gate and workflow policy
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/check-workflow-policy.mjs
+      - name: CodeQL original SARIF verdict negative controls
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        run: python3 .github/scripts/release-codeql-verdict.py --self-test
       - name: Issue metadata policy
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node --test scripts/test-issue-metadata.mjs
@@ -404,22 +287,13 @@ jobs:
     steps:
       - name: Require every merge-gate component to succeed
         env:
-          RUST_RESULT: ${{ needs.rust.result }}
-          COORDINATOR_RESULT: ${{ needs.coordinator.result }}
-          REVIEW_RESULT: ${{ needs.review.result }}
-          WORKFLOW_SECURITY_RESULT: ${{ needs['workflow-security'].result }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
         shell: bash
         run: |
           set -euo pipefail
           failed=0
-          for entry in \
-            "rust=$RUST_RESULT" \
-            "coordinator=$COORDINATOR_RESULT" \
-            "review=$REVIEW_RESULT" \
-            "workflow-security=$WORKFLOW_SECURITY_RESULT"
-          do
-            name="${entry%%=*}"
-            result="${entry#*=}"
+          for name in rust coordinator review workflow-security; do
+            result="$(jq -r --arg name "$name" '.[$name].result // "missing"' <<<"$NEEDS_JSON")"
             if [ "$result" != "success" ]; then
               echo "::error::$name concluded '$result'; Merge Gate remains closed."
               failed=1
