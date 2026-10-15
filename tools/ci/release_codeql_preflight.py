@@ -157,6 +157,11 @@ def verify_live(repo: str, sha: str, verdict: Path, timeout_seconds: int = 4200,
         reject("ambiguous rerun attempt for exact candidate")
     if len(active) > 1:
         reject("ambiguous active exact-source CodeQL scans")
+    completed = [row for row in exact_runs if row.get("status") == "completed"]
+    if any(row.get("conclusion") != "success" for row in completed):
+        reject("failed existing exact-source CodeQL scan cannot be replaced")
+    if len(completed) > 1:
+        reject("ambiguous duplicate completed exact-source CodeQL scans")
     if active and any(row.get("status") == "completed" and row.get("conclusion") != "success" for row in exact_runs):
         reject("active scan conflicts with failed existing scan")
 
@@ -165,7 +170,6 @@ def verify_live(repo: str, sha: str, verdict: Path, timeout_seconds: int = 4200,
         selected = active[0]["id"]
         print(f"Joining active exact-source CodeQL {selected}", flush=True)
     else:
-        completed = [row for row in exact_runs if row.get("status") == "completed"]
         if completed:
             newest = completed[0]
             if newest.get("conclusion") != "success":
@@ -310,6 +314,10 @@ def self_test() -> None:
     exercise(candidate("completed", "failure"), None, False, "ended failure")
     exercise(candidate("in_progress", attempt=2), None, False, "ambiguous rerun")
     exercise([candidate("in_progress", run_id=71), candidate("queued", run_id=72)], None, False, "ambiguous active")
+    exercise([candidate("completed", "success", run_id=71),
+              candidate("completed", "success", run_id=72)], None, False, "ambiguous duplicate")
+    exercise([candidate("completed", "success", run_id=71),
+              candidate("completed", "failure", run_id=72)], None, False, "failed existing")
 
     with mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}), mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha), mock.patch.object(sys.modules[__name__], "workflow", return_value=wf), mock.patch.object(sys.modules[__name__], "candidates", return_value=[]), mock.patch.object(sys.modules[__name__], "gh", side_effect=subprocess.CalledProcessError(1, ["gh"])):
         try:
