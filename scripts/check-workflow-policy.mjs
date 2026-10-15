@@ -421,6 +421,96 @@ function checkCiAndCodeqlCadence() {
 checkCiAndCodeqlCadence();
 
 
+// --- exact-SHA release preflight and future publisher boundary (#192) ---
+// Registry submission is upstream/operator-controlled. Guard repo-managed changes.
+function checkReleaseCodeqlPreflight() {
+  const scanner = workflows.get("codeql.yml");
+  const gate = workflows.get("release-codeql-preflight.yml");
+  if (!scanner || !gate) {
+    fail("exact-SHA CodeQL release preflight workflow is missing.");
+    return;
+  }
+  for (const required of [
+    "run-name: CodeQL source ${{ inputs.candidate_sha || github.sha }}",
+    "compare/${EXPECTED_SHA}...${remote_main}",
+    "merge_base_commit.sha",
+    "candidate_tree",
+    "codeql-source-${{ env.EXPECTED_SHA }}-${{ matrix.language }}",
+    "release-codeql-verdict.py",
+  ]) {
+    if (!scanner.text.includes(required)) fail("CodeQL source provenance / historical-main assurance missing: " + required);
+  }
+  // The Java-only configuration is a reviewed source boundary. Do not let a
+  // one-line scope shrink turn a previously full extraction into green evidence.
+  const configPath = join(ROOT, ".github/codeql-java-config.yml");
+  const approvedJavaLines = [
+    "name: Zed active Java fixture security corpus",
+    "paths:",
+    "- tests/fixtures/spring-boot-basic/src/main/java/**",
+    "- tests/fixtures/spring-codelens-showcase/src/main/java/**",
+    "- tests/fixtures/spring-modulith-gradle/src/main/java/**",
+  ];
+  const configLines = existsSync(configPath)
+    ? readFileSync(configPath, "utf8").split("\n").map((line) => line.trim())
+        .filter((line) => line !== "" && !line.startsWith("#"))
+    : [];
+  if (JSON.stringify(configLines) !== JSON.stringify(approvedJavaLines) ||
+      !scanner.text.includes("codeql-java-config.yml") ||
+      !scanner.text.includes("runner.temp")) {
+    fail("Java release CodeQL source scope drifted from the reviewed fixture corpus.");
+  }
+  if (!gate.triggers.has("workflow_dispatch") || gate.triggers.size !== 1) {
+    fail("release CodeQL preflight must be manual-only.");
+  }
+  if (!gate.text.includes("candidate_sha:") ||
+      !gate.text.includes("actions: write") ||
+      !gate.text.includes("contents: read") ||
+      !gate.text.includes("tools/ci/release_codeql_preflight.py") ||
+      !gate.text.includes("ref: ${{ github.sha }}") ||
+      !gate.jobs.has("preflight")) {
+    fail("release CodeQL preflight lost trusted scanner dispatch/checkout authority.");
+  }
+  const mutation = /(?:\bgh\s+release\s+(?:create|upload|edit|delete)\b|\bgh\s+api\b[^\n]*(?:\/releases|\/git\/refs)|\b(?:cargo|npm|pnpm)\s+publish\b|softprops\/action-gh-release@|(?:\b|\W)(?:publish|submit)[-_](?:registry|extension)\b|(?:\b|\W)(?:publish|release)[-_](?:registry|extension)\.(?:sh|py|mjs)\b)/i;
+  const commands = (w) => w.code.map((line) => line.code).join("\n");
+  if (mutation.test(commands(gate))) {
+    fail("nonpublishing release CodeQL preflight gained a publication side effect.");
+  }
+  for (const wf of workflows.values()) {
+    if (["codeql.yml", "release-codeql-preflight.yml"].includes(wf.file)) continue;
+    const namedPublisher = /(?:^|[-_])(?:release|publish|registry)(?:[-_.]|$)/i.test(wf.file);
+    const mutators = [...wf.jobs.entries()].filter(([, job]) =>
+      mutation.test(job.body.map((line) => line.code).join("\n")));
+    if (!namedPublisher && mutators.length === 0) continue;
+    const preflight = wf.jobs.get("codeql-preflight");
+    if (!preflight) {
+      fail(wf.file + ": repository-managed publication requires codeql-preflight job.");
+      continue;
+    }
+    const code = preflight.body.map((line) => line.code).join("\n");
+    if (!code.includes("tools/ci/release_codeql_preflight.py") ||
+        !code.includes("actions: write") ||
+        mutation.test(code)) {
+      fail(wf.file + ": codeql-preflight must invoke nonpublishing reuse-or-auto-scan with scanner dispatch authority.");
+    }
+    if (preflight.continueOnError || /continue-on-error:\s*true/.test(code) ||
+        /(?:^|\n)\s*if:\s*.*(?:always\(|failure\(|cancelled\()/.test(code)) {
+      fail(wf.file + ": publication preflight cannot mask failures or run unconditionally.");
+    }
+    for (const [id, job] of mutators) {
+      if (id === "codeql-preflight" ||
+          !job.needs ||
+          !/\bcodeql-preflight\b/.test(job.needs.code) ||
+          job.continueOnError ||
+          /(?:^|\n)\s*if:\s*.*(?:always\(|failure\(|cancelled\()/.test(job.body.map((line) => line.code).join("\n"))) {
+        fail(wf.file + ": publication job " + id + " must depend directly on codeql-preflight.");
+      }
+    }
+  }
+}
+checkReleaseCodeqlPreflight();
+
+
+
 const claimed = new Set();
 for (const entry of contexts) {
   const workflow = workflows.get(entry.workflow);
