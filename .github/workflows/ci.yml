@@ -260,6 +260,9 @@ jobs:
       - name: CodeQL original SARIF verdict negative controls
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: python3 .github/scripts/release-codeql-verdict.py --self-test
+      - name: Four-language exact-SHA release CodeQL reuse/dispatch/join state-machine tests
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        run: python3 tools/ci/release_codeql_preflight.py --self-test
       - name: Issue metadata policy
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node --test scripts/test-issue-metadata.mjs
