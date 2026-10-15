@@ -6,6 +6,7 @@ unaltered SARIF as evidence. This gate rejects corrupt reports, missing security
 severity, and any High/Critical finding; it does not grant release authorization.
 """
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import math
@@ -227,11 +228,11 @@ def self_test() -> None:
             "invocations": [{"executionSuccessful": True, "toolExecutionNotifications": [
                 {"level": "none", "descriptor": {"id": "cli/expected-extracted-files/" +
                     ("javascript" if language == "javascript-typescript" else "java" if language == "java-kotlin" else language)},
-                 "locations": source_locations},
+                 "locations": deepcopy(source_locations)},
                 {"level": "none", "descriptor": {"id":
                     ("js" if language == "javascript-typescript" else "java" if language == "java-kotlin" else language)
                     + "/diagnostics/successfully-extracted-files"},
-                 "locations": source_locations},
+                 "locations": deepcopy(source_locations)},
             ]}],
             "results": [{"ruleId": "java/test", "rule": {
                 "id": "java/test", "index": 0, "toolComponent": {"index": 0}
