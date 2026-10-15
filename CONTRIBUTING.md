@@ -137,6 +137,8 @@ label when the active Codex model changes.
 
 ## Repository hygiene
 
+Research, experiment, migration, and temporary GitHub Actions workflows should stay off protected default branch where practical. If an exceptional ephemeral workflow must land under `.github/workflows`, filenames beginning with `research-`, `temporary-`, `tmp-`, or `experiment-` must declare non-empty `# lifecycle-owner:` and `# lifecycle-retire:` header metadata. The owner identifies the issue/campaign responsible for the workflow; the retirement field states the concrete deletion or consolidation condition. Historical Actions runs and artifacts remain evidence and are not a reason to keep or recreate obsolete workflow source.
+
 - Do not commit credentials, private evidence, logs, profiles, screenshots,
   downloaded VSIX/JAR/JDT/Zed artifacts, generated WASM, or build output.
 - Pin external inputs by version and checksum; never treat an unpinned `latest`
