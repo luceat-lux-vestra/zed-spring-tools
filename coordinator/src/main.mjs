@@ -3547,10 +3547,16 @@ export function sanitizedEnvironment(environment) {
     "TMP",
     "LANG",
     "LC_ALL",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "http_proxy",
+    "https_proxy",
     "NO_PROXY",
     "no_proxy",
     "SSL_CERT_FILE",
     "SSL_CERT_DIR",
+    "JAVA_TOOL_OPTIONS",
+    "JDK_JAVA_OPTIONS",
     "SYSTEMROOT",
     "WINDIR",
   ];
@@ -3597,7 +3603,14 @@ export async function run(arguments_, dependencies = {}) {
     timeout: 5000,
   });
   if (version.error !== undefined || version.status !== 0) {
-    throw new Error("JDK version check failed; configure a working JDK 21 or newer");
+    const detail = version.error !== undefined
+      ? `error: ${version.error.message} (code: ${version.error.code})`
+      : `status: ${version.status}, signal: ${version.signal ?? "none"}`;
+    const envKeys = Object.keys(environment).sort().join(", ");
+    throw new Error(
+      `JDK version check failed; configure a working JDK 21 or newer`
+      + ` — java: ${options.java}, ${detail}, env keys: [${envKeys}]`,
+    );
   }
   const versionOutput = `${version.stdout ?? ""}\n${version.stderr ?? ""}`;
   const jdkVersion = javaVersion(versionOutput);
@@ -3607,7 +3620,7 @@ export async function run(arguments_, dependencies = {}) {
 
   const child = (dependencies.spawn ?? spawn)(
     options.java,
-    springArguments(options.springServer, options.worktree, options.mcpServerPort),
+    springArguments(options.springServer, options.worktree, options.mcpServerPort, process.platform, environment),
     {
       cwd: options.worktree,
       env: environment,
@@ -3803,6 +3816,7 @@ export function springArguments(
   projectDirectory,
   mcpServerPort = null,
   hostPlatform = process.platform,
+  environment = {},
 ) {
   if (typeof projectDirectory !== "string" || projectDirectory.length === 0) {
     throw new Error("standalone Spring Tools project directory is required");
@@ -3823,9 +3837,91 @@ export function springArguments(
     // under /var is exposed by Java as /private/var, and "." would let Spring
     // import the same physical project twice under those two URI identities.
     `-Dspring.boot.ls.project.dir=${standaloneProjectDirectory}`,
+    ...proxyJvmArguments(environment),
     "-jar",
     server,
   ];
+}
+
+/**
+ * Translate ordinary HTTP proxy environment settings for the standalone JVM.
+ * The Node coordinator inherits its own TLS settings directly from Zed;
+ * only JVM-relevant settings are forwarded to the Java subprocess.
+ *
+ * Custom JVM certificate stores and proxy authentication settings may be
+ * supplied through JAVA_TOOL_OPTIONS / JDK_JAVA_OPTIONS. No trust store or
+ * TLS-verification policy is forced on Windows or any other platform.
+ */
+export function proxyJvmArguments(environment = {}) {
+  const args = [];
+  for (const [protocol, upper, lower] of [
+    ["https", "HTTPS_PROXY", "https_proxy"],
+    ["http", "HTTP_PROXY", "http_proxy"],
+  ]) {
+    const value = environment[upper] || environment[lower];
+    if (value === undefined || value === null || value === "") continue;
+    const proxy = parseHttpProxy(value, upper);
+    args.push(`-D${protocol}.proxyHost=${proxy.host}`);
+    args.push(`-D${protocol}.proxyPort=${proxy.port}`);
+  }
+
+  const rawNoProxy = environment.NO_PROXY ?? environment.no_proxy;
+  if (args.length > 0 && typeof rawNoProxy === "string" && rawNoProxy.trim() !== "") {
+    const pattern = noProxyToJvmPattern(rawNoProxy);
+    // Explicitly retain Java's default loopback exclusions when setting an
+    // additional nonProxyHosts value. HTTPS uses http.nonProxyHosts as well.
+    args.push(`-Dhttp.nonProxyHosts=${pattern === "*" ? "*" : `localhost|127.*|[::1]|${pattern}`}`);
+  }
+  return args;
+}
+
+function parseHttpProxy(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a valid HTTP proxy URL`);
+  }
+  let parsed;
+  try {
+    const trimmed = value.trim();
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+      ? trimmed : `http://${trimmed}`;
+    parsed = new URL(withScheme);
+  } catch {
+    throw new Error(`${label} must be a valid HTTP proxy URL`);
+  }
+  // Java's http(s).proxyHost properties describe an HTTP proxy, not a
+  // TLS-to-proxy or SOCKS transport. Avoid silently changing its protocol.
+  // Userinfo is not implemented by JVM proxyHost and must not be leaked in
+  // diagnostics; use the JDK's explicitly configured authentication instead.
+  if (parsed.protocol !== "http:" || !parsed.hostname ||
+      parsed.username || parsed.password || parsed.pathname !== "/" ||
+      parsed.search !== "" || parsed.hash !== "") {
+    throw new Error(`${label} must be an unauthenticated HTTP proxy URL without a path`);
+  }
+  // A URL such as http://proxy.example.com implicitly selects port 80. The
+  // JDK's default HTTPS proxy port is 443, so spell out the URL's port here.
+  return { host: parsed.hostname, port: parsed.port || "80" };
+}
+
+function noProxyToJvmPattern(noProxy) {
+  const entries = [];
+  for (const raw of noProxy.split(",")) {
+    const host = raw.trim();
+    if (!host) continue;
+    if (host === "*") return "*";
+    // Java's http.nonProxyHosts is a hostname glob, not a CIDR/port matcher.
+    // Reject unrepresentable rules instead of silently proxying private hosts.
+    if (host.includes("/") || host.includes(":") && !/^\[[a-f0-9:]+\]$/i.test(host) ||
+        !/^(?:[a-z0-9*_.-]+|\[[a-f0-9:]+\])$/i.test(host) || host.includes("|")) {
+      throw new Error("NO_PROXY contains a rule Java cannot represent; use hostname patterns without CIDR or ports");
+    }
+    if (host.startsWith(".")) {
+      const domain = host.slice(1);
+      entries.push(domain, `*.${domain}`);
+    } else {
+      entries.push(host);
+    }
+  }
+  return [...new Set(entries)].join("|");
 }
 
 function requireFile(file, label) {
