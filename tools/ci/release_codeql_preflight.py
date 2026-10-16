@@ -57,10 +57,18 @@ def workflow(repo: str) -> dict:
 def candidates(repo: str, wf: dict) -> list[dict]:
     result: list[dict] = []
     for event in ("workflow_dispatch", "schedule"):
-        rows = api(repo, f"actions/workflows/codeql.yml/runs?event={event}&branch=main&per_page=100").get("workflow_runs")
-        if not isinstance(rows, list):
-            reject("CodeQL discovery returned invalid run array")
-        result.extend(row for row in rows if isinstance(row, dict) and row.get("workflow_id") == wf["id"] and row.get("path") == WORKFLOW and row.get("head_branch") == "main" and (row.get("head_repository") or {}).get("full_name") == repo)
+        for page in range(1, 11):
+            payload = api(repo, f"actions/workflows/codeql.yml/runs?event={event}&branch=main&per_page=100&page={page}")
+            rows = payload.get("workflow_runs")
+            if not isinstance(rows, list) or len(rows) > 100:
+                reject("CodeQL discovery returned invalid run array")
+            if any(not isinstance(row, dict) for row in rows):
+                reject("CodeQL discovery returned malformed run")
+            result.extend(row for row in rows if row.get("workflow_id") == wf["id"] and row.get("path") == WORKFLOW and row.get("head_branch") == "main" and (row.get("head_repository") or {}).get("full_name") == repo)
+            if len(rows) < 100:
+                break
+        else:
+            reject("CodeQL discovery exhausted 1000-run bound; cannot prove unique candidate")
     return sorted(result, key=lambda row: row.get("created_at", ""), reverse=True)
 
 
@@ -70,7 +78,7 @@ def exact(run: dict, sha: str) -> bool:
     return run.get("event") == "schedule" and run.get("head_sha") == sha
 
 
-def metadata(run: dict, wf: dict, jobs: dict, artifacts: dict, repo: str, sha: str) -> None:
+def metadata(run: dict, wf: dict, jobs: dict, artifacts: dict, repo: str, sha: str, *, allow_missing: bool = False) -> bool:
     if run.get("workflow_id") != wf["id"] or run.get("path") != WORKFLOW or run.get("event") not in ("workflow_dispatch", "schedule") or run.get("head_branch") != "main" or (run.get("head_repository") or {}).get("full_name") != repo or run.get("status") != "completed" or run.get("conclusion") != "success" or run.get("run_attempt") != 1:
         reject("untrusted or mismatched CodeQL run identity/state/source")
     try:
@@ -85,11 +93,36 @@ def metadata(run: dict, wf: dict, jobs: dict, artifacts: dict, repo: str, sha: s
         reject("missing, extra, incomplete or unsuccessful CodeQL language jobs")
     expected_artifacts = {*(f"codeql-{sha}-{language}" for language in LANGUAGES), *(f"codeql-source-{sha}-{language}" for language in LANGUAGES)}
     rows = artifacts.get("artifacts")
-    if artifacts.get("total_count") != 2 * len(LANGUAGES) or not isinstance(rows, list) or len(rows) != 2 * len(LANGUAGES) or {row.get("name") for row in rows if isinstance(row, dict)} != expected_artifacts:
-        reject("expected all four SARIF plus four source-provenance artifacts")
+    if not isinstance(rows, list) or artifacts.get("total_count") != len(rows) or len(rows) > 2 * len(LANGUAGES):
+        reject("invalid or incomplete CodeQL artifact listing")
+    names = [row.get("name") for row in rows if isinstance(row, dict)]
+    if len(names) != len(rows) or len(names) != len(set(names)) or not set(names) <= expected_artifacts:
+        reject("unexpected or duplicate CodeQL artifact")
+    expired = False
     for row in rows:
-        if row.get("expired") is not False or not isinstance(row.get("id"), int) or not isinstance(row.get("size_in_bytes"), int) or row["size_in_bytes"] <= 0 or row.get("workflow_run", {}).get("head_sha") not in (None, run.get("head_sha")):
-            reject("expired, empty or wrong-source CodeQL artifact")
+        if (not isinstance(row.get("id"), int) or
+                not isinstance(row.get("size_in_bytes"), int) or row["size_in_bytes"] <= 0 or
+                (row.get("workflow_run") or {}).get("head_sha") not in (None, run.get("head_sha"))):
+            reject("empty, malformed or wrong-source CodeQL artifact")
+        if row.get("expired") is True:
+            expired = True
+        elif row.get("expired") is not False:
+            reject("unknown CodeQL artifact expiry state")
+    if len(rows) != 2 * len(LANGUAGES) or expired:
+        if allow_missing:
+            return False
+        reject("missing or expired original CodeQL evidence")
+    return True
+
+
+def evidence_available(repo: str, sha: str, wf: dict, run_id: int) -> bool:
+    """Classify *only* genuinely absent/expired proof as refreshable, never invalid proof."""
+    run = api(repo, f"actions/runs/{run_id}")
+    if not exact(run, sha):
+        reject("existing candidate scan source identity changed")
+    jobs = api(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+    artifacts = api(repo, f"actions/runs/{run_id}/artifacts?per_page=100")
+    return metadata(run, wf, jobs, artifacts, repo, sha, allow_missing=True)
 
 
 def tree(repo: str, sha: str) -> str:
@@ -160,10 +193,8 @@ def verify_live(repo: str, sha: str, verdict: Path, timeout_seconds: int = 4200,
     completed = [row for row in exact_runs if row.get("status") == "completed"]
     if any(row.get("conclusion") != "success" for row in completed):
         reject("failed existing exact-source CodeQL scan cannot be replaced")
-    if len(completed) > 1:
-        reject("ambiguous duplicate completed exact-source CodeQL scans")
-    if active and any(row.get("status") == "completed" and row.get("conclusion") != "success" for row in exact_runs):
-        reject("active scan conflicts with failed existing scan")
+    if active and completed:
+        reject("ambiguous concurrent and completed exact-source CodeQL scans")
 
     selected: int | None = None
     if active:
@@ -171,14 +202,23 @@ def verify_live(repo: str, sha: str, verdict: Path, timeout_seconds: int = 4200,
         print(f"Joining active exact-source CodeQL {selected}", flush=True)
     else:
         if completed:
-            newest = completed[0]
-            if newest.get("conclusion") != "success":
-                reject(f"existing exact candidate CodeQL run {newest.get('id')} ended {newest.get('conclusion')}")
-            try:
-                inspect(repo, sha, wf, newest["id"], verdict)
-            except (ValueError, subprocess.CalledProcessError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
-                raise ValueError(f"invalid completed exact candidate scan {newest.get('id')}: {exc}") from exc
-            return
+            valid_count = 0
+            for existing in completed:
+                run_id = existing["id"]
+                try:
+                    if evidence_available(repo, sha, wf, run_id):
+                        # Check *every* available same-source proof. Never hide a finding
+                        # or a forged manifest behind a different successful run.
+                        inspect(repo, sha, wf, run_id, verdict)
+                        valid_count += 1
+                except (ValueError, subprocess.CalledProcessError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                    raise ValueError(f"invalid completed exact candidate scan {run_id}: {exc}") from exc
+            if valid_count:
+                print(f"Reused {valid_count} independently verified same-source CodeQL run(s)", flush=True)
+                return
+            # All previous successful scans are missing or expired *original*
+            # artifacts: replace absent evidence with one trusted new full scan.
+            print("Prior CodeQL original evidence missing or expired: renewing exact-source scan", flush=True)
         before = {row.get("id") for row in all_runs if isinstance(row.get("id"), int)}
         gh("api", "-X", "POST", f"repos/{repo}/actions/workflows/codeql.yml/dispatches", "-f", "ref=main", "-f", f"inputs[candidate_sha]={sha}")
         print(f"Dispatched trusted full CodeQL for candidate {sha}", flush=True)
@@ -296,6 +336,7 @@ def self_test() -> None:
             mock.patch.object(sys.modules[__name__], "candidates", side_effect=calls),
             mock.patch.object(sys.modules[__name__], "api", return_value=polled or {}),
             mock.patch.object(sys.modules[__name__], "inspect", return_value=None) as inspected,
+            mock.patch.object(sys.modules[__name__], "evidence_available", return_value=True),
             mock.patch.object(sys.modules[__name__], "gh", return_value="") as dispatched,
             mock.patch.object(time, "monotonic", side_effect=[0, 0, 1]),
             mock.patch.object(time, "sleep", return_value=None),
@@ -319,9 +360,52 @@ def self_test() -> None:
     exercise(candidate("in_progress", attempt=2), None, False, "ambiguous rerun")
     exercise([candidate("in_progress", run_id=71), candidate("queued", run_id=72)], None, False, "ambiguous active")
     exercise([candidate("completed", "success", run_id=71),
-              candidate("completed", "success", run_id=72)], None, False, "ambiguous duplicate")
+              candidate("completed", "success", run_id=72)], None, False)
+    exercise([candidate("completed", "success", run_id=71),
+              candidate("in_progress", run_id=72)], None, False, "ambiguous concurrent")
     exercise([candidate("completed", "success", run_id=71),
               candidate("completed", "failure", run_id=72)], None, False, "failed existing")
+
+    # A verified completed scan with expired/absent original evidence must
+    # trigger *one* fresh trusted dispatch, not make this immutable SHA unusable.
+    with (
+        mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}),
+        mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha),
+        mock.patch.object(sys.modules[__name__], "workflow", return_value=wf),
+        mock.patch.object(sys.modules[__name__], "candidates", side_effect=[
+            [candidate("completed", "success", run_id=71)],
+            [candidate("completed", "success", run_id=71), candidate("queued", run_id=72)]]),
+        mock.patch.object(sys.modules[__name__], "evidence_available", return_value=False),
+        mock.patch.object(sys.modules[__name__], "api", return_value=candidate("completed", "success", run_id=72)),
+        mock.patch.object(sys.modules[__name__], "inspect", return_value=None) as checked,
+        mock.patch.object(sys.modules[__name__], "gh", return_value="") as refreshed,
+        mock.patch.object(time, "monotonic", side_effect=[0, 0, 1]),
+    ):
+        verify_live(repo, sha, Path("verdict.py"), 10, 1)
+        assert refreshed.call_count == 1 and checked.call_count == 1
+        assert checked.call_args.args[3] == 72
+
+    # Expiration cannot justify swallowing malformed or wrong-source metadata.
+    assert metadata(run, wf, jobs, artifacts, repo, sha, allow_missing=True)
+    stale = json.loads(json.dumps(artifacts))
+    stale["artifacts"][0]["expired"] = True
+    assert metadata(run, wf, jobs, stale, repo, sha, allow_missing=True) is False
+    stale["artifacts"][0]["id"] = None
+    try:
+        metadata(run, wf, jobs, stale, repo, sha, allow_missing=True)
+    except ValueError as exc:
+        assert "malformed" in str(exc)
+    else:
+        raise AssertionError("malformed expired artifact was refreshable")
+
+    # Pagination prevents the common >100-run discovery blind spot.
+    with mock.patch.object(sys.modules[__name__], "api", side_effect=[
+        {"workflow_runs": [candidate("completed", "success", run_id=100 + i) for i in range(100)]},
+        {"workflow_runs": [candidate("completed", "success", run_id=7)]},
+        {"workflow_runs": []},
+    ]) as paged:
+        found = candidates(repo, wf)
+        assert len(found) == 101 and paged.call_count == 3
 
     with mock.patch.dict(os.environ, {"GH_TOKEN": "fixture"}), mock.patch.object(sys.modules[__name__], "ancestry", return_value=sha), mock.patch.object(sys.modules[__name__], "workflow", return_value=wf), mock.patch.object(sys.modules[__name__], "candidates", return_value=[]), mock.patch.object(sys.modules[__name__], "gh", side_effect=subprocess.CalledProcessError(1, ["gh"])):
         try:
