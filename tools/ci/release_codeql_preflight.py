@@ -349,7 +349,11 @@ def self_test() -> None:
             else:
                 if error:
                     raise AssertionError(f"expected error {error}")
-                assert inspected.call_count == 1
+                expected_inspections = sum(
+                    1 for row in (initial if isinstance(initial, list) else ([initial] if initial else []))
+                    if row.get("status") == "completed" and row.get("conclusion") == "success"
+                )
+                assert inspected.call_count == (expected_inspections or 1)
             assert dispatched.called is dispatch_expected
 
     exercise(candidate("completed", "success"), None, False)
