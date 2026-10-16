@@ -80,6 +80,16 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.EXPECTED_SHA }}
 
+      - name: Stage trusted Java CodeQL configuration inside workspace
+        if: matrix.language == 'java-kotlin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -s "$RUNNER_TEMP/codeql-java-config.yml"
+          install -m 0600 "$RUNNER_TEMP/codeql-java-config.yml" "$GITHUB_WORKSPACE/.github/codeql-java-release-config.yml"
+          cmp "$RUNNER_TEMP/codeql-java-config.yml" "$GITHUB_WORKSPACE/.github/codeql-java-release-config.yml"
+
       - name: Verify checked-out commit and record source identity
         env:
           CODEQL_LANGUAGE: ${{ matrix.language }}
@@ -151,7 +161,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # Only the Java buildless leg has overlapping historical fixture FQCNs.
-          config-file: ${{ matrix.language == 'java-kotlin' && format('{0}/codeql-java-config.yml', runner.temp) || '' }}
+          config-file: ${{ matrix.language == 'java-kotlin' && format('{0}/.github/codeql-java-release-config.yml', github.workspace) || '' }}
 
       - name: Analyze CodeQL
         id: analyze

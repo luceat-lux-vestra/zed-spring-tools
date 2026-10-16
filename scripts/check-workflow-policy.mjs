@@ -456,7 +456,9 @@ function checkReleaseCodeqlPreflight() {
     : [];
   if (JSON.stringify(configLines) !== JSON.stringify(approvedJavaLines) ||
       !scanner.text.includes("codeql-java-config.yml") ||
-      !scanner.text.includes("runner.temp")) {
+      !scanner.text.includes("github.workspace") ||
+      !scanner.text.includes("Stage trusted Java CodeQL configuration inside workspace") ||
+      !scanner.text.includes('install -m 0600 "$RUNNER_TEMP/codeql-java-config.yml" "$GITHUB_WORKSPACE/.github/codeql-java-release-config.yml"')) {
     fail("Java release CodeQL source scope drifted from the reviewed fixture corpus.");
   }
   if (!gate.triggers.has("workflow_dispatch") || gate.triggers.size !== 1) {

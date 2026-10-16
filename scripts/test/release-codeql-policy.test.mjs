@@ -113,3 +113,16 @@ test("publisher cannot always-run around failed preflight", () => {
     assert.match(check.output, /must depend directly on codeql-preflight/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("Java CodeQL config must be inside the workspace", () => {
+  const root = fixture();
+  try {
+    const path = join(root, ".github/workflows/codeql.yml");
+    const original = readFileSync(path, "utf8");
+    assert.match(original, /github\.workspace/);
+    writeFileSync(path, original.replace("github.workspace", "runner.temp"));
+    const check = run(root);
+    assert.equal(check.status, 1);
+    assert.match(check.output, /Java release CodeQL source scope drifted/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
