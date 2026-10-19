@@ -91,7 +91,7 @@ jobs:
       # an unchanged tree the day a new lint ships. The extension registry builds
       # the shipped WASM on its own toolchain, so this pin governs CI only; move
       # it deliberately, with a run that proves the new compiler is clean.
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
