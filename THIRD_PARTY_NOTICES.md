@@ -101,7 +101,7 @@ dependencies are:
 | --- | --- | --- |
 | `zed_extension_api` | 0.7.0 | Apache-2.0 |
 | `flate2` | 1.1.10 | MIT OR Apache-2.0 |
-| `sha2` | 0.11.0 | MIT OR Apache-2.0 |
+| `sha2` | 0.11.1 | MIT OR Apache-2.0 |
 | `zip` | 7.1.0 | MIT |
 
 Across the whole locked tree, all 96 packages are accounted for and every one
