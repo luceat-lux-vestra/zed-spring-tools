@@ -87,7 +87,7 @@ jobs:
       # Microsoft OpenJDK publishes the same current JDK 25 LTS line for all
       # six native tuples, including Windows ARM64. A single distribution keeps
       # this matrix comparable instead of silently dropping that tuple.
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: microsoft
@@ -169,7 +169,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: temurin
