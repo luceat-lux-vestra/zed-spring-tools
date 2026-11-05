@@ -92,6 +92,33 @@ For create operations, search/read before retrying. For ref movement, re-read an
 
 Current PR HEAD is authoritative. Any HEAD movement invalidates prior HEAD-specific CI/review/runtime evidence unless repository policy explicitly permits same-SHA reuse. Branch-history cleanup or another rewrite therefore requires fresh evidence for the new exact final HEAD.
 
+## Base advancement with unchanged HEAD
+
+This section clarifies evidence provenance when the PR HEAD is unchanged but `main` advances. It does not weaken zed-spring-tools' exact-HEAD rule, live merge gate, release-evidence discipline, or current-composition requirements.
+
+Classify movement before deciding what prior evidence still proves:
+
+1. **PR HEAD moved** — prior HEAD-specific CI/review/runtime/release evidence is invalid. Validate the new exact final HEAD.
+2. **PR HEAD unchanged; base unchanged** — apply the ordinary exact-HEAD merge gate.
+3. **PR HEAD unchanged; base advanced** — prior evidence may still support claims that depend only on the unchanged HEAD, but it does not by itself prove the newly composed base+HEAD result or authorize merge.
+4. **Material authority or semantic interaction is unavailable or `UNKNOWN`** — fail closed and refresh/revalidate.
+
+Before relying on same-HEAD evidence after base advancement, fresh-read the current PR HEAD, `main`, merge-base, live ruleset, required checks, review threads, and mergeability. Determine whether the evidence was produced for the unchanged HEAD itself or for an old synthetic merge/base+HEAD composition.
+
+For zed-spring-tools specifically, the live `main` ruleset requires the GitHub Actions `Merge Gate` with strict required-status-check enforcement. `AGENTS.md` also binds release and capability evidence to exact revisions and requires exact-final-HEAD repository checks before release or Registry claims advance. Those stricter requirements remain authoritative. Same-HEAD evidence reuse therefore never authorizes an out-of-date or otherwise invalid current composition, and it never advances release/capability claims by itself.
+
+Evidence reuse is claim-scoped, not blanket merge or release authorization:
+
+- exact-HEAD evidence may remain useful when its producer and claim are independent of the base movement;
+- evidence tied to an old synthetic merge result or old base+HEAD tree is not proof for the newly composed tree;
+- different filenames alone do not establish semantic independence;
+- dependency/lockfile, pinned runtime/toolchain, platform matrix, workflow/security policy, generated or derived records, Registry/release evidence, capability evidence, or other cross-cutting interactions require revalidation when material;
+- conflicts, changed required checks, policy/ruleset drift, or unresolved material interaction require fresh validation rather than reuse.
+
+If bringing the branch up to date, rebasing, conflict resolution, history cleanup, regeneration, or any other action changes the PR HEAD, the resulting SHA becomes a new exact-HEAD proof unit and all prior HEAD-specific PASS evidence is invalid.
+
+Do not change CI workflows, `.github/merge-gate-policy.json`, release policy, capability evidence, or live rulesets merely to make prior evidence reusable.
+
 ## Failure handling
 
 - Read-only interruption: fresh-read and continue.
