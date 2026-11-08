@@ -205,7 +205,7 @@ for (const workflow of workflows.values()) {
   for (const use of workflow.uses) {
     // A local action (`./...`) is this repository's own code and a container
     // action (`docker://`) is pinned by its own digest syntax.
-    if (use.ref.startsWith("./") || use.ref.startsWith("docker://")) continue;
+    if (use.ref.startsWith("./") || use.ref.startsWith("$/") || use.ref.startsWith("docker://")) continue;
     if (!IMMUTABLE_REF.test(use.ref)) {
       fail(
         `${workflow.file}:${use.number} uses \`${use.ref}\`, a mutable ref. Pin the action to a full-length commit SHA with the version in a trailing comment.`,

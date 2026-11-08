@@ -151,7 +151,7 @@ test("a reusable workflow caller does not require a caller-side timeout", () => 
   const result = run(REPOSITORY);
   assert.equal(result.code, 0, result.output);
   const ci = readFileSync(join(REPOSITORY, ".github/workflows/ci.yml"), "utf8");
-  assert.match(ci, /platform-validation:\n\s+name: Platform Validation\n\s+uses: \.\/\.github\/workflows\/platform-validation\.yml/);
+  assert.match(ci, /platform-validation:\n\s+name: Platform Validation\n\s+uses: \$\/\.github\/workflows\/platform-validation\.yml/);
 });
 
 test("a path filter on a required workflow is rejected", () => {
