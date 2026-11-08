@@ -237,12 +237,14 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/policy-tools"
           cd "${RUNNER_TEMP}/policy-tools"
           curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 20 \
             --retry 4 --retry-delay 2 --retry-max-time 60 --retry-all-errors \
             --output actionlint.tar.gz \
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_arm64.tar.gz"
           echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
           tar -xzf actionlint.tar.gz actionlint
           curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 20 \
             --retry 4 --retry-delay 2 --retry-max-time 60 --retry-all-errors \
             --output zizmor.tar.gz \
             "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-aarch64-unknown-linux-gnu.tar.gz"
