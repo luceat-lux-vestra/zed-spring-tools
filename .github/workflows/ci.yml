@@ -284,7 +284,7 @@ jobs:
 
   platform-validation:
     name: Platform Validation
-    uses: $/.github/workflows/platform-validation.yml
+    uses: ./.github/workflows/platform-validation.yml # zizmor: ignore[self-repository] actionlint 1.7.12 rejects GitHub's newer $/ self-repository syntax.
 
   merge-gate:
     name: Merge Gate
