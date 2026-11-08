@@ -225,32 +225,39 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: 24
+      # Avoid a per-PR dependency on GitHub Release asset delivery. actionlint
+      # is built from its exact upstream release commit via the Go module checksum
+      # pipeline; zizmor is installed only from its hash-pinned PyPI ARM64 wheel.
       - name: Install actionlint and zizmor
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         env:
           ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6
+          ACTIONLINT_REV: 914e7df21a07ef503a81201c76d2b11c789d3fca
           ZIZMOR_VERSION: 1.30.0
-          ZIZMOR_SHA256: 018a024d6b6d09733b07f6ef42838d984c23ec04bc9b2acd55f7d67826aeafe5
+          ZIZMOR_WHEEL_SHA256: 7569a58319fb270c14a64663a6565929035f26f6f6d13059314f796e988129eb
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/policy-tools"
-          cd "${RUNNER_TEMP}/policy-tools"
-          curl --fail --silent --show-error --location \
-            --connect-timeout 10 --max-time 20 \
-            --retry 4 --retry-delay 2 --retry-max-time 60 --retry-all-errors \
-            --output actionlint.tar.gz \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_arm64.tar.gz"
-          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
-          tar -xzf actionlint.tar.gz actionlint
-          curl --fail --silent --show-error --location \
-            --connect-timeout 10 --max-time 20 \
-            --retry 4 --retry-delay 2 --retry-max-time 60 --retry-all-errors \
-            --output zizmor.tar.gz \
-            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-aarch64-unknown-linux-gnu.tar.gz"
-          echo "${ZIZMOR_SHA256}  zizmor.tar.gz" | sha256sum --check --strict
-          tar -xzf zizmor.tar.gz zizmor
-          echo "${RUNNER_TEMP}/policy-tools" >> "${GITHUB_PATH}"
+          tools_dir="${RUNNER_TEMP}/policy-tools"
+          zizmor_venv="${RUNNER_TEMP}/policy-zizmor"
+          mkdir -p "${tools_dir}"
+
+          GOBIN="${tools_dir}" go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_REV}"
+
+          python3 -m venv "${zizmor_venv}"
+          printf 'zizmor==%s --hash=sha256:%s\n' "${ZIZMOR_VERSION}" "${ZIZMOR_WHEEL_SHA256}" > "${RUNNER_TEMP}/zizmor-requirements.txt"
+          "${zizmor_venv}/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --no-deps \
+            --only-binary=:all: \
+            --require-hashes \
+            --retries 4 \
+            --timeout 20 \
+            -r "${RUNNER_TEMP}/zizmor-requirements.txt"
+          ln -s "${zizmor_venv}/bin/zizmor" "${tools_dir}/zizmor"
+
+          "${tools_dir}/actionlint" -version
+          "${tools_dir}/zizmor" --version
+          echo "${tools_dir}" >> "${GITHUB_PATH}"
       - name: actionlint
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: actionlint
