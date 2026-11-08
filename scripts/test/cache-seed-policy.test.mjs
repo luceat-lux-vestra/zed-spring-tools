@@ -28,7 +28,7 @@ test("only exact trusted-main producer writes and PR Rust remains read-only", ()
   assert.match(producer, /run: test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
   assert.match(producer, /shared-key: main-ci-rust-arm64/);
   assert.match(consumer, /shared-key: main-ci-rust-arm64\n\s+save-if: false/);
-  assert.equal((producer.match(/Swatinem\/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6/g) ?? []).length, 1);
+  assert.equal((producer.match(/Swatinem\/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0/g) ?? []).length, 1);
   assert.match(producer, /cargo clippy --all-targets --all-features -- -D warnings/);
   assert.match(producer, /cargo test --locked/);
   assert.match(producer, /cargo build --locked --release --target wasm32-wasip2/);
@@ -50,7 +50,7 @@ function validateContract(mainProducer, prConsumer) {
   assert.match(mainProducer, /run: test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
   assert.match(mainProducer, /shared-key: main-ci-rust-arm64/);
   assert.match(prConsumer, /shared-key: main-ci-rust-arm64\n\s+save-if: false/);
-  assert.equal((mainProducer.match(/Swatinem\/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6/g) ?? []).length, 1);
+  assert.equal((mainProducer.match(/Swatinem\/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0/g) ?? []).length, 1);
   assert.match(mainProducer, /RUST_TOOLCHAIN: "1\.98\.0"/);
   assert.match(mainProducer, /toolchain: \$\{\{ env\.RUST_TOOLCHAIN \}\}/);
   assert.match(prConsumer, /RUST_TOOLCHAIN: "1\.98\.0"/);
