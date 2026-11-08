@@ -20,8 +20,9 @@ concurrency:
 # Dependabot moves both together. `scripts/check-workflow-policy.mjs` fails this
 # workflow if a mutable ref ever comes back.
 #
-# `rust`, `coordinator`, `review`, and `workflow-security` are the
-# authoritative components behind one required `Merge Gate`. The policy file
+# `rust`, `coordinator`, `review`, `workflow-security`, and the reusable
+# `platform-validation` result are the authoritative components behind one
+# required `Merge Gate`. The policy file
 # records the exact component set so removing, renaming, or bypassing one cannot
 # silently weaken the live merge contract.
 jobs:
@@ -281,9 +282,13 @@ jobs:
         with:
           fail-on-severity: moderate
 
+  platform-validation:
+    name: Platform Validation
+    uses: ./.github/workflows/platform-validation.yml
+
   merge-gate:
     name: Merge Gate
-    needs: [rust, coordinator, review, workflow-security]
+    needs: [rust, coordinator, review, workflow-security, platform-validation]
     if: ${{ always() }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
@@ -295,7 +300,7 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for name in rust coordinator review workflow-security; do
+          for name in rust coordinator review workflow-security platform-validation; do
             result="$(jq -r --arg name "$name" '.[$name].result // "missing"' <<<"$NEEDS_JSON")"
             if [ "$result" != "success" ]; then
               echo "::error::$name concluded '$result'; Merge Gate remains closed."

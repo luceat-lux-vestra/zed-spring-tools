@@ -59,11 +59,14 @@ small bug fix, or a documentation correction does not need a spike plan.
 A narrowly bounded documentation-only pull request avoids Rust/coordinator
 product build and toolchain work when every changed file is an accepted root
 document or Markdown under `docs/**`. The component jobs still appear, while
-workflow-security and Dependency Review continue to run. One required
-`Merge Gate` fails unless all four components succeed. Mixed or unrecognized
-paths fall back to the full gate. Generated `CONTRIBUTORS.md` and
-`THIRD_PARTY_NOTICES.md` are not eligible for this shortcut because CI
-validates them against repository state.
+workflow-security and Dependency Review continue to run. The reusable Platform
+Validation component also remains present but returns a successful
+non-applicable result unless its reviewed platform/runtime path set is touched.
+One required `Merge Gate` fails unless all five components succeed. Mixed or
+unrecognized docs-only paths fall back to the full Rust/coordinator gate, while
+unknown or incomplete platform scope fails closed to the full platform matrix.
+Generated `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are not eligible
+for the docs-only shortcut because CI validates them against repository state.
 
 ## Branching
 

@@ -1,10 +1,9 @@
 # Automated platform validation
 
-[![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
-
-`Platform Validation` is the repository's continuously refreshed native,
-headless CI evidence. The badge reflects the latest `main` result; pull-request
-runs retain evidence for their own exact source HEAD and synthetic merge commit.
+`Platform Validation` is the repository's native, headless platform/runtime
+evidence. Pull requests enter it through the canonical `CI` DAG; the reusable
+workflow retains evidence for the caller's exact source HEAD and synthetic merge
+commit. `workflow_dispatch` remains available for deliberate full-matrix runs.
 
 D007 changed the runtime boundary on 2026-09-25. This workflow now validates the
 official **standalone Spring Tools language server** from `5.3.0.RELEASE`. The former JDT/Spring/bridge
@@ -12,21 +11,25 @@ layer is retired and is not part of current platform evidence.
 
 ## Automatic pull-request scope
 
-The full platform workflow is intentionally **not** an every-PR check. A pull
-request launches it automatically only when the change can affect evidence this
-workflow actually owns: Rust/Cargo inputs, extension Rust sources, coordinator
+`CI` is the sole substantive pull-request orchestration owner. It always calls
+the reusable Platform Validation workflow, whose small `platform-scope` job
+decides whether the expensive matrix is applicable. The reviewed applicability
+surface remains Rust/Cargo inputs, extension Rust sources, coordinator
 code/tests, protocol inputs, the platform/runtime scripts, or this workflow
-itself.
+itself. Renames consider both the current and previous filename.
 
 Documentation, repository metadata, governance-only changes, and other inputs
-outside that evidence boundary do not fan out six native runners plus the JDK
-floor job. `workflow_dispatch` remains the explicit full-matrix recovery and
-verification path when a reviewer needs platform evidence for a change outside
-the automatic scope.
+outside that evidence boundary return a successful non-applicable result without
+fanning out six native runners plus the JDK floor job. Draft pull requests also
+defer the expensive matrix. An unreadable, incomplete, empty, or malformed
+changed-file set fails closed to full platform validation. `workflow_dispatch`
+remains the explicit full-matrix recovery and verification path.
 
-Because a path-scoped context legitimately does not exist on many pull
-requests, `platform-gate` is advisory and is not a candidate required ruleset
-context. The repository's required merge authority remains `Merge Gate`.
+The internal `platform-gate` remains the reusable workflow's completeness
+aggregate, but the repository ruleset still requires only one external merge
+authority: `Merge Gate`. The canonical CI gate now includes the reusable
+Platform Validation result, so an applicable platform/runtime failure blocks
+that single final gate while a non-applicable PR remains green.
 
 ## Native matrix
 
