@@ -1,28 +1,12 @@
 name: Platform Validation
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    # This workflow is six native runners plus an independent JDK-floor job.
-    # Run it automatically only when its actual platform/runtime evidence can change.
-    paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.cargo/**'
-      - 'rust-toolchain'
-      - 'rust-toolchain.toml'
-      - 'src/**'
-      - 'coordinator/**'
-      - 'protocol/**'
-      - 'scripts/platform-validation.mjs'
-      - 'scripts/platform-capability-probes.mjs'
-      - 'scripts/run-coordinator-tests.mjs'
-      - 'scripts/spring-runtime-smoke.mjs'
-      - '.github/workflows/platform-validation.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: platform-validation-${{ github.ref }}
@@ -34,7 +18,69 @@ env:
   RUST_TOOLCHAIN: "1.98.0"
 
 jobs:
+  scope:
+    name: platform-scope
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    outputs:
+      run_validation: ${{ steps.classify.outputs.run_validation }}
+    steps:
+      - name: Classify platform validation scope
+        id: classify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_COUNT: ${{ github.event.pull_request.changed_files }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          run_validation=true
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ "$IS_DRAFT" = "true" ]; then
+            run_validation=false
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            changed="$RUNNER_TEMP/platform-changed-files.json"
+            if ! [[ "$EXPECTED_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::warning::Changed-file count is empty or malformed; running full platform validation."
+            elif ! gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" > "$changed"; then
+              echo "::warning::Could not establish the complete changed-file set; running full platform validation."
+            else
+              observed="$(jq '[.[][]] | length' "$changed")"
+              if [ "$observed" -ne "$EXPECTED_COUNT" ]; then
+                echo "::warning::Changed-file API returned $observed of $EXPECTED_COUNT files; running full platform validation."
+              elif jq -e '
+                [.[][] | .filename, (.previous_filename // "")]
+                | any(
+                    . == "Cargo.toml"
+                    or . == "Cargo.lock"
+                    or startswith(".cargo/")
+                    or . == "rust-toolchain"
+                    or . == "rust-toolchain.toml"
+                    or startswith("src/")
+                    or startswith("coordinator/")
+                    or startswith("protocol/")
+                    or . == "scripts/platform-validation.mjs"
+                    or . == "scripts/platform-capability-probes.mjs"
+                    or . == "scripts/run-coordinator-tests.mjs"
+                    or . == "scripts/spring-runtime-smoke.mjs"
+                    or . == ".github/workflows/platform-validation.yml"
+                  )
+              ' "$changed" >/dev/null; then
+                run_validation=true
+              else
+                run_validation=false
+              fi
+            fi
+          fi
+
+          echo "run_validation=$run_validation" >> "$GITHUB_OUTPUT"
+          echo "platform-validation=$run_validation"
+
   platform:
+    needs: [scope]
+    if: ${{ always() && (needs.scope.result != 'success' || needs.scope.outputs.run_validation == 'true') }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -159,6 +205,8 @@ jobs:
   # cross-architecture oracle: the six-tuple matrix runs x64 on JDK 25 only.
   # Changing this job to ARM64 would silently remove the x64 JDK 21 proof.
   spring-runtime-floor:
+    needs: [scope]
+    if: ${{ always() && (needs.scope.result != 'success' || needs.scope.outputs.run_validation == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -191,16 +239,30 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # One stable context represents a complete applicable platform run. The
-  # workflow is intentionally path-scoped, so this aggregate is advisory and
-  # must never become a required context that is expected on every PR.
+  # Stable reusable-workflow result: non-applicable PRs return success without
+  # fanning out expensive runners; applicable/manual runs fail unless every
+  # native platform leg and the JDK 21 floor succeed.
   platform-gate:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     needs:
+      - scope
       - platform
       - spring-runtime-floor
+    if: ${{ always() }}
     steps:
+      - name: Platform validation not applicable
+        if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_validation != 'true' }}
+        run: echo "platform validation is not applicable to this pull request"
+
       - name: Confirm complete platform evidence
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-        run: echo "all six native platform legs and the JDK 21 runtime floor passed"
+        if: ${{ needs.scope.result != 'success' || needs.scope.outputs.run_validation == 'true' }}
+        env:
+          PLATFORM_RESULT: ${{ needs.platform.result }}
+          FLOOR_RESULT: ${{ needs.spring-runtime-floor.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PLATFORM_RESULT" = "success"
+          test "$FLOOR_RESULT" = "success"
+          echo "all six native platform legs and the JDK 21 runtime floor passed"

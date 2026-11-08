@@ -126,8 +126,8 @@ test("Merge Gate cannot omit a required component", () => {
   edit(
     root,
     ".github/workflows/ci.yml",
-    "needs: [rust, coordinator, review, workflow-security]",
-    "needs: [rust, coordinator, workflow-security]",
+    "needs: [rust, coordinator, review, workflow-security, platform-validation]",
+    "needs: [rust, coordinator, workflow-security, platform-validation]",
   );
   const result = run(root);
   assert.equal(result.code, 1, result.output);
@@ -145,6 +145,13 @@ test("Merge Gate must use exact always condition", () => {
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /must use exact `if: always\(\)`/);
+});
+
+test("a reusable workflow caller does not require a caller-side timeout", () => {
+  const result = run(REPOSITORY);
+  assert.equal(result.code, 0, result.output);
+  const ci = readFileSync(join(REPOSITORY, ".github/workflows/ci.yml"), "utf8");
+  assert.match(ci, /platform-validation:\n\s+name: Platform Validation\n\s+uses: \.\/\.github\/workflows\/platform-validation\.yml # zizmor: ignore\[self-repository\] actionlint 1\.7\.12 rejects GitHub's newer \$\/ self-repository syntax\./);
 });
 
 test("a path filter on a required workflow is rejected", () => {

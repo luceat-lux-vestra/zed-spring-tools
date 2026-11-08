@@ -143,6 +143,7 @@ function scanWorkflow(file, text) {
         condition: keyAt("if"),
         needs: keyAt("needs"),
         continueOnError: keyAt("continue-on-error"),
+        uses: keyAt("uses"),
         matrix: body.some((line) => /^\s*matrix:/.test(line.code)),
       });
     });
@@ -213,7 +214,7 @@ for (const workflow of workflows.values()) {
   }
 
   for (const job of workflow.jobs.values()) {
-    if (!job.timeout) {
+    if (!job.timeout && !job.uses) {
       fail(`${workflow.file}: job \`${job.id}\` sets no \`timeout-minutes\`; a hung step holds the runner and the context for the six-hour default.`);
     }
   }

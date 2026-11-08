@@ -249,11 +249,14 @@ change sets fall back to full validation.
 
 The `rust` and `coordinator` component jobs must still exist and report
 success; only their product/toolchain work may be skipped. `review`
-(Dependency Review) and `workflow-security` still run. The live ruleset
-requires one `Merge Gate`, which fails unless all four components succeed on
-the exact pull-request revision. `CONTRIBUTORS.md` and
-`THIRD_PARTY_NOTICES.md` are deliberately excluded because coordinator checks
-derive and validate them.
+(Dependency Review) and `workflow-security` still run. The reusable
+`platform-validation` component is also always represented in the canonical
+CI DAG: it returns a successful non-applicable result outside its reviewed
+platform/runtime path set, and fails closed to the full six-platform + JDK-floor
+evidence when scope cannot be established. The live ruleset requires one
+`Merge Gate`, which fails unless all five components succeed on the exact
+pull-request revision. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are
+deliberately excluded because coordinator checks derive and validate them.
 
 ## Change discipline
 

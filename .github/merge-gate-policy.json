@@ -76,9 +76,14 @@
           "job": "workflow-security",
           "name": "workflow-security",
           "proves": "actionlint, zizmor and this policy check all pass, so no workflow carries a mutable action ref, a missing timeout, an unsafe `pull_request_target` checkout, or a context that has drifted from this file."
+        },
+        {
+          "job": "platform-validation",
+          "name": "Platform Validation",
+          "proves": "The canonical CI DAG invokes the reusable Platform Validation workflow on every pull request. Its internal fail-closed scope classifier preserves the reviewed path applicability: non-applicable or draft PRs return a successful no-op result, while applicable PRs require all six native platform legs and the independent JDK 21 runtime floor to succeed for the exact pull-request revision."
         }
       ],
-      "proves": "All authoritative merge components for the exact pull-request revision completed successfully; failed, cancelled, skipped, or missing component results keep the gate closed."
+      "proves": "All authoritative merge components for the exact pull-request revision completed successfully. Platform Validation is a stable reusable component: its expensive matrix is conditional, but any applicable platform/runtime failure keeps Merge Gate closed; failed, cancelled, skipped, or missing component results also keep the gate closed."
     },
     {
       "context": "platform",
@@ -99,7 +104,7 @@
       "class": "advisory",
       "workflow": "platform-validation.yml",
       "job": "platform-gate",
-      "proves": "When Platform Validation is applicable, all six native `platform` matrix legs and the independent JDK 21 `spring-runtime-floor` job completed successfully for the same workflow revision. The workflow is intentionally pull-request path-scoped to platform/runtime-impacting inputs, so this aggregate is advisory and is not eligible for ruleset promotion as an always-present required context."
+      "proves": "Internal aggregate of the reusable Platform Validation workflow. For applicable/manual runs it requires all six native platform legs and the independent JDK 21 floor; for non-applicable or draft pull requests it records a successful no-op. The repository ruleset still requires only the outer `Merge Gate`."
     },
     {
       "context": "Analyze ${{ matrix.language }}",

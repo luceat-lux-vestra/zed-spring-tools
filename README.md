@@ -3,7 +3,6 @@
 **Spring Boot language intelligence for Zed.**
 
 [![CI](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml)
-[![Platform Validation](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/platform-validation.yml)
 [![CodeQL](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/codeql.yml)
 [![License](https://img.shields.io/github/license/luceat-lux-vestra/zed-spring-tools)](LICENSE)
 <br>
