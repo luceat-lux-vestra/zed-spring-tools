@@ -465,6 +465,25 @@ function checkCodeqlPrRuntimeAdapter() {
     return;
   }
   const text = jobText(adapter);
+  const checkout = stepBlocks(adapter).find(
+    (step) => step.label === "Check out exact PR head for CodeQL runtime",
+  );
+  if (!checkout) {
+    fail("PR CodeQL runtime adapter is missing its exact-head checkout step.");
+  } else {
+    const checkoutText = checkout.lines.map((line) => line.code).join("\n");
+    const exactCheckout = [
+      ["repository: ${{ github.event.pull_request.head.repo.full_name }}", "github.event.pull_request.head.repo.full_name"],
+      ["ref: ${{ github.event.pull_request.head.sha }}", "github.event.pull_request.head.sha"],
+      ["persist-credentials: false", "persist-credentials: false"],
+    ];
+    for (const [requiredLine, reportedFragment] of exactCheckout) {
+      if (!checkoutText.includes(requiredLine)) {
+        fail("PR CodeQL runtime adapter lost required contract fragment " + JSON.stringify(reportedFragment) + ".");
+      }
+    }
+  }
+
   for (const fragment of [
     "name: codeql-runtime",
     "timeout-minutes: 12",
