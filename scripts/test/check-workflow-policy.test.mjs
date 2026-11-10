@@ -126,7 +126,7 @@ test("Merge Gate cannot omit a required component", () => {
   edit(
     root,
     ".github/workflows/ci.yml",
-    "needs: [rust, coordinator, review, workflow-security, platform-validation]",
+    "needs: [rust, coordinator, review, workflow-security, platform-validation, codeql-runtime]",
     "needs: [rust, coordinator, workflow-security, platform-validation]",
   );
   const result = run(root);
@@ -304,4 +304,87 @@ test("CodeQL Kotlin coverage refusal cannot disappear", () => {
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /CodeQL language, Kotlin, exact-SHA or raw SARIF assurance drifted/);
+});
+
+test("a third CodeQL workflow consumer is rejected", () => {
+  const root = fixture();
+  writeFileSync(
+    join(root, ".github/workflows/shadow-codeql.yml"),
+    [
+      "name: Shadow CodeQL",
+      "on:",
+      "  workflow_dispatch:",
+      "permissions: {}",
+      "jobs:",
+      "  analyze:",
+      "    runs-on: ubuntu-24.04-arm",
+      "    timeout-minutes: 5",
+      "    steps:",
+      "      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066",
+      "",
+    ].join("\n"),
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /CodeQL action consumers must be exactly canonical ci\.yml plus production codeql\.yml/);
+});
+
+test("PR CodeQL runtime upload cannot become trusted upload", () => {
+  const root = fixture();
+  edit(root, ".github/workflows/ci.yml", "          upload: never", "          upload: always");
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /PR CodeQL runtime adapter/);
+});
+
+test("PR CodeQL runtime cannot gain security-events write", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "      pull-requests: read\n    steps:",
+    "      pull-requests: read\n      security-events: write\n    steps:",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /forbidden authority "security-events: write"/);
+});
+
+test("PR CodeQL runtime pin must match production", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3",
+    "uses: github/codeql-action/init@ffffffffffffffffffffffffffffffffffffffff # drift",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /PR CodeQL runtime immutable pin does not match production/);
+});
+
+test("PR CodeQL runtime exact-head checkout cannot drift to synthetic event SHA", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "          ref: ${{ github.event.pull_request.head.sha }}",
+    "          ref: ${{ github.sha }}",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /lost required contract fragment "github.event.pull_request.head.sha"/);
+});
+
+test("PR CodeQL runtime cannot disappear behind a job-level condition", () => {
+  const root = fixture();
+  edit(
+    root,
+    ".github/workflows/ci.yml",
+    "  codeql-runtime:\n    name: codeql-runtime\n",
+    "  codeql-runtime:\n    name: codeql-runtime\n    if: ${{ github.event.pull_request.draft == false }}\n",
+  );
+  const result = run(root);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /job-level .*if:/);
 });

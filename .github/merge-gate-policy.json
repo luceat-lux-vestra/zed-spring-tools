@@ -81,9 +81,14 @@
           "job": "platform-validation",
           "name": "Platform Validation",
           "proves": "The canonical CI DAG invokes the reusable Platform Validation workflow on every pull request. Its internal fail-closed scope classifier preserves the reviewed path applicability: non-applicable or draft PRs return a successful no-op result, while applicable PRs require all six native platform legs and the independent JDK 21 runtime floor to succeed for the exact pull-request revision."
+        },
+        {
+          "job": "codeql-runtime",
+          "name": "codeql-runtime",
+          "proves": "Always-present read-only compatibility probe for the production-pinned CodeQL Actions runtime. Trusted-base fail-closed classification selects real execution only for CodeQL compatibility-sensitive changes; selected runs analyze the exact pull-request head with build-mode none, upload never and runner-local SARIF, then reuse the strict Actions SARIF verdict and prove the result cannot satisfy trusted release evidence."
         }
       ],
-      "proves": "All authoritative merge components for the exact pull-request revision completed successfully. Platform Validation is a stable reusable component: its expensive matrix is conditional, but any applicable platform/runtime failure keeps Merge Gate closed; failed, cancelled, skipped, or missing component results also keep the gate closed."
+      "proves": "All six authoritative merge components for the exact pull-request revision completed successfully. Platform Validation and the CodeQL runtime compatibility probe are stable always-present components: their expensive work is conditional, but applicable failures, failed classification, cancelled/skipped/missing component results, or any other non-success keep Merge Gate closed."
     },
     {
       "context": "platform",

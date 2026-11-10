@@ -20,8 +20,8 @@ concurrency:
 # Dependabot moves both together. `scripts/check-workflow-policy.mjs` fails this
 # workflow if a mutable ref ever comes back.
 #
-# `rust`, `coordinator`, `review`, `workflow-security`, and the reusable
-# `platform-validation` result are the authoritative components behind one
+# `rust`, `coordinator`, `review`, `workflow-security`, the reusable
+# `platform-validation` result, and `codeql-runtime` are the authoritative components behind one
 # required `Merge Gate`. The policy file
 # records the exact component set so removing, renaming, or bypassing one cannot
 # silently weaken the live merge contract.
@@ -295,13 +295,127 @@ jobs:
         with:
           fail-on-severity: moderate
 
+  codeql-runtime:
+    name: codeql-runtime
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Draft final-gate placeholder
+        if: ${{ github.event.pull_request.draft }}
+        run: echo "CodeQL runtime compatibility validation is deferred until the pull request is ready for review."
+
+      - name: Classify selective CodeQL runtime from trusted base
+        id: codeql_runtime_scope
+        if: ${{ github.event.pull_request.draft == false }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          echo 'required=true' >> "$GITHUB_OUTPUT"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::missing immutable PR base/head identity"
+            exit 1
+          }
+
+          trusted="$RUNNER_TEMP/trusted-codeql-runtime-validation.py"
+          encoded="$RUNNER_TEMP/trusted-codeql-runtime-validation.b64"
+          if ! gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$REPO/contents/.github/scripts/trusted-codeql-runtime-validation.py?ref=$BASE_SHA" \
+            --jq '.content' > "$encoded" 2>/dev/null; then
+            echo "Protected base predates the CodeQL runtime classifier; requiring the real probe."
+            exit 0
+          fi
+          tr -d '\n' < "$encoded" | base64 --decode > "$trusted"
+          test -s "$trusted"
+
+          pr_json="$RUNNER_TEMP/codeql-runtime-pr.json"
+          pages="$RUNNER_TEMP/codeql-runtime-pages"
+          files_json="$RUNNER_TEMP/codeql-runtime-files.json"
+          mkdir -p "$pages"
+          gh api -H 'Accept: application/vnd.github+json' "repos/$REPO/pulls/$PR_NUMBER" > "$pr_json"
+
+          complete=false
+          for page in $(seq 1 30); do
+            page_file="$pages/page-$(printf '%02d' "$page").json"
+            gh api -H 'Accept: application/vnd.github+json' \
+              "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100&page=$page" > "$page_file"
+            count="$(jq -er 'if type == "array" then length else error("invalid file page") end' "$page_file")"
+            if [ "$count" -lt 100 ]; then
+              complete=true
+              break
+            fi
+          done
+          [ "$complete" = true ] || {
+            echo "::error::changed-file pagination exceeded the supported 3000-file bound"
+            exit 1
+          }
+          jq -s '.' "$pages"/page-*.json > "$files_json"
+
+          python3 "$trusted" classify \
+            --pr-json "$pr_json" \
+            --files-json "$files_json" \
+            --repo "$REPO" \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --head-repo "$HEAD_REPO" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Non-applicable CodeQL runtime fast path
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'false' }}
+        run: echo "Trusted-base classification proved the CodeQL runtime compatibility probe is not applicable."
+
+      - name: Check out exact PR head for CodeQL runtime
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify selective CodeQL runtime contract
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
+        run: |
+          python3 .github/scripts/trusted-codeql-runtime-validation.py self-test
+          python3 .github/scripts/trusted-codeql-runtime-validation.py check-contract
+
+      - name: Initialize PR-only CodeQL runtime
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: actions
+          build-mode: none
+
+      - name: Analyze PR-only CodeQL runtime without upload
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:actions"
+          upload: never
+          output: ${{ runner.temp }}/pr-codeql-runtime
+
+      - name: Verify local PR-only CodeQL SARIF and reject promotion
+        if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SARIF_DIR: ${{ runner.temp }}/pr-codeql-runtime
+        run: python3 .github/scripts/trusted-codeql-runtime-validation.py verify --sarif-dir "$SARIF_DIR" --head "$HEAD_SHA"
+
   platform-validation:
     name: Platform Validation
     uses: ./.github/workflows/platform-validation.yml # zizmor: ignore[self-repository] actionlint 1.7.12 rejects GitHub's newer $/ self-repository syntax.
 
   merge-gate:
     name: Merge Gate
-    needs: [rust, coordinator, review, workflow-security, platform-validation]
+    needs: [rust, coordinator, review, workflow-security, platform-validation, codeql-runtime]
     if: ${{ always() }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
@@ -313,7 +427,7 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for name in rust coordinator review workflow-security platform-validation; do
+          for name in rust coordinator review workflow-security platform-validation codeql-runtime; do
             result="$(jq -r --arg name "$name" '.[$name].result // "missing"' <<<"$NEEDS_JSON")"
             if [ "$result" != "success" ]; then
               echo "::error::$name concluded '$result'; Merge Gate remains closed."
