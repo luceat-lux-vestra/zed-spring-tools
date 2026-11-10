@@ -422,6 +422,118 @@ function checkCiAndCodeqlCadence() {
 checkCiAndCodeqlCadence();
 
 
+function codeqlPins(text) {
+  const found = { init: [], analyze: [] };
+  for (const match of text.matchAll(/github\/codeql-action\/(init|analyze)@([0-9a-f]{40})(?:\s+#.*)?/g)) {
+    found[match[1]].push(match[2]);
+  }
+  return found;
+}
+
+function jobText(job) {
+  return job ? job.body.map((line) => line.code).join("\n") : "";
+}
+
+function checkCodeqlPrRuntimeAdapter() {
+  const ci = workflows.get("ci.yml");
+  const production = workflows.get("codeql.yml");
+  if (!ci || !production) {
+    fail("canonical CI or production CodeQL workflow is missing.");
+    return;
+  }
+
+  const consumers = [...workflows.values()]
+    .filter((workflow) => workflow.text.includes("github/codeql-action/"))
+    .map((workflow) => workflow.file)
+    .sort();
+  if (JSON.stringify(consumers) !== JSON.stringify(["ci.yml", "codeql.yml"])) {
+    fail("CodeQL action consumers must be exactly canonical ci.yml plus production codeql.yml; found " + JSON.stringify(consumers) + ".");
+  }
+
+  const productionPins = codeqlPins(production.text);
+  if (
+    productionPins.init.length !== 1 ||
+    productionPins.analyze.length !== 1 ||
+    productionPins.init[0] !== productionPins.analyze[0]
+  ) {
+    fail("production CodeQL init/analyze immutable pin contract drifted.");
+  }
+
+  const adapter = ci.jobs.get("codeql-runtime");
+  if (!adapter) {
+    fail("canonical ci.yml CodeQL runtime adapter is missing.");
+    return;
+  }
+  const text = jobText(adapter);
+  for (const fragment of [
+    "name: codeql-runtime",
+    "timeout-minutes: 12",
+    "permissions:",
+    "contents: read",
+    "pull-requests: read",
+    "github.event.pull_request.head.repo.full_name",
+    "github.event.pull_request.head.sha",
+    "persist-credentials: false",
+    "trusted-codeql-runtime-validation.py?ref=$BASE_SHA",
+    "files?per_page=100&page=$page",
+    "trusted-codeql-runtime-validation.py self-test",
+    "trusted-codeql-runtime-validation.py check-contract",
+    "languages: actions",
+    "build-mode: none",
+    'category: "/language:actions"',
+    "upload: never",
+    "runner.temp",
+    "trusted-codeql-runtime-validation.py verify",
+  ]) {
+    if (!text.includes(fragment)) {
+      fail("PR CodeQL runtime adapter lost required contract fragment " + JSON.stringify(fragment) + ".");
+    }
+  }
+
+  if (adapter.condition) {
+    fail("PR CodeQL runtime adapter carries a job-level if and can disappear before Merge Gate evaluates it.");
+  }
+
+  for (const forbidden of [
+    "security-events: write",
+    "actions: write",
+    "id-token: write",
+    "packages: write",
+    "upload-artifact@",
+    "upload: always",
+  ]) {
+    if (text.includes(forbidden)) {
+      fail("PR CodeQL runtime adapter gained forbidden authority " + JSON.stringify(forbidden) + ".");
+    }
+  }
+
+  const adapterPins = codeqlPins(text);
+  if (
+    adapterPins.init.length !== 1 ||
+    adapterPins.analyze.length !== 1 ||
+    adapterPins.init[0] !== adapterPins.analyze[0] ||
+    productionPins.init.length !== 1 ||
+    adapterPins.init[0] !== productionPins.init[0]
+  ) {
+    fail("PR CodeQL runtime immutable pin does not match production.");
+  }
+
+  const merge = contexts.find((entry) => entry.context === "Merge Gate");
+  const jobs = (merge?.components ?? []).map((component) => component.job);
+  if (JSON.stringify(jobs) !== JSON.stringify([
+    "rust",
+    "coordinator",
+    "review",
+    "workflow-security",
+    "platform-validation",
+    "codeql-runtime",
+  ])) {
+    fail("Merge Gate policy must classify the exact six authoritative components including codeql-runtime.");
+  }
+}
+checkCodeqlPrRuntimeAdapter();
+
+
 // --- exact-SHA release preflight and future publisher boundary (#192) ---
 // Registry submission is upstream/operator-controlled. Guard repo-managed changes.
 function checkReleaseCodeqlPreflight() {
