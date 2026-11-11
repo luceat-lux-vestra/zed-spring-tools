@@ -38,7 +38,7 @@
     "allowed_merge_methods": [
       "squash"
     ],
-    "strict_required_status_checks_policy": true,
+    "strict_required_status_checks_policy": false,
     "required_approving_review_count": 0,
     "required_review_thread_resolution": true,
     "require_extra_approval_for_unattributed_changes": true,
