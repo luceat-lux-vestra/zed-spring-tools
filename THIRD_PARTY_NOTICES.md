@@ -100,7 +100,7 @@ dependencies are:
 | Crate | Version | License |
 | --- | --- | --- |
 | `zed_extension_api` | 0.7.0 | Apache-2.0 |
-| `flate2` | 1.1.10 | MIT OR Apache-2.0 |
+| `flate2` | 1.1.11 | MIT OR Apache-2.0 |
 | `sha2` | 0.11.1 | MIT OR Apache-2.0 |
 | `zip` | 7.1.0 | MIT |
 
@@ -113,8 +113,8 @@ packages that were reachable only through it (`errno`, `fastrand`,
 previously audited graph. No copyleft-only license appears, and no retained
 package leaves its license field unstated.
 
-For the `flate2` 1.1.10 refresh, the changed and newly introduced package
-metadata was re-read rather than carried forward: `flate2` 1.1.10 remains
+For the `flate2` 1.1.11 refresh, the changed and newly introduced package
+metadata was re-read rather than carried forward: `flate2` 1.1.11 remains
 `MIT OR Apache-2.0`, `miniz_oxide` 0.9.1 remains
 `MIT OR Zlib OR Apache-2.0`, and the newly locked `zlib-rs` 0.6.7 declares
 `Zlib`.
