@@ -7,7 +7,7 @@ import path from "node:path";
 
 const EXPECTED_NODE_MAJOR = 24;
 const EXPECTED_JAVA_MAJOR = 25;
-const EXPECTED_RUST = "1.98.0";
+const EXPECTED_RUST_CHANNEL = "stable";
 
 const expectedOs = requiredEnv("EXPECTED_OS");
 const expectedArch = requiredEnv("EXPECTED_ARCH");
@@ -21,6 +21,7 @@ const nodeVersion = process.versions.node;
 const javaVersion = commandOutput(javaTool("java"), ["-version"]);
 const javacVersion = commandOutput(javaTool("javac"), ["-version"]);
 const rustcVersion = commandOutput("rustc", ["--version"]);
+const stableRustcVersion = commandOutput("rustup", ["run", EXPECTED_RUST_CHANNEL, "rustc", "--version"]);
 const cargoVersion = commandOutput("cargo", ["--version"]);
 
 assertEqual(actualOs, expectedOs, "host OS");
@@ -28,7 +29,7 @@ assertEqual(actualArch, expectedArch, "host architecture");
 assertEqual(Number(nodeVersion.split(".")[0]), EXPECTED_NODE_MAJOR, "Node major version");
 assertEqual(javaMajor(javaVersion), EXPECTED_JAVA_MAJOR, "Java major version");
 assertEqual(javaMajor(javacVersion), EXPECTED_JAVA_MAJOR, "javac major version");
-assertEqual(rustVersion(rustcVersion), EXPECTED_RUST, "Rust toolchain version");
+assertEqual(rustVersion(rustcVersion), rustVersion(stableRustcVersion), "Rust toolchain (current installed stable)");
 assertSha(sourceHead, "source HEAD");
 assertSha(testedCommit, "tested commit");
 

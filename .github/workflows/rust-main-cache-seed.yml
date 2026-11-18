@@ -24,7 +24,7 @@ concurrency:
 
 env:
   # Must match CI/rust and platform-validation Linux ARM64 before rust-cache.
-  RUST_TOOLCHAIN: "1.98.0"
+  RUST_TOOLCHAIN: "stable"
 
 jobs:
   rust:
