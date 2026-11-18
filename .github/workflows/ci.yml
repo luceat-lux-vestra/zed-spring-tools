@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 30
     env:
       # Keep the rust-cache environment hash aligned with platform validation.
-      RUST_TOOLCHAIN: "1.98.0"
+      RUST_TOOLCHAIN: "stable"
     steps:
       - name: Detect documentation-only scope
         id: scope
@@ -86,11 +86,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      # Pinned by SHA *and* by toolchain version. `@stable` floats twice over:
+      # Action source is pinned by SHA; the explicitly requested Rust `stable` channel
+      # intentionally floats as new stable compiler versions are released. `@stable`
+      # as an Action ref would float the Action source too:
       # the action's own code moves, and the compiler it installs changes every
       # six weeks, which turns `clippy -D warnings` into a check that can fail on
       # an unchanged tree the day a new lint ships. The extension registry builds
-      # the shipped WASM on its own toolchain, so this pin governs CI only; move
+      # the shipped WASM on its own toolchain, so the Action pin governs CI code
+      # while Rust Stable updates are intentionally followed.
       # it deliberately, with a run that proves the new compiler is clean.
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         if: ${{ steps.scope.outputs.docs_only != 'true' }}

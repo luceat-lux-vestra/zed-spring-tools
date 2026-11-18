@@ -222,6 +222,14 @@ new exact final PR HEAD before merge.
 
 ## CI cache ownership
 
+Rust development and CI intentionally follow the floating `stable` release channel
+from `rust-toolchain.toml`; do not add a fixed compiler version or a Nightly
+requirement. All PR consumers and protected-main cache producers must request
+the same `RUST_TOOLCHAIN: "stable"` before `Swatinem/rust-cache`. Runtime
+platform verification compares the active compiler against `rustup run stable`
+without assuming a numeric version. Real WASM builds remain mandatory.
+
+
 Rust caches are written only from trusted protected `main` producers. Pull-request
 jobs restore them read-only and must still compile successfully after a miss.
 

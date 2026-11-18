@@ -15,7 +15,7 @@ concurrency:
 env:
   JAVA_LTS: "25"
   NODE_LTS: "24"
-  RUST_TOOLCHAIN: "1.98.0"
+  RUST_TOOLCHAIN: "stable"
 
 jobs:
   scope:

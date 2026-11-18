@@ -51,9 +51,9 @@ function validateContract(mainProducer, prConsumer) {
   assert.match(mainProducer, /shared-key: main-ci-rust-arm64/);
   assert.match(prConsumer, /shared-key: main-ci-rust-arm64\n\s+save-if: false/);
   assert.equal((mainProducer.match(/Swatinem\/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0/g) ?? []).length, 1);
-  assert.match(mainProducer, /RUST_TOOLCHAIN: "1\.98\.0"/);
+  assert.match(mainProducer, /RUST_TOOLCHAIN: "stable"/);
   assert.match(mainProducer, /toolchain: \$\{\{ env\.RUST_TOOLCHAIN \}\}/);
-  assert.match(prConsumer, /RUST_TOOLCHAIN: "1\.98\.0"/);
+  assert.match(prConsumer, /RUST_TOOLCHAIN: "stable"/);
   assert.match(prConsumer, /toolchain: \$\{\{ env\.RUST_TOOLCHAIN \}\}/);
   assert.match(mainProducer, /targets: wasm32-wasip2/);
   assert.match(mainProducer, /cargo clippy --all-targets --all-features -- -D warnings/);
@@ -72,6 +72,7 @@ test("cache topology regression gate rejects stale, unsafe or overbroad policies
     ["wrong cache producer key", producer.replace("shared-key: main-ci-rust-arm64", "shared-key: incompatible-cache")],
     ["checkout authority removed", producer.replace('test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"', "echo unchecked")],
     ["target release build removed", producer.replace("cargo build --locked --release --target wasm32-wasip2", "cargo build --release")],
+    ["unreviewed producer Rust channel", producer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "nightly"')],
   ];
   for (const [name, mutated] of producerMutants) {
     assert.notEqual(mutated, producer, `test fixture not applied: ${name}`);
@@ -80,6 +81,7 @@ test("cache topology regression gate rejects stale, unsafe or overbroad policies
   const consumerMutants = [
     ["PR cache write silently enabled", consumer.replace("          save-if: false\n", "")],
     ["consumer key diverged from main", consumer.replace("shared-key: main-ci-rust-arm64", "shared-key: pr-only-cache")],
+    ["consumer compiler pin reintroduced", consumer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "1.98.0"')],
   ];
   for (const [name, mutated] of consumerMutants) {
     assert.notEqual(mutated, consumer, `test fixture not applied: ${name}`);
@@ -120,8 +122,9 @@ function validatePlatformCacheContract(mainProducer, prConsumer) {
   }
   assert.ok(prConsumer.includes("rust_cache_key: main-ci-rust-arm64"));
   assert.match(prConsumer, /shared-key: \$\{\{ matrix\.rust_cache_key \}\}\n\s+save-if: false/);
-  assert.match(prConsumer, /RUST_TOOLCHAIN: "1\.98\.0"/);
-  assert.match(consumer, /RUST_TOOLCHAIN: "1\.98\.0"/);
+  assert.match(mainProducer, /RUST_TOOLCHAIN: "stable"/);
+  assert.match(prConsumer, /RUST_TOOLCHAIN: "stable"/);
+  assert.match(consumer, /RUST_TOOLCHAIN: "stable"/);
 }
 
 test("platform Rust cache ownership is protected-main and PR read-only", () => {
@@ -135,6 +138,7 @@ test("platform cache contract rejects duplicate ARM64 producers and PR writes", 
     ["wrong main branch", platformProducer.replace("branches: [main]", "branches: [develop]")],
     ["duplicate linux arm64 producer", platformProducer.replace("          - id: linux-x86_64", "          - id: linux-arm64\n            runner: ubuntu-24.04-arm\n            rust_cache_key: main-ci-rust-arm64\n          - id: linux-x86_64")],
     ["native tests removed", platformProducer.replace("run: cargo test --locked", "run: cargo metadata --locked --no-deps")],
+    ["platform producer compiler pin reintroduced", platformProducer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "1.98.0"')],
   ];
   for (const [name, mutated] of producerMutants) {
     assert.notEqual(mutated, platformProducer, "platform producer fixture not applied: " + name);
@@ -145,6 +149,7 @@ test("platform cache contract rejects duplicate ARM64 producers and PR writes", 
     ["PR writes enabled", platformConsumer.replace("          save-if: false\n", "")],
     ["linux ARM64 duplicates platform key", platformConsumer.replace("rust_cache_key: main-ci-rust-arm64", "rust_cache_key: platform-linux-arm64")],
     ["x64 cache key drift", platformConsumer.replace("rust_cache_key: platform-linux-x86_64", "rust_cache_key: wrong-linux-x86_64")],
+    ["platform consumer Rust channel drift", platformConsumer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "nightly"')],
   ];
   for (const [name, mutated] of consumerMutants) {
     assert.notEqual(mutated, platformConsumer, "platform consumer fixture not applied: " + name);
