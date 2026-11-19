@@ -1,5 +1,7 @@
 # Zed Spring Tools
 
+[![GitHub Stars](https://img.shields.io/github/stars/luceat-lux-vestra/zed-spring-tools?style=flat&label=Stars)](https://www.star-history.com/?repos=luceat-lux-vestra%2Fzed-spring-tools&type=date)
+
 **Spring Boot language intelligence for Zed.**
 
 [![CI](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luceat-lux-vestra/zed-spring-tools/actions/workflows/ci.yml)
