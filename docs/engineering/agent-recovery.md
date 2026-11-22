@@ -116,7 +116,7 @@ Classify movement before deciding what prior evidence still proves:
 
 Before relying on same-HEAD evidence after base advancement, fresh-read the current PR HEAD, `main`, merge-base, live ruleset, required checks, review threads, and mergeability. Determine whether the evidence was produced for the unchanged HEAD itself or for an old synthetic merge/base+HEAD composition.
 
-For zed-spring-tools specifically, the live `main` ruleset requires the GitHub Actions `Merge Gate` with strict required-status-check enforcement. `AGENTS.md` also binds release and capability evidence to exact revisions and requires exact-final-HEAD repository checks before release or Registry claims advance. Those stricter requirements remain authoritative. Same-HEAD evidence reuse therefore never authorizes an out-of-date or otherwise invalid current composition, and it never advances release/capability claims by itself.
+For zed-spring-tools specifically, fresh-read the live `main` ruleset at merge judgment time. The ruleset currently requires the GitHub Actions `Merge Gate`; do not infer a strict latest-base/up-to-date requirement unless the live ruleset actually establishes one. `AGENTS.md` also binds release and capability evidence to exact revisions and requires exact-final-HEAD repository checks before release or Registry claims advance. Those stricter repository requirements remain authoritative. Same-HEAD evidence reuse therefore never authorizes a semantically invalid current composition, and it never advances release/capability claims by itself.
 
 Evidence reuse is claim-scoped, not blanket merge or release authorization:
 
