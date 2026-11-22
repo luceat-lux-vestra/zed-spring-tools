@@ -27,7 +27,7 @@ concurrency:
 # silently weaken the live merge contract.
 jobs:
   rust:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     env:
       # Keep the rust-cache environment hash aligned with platform validation.
@@ -118,7 +118,7 @@ jobs:
         run: cargo build --locked --release --target wasm32-wasip2
 
   coordinator:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     steps:
       - name: Detect documentation-only scope
@@ -168,11 +168,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Node 24 is the current LTS line and is also the M5 platform baseline.
+      # Follow the current Node LTS channel; platform validation verifies the resolved runtime is LTS.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
-          node-version: 24
+          node-version: 'lts/*'
       # Use the same explicit cross-platform discovery path as the six-tuple
       # platform matrix so adding a new coordinator test cannot diverge between
       # required CI and portability CI.
@@ -212,7 +212,7 @@ jobs:
   # ordinary pull request. That is a precondition for promoting it to a required
   # context later; see `.github/merge-gate-policy.json`.
   workflow-security:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -223,7 +223,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
-          node-version: 24
+          node-version: 'lts/*'
       # Avoid a per-PR dependency on GitHub Release asset delivery. actionlint
       # is built from its exact upstream release commit via the Go module checksum
       # pipeline; zizmor is installed only from its hash-pinned PyPI ARM64 wheel.
@@ -282,7 +282,7 @@ jobs:
 
 
   review:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -296,7 +296,7 @@ jobs:
 
   codeql-runtime:
     name: codeql-runtime
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 12
     permissions:
       contents: read
@@ -416,7 +416,7 @@ jobs:
     name: Merge Gate
     needs: [rust, coordinator, review, workflow-security, platform-validation, codeql-runtime]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     steps:
       - name: Require every merge-gate component to succeed

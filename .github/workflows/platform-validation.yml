@@ -14,13 +14,13 @@ concurrency:
 
 env:
   JAVA_LTS: "25"
-  NODE_LTS: "24"
+  NODE_LTS: "lts/*"
   RUST_TOOLCHAIN: "stable"
 
 jobs:
   scope:
     name: platform-scope
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     outputs:
       run_validation: ${{ steps.classify.outputs.run_validation }}
@@ -87,12 +87,12 @@ jobs:
       matrix:
         include:
           - id: linux-x86_64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             expected_os: linux
             expected_arch: x86_64
             rust_cache_key: platform-linux-x86_64
           - id: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             expected_os: linux
             expected_arch: arm64
             # Reuse the already-proven required-CI main producer instead of
@@ -207,7 +207,7 @@ jobs:
   spring-runtime-floor:
     needs: [scope]
     if: ${{ always() && (needs.scope.result != 'success' || needs.scope.outputs.run_validation == 'true') }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
       SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/spring-runtime-floor-evidence.json
@@ -243,7 +243,7 @@ jobs:
   # fanning out expensive runners; applicable/manual runs fail unless every
   # native platform leg and the JDK 21 floor succeed.
   platform-gate:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     needs:
       - scope

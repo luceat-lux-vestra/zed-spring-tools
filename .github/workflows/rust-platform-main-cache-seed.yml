@@ -32,7 +32,7 @@ jobs:
       matrix:
         include:
           - id: linux-x86_64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             rust_cache_key: platform-linux-x86_64
           - id: macos-x86_64
             runner: macos-15-intel

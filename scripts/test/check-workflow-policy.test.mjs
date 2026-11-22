@@ -317,7 +317,7 @@ test("a third CodeQL workflow consumer is rejected", () => {
       "permissions: {}",
       "jobs:",
       "  analyze:",
-      "    runs-on: ubuntu-24.04-arm",
+      "    runs-on: ubuntu-26.04-arm",
       "    timeout-minutes: 5",
       "    steps:",
       "      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066",

@@ -136,7 +136,7 @@ test("platform cache contract rejects duplicate ARM64 producers and PR writes", 
     ["source-wide trigger", platformProducer.replace("      - 'Cargo.lock'\n", "      - 'Cargo.lock'\n      - 'src/**'\n")],
     ["manual recovery removed", platformProducer.replace("  workflow_dispatch:", "  # workflow_dispatch:")],
     ["wrong main branch", platformProducer.replace("branches: [main]", "branches: [develop]")],
-    ["duplicate linux arm64 producer", platformProducer.replace("          - id: linux-x86_64", "          - id: linux-arm64\n            runner: ubuntu-24.04-arm\n            rust_cache_key: main-ci-rust-arm64\n          - id: linux-x86_64")],
+    ["duplicate linux arm64 producer", platformProducer.replace("          - id: linux-x86_64", "          - id: linux-arm64\n            runner: ubuntu-26.04-arm\n            rust_cache_key: main-ci-rust-arm64\n          - id: linux-x86_64")],
     ["native tests removed", platformProducer.replace("run: cargo test --locked", "run: cargo metadata --locked --no-deps")],
     ["platform producer compiler pin reintroduced", platformProducer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "1.98.0"')],
   ];

@@ -17,6 +17,9 @@ ACTION_LINE = re.compile(
     r"^\s*uses:\s*github/codeql-action/(?P<action>init|analyze)@"
     r"(?P<sha>[0-9a-f]{40})(?:\s+#.*)?\s*$"
 )
+RUNNER_LINE = re.compile(
+    r"^\s*runs-on:\s*(?P<label>ubuntu-[0-9]{2}\.[0-9]{2}-arm)\s*$"
+)
 SIMPLE_STATUSES = frozenset({"added", "modified", "removed"})
 MOVE_STATUSES = frozenset({"renamed", "copied"})
 RELEVANT_PATHS = frozenset({
@@ -61,30 +64,55 @@ def flatten_pages(value: object) -> list[dict]:
     return rows
 
 
-def validate_codeql_pin_only_patch(row: dict) -> None:
+def validate_codeql_direct_patch(row: dict) -> None:
     if row.get("status") != "modified":
-        reject("direct codeql.yml change is supported only as an in-place pin replacement")
+        reject("direct codeql.yml change is supported only as an in-place reviewed replacement")
     patch = row.get("patch")
     if not isinstance(patch, str) or not patch.strip():
         reject("direct codeql.yml change lacks a complete reviewable patch")
-    changed: list[tuple[str, str, str]] = []
+
+    actions: list[tuple[str, str, str]] = []
+    runners: list[tuple[str, str]] = []
     for raw in patch.splitlines():
         if not raw or raw.startswith(("+++", "---", "@@")) or raw[0] not in "+-":
             continue
-        match = ACTION_LINE.fullmatch(raw[1:])
-        if match is None:
-            reject("direct codeql.yml mutation is not an immutable init/analyze pin-only change")
-        changed.append((raw[0], match.group("action"), match.group("sha")))
-    if len(changed) != 4:
-        reject("direct codeql.yml pin-only change must replace init and analyze exactly once")
-    old = {action: sha for sign, action, sha in changed if sign == "-"}
-    new = {action: sha for sign, action, sha in changed if sign == "+"}
-    if set(old) != {"init", "analyze"} or set(new) != {"init", "analyze"}:
-        reject("direct codeql.yml pin-only change must cover both init and analyze")
-    if old["init"] != old["analyze"] or new["init"] != new["analyze"]:
-        reject("CodeQL init/analyze pins must move together")
-    if old["init"] == new["init"]:
-        reject("CodeQL pin-only patch did not change the immutable pin")
+        line = raw[1:]
+        action = ACTION_LINE.fullmatch(line)
+        if action is not None:
+            actions.append((raw[0], action.group("action"), action.group("sha")))
+            continue
+        runner = RUNNER_LINE.fullmatch(line)
+        if runner is not None:
+            runners.append((raw[0], runner.group("label")))
+            continue
+        reject("direct codeql.yml mutation is neither an immutable init/analyze pin change nor an ARM runner-label change")
+
+    if actions and runners:
+        reject("direct codeql.yml change must not combine CodeQL pin and runner-label migrations")
+
+    if actions:
+        if len(actions) != 4:
+            reject("direct codeql.yml pin-only change must replace init and analyze exactly once")
+        old = {action: sha for sign, action, sha in actions if sign == "-"}
+        new = {action: sha for sign, action, sha in actions if sign == "+"}
+        if set(old) != {"init", "analyze"} or set(new) != {"init", "analyze"}:
+            reject("direct codeql.yml pin-only change must cover both init and analyze")
+        if old["init"] != old["analyze"] or new["init"] != new["analyze"]:
+            reject("CodeQL init/analyze pins must move together")
+        if old["init"] == new["init"]:
+            reject("CodeQL pin-only patch did not change the immutable pin")
+        return
+
+    if runners:
+        if len(runners) != 2:
+            reject("direct codeql.yml runner migration must replace exactly one runs-on label")
+        old = [label for sign, label in runners if sign == "-"]
+        new = [label for sign, label in runners if sign == "+"]
+        if len(old) != 1 or len(new) != 1 or old[0] == new[0]:
+            reject("direct codeql.yml runner migration must replace one immutable ARM runner label")
+        return
+
+    reject("direct codeql.yml patch contained no supported change")
 
 
 def classify(
@@ -137,7 +165,7 @@ def classify(
         if previous:
             touched.add(previous)
         if ".github/workflows/codeql.yml" in touched:
-            validate_codeql_pin_only_patch(row)
+            validate_codeql_direct_patch(row)
             required = True
         if touched & RELEVANT_PATHS:
             required = True
@@ -350,6 +378,17 @@ def self_test(root: Path = ROOT) -> None:
     assert classify(
         pr(1),
         [[{"status": "modified", "filename": ".github/workflows/codeql.yml", "patch": patch}]],
+        repo=repo, base=base, head=head, head_repo=repo,
+    )
+
+    runner_patch = (
+        "@@ -1 +1 @@\n"
+        "-    runs-on: ubuntu-24.04-arm\n"
+        "+    runs-on: ubuntu-26.04-arm\n"
+    )
+    assert classify(
+        pr(1),
+        [[{"status": "modified", "filename": ".github/workflows/codeql.yml", "patch": runner_patch}]],
         repo=repo, base=base, head=head, head_repo=repo,
     )
 
