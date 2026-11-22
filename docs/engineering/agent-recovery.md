@@ -49,6 +49,17 @@ stop_condition: <repository-policy stop condition>
 
 Do not store the mutable checkpoint in a production branch and do not mirror volatile CI state in it.
 
+
+Checkpoint ownership is single-writer for the owning work item. Delegates may
+propose state, but must not concurrently overwrite the canonical checkpoint.
+Where multiple processes can write the same durable state, use an appropriate
+lock/lease or version-checked compare-and-swap and an atomic durable replacement
+where supported. Confirm the prior revision before committing the new one. If
+coordination, conflict detection, or atomic persistence cannot be assured,
+operate with one writer only. On a conflicting or uncertain write, re-read
+GitHub and the current checkpoint, reconcile, and STOP rather than applying
+last-writer-wins.
+
 Normal durable boundaries are: work selected, candidate ref verified, PR verified, final candidate HEAD established, merge verified, post-merge housekeeping verified, done.
 
 Do not intentionally leave checkpoints stale during normal work. Staleness is a recovery condition caused by interruption, lost response, concurrent movement, or failed checkpoint write.

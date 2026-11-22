@@ -195,6 +195,40 @@ mechanical.
   currently resolves that trailer to the `codex` account; update the model label
   when the active Codex model changes.
 
+## Portable agent execution and engineering integrity
+
+These repository-local rules are self-contained for agent execution. External
+governance material may provide provenance, but an agent working here must not
+need access to another repository in order to know the mandatory execution
+contract.
+
+- One explicit user authorization permits exactly **one bounded work unit**.
+  Planner/advisor/reviewer calls, tool calls, retries, delegates, and subagents
+  do not create additional authorization or permission to advance lifecycle
+  phases.
+- Keep lifecycle boundaries separate: implementation and candidate commit; PR
+  creation; CI observation/judgment; remediation; merge; and post-merge
+  verification/housekeeping. Complete the selected unit, verify its durable
+  postcondition, update the owning checkpoint, and STOP.
+- CI observation is a separate work unit. Take one bounded logical evidence
+  pass for the exact revision using the minimum distinct authoritative sources
+  needed to classify checks, workflow runs, status contexts, required-check
+  identities, and provenance. Do not poll, sleep/wait for a transition,
+  repeatedly re-query evolving status, or rerun work merely to obtain green.
+- Mutable or environment-dependent production facts must come from the
+  designated authoritative configuration, discovery mechanism, validated
+  input, or accepted contract. Do not hardcode machine-specific paths,
+  endpoints, credentials, transient identifiers, current SHAs, fabricated
+  outcomes, fixture-specific success paths, silent arbitrary fallbacks, or
+  unexplained magic thresholds. Legitimate protocol/domain constants,
+  intentional dependency/security pins, documented safe defaults,
+  reproducible fixtures, and golden outputs remain allowed when their scope and
+  rationale are explicit.
+- Never claim that a rule reaches a model, OMP worker, or subagent merely
+  because the file exists. Assert coverage only after the relevant process is
+  proven to load these repository-local instructions; inheritance across agents
+  remains UNVERIFIED until demonstrated.
+
 ## Failure handling before remediation
 
 A failing capability observation, integration test, evidence gate, workflow
