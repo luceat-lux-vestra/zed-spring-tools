@@ -5,7 +5,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const EXPECTED_NODE_MAJOR = 24;
 const EXPECTED_JAVA_MAJOR = 25;
 const EXPECTED_RUST_CHANNEL = "stable";
 
@@ -26,7 +25,7 @@ const cargoVersion = commandOutput("cargo", ["--version"]);
 
 assertEqual(actualOs, expectedOs, "host OS");
 assertEqual(actualArch, expectedArch, "host architecture");
-assertEqual(Number(nodeVersion.split(".")[0]), EXPECTED_NODE_MAJOR, "Node major version");
+assertNodeLts(process.release.lts);
 assertEqual(javaMajor(javaVersion), EXPECTED_JAVA_MAJOR, "Java major version");
 assertEqual(javaMajor(javacVersion), EXPECTED_JAVA_MAJOR, "javac major version");
 assertEqual(rustVersion(rustcVersion), rustVersion(stableRustcVersion), "Rust toolchain (current installed stable)");
@@ -61,6 +60,7 @@ const evidence = {
   },
   runtime: {
     node: nodeVersion,
+    nodeLts: process.release.lts,
     java: firstLine(javaVersion),
     javac: firstLine(javacVersion),
     rustc: firstLine(rustcVersion),
@@ -135,6 +135,12 @@ function rustVersion(output) {
 
 function firstLine(value) {
   return value.split(/\r?\n/, 1)[0];
+}
+
+function assertNodeLts(value) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Node runtime is not an LTS release: ${JSON.stringify(process.versions.node)}`);
+  }
 }
 
 function assertSha(value, label) {

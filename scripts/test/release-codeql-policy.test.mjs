@@ -24,7 +24,7 @@ on:
 permissions: {}
 jobs:
   codeql-preflight:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 75
     permissions:
       contents: read
@@ -33,7 +33,7 @@ jobs:
       - run: python3 tools/ci/release_codeql_preflight.py --sha "$GITHUB_SHA"
   publish:
     needs: [codeql-preflight]
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     steps:
       - run: gh release create v999 # synthetic dry fixture, never executed

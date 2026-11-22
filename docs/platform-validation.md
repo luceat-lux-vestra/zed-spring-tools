@@ -35,8 +35,8 @@ that single final gate while a non-applicable PR remains green.
 
 | Host | Architecture | GitHub runner |
 | --- | --- | --- |
-| Linux | x86_64 | `ubuntu-24.04` |
-| Linux | arm64 | `ubuntu-24.04-arm` |
+| Linux | x86_64 | `ubuntu-26.04` |
+| Linux | arm64 | `ubuntu-26.04-arm` |
 | macOS | x86_64 | `macos-15-intel` |
 | macOS | arm64 | `macos-15` |
 | Windows | x86_64 | `windows-2025` |

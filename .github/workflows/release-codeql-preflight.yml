@@ -19,7 +19,7 @@ concurrency:
 jobs:
   preflight:
     name: Release CodeQL preflight
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 75
     permissions:
       actions: write
