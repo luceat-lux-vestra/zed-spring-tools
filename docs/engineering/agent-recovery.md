@@ -47,8 +47,11 @@ last_mutation:
 stop_condition: <repository-policy stop condition>
 ```
 
-Do not store the mutable checkpoint in a production branch and do not mirror volatile CI state in it.
-
+Do not store the mutable checkpoint in a production branch. The checkpoint may
+summarize the **current** CI or verification judgment needed to resume safely,
+but it is never an authoritative mirror of GitHub. Fresh-read current GitHub
+state before any decision that depends on checks, workflows, reviews, merge
+state, or the default branch.
 
 Checkpoint ownership is single-writer for the owning work item. Delegates may
 propose state, but must not concurrently overwrite the canonical checkpoint.
@@ -59,6 +62,25 @@ coordination, conflict detection, or atomic persistence cannot be assured,
 operate with one writer only. On a conflicting or uncertain write, re-read
 GitHub and the current checkpoint, reconcile, and STOP rather than applying
 last-writer-wins.
+
+### Rolling-checkpoint discipline
+
+The canonical owning-Issue checkpoint is a **latest-state snapshot, not an
+append-only log**. Keep at most one marked mutable checkpoint for the active
+work item. Each edit replaces obsolete or superseded state; retain only concise
+completed outcomes needed to understand the current situation, current state,
+blockers, the next safe unit, and the STOP condition.
+
+Do not accumulate old `Step N` sections, prior CI snapshots, superseded HEAD
+states, per-turn/session progress, or duplicate checkpoint comments merely for
+chronology. Git commits, PR history, Issue events, review records, and other
+independently durable evidence own that history. Preserve user-authored
+decisions, review discussion, and immutable evidence in their authoritative
+records rather than copying them into checkpoint history.
+
+Before writing checkpoint state, fresh-read Issue comments and reuse the
+existing `<!-- agent-resume-checkpoint:v1 -->` comment. If duplicates already
+exist, do not create another; reconcile them and keep one canonical writer.
 
 Normal durable boundaries are: work selected, candidate ref verified, PR verified, final candidate HEAD established, merge verified, post-merge housekeeping verified, done.
 

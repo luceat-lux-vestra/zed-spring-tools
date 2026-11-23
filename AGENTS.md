@@ -36,9 +36,10 @@ production.
 - The repository is already public and the M1-M6 implementation program is
   historical. New work should advance an explicit current issue/track, not
   recreate completed milestone work.
-- Current release work is intentionally narrow: resolve #159, obtain accepted
-  Registry publication, drive #112 through the real Registry lifecycle, and
-  promote release claims through #113 only when exact evidence supports them.
+- Current release work is intentionally narrow: preserve #159's completed D007
+  closure evidence, obtain accepted Registry publication, drive #112 through the
+  real Registry lifecycle, and promote release claims through #113 only when
+  exact evidence supports them.
 - Platform-aware code or CI does not by itself broaden support. Untested runtime
   tuples remain unverified until driven evidence exists.
 
@@ -227,7 +228,10 @@ contract.
 - Never claim that a rule reaches a model, OMP worker, or subagent merely
   because the file exists. Assert coverage only after the relevant process is
   proven to load these repository-local instructions; inheritance across agents
-  remains UNVERIFIED until demonstrated.
+  remains UNVERIFIED until demonstrated. Before claiming **full** OMP or other
+  multi-agent coverage, verify the installed/runtime version, configuration
+  precedence, these target-local instructions, subagent inheritance, and any
+  persistent `RULES.md` behavior that can alter instruction loading.
 
 ## Failure handling before remediation
 
@@ -296,8 +300,9 @@ success; only their product/toolchain work may be skipped. `review`
 CI DAG: it returns a successful non-applicable result outside its reviewed
 platform/runtime path set, and fails closed to the full six-platform + JDK-floor
 evidence when scope cannot be established. The live ruleset requires one
-`Merge Gate`, which fails unless all five components succeed on the exact
-pull-request revision. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are
+`Merge Gate`, which fails unless every canonical component declared by
+`.github/merge-gate-policy.json` and wired into the canonical CI DAG succeeds
+for the exact pull-request revision. `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are
 deliberately excluded because coordinator checks derive and validate them.
 
 ## Change discipline
