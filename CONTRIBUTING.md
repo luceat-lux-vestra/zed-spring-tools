@@ -14,9 +14,10 @@ maintained authority for the work you are changing. `docs/implementation-plan.md
 is a historical M1-M6 milestone record, not the current roadmap. Current
 capability/support truth lives in the capability inventory, compatibility and
 limitations documents; release work is owned by Epic #108 and the current
-release gate. D002-D006 remain the checked-in architecture on current `main`,
-while #159 explicitly reopens the Registry publishing boundary for the private
-Java transport.
+release gate. D007 is the current runtime publishing boundary: it supersedes
+the private cross-extension Java-coordination portions of D002/D003/D004/D006,
+#159 is closed, and the retired sibling-workdir/proxy/bridge transport must not
+be reintroduced without a new recorded decision.
 
 Keep a contribution to one investigation, experiment, decision, or reviewed
 implementation slice. Open an issue before broad architecture, packaging,
@@ -62,9 +63,11 @@ document or Markdown under `docs/**`. The component jobs still appear, while
 workflow-security and Dependency Review continue to run. The reusable Platform
 Validation component also remains present but returns a successful
 non-applicable result unless its reviewed platform/runtime path set is touched.
-One required `Merge Gate` fails unless all five components succeed. Mixed or
-unrecognized docs-only paths fall back to the full Rust/coordinator gate, while
-unknown or incomplete platform scope fails closed to the full platform matrix.
+One required `Merge Gate` fails unless every canonical component declared by
+`.github/merge-gate-policy.json` and wired into the canonical CI DAG succeeds.
+Mixed or unrecognized docs-only paths fall back to the full Rust/coordinator
+gate, while unknown or incomplete platform scope fails closed to the full
+platform matrix.
 Generated `CONTRIBUTORS.md` and `THIRD_PARTY_NOTICES.md` are not eligible
 for the docs-only shortcut because CI validates them against repository state.
 

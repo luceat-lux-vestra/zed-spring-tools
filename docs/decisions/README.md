@@ -22,7 +22,7 @@ Zed's publishing boundary.
 | [D004](004-product-stack-build-and-packaging.md) | Product stack, build, and packaging | Accepted |
 | [D005](005-lsp-first-capability-delivery.md) | LSP-first capability delivery with preserved fallbacks | Accepted |
 | [D006](006-capability-first-java-compatibility-and-reporting.md) | Capability-first Java compatibility and user-reviewed reporting | Superseded by D007 for runtime Java coordination |
-| [D007](007-standalone-spring-publishing-boundary.md) | Standalone Spring language server and publishing boundary | Accepted for #159 implementation; exact-head Zed release validation pending |
+| [D007](007-standalone-spring-publishing-boundary.md) | Standalone Spring language server and publishing boundary | Accepted and implemented; #159 exact-candidate validation complete, Registry lifecycle pending |
 
 Decision records in this directory must cite supporting research and spike
 results. S010 supported an isolated managed JDT runtime with private Equinox
