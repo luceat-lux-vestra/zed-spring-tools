@@ -55,13 +55,21 @@ export function validateLifecycle(paths, read, now = new Date().toISOString().sl
   const ci=read(".github/workflows/ci.yml");
   const drift=read(".github/workflows/repository-drift.yml");
   if(!/go-version:\s*['"]stable['"]\s*\n\s*check-latest: true/.test(ci)||!ci.includes("bash .github/scripts/check-actions-security.sh")) fail("managed actionlint channel absent");
-  const zizmor=[...ci.matchAll(/uses: zizmorcore\/zizmor-action@([0-9a-f]{40})/g)].map(m=>m[1]);
+  const security=ci.split(/^  workflow-security:[ \t]*$/m)[1]?.split(/^  [\w-]+:[ \t]*$/m)[0]??"";
+  const header=security.split(/^    steps:[ \t]*$/m)[0];
+  const permissions=header.match(/^    permissions:[ \t]*\n((?:      [^\n]+\n)+)/m);
+  if(!permissions||permissions[1].trim()!=="contents: read") fail("workflow-security token scope must be contents: read only");
+  const zizmor=[...security.matchAll(/uses: zizmorcore\/zizmor-action@([0-9a-f]{40})/g)].map(m=>m[1]);
   if(zizmor.length!==2||new Set(zizmor).size!==1) fail("zizmor positive/negative immutable pins differ");
   for(const name of ["Validate workflows with managed zizmor","Prove zizmor negative control"]){
-    const section=ci.split("- name: "+name+"\n")[1]?.split("\n      - name: ")[0]??"";
-    for(const input of ["strict-collection: true","online-audits: false","advanced-security: false","token: ''"]) if(!section.includes(input)) fail("zizmor trust contract "+name+": "+input);
+    const section=security.split("- name: "+name+"\n")[1]?.split("\n      - name: ")[0]??"";
+    for(const input of ["strict-collection: true","fail-on-no-inputs: true","online-audits: false","advanced-security: false","annotations: false","token: "+expression+" github.token }}"]) if(!section.includes(input)) fail("zizmor trust contract "+name+": "+input);
+    if(/^\s*(?:min-severity|min-confidence|version):/m.test(section)) fail("zizmor unreviewed filtering or version override "+name);
+    if((section.match(/^\s*token:/gm)??[]).length!==1) fail("zizmor token input must be unique "+name);
     if(section.includes("continue-on-error: true")!==(name==="Prove zizmor negative control")) fail("zizmor failure gate drift "+name);
   }
+  const clear=security.indexOf('run: rm -f "$RUNNER_TEMP/zizmor"');
+  if(clear<0||clear<security.indexOf("- name: Validate workflows with managed zizmor")||clear>=security.indexOf("- name: Prove zizmor negative control")) fail("zizmor negative control output reset missing");
   if(!ci.includes("test \"$ZIZMOR_NEGATIVE_OUTCOME\" = failure")||!ci.includes("grep -q 'unpinned-uses' \"$RUNNER_TEMP/zizmor\"")) fail("zizmor negative outcome verifier missing");
   if(!ci.includes("run: mvn -B -ntp -f tests/fixtures/spring-codelens-showcase/pom.xml compile")) fail("active fixture compile gate missing");
   if(!drift.includes("run: node scripts/check-dependency-lifecycle.mjs")) fail("scheduled lifecycle check missing");

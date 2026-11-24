@@ -218,6 +218,10 @@ jobs:
   workflow-security:
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
+    # Checkout needs read access. The official zizmor wrapper requires a non-empty
+    # GitHub token even for offline audits; constrain it to this read-only job.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -246,11 +250,17 @@ jobs:
         with:
           inputs: .github/workflows/
           strict-collection: true
+          fail-on-no-inputs: true
           online-audits: false
           advanced-security: false
           annotations: false
-          token: ''
+          token: ${{ github.token }}
           color: false
+      # The prior positive scan must succeed. Clear its output so a failed
+      # negative invocation cannot reuse stale findings from another step.
+      - name: Clear prior zizmor output
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        run: rm -f "$RUNNER_TEMP/zizmor"
       - name: Prove zizmor negative control
         id: zizmor-negative
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -259,10 +269,11 @@ jobs:
         with:
           inputs: ${{ steps.actionlint-control.outputs.zizmor_fixture }}
           strict-collection: true
+          fail-on-no-inputs: true
           online-audits: false
           advanced-security: false
           annotations: false
-          token: ''
+          token: ${{ github.token }}
           color: false
       - name: Verify zizmor negative-control finding
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}

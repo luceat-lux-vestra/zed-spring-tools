@@ -421,9 +421,9 @@
       ],
       "strategy": "DEPENDABOT",
       "authority": "Upstream stable GitHub Action releases",
-      "mechanism": "Immutable full SHA + root github-actions Dependabot.",
+      "mechanism": "Immutable full SHA + root github-actions Dependabot. Official zizmor action resolves a hash-verified wheel from its own immutable release; its input contract requires a non-empty GitHub token even with online audits disabled. The workflow-security job is restricted to contents: read and supplies only github.token; no online audits, SARIF upload, threshold filtering, or persistent checkout credentials.",
       "owner": "luceat-lux-vestra/zed-spring-tools#221",
-      "validation": "Required Merge Gate and security validation."
+      "validation": "Required Merge Gate, strict offline zizmor positive scan and unpinned-uses negative control with fresh output, exact job-token scope regression tests, actionlint checks."
     },
     {
       "id": "node-lts",

@@ -26,3 +26,22 @@ test("unowned matrix runner and missing negative verifier fail",()=>{
   assert.match(evaluate(ci,s=>s.replace("test \"$ZIZMOR_NEGATIVE_OUTCOME\" = failure","echo unchecked")).join("\n"),/negative outcome verifier/);
 });
 test("native-managed fixture requires compile evidence",()=>assert.match(evaluate(ci,s=>s.replace("run: mvn -B -ntp -f tests/fixtures/spring-codelens-showcase/pom.xml compile","run: echo unchecked")).join("\n"),/active fixture compile gate missing/));
+
+test("zizmor requires official job token and strict offline scan contract",()=>{
+  const token = "token: " + String.fromCharCode(36,123,123) + " github.token }}";
+  const mutants = [
+    [token, "token: ''", /zizmor trust contract/],
+    [token, "token: " + String.fromCharCode(36,123,123) + " secrets.PAT }}", /zizmor trust contract/],
+    ["online-audits: false", "online-audits: true", /zizmor trust contract/],
+    ["advanced-security: false", "advanced-security: true", /zizmor trust contract/],
+    ["fail-on-no-inputs: true", "fail-on-no-inputs: false", /zizmor trust contract/],
+    ["annotations: false", "annotations: false\n          min-severity: high", /zizmor unreviewed filtering/],
+    ['run: rm -f "$RUNNER_TEMP/zizmor"', "run: echo unchecked", /negative control output reset missing/],
+    ["    permissions:\n      contents: read\n    steps:", "    permissions:\n      contents: write\n    steps:", /token scope/],
+    ["    permissions:\n      contents: read\n    steps:", "    permissions:\n      contents: read\n      pull-requests: read\n    steps:", /token scope/],
+  ];
+  for (const [from,to,expected] of mutants) {
+    assert.ok(read(ci).includes(from), "stale negative fixture: "+from);
+    assert.match(evaluate(ci,s=>s.replace(from,to)).join("\n"),expected);
+  }
+});

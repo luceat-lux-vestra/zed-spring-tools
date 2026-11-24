@@ -26,6 +26,18 @@ function edit(root, file, from, to) {
   writeFileSync(path, before.replace(from, to));
 }
 
+// Derive live fixture anchors from the tracked workflows, not a particular
+// Dependabot revision. A missing, ambiguous, or mutable anchor must still fail.
+function immutableActionRef(root, file, action) {
+  const source = readFileSync(join(root, file), "utf8");
+  const refs = [...source.matchAll(/\buses:[ \t]+([^\s@]+)@([0-9a-f]{40})(?=[ \t\r\n]|$)/g)]
+    .filter((match) => match[1] === action)
+    .map((match) => match[1] + "@" + match[2]);
+  const distinct = [...new Set(refs)];
+  assert.equal(distinct.length, 1, "missing or inconsistent immutable action anchor: " + action);
+  return distinct[0];
+}
+
 function run(root) {
   const result = spawnSync(process.execPath, [CHECK, "--root", root], { encoding: "utf8" });
   return { code: result.status, output: result.stdout + result.stderr };
@@ -201,7 +213,8 @@ test("docs-only full-validation guard cannot disappear", () => {
 
 test("a mutable action ref is rejected", () => {
   const root = fixture();
-  edit(root, ".github/workflows/ci.yml", "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7");
+  const current = immutableActionRef(root, ".github/workflows/ci.yml", "actions/checkout");
+  edit(root, ".github/workflows/ci.yml", current, "actions/checkout@v7");
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /uses `actions\/checkout@v7`, a mutable ref/);
@@ -219,7 +232,7 @@ test("a privileged workflow checkout is rejected", () => {
     root,
     ".github/workflows/labeler.yml",
     "    steps:\n",
-    "    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
+    "    steps:\n      - uses: " + immutableActionRef(root, ".github/workflows/ci.yml", "actions/checkout") + "\n",
   );
   const result = run(root);
   assert.equal(result.code, 1, result.output);
@@ -320,7 +333,7 @@ test("a third CodeQL workflow consumer is rejected", () => {
       "    runs-on: ubuntu-26.04-arm",
       "    timeout-minutes: 5",
       "    steps:",
-      "      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066",
+      "      - uses: " + immutableActionRef(root, ".github/workflows/codeql.yml", "github/codeql-action/analyze"),
       "",
     ].join("\n"),
   );
@@ -352,12 +365,10 @@ test("PR CodeQL runtime cannot gain security-events write", () => {
 
 test("PR CodeQL runtime pin must match production", () => {
   const root = fixture();
-  edit(
-    root,
-    ".github/workflows/ci.yml",
-    "uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3",
-    "uses: github/codeql-action/init@ffffffffffffffffffffffffffffffffffffffff # drift",
-  );
+  const current = immutableActionRef(root, ".github/workflows/ci.yml", "github/codeql-action/init");
+  const sha = current.split("@")[1];
+  const different = (sha[0] === "f" ? "0" : "f") + sha.slice(1);
+  edit(root, ".github/workflows/ci.yml", current, "github/codeql-action/init@" + different);
   const result = run(root);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /PR CodeQL runtime immutable pin does not match production/);
