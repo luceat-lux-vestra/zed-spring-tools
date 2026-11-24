@@ -45,3 +45,56 @@ test("zizmor requires official job token and strict offline scan contract",()=>{
     assert.match(evaluate(ci,s=>s.replace(from,to)).join("\n"),expected);
   }
 });
+
+// Derive the live companion fixture from the actual registry; the test must
+// remain valid when independent evidence modules are added or retired.
+const companionPattern = /(?:^|\/)(Cargo\.lock|settings\.gradle(?:\.kts)?|gradle\.lockfile|go\.sum|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock)$/;
+const registry = JSON.parse(read(policy));
+const companionOwner = registry.entries.find(e=>e.strategy==="REVIEWED_FREEZE" && e.source_paths.some(p=>companionPattern.test(p)));
+assert.ok(companionOwner, "expected a reviewed companion path to exercise");
+const companion = companionOwner.source_paths.find(p=>companionPattern.test(p));
+const mutateRegistry = change => evaluate(policy, source=>{
+  const data=JSON.parse(source);
+  change(data.entries);
+  return JSON.stringify(data);
+});
+test("each exact declaration path belongs to its root owner",()=>{
+  assert.match(mutateRegistry(entries=>{
+    const entry=entries.find(e=>e.id===companionOwner.id);
+    entry.source_paths=entry.source_paths.filter(p=>p!==companion);
+  }).join("\n"),/missing exact dependency source path/);
+  assert.match(mutateRegistry(entries=>{
+    const other=entries.find(e=>e.id!==companionOwner.id && e.provenance?.ecosystem);
+    other.source_paths.push(companion);
+  }).join("\n"),/ambiguous dependency path ownership/);
+  assert.match(mutateRegistry(entries=>{
+    const entry=entries.find(e=>e.id===companionOwner.id);
+    entries.push({...entry,id:entry.id+"-duplicate",source_paths:[companion]});
+  }).join("\n"),/ambiguous dependency root/);
+});
+test("new companion declarations fail closed without exact ownership",()=>{
+  const example=paths.find(p=>p.endsWith("/go.mod")||p==="go.mod");
+  assert.ok(example, "expected a managed Go module");
+  const sum=example.replace(/go\.mod$/,"go.sum");
+  if (!paths.includes(sum)) assert.match(validateLifecycle([...paths,sum],read).join("\n"),/missing exact dependency source path/);
+  else assert.match(mutateRegistry(entries=>{
+    const owner=entries.find(e=>e.source_paths.includes(sum));
+    assert.ok(owner);
+    owner.source_paths=owner.source_paths.filter(p=>p!==sum);
+  }).join("\n"),/missing exact dependency source path/);
+  for (const path of ["unowned-module/Cargo.lock","unowned-module/package-lock.json","unowned-module/go.sum"]) {
+    const errors=validateLifecycle([...paths,path],read).join("\n");
+    assert.match(errors,/orphan dependency companion without manifest/);
+    assert.match(errors,/missing or ambiguous dependency root/);
+  }
+  for (const path of ["new-module/settings.gradle.kts","new-module/build.gradle.kts","new-module/package.json",".gitmodules"]) {
+    if (!paths.includes(path)) assert.match(validateLifecycle([...paths,path],read).join("\n"),/missing or ambiguous dependency root/);
+  }
+});
+test("a registry owner cannot outlive its root or change freeze into silent native coverage",()=>{
+  assert.match(mutateRegistry(entries=>{
+    const entry=entries.find(e=>e.id===companionOwner.id);
+    entry.provenance.directory+="-missing";
+  }).join("\n"),/orphan dependency root owner/);
+  assert.match(evaluate(".github/dependabot.yml",source=>source+"\n  - package-ecosystem: "+companionOwner.provenance.ecosystem+"\n    directory: "+companionOwner.provenance.directory+"\n").join("\n"),/dependency root strategy mismatch/);
+});

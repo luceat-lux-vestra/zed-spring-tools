@@ -4,6 +4,40 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+// Discover declaration files by tracked path, not a list of today's modules.
+// A root has one lifecycle owner across its manifests and companion files.
+// Keep the exact paths used by the central detector (e.g. Cargo.lock and
+// settings.gradle) alongside the build manifests that express requirements.
+const declarationKinds = {
+  "Cargo.toml": ["cargo", true], "Cargo.lock": ["cargo", false],
+  "pom.xml": ["maven", true],
+  "build.gradle": ["gradle", true], "build.gradle.kts": ["gradle", true],
+  "settings.gradle": ["gradle", true], "settings.gradle.kts": ["gradle", true],
+  "gradle.lockfile": ["gradle", false],
+  "go.mod": ["gomod", true], "go.sum": ["gomod", false],
+  "package.json": ["npm", true], "package-lock.json": ["npm", false],
+  "npm-shrinkwrap.json": ["npm", false], "pnpm-lock.yaml": ["npm", false],
+  "yarn.lock": ["npm", false],
+  ".gitmodules": ["gitsubmodule", true],
+};
+
+function discoverDependencyRoots(paths) {
+  const roots = new Map();
+  for (const path of paths) {
+    const slash = path.lastIndexOf("/");
+    const name = path.slice(slash + 1);
+    if (!Object.hasOwn(declarationKinds, name)) continue;
+    const [ecosystem, primary] = declarationKinds[name];
+    const directory = slash < 0 ? "/" : "/" + path.slice(0, slash);
+    const key = ecosystem + ":" + directory;
+    if (!roots.has(key)) roots.set(key, {ecosystem, directory, paths: [], primary: false});
+    const root = roots.get(key);
+    root.paths.push(path);
+    root.primary ||= primary;
+  }
+  return roots;
+}
+
 export function validateLifecycle(paths, read, now = new Date().toISOString().slice(0, 10)) {
   const failures = [];
   const fail = message => failures.push(message);
@@ -22,13 +56,28 @@ export function validateLifecycle(paths, read, now = new Date().toISOString().sl
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.review_by ?? "") || r.review_by <= now || !r.rationale || !r.evidence || !r.trigger) fail("expired or incomplete freeze "+e.id);
     }
   }
-  for (const p of paths.filter(p=>/(?:^|\/)(Cargo\.toml|pom\.xml|build\.gradle|go\.mod)$/.test(p))) {
-    const eco = p.endsWith("Cargo.toml")?"cargo":p.endsWith("pom.xml")?"maven":p.endsWith("build.gradle")?"gradle":"gomod";
-    const dir = p.includes("/")?"/"+p.slice(0,p.lastIndexOf("/")):"/";
-    const owners = entries.filter(e=>e.source_paths.includes(p) && e.provenance?.ecosystem===eco && e.provenance?.directory===dir);
-    if (owners.length!==1) {fail("missing or ambiguous dependency root "+p);continue;}
-    const active = managed.has(eco+":"+dir);
-    if (owners[0].strategy==="DEPENDABOT"?!active:owners[0].strategy!=="REVIEWED_FREEZE"||active) fail("dependency root strategy mismatch "+p);
+  const roots = discoverDependencyRoots(tracked);
+  const rootOwners = new Map();
+  for (const entry of entries) {
+    const {ecosystem, directory} = entry.provenance ?? {};
+    if (ecosystem === undefined && directory === undefined) continue;
+    const key = ecosystem + ":" + directory;
+    if (!roots.has(key)) {fail("orphan dependency root owner "+entry.id+": "+key);continue;}
+    if (!rootOwners.has(key)) rootOwners.set(key, []);
+    rootOwners.get(key).push(entry);
+  }
+  for (const [key, root] of roots) {
+    if (!root.primary) fail("orphan dependency companion without manifest "+key);
+    const owners = rootOwners.get(key) ?? [];
+    if (owners.length !== 1) {fail("missing or ambiguous dependency root "+key);continue;}
+    const owner = owners[0];
+    for (const path of root.paths) {
+      const claims = entries.filter(e=>e.source_paths?.includes(path));
+      if (!owner.source_paths?.includes(path)) fail("missing exact dependency source path "+path+" in "+owner.id);
+      if (claims.length !== 1 || claims[0] !== owner) fail("missing or ambiguous dependency path ownership "+path);
+    }
+    const active = managed.has(key);
+    if (owner.strategy==="DEPENDABOT"?!active:owner.strategy!=="REVIEWED_FREEZE"||active) fail("dependency root strategy mismatch "+key);
   }
   if (!managed.has("github-actions:/")) fail("missing native Actions coverage");
   const expression = String.fromCharCode(36,123,123);

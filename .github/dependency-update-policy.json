@@ -8,7 +8,8 @@
       "id": "product-cargo",
       "source": "Cargo.toml",
       "source_paths": [
-        "Cargo.toml"
+        "Cargo.toml",
+        "Cargo.lock"
       ],
       "strategy": "DEPENDABOT",
       "authority": "Native ecosystem registry",
@@ -24,7 +25,8 @@
       "id": "historical-spikes-s001-zed-lifecycle-extension-cargo-toml",
       "source": "spikes/s001-zed-lifecycle/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s001-zed-lifecycle/extension/Cargo.toml"
+        "spikes/s001-zed-lifecycle/extension/Cargo.toml",
+        "spikes/s001-zed-lifecycle/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s001-zed-lifecycle/extension/Cargo.toml",
@@ -46,7 +48,8 @@
       "id": "historical-spikes-s002-spring-ls-limited-extension-cargo-toml",
       "source": "spikes/s002-spring-ls-limited/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s002-spring-ls-limited/extension/Cargo.toml"
+        "spikes/s002-spring-ls-limited/extension/Cargo.toml",
+        "spikes/s002-spring-ls-limited/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s002-spring-ls-limited/extension/Cargo.toml",
@@ -68,7 +71,8 @@
       "id": "historical-spikes-s003-jdtls-synthetic-bundle-extension-cargo-toml",
       "source": "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml"
+        "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
+        "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
@@ -90,7 +94,8 @@
       "id": "historical-spikes-s004-spring-jdt-command-extension-cargo-toml",
       "source": "spikes/s004-spring-jdt-command/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s004-spring-jdt-command/extension/Cargo.toml"
+        "spikes/s004-spring-jdt-command/extension/Cargo.toml",
+        "spikes/s004-spring-jdt-command/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s004-spring-jdt-command/extension/Cargo.toml",
@@ -134,7 +139,8 @@
       "id": "historical-spikes-s005-classpath-callback-extension-cargo-toml",
       "source": "spikes/s005-classpath-callback/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s005-classpath-callback/extension/Cargo.toml"
+        "spikes/s005-classpath-callback/extension/Cargo.toml",
+        "spikes/s005-classpath-callback/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/extension/Cargo.toml",
@@ -156,7 +162,8 @@
       "id": "historical-spikes-s005-classpath-callback-proxy-tests-cargo-toml",
       "source": "spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
       "source_paths": [
-        "spikes/s005-classpath-callback/proxy/tests/Cargo.toml"
+        "spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
+        "spikes/s005-classpath-callback/proxy/tests/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
@@ -178,7 +185,8 @@
       "id": "historical-spikes-s006-spring-boot-end-to-end-extension-cargo-toml",
       "source": "spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
       "source_paths": [
-        "spikes/s006-spring-boot-end-to-end/extension/Cargo.toml"
+        "spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
+        "spikes/s006-spring-boot-end-to-end/extension/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
@@ -222,7 +230,8 @@
       "id": "historical-spikes-s006-spring-boot-end-to-end-proxy-tests-cargo-toml",
       "source": "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
       "source_paths": [
-        "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml"
+        "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
+        "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.lock"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
@@ -266,7 +275,8 @@
       "id": "historical-spikes-s016-official-java-6-8-23-compatibility-refresh-fixture-gradle-build-gradle",
       "source": "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
       "source_paths": [
-        "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle"
+        "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
+        "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/settings.gradle"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "AGENTS.md and docs/spikes/README.md; spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
@@ -310,7 +320,8 @@
       "id": "paired-tests-fixtures-spring-boot-gradle-build-gradle",
       "source": "tests/fixtures/spring-boot-gradle/build.gradle",
       "source_paths": [
-        "tests/fixtures/spring-boot-gradle/build.gradle"
+        "tests/fixtures/spring-boot-gradle/build.gradle",
+        "tests/fixtures/spring-boot-gradle/settings.gradle"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
@@ -349,7 +360,8 @@
       "id": "paired-tests-fixtures-spring-modulith-gradle-build-gradle",
       "source": "tests/fixtures/spring-modulith-gradle/build.gradle",
       "source_paths": [
-        "tests/fixtures/spring-modulith-gradle/build.gradle"
+        "tests/fixtures/spring-modulith-gradle/build.gradle",
+        "tests/fixtures/spring-modulith-gradle/settings.gradle"
       ],
       "strategy": "REVIEWED_FREEZE",
       "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
