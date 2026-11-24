@@ -81,11 +81,15 @@ jobs:
           persist-credentials: false
       # Java 21 is intentional here: this required job proves the declared JDK
       # floor. M5 platform validation separately drives the latest LTS, JDK 25.
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           distribution: temurin
           java-version: "21"
+          check-latest: true
+      - name: Compile active CodeLens fixture
+        if: ${{ steps.scope.outputs.docs_only != 'true' }}
+        run: mvn -B -ntp -f tests/fixtures/spring-codelens-showcase/pom.xml compile
       # Pin the Action source to an immutable SHA while the Rust compiler
       # deliberately tracks the floating stable channel. New Stable releases
       # can introduce clippy lints; required CI must prove the exact PR revision.
@@ -173,6 +177,7 @@ jobs:
         if: ${{ steps.scope.outputs.docs_only != 'true' }}
         with:
           node-version: 'lts/*'
+          check-latest: true
       # Use the same explicit cross-platform discovery path as the six-tuple
       # platform matrix so adding a new coordinator test cannot diverge between
       # required CI and portability CI.
@@ -203,10 +208,9 @@ jobs:
         if: ${{ steps.scope.outputs.docs_only != 'true' }}
         run: node scripts/check-pin-inventory.mjs
 
-  # Fail-closed workflow policy. Both tools are fetched by exact version and
-  # verified against a recorded SHA-256 before they run: a policy checker that
-  # silently installed whatever the release page serves today would be the same
-  # unpinned-input problem it exists to catch.
+  # Fail-closed workflow policy. Dependabot owns the actionlint Go module and
+  # immutable official zizmor action (which verifies wheel hashes).
+  # Positive and negative controls prove both scanners actually execute.
   #
   # This job carries no path filter and no `if:`, so it is emitted on every
   # ordinary pull request. That is a precondition for promoting it to a required
@@ -224,49 +228,53 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: 'lts/*'
-      # Avoid a per-PR dependency on GitHub Release asset delivery. actionlint
-      # is built from its exact upstream release commit via the Go module checksum
-      # pipeline; zizmor is installed only from its hash-pinned PyPI ARM64 wheel.
-      - name: Install actionlint and zizmor
+          check-latest: true
+      - name: Set up current Go stable for managed actionlint
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: 'stable'
+          check-latest: true
+          cache: false
+      - name: Validate managed actionlint and prepare negative fixture
+        id: actionlint-control
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        run: bash .github/scripts/check-actions-security.sh
+      - name: Validate workflows with managed zizmor
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
+        with:
+          inputs: .github/workflows/
+          strict-collection: true
+          online-audits: false
+          advanced-security: false
+          annotations: false
+          token: ''
+          color: false
+      - name: Prove zizmor negative control
+        id: zizmor-negative
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        continue-on-error: true
+        uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
+        with:
+          inputs: ${{ steps.actionlint-control.outputs.zizmor_fixture }}
+          strict-collection: true
+          online-audits: false
+          advanced-security: false
+          annotations: false
+          token: ''
+          color: false
+      - name: Verify zizmor negative-control finding
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         env:
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_REV: 914e7df21a07ef503a81201c76d2b11c789d3fca
-          ZIZMOR_VERSION: 1.30.0
-          ZIZMOR_WHEEL_SHA256: 7569a58319fb270c14a64663a6565929035f26f6f6d13059314f796e988129eb
+          ZIZMOR_NEGATIVE_OUTCOME: ${{ steps.zizmor-negative.outcome }}
         run: |
           set -euo pipefail
-          tools_dir="${RUNNER_TEMP}/policy-tools"
-          zizmor_venv="${RUNNER_TEMP}/policy-zizmor"
-          mkdir -p "${tools_dir}"
-
-          GOBIN="${tools_dir}" go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_REV}"
-
-          python3 -m venv "${zizmor_venv}"
-          printf 'zizmor==%s --hash=sha256:%s\n' "${ZIZMOR_VERSION}" "${ZIZMOR_WHEEL_SHA256}" > "${RUNNER_TEMP}/zizmor-requirements.txt"
-          "${zizmor_venv}/bin/python" -m pip install \
-            --disable-pip-version-check \
-            --no-deps \
-            --only-binary=:all: \
-            --require-hashes \
-            --retries 4 \
-            --timeout 20 \
-            -r "${RUNNER_TEMP}/zizmor-requirements.txt"
-          ln -s "${zizmor_venv}/bin/zizmor" "${tools_dir}/zizmor"
-
-          "${tools_dir}/actionlint" -version
-          "${tools_dir}/zizmor" --version
-          echo "${tools_dir}" >> "${GITHUB_PATH}"
-      - name: actionlint
+          test "$ZIZMOR_NEGATIVE_OUTCOME" = failure
+          grep -q 'unpinned-uses' "$RUNNER_TEMP/zizmor"
+      - name: Validate dependency lifecycle ownership
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-        run: actionlint
-      # `--no-online-audits` keeps this offline and tokenless. Every finding
-      # fails: the tree is clean today, so a suppression must be written down as
-      # a `# zizmor: ignore[...]` comment next to the reason, not absorbed by a
-      # severity threshold.
-      - name: zizmor
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-        run: zizmor --no-online-audits --format plain .github/workflows/
+        run: node scripts/check-dependency-lifecycle.mjs
       - name: Merge-gate and workflow policy
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/check-workflow-policy.mjs
@@ -289,7 +297,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           fail-on-severity: moderate
@@ -388,14 +396,14 @@ jobs:
 
       - name: Initialize PR-only CodeQL runtime
         if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
-        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           languages: actions
           build-mode: none
 
       - name: Analyze PR-only CodeQL runtime without upload
         if: ${{ github.event.pull_request.draft == false && steps.codeql_runtime_scope.outcome == 'success' && steps.codeql_runtime_scope.outputs.required == 'true' }}
-        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           category: "/language:actions"
           upload: never
@@ -410,7 +418,7 @@ jobs:
 
   platform-validation:
     name: Platform Validation
-    uses: ./.github/workflows/platform-validation.yml # zizmor: ignore[self-repository] actionlint 1.7.12 rejects GitHub's newer $/ self-repository syntax.
+    uses: ./.github/workflows/platform-validation.yml # zizmor: ignore[self-repository] the managed actionlint release rejects GitHub's newer $/ self-repository syntax; see dependency policy.
 
   merge-gate:
     name: Merge Gate

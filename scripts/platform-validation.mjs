@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const EXPECTED_JAVA_MAJOR = 25;
+const EXPECTED_JAVA_MAJOR = Number(requiredEnv("JAVA_LTS"));
 const EXPECTED_RUST_CHANNEL = "stable";
 
 const expectedOs = requiredEnv("EXPECTED_OS");

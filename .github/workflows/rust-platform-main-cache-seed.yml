@@ -32,16 +32,16 @@ jobs:
       matrix:
         include:
           - id: linux-x86_64
-            runner: ubuntu-26.04
+            runner: ubuntu-latest
             rust_cache_key: platform-linux-x86_64
           - id: macos-x86_64
             runner: macos-15-intel
             rust_cache_key: platform-macos-x86_64
           - id: macos-arm64
-            runner: macos-15
+            runner: macos-latest
             rust_cache_key: platform-macos-arm64
           - id: windows-x86_64
-            runner: windows-2025
+            runner: windows-latest
             rust_cache_key: platform-windows-x86_64
           - id: windows-arm64
             runner: windows-11-arm

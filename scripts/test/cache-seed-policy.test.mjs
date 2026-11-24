@@ -28,7 +28,7 @@ test("only exact trusted-main producer writes and PR Rust remains read-only", ()
   assert.match(producer, /run: test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
   assert.match(producer, /shared-key: main-ci-rust-arm64/);
   assert.match(consumer, /shared-key: main-ci-rust-arm64\n\s+save-if: false/);
-  assert.equal((producer.match(/Swatinem\/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0/g) ?? []).length, 1);
+  assert.equal((producer.match(/Swatinem\/rust-cache@[0-9a-f]{40}/g) ?? []).length, 1);
   assert.match(producer, /cargo clippy --all-targets --all-features -- -D warnings/);
   assert.match(producer, /cargo test --locked/);
   assert.match(producer, /cargo build --locked --release --target wasm32-wasip2/);
@@ -50,7 +50,7 @@ function validateContract(mainProducer, prConsumer) {
   assert.match(mainProducer, /run: test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
   assert.match(mainProducer, /shared-key: main-ci-rust-arm64/);
   assert.match(prConsumer, /shared-key: main-ci-rust-arm64\n\s+save-if: false/);
-  assert.equal((mainProducer.match(/Swatinem\/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0/g) ?? []).length, 1);
+  assert.equal((mainProducer.match(/Swatinem\/rust-cache@[0-9a-f]{40}/g) ?? []).length, 1);
   assert.match(mainProducer, /RUST_TOOLCHAIN: "stable"/);
   assert.match(mainProducer, /toolchain: \$\{\{ env\.RUST_TOOLCHAIN \}\}/);
   assert.match(prConsumer, /RUST_TOOLCHAIN: "stable"/);
@@ -109,6 +109,8 @@ function validatePlatformCacheContract(mainProducer, prConsumer) {
   assert.match(mainProducer, /run: test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/);
   assert.match(mainProducer, /run: cargo test --locked/);
   assert.doesNotMatch(mainProducer, /id: linux-arm64/);
+  const runners = (source) => new Map([...source.matchAll(/^\s*- id: (\S+)\n\s+runner: (\S+)/gm)].map(m => [m[1], m[2]]));
+  for (const [id, label] of runners(mainProducer)) assert.equal(label, runners(prConsumer).get(id), "runner mismatch for " + id);
 
   for (const key of [
     "platform-linux-x86_64",
@@ -137,6 +139,7 @@ test("platform cache contract rejects duplicate ARM64 producers and PR writes", 
     ["manual recovery removed", platformProducer.replace("  workflow_dispatch:", "  # workflow_dispatch:")],
     ["wrong main branch", platformProducer.replace("branches: [main]", "branches: [develop]")],
     ["duplicate linux arm64 producer", platformProducer.replace("          - id: linux-x86_64", "          - id: linux-arm64\n            runner: ubuntu-26.04-arm\n            rust_cache_key: main-ci-rust-arm64\n          - id: linux-x86_64")],
+    ["x64 runner drift", platformProducer.replace("runner: ubuntu-latest", "runner: ubuntu-24.04")],
     ["native tests removed", platformProducer.replace("run: cargo test --locked", "run: cargo metadata --locked --no-deps")],
     ["platform producer compiler pin reintroduced", platformProducer.replace('RUST_TOOLCHAIN: "stable"', 'RUST_TOOLCHAIN: "1.98.0"')],
   ];

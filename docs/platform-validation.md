@@ -35,14 +35,14 @@ that single final gate while a non-applicable PR remains green.
 
 | Host | Architecture | GitHub runner |
 | --- | --- | --- |
-| Linux | x86_64 | `ubuntu-26.04` |
+| Linux | x86_64 | `ubuntu-latest` |
 | Linux | arm64 | `ubuntu-26.04-arm` |
 | macOS | x86_64 | `macos-15-intel` |
-| macOS | arm64 | `macos-15` |
-| Windows | x86_64 | `windows-2025` |
+| macOS | arm64 | `macos-latest` |
+| Windows | x86_64 | `windows-latest` |
 | Windows | arm64 | `windows-11-arm` |
 
-Each tuple executes the same product-contract and real-runtime evidence.
+Each tuple executes the same product-contract and real-runtime evidence. Moving labels follow GitHub's production image channels only where native architecture is retained. Cache producer and validation consumer select identical images. Architecture-specific labels have finite provider-gap ownership in `.github/dependency-update-policy.json`; a compatible GA replacement requires fresh native evidence.
 
 ### Layer 1 — native substrate and product contracts
 

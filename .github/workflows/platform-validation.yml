@@ -87,7 +87,7 @@ jobs:
       matrix:
         include:
           - id: linux-x86_64
-            runner: ubuntu-26.04
+            runner: ubuntu-latest
             expected_os: linux
             expected_arch: x86_64
             rust_cache_key: platform-linux-x86_64
@@ -104,12 +104,12 @@ jobs:
             expected_arch: x86_64
             rust_cache_key: platform-macos-x86_64
           - id: macos-arm64
-            runner: macos-15
+            runner: macos-latest
             expected_os: macos
             expected_arch: arm64
             rust_cache_key: platform-macos-arm64
           - id: windows-x86_64
-            runner: windows-2025
+            runner: windows-latest
             expected_os: windows
             expected_arch: x86_64
             rust_cache_key: platform-windows-x86_64
@@ -133,15 +133,17 @@ jobs:
       # Microsoft OpenJDK publishes the same current JDK 25 LTS line for all
       # six native tuples, including Windows ARM64. A single distribution keeps
       # this matrix comparable instead of silently dropping that tuple.
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: microsoft
           java-version: ${{ env.JAVA_LTS }}
+          check-latest: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: ${{ env.NODE_LTS }}
+          check-latest: true
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
@@ -207,7 +209,7 @@ jobs:
   spring-runtime-floor:
     needs: [scope]
     if: ${{ always() && (needs.scope.result != 'success' || needs.scope.outputs.run_validation == 'true') }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       SPRING_RUNTIME_EVIDENCE: ${{ github.workspace }}/spring-runtime-floor-evidence.json
@@ -217,15 +219,20 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           persist-credentials: false
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           distribution: temurin
           java-version: "21"
+          check-latest: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         with:
           node-version: ${{ env.NODE_LTS }}
+          check-latest: true
+      - name: Verify native x64 JDK floor runner
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+        run: node -e "if (process.platform !== 'linux' || process.arch !== 'x64') process.exit(1)"
       - name: Pinned Spring runtime smoke on JDK 21 floor
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         run: node scripts/spring-runtime-smoke.mjs
