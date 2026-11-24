@@ -28,7 +28,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20
+          node-version: 'lts/*'
+          check-latest: true
 
       - name: Reconcile repository workflow policy
         env:
@@ -47,3 +48,6 @@ jobs:
         run: node scripts/check-pin-inventory.mjs
       - name: Reconcile third-party notices
         run: node scripts/check-third-party-notices.mjs
+
+      - name: Reconcile dependency lifecycle ownership
+        run: node scripts/check-dependency-lifecycle.mjs

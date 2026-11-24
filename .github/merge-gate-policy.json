@@ -60,7 +60,7 @@
         {
           "job": "rust",
           "name": "rust",
-          "proves": "The extension crate formats, passes clippy with warnings denied, passes `cargo test --locked`, and builds for `wasm32-wasip2` — the target the extension registry ships. It does not prove anything about Spring Tools behaviour."
+          "proves": "The extension crate formats, passes clippy with warnings denied, passes `cargo test --locked`, and builds for `wasm32-wasip2` — the target the extension registry ships. It also compiles the active CodeLens Maven fixture on the supported JDK 21 floor. It does not prove anything about Spring Tools behaviour."
         },
         {
           "job": "coordinator",

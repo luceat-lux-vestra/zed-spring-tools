@@ -1,0 +1,570 @@
+{
+  "schema": "zed-spring-tools/dependency-update-policy/v1",
+  "policy": "EG-DEP-001",
+  "owner": "luceat-lux-vestra/zed-spring-tools#221",
+  "reviewed_at": "2026-11-24",
+  "entries": [
+    {
+      "id": "product-cargo",
+      "source": "Cargo.toml",
+      "source_paths": [
+        "Cargo.toml"
+      ],
+      "strategy": "DEPENDABOT",
+      "authority": "Native ecosystem registry",
+      "mechanism": "Native cargo Dependabot, directory /",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Required CI; for CodeLens changes compile and repeat manual evidence before relying on it",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/"
+      }
+    },
+    {
+      "id": "historical-spikes-s001-zed-lifecycle-extension-cargo-toml",
+      "source": "spikes/s001-zed-lifecycle/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s001-zed-lifecycle/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s001-zed-lifecycle/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s001-zed-lifecycle/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s001-zed-lifecycle/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s002-spring-ls-limited-extension-cargo-toml",
+      "source": "spikes/s002-spring-ls-limited/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s002-spring-ls-limited/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s002-spring-ls-limited/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s002-spring-ls-limited/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s002-spring-ls-limited/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s003-jdtls-synthetic-bundle-extension-cargo-toml",
+      "source": "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s003-jdtls-synthetic-bundle/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s003-jdtls-synthetic-bundle/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s004-spring-jdt-command-extension-cargo-toml",
+      "source": "spikes/s004-spring-jdt-command/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s004-spring-jdt-command/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s004-spring-jdt-command/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s004-spring-jdt-command/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s004-spring-jdt-command/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s004-spring-jdt-command-fixture-pom-xml",
+      "source": "spikes/s004-spring-jdt-command/fixture/pom.xml",
+      "source_paths": [
+        "spikes/s004-spring-jdt-command/fixture/pom.xml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s004-spring-jdt-command/fixture/pom.xml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "maven",
+        "directory": "/spikes/s004-spring-jdt-command/fixture"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s004-spring-jdt-command/fixture/pom.xml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s005-classpath-callback-extension-cargo-toml",
+      "source": "spikes/s005-classpath-callback/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s005-classpath-callback/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s005-classpath-callback/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s005-classpath-callback-proxy-tests-cargo-toml",
+      "source": "spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
+      "source_paths": [
+        "spikes/s005-classpath-callback/proxy/tests/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s005-classpath-callback/proxy/tests"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s005-classpath-callback/proxy/tests/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s006-spring-boot-end-to-end-extension-cargo-toml",
+      "source": "spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s006-spring-boot-end-to-end/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s006-spring-boot-end-to-end/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s006-spring-boot-end-to-end-fixture-pom-xml",
+      "source": "spikes/s006-spring-boot-end-to-end/fixture/pom.xml",
+      "source_paths": [
+        "spikes/s006-spring-boot-end-to-end/fixture/pom.xml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/fixture/pom.xml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "maven",
+        "directory": "/spikes/s006-spring-boot-end-to-end/fixture"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/fixture/pom.xml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s006-spring-boot-end-to-end-proxy-tests-cargo-toml",
+      "source": "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
+      "source_paths": [
+        "spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s006-spring-boot-end-to-end/proxy/tests"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s006-spring-boot-end-to-end/proxy/tests/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s012-unmodified-java-companion-bridge-extension-cargo-toml",
+      "source": "spikes/s012-unmodified-java-companion-bridge/extension/Cargo.toml",
+      "source_paths": [
+        "spikes/s012-unmodified-java-companion-bridge/extension/Cargo.toml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s012-unmodified-java-companion-bridge/extension/Cargo.toml",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "cargo",
+        "directory": "/spikes/s012-unmodified-java-companion-bridge/extension"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s012-unmodified-java-companion-bridge/extension/Cargo.toml",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "historical-spikes-s016-official-java-6-8-23-compatibility-refresh-fixture-gradle-build-gradle",
+      "source": "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
+      "source_paths": [
+        "spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "AGENTS.md and docs/spikes/README.md; spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
+      "mechanism": "Retain original experiment input; do not update an abandoned experiment independently of evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "gradle",
+        "directory": "/spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Completed disposable spike excluded from production by AGENTS.md.",
+        "evidence": "AGENTS.md and docs/spikes/README.md; spikes/s016-official-java-6.8.23-compatibility-refresh/fixture-gradle/build.gradle",
+        "trigger": "New experiment reactivates this path, security exposure, or review deadline."
+      }
+    },
+    {
+      "id": "paired-tests-fixtures-spring-boot-basic-pom-xml",
+      "source": "tests/fixtures/spring-boot-basic/pom.xml",
+      "source_paths": [
+        "tests/fixtures/spring-boot-basic/pom.xml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+      "mechanism": "Retain the paired comparison input and deliberate old-version diagnostic subject; refresh Maven and Gradle controls together with fresh capability evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "maven",
+        "directory": "/tests/fixtures/spring-boot-basic"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "A unilateral version bump changes the paired control or erases the version-diagnostic subject.",
+        "evidence": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+        "trigger": "New fixture contract, dependency security exposure, capability refresh, or review deadline."
+      }
+    },
+    {
+      "id": "paired-tests-fixtures-spring-boot-gradle-build-gradle",
+      "source": "tests/fixtures/spring-boot-gradle/build.gradle",
+      "source_paths": [
+        "tests/fixtures/spring-boot-gradle/build.gradle"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+      "mechanism": "Retain the paired comparison input and deliberate old-version diagnostic subject; refresh Maven and Gradle controls together with fresh capability evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "gradle",
+        "directory": "/tests/fixtures/spring-boot-gradle"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "A unilateral version bump changes the paired control or erases the version-diagnostic subject.",
+        "evidence": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+        "trigger": "New fixture contract, dependency security exposure, capability refresh, or review deadline."
+      }
+    },
+    {
+      "id": "active-codelens-fixture",
+      "source": "tests/fixtures/spring-codelens-showcase/pom.xml",
+      "source_paths": [
+        "tests/fixtures/spring-codelens-showcase/pom.xml",
+        ".github/workflows/ci.yml"
+      ],
+      "strategy": "DEPENDABOT",
+      "authority": "Native ecosystem registry",
+      "mechanism": "Native maven Dependabot, directory /tests/fixtures/spring-codelens-showcase; update PRs run the actual fixture compilation.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Required Rust component compiles this Maven fixture on the JDK 21 compatibility floor for non-doc PRs; repeat manual CodeLens evidence before claiming behavior.",
+      "provenance": {
+        "ecosystem": "maven",
+        "directory": "/tests/fixtures/spring-codelens-showcase"
+      }
+    },
+    {
+      "id": "paired-tests-fixtures-spring-modulith-gradle-build-gradle",
+      "source": "tests/fixtures/spring-modulith-gradle/build.gradle",
+      "source_paths": [
+        "tests/fixtures/spring-modulith-gradle/build.gradle"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+      "mechanism": "Retain the paired comparison input and deliberate old-version diagnostic subject; refresh Maven and Gradle controls together with fresh capability evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "gradle",
+        "directory": "/tests/fixtures/spring-modulith-gradle"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "A unilateral version bump changes the paired control or erases the version-diagnostic subject.",
+        "evidence": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+        "trigger": "New fixture contract, dependency security exposure, capability refresh, or review deadline."
+      }
+    },
+    {
+      "id": "paired-tests-fixtures-spring-modulith-maven-pom-xml",
+      "source": "tests/fixtures/spring-modulith-maven/pom.xml",
+      "source_paths": [
+        "tests/fixtures/spring-modulith-maven/pom.xml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+      "mechanism": "Retain the paired comparison input and deliberate old-version diagnostic subject; refresh Maven and Gradle controls together with fresh capability evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Check exact manifest path and finite review; any refresh must re-run the affected experimental or capability gate.",
+      "provenance": {
+        "ecosystem": "maven",
+        "directory": "/tests/fixtures/spring-modulith-maven"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "A unilateral version bump changes the paired control or erases the version-diagnostic subject.",
+        "evidence": "docs/gradle-axis-resolution.md and paired Spring fixture manifests",
+        "trigger": "New fixture contract, dependency security exposure, capability refresh, or review deadline."
+      }
+    },
+    {
+      "id": "actionlint-module",
+      "source": "Managed actionlint module",
+      "source_paths": [
+        ".github/tools/actionlint/go.mod"
+      ],
+      "strategy": "DEPENDABOT",
+      "authority": "https://github.com/rhysd/actionlint/releases and Go checksum database",
+      "mechanism": "Native gomod Dependabot; CI builds module using Go stable.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Workflow-security positive scan and runner-label negative control.",
+      "provenance": {
+        "ecosystem": "gomod",
+        "directory": "/.github/tools/actionlint"
+      }
+    },
+    {
+      "id": "remote-actions",
+      "source": "Remote GitHub Actions",
+      "source_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/issue-metadata.yml",
+        ".github/workflows/labeler.yml",
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/release-codeql-preflight.yml",
+        ".github/workflows/repository-drift.yml",
+        ".github/workflows/rust-main-cache-seed.yml",
+        ".github/workflows/rust-platform-main-cache-seed.yml"
+      ],
+      "strategy": "DEPENDABOT",
+      "authority": "Upstream stable GitHub Action releases",
+      "mechanism": "Immutable full SHA + root github-actions Dependabot. Official zizmor action resolves a hash-verified wheel from its own immutable release; its input contract requires a non-empty GitHub token even with online audits disabled. The workflow-security job is restricted to contents: read and supplies only github.token; no online audits, SARIF upload, threshold filtering, or persistent checkout credentials.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Required Merge Gate, strict offline zizmor positive scan and unpinned-uses negative control with fresh output, exact job-token scope regression tests, actionlint checks."
+    },
+    {
+      "id": "node-lts",
+      "source": "Maintenance Node selectors",
+      "source_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/repository-drift.yml"
+      ],
+      "strategy": "CHANNEL",
+      "authority": "Node supported LTS channel",
+      "mechanism": "setup-node lts/* with check-latest true; platform uses NODE_LTS.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Five maintenance selectors and native platform runtime check."
+    },
+    {
+      "id": "go-stable",
+      "source": "Security tool Go runtime",
+      "source_paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "strategy": "CHANNEL",
+      "authority": "Go stable channel",
+      "mechanism": "setup-go stable with check-latest true.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Actionlint build and negative control."
+    },
+    {
+      "id": "rust-stable",
+      "source": "Rust maintenance toolchain",
+      "source_paths": [
+        "rust-toolchain.toml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/rust-main-cache-seed.yml",
+        ".github/workflows/rust-platform-main-cache-seed.yml"
+      ],
+      "strategy": "CHANNEL",
+      "authority": "Rust stable channel",
+      "mechanism": "Stable toolchain and separate consumer evidence.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Required Rust checks and six-platform validation."
+    },
+    {
+      "id": "java-lts-major",
+      "source": "Build JDK and runtime floor",
+      "source_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/platform-validation.yml",
+        "scripts/platform-validation.mjs"
+      ],
+      "strategy": "UPDATE_PR",
+      "authority": "Vendor supported Java LTS roadmap",
+      "mechanism": "Follow patches via setup-java check-latest; review next LTS major in PR with six-tuple support and preserved JDK 21 floor.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Native platform oracle reads JAVA_LTS; independent JDK 21 floor."
+    },
+    {
+      "id": "runner-ubuntu-26.04-arm",
+      "source": "Architecture-specific runner ubuntu-26.04-arm",
+      "source_paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/issue-metadata.yml",
+        ".github/workflows/labeler.yml",
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/release-codeql-preflight.yml",
+        ".github/workflows/repository-drift.yml",
+        ".github/workflows/rust-main-cache-seed.yml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "mechanism": "Explicit architecture label until compatible moving alias or reviewed GA replacement; no bespoke updater.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Native architecture/OS oracle, JDK floor and exact-head Merge Gate.",
+      "provenance": {
+        "label": "ubuntu-26.04-arm"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Current GA ARM64 runner required; GitHub has no equivalent moving ARM64 Ubuntu alias.",
+        "evidence": "GitHub hosted runner reference; docs/platform-validation.md; #215 six-native-tuple evidence.",
+        "trigger": "Provider introduces equivalent moving alias or newer supported GA image, compatibility/security change, or review deadline."
+      }
+    },
+    {
+      "id": "runner-macos-15-intel",
+      "source": "Architecture-specific runner macos-15-intel",
+      "source_paths": [
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/rust-platform-main-cache-seed.yml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "mechanism": "Explicit architecture label until compatible moving alias or reviewed GA replacement; no bespoke updater.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Native architecture/OS oracle, JDK floor and exact-head Merge Gate.",
+      "provenance": {
+        "label": "macos-15-intel"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Intel-native compatibility tuple has no equivalent moving alias; macos-latest is ARM64.",
+        "evidence": "GitHub hosted runner reference; docs/platform-validation.md; #215 six-native-tuple evidence.",
+        "trigger": "Provider introduces equivalent moving alias or newer supported GA image, compatibility/security change, or review deadline."
+      }
+    },
+    {
+      "id": "runner-windows-11-arm",
+      "source": "Architecture-specific runner windows-11-arm",
+      "source_paths": [
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/rust-platform-main-cache-seed.yml"
+      ],
+      "strategy": "REVIEWED_FREEZE",
+      "authority": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "mechanism": "Explicit architecture label until compatible moving alias or reviewed GA replacement; no bespoke updater.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Native architecture/OS oracle, JDK floor and exact-head Merge Gate.",
+      "provenance": {
+        "label": "windows-11-arm"
+      },
+      "revisit": {
+        "review_by": "2027-02-22",
+        "rationale": "Native Windows ARM64 validated tuple; no equivalent moving ARM64 alias and VS2026 image equivalence is not yet proven.",
+        "evidence": "GitHub hosted runner reference; docs/platform-validation.md; #215 six-native-tuple evidence.",
+        "trigger": "Provider introduces equivalent moving alias or newer supported GA image, compatibility/security change, or review deadline."
+      }
+    },
+    {
+      "id": "moving-runner-channels",
+      "source": "Moving GitHub-hosted x64 Linux, arm64 macOS, x64 Windows",
+      "source_paths": [
+        ".github/workflows/platform-validation.yml",
+        ".github/workflows/rust-platform-main-cache-seed.yml"
+      ],
+      "strategy": "CHANNEL",
+      "authority": "GitHub hosted runner documentation",
+      "mechanism": "ubuntu-latest, macos-latest and windows-latest; producer and consumer labels agree; verify actual OS and architecture.",
+      "owner": "luceat-lux-vestra/zed-spring-tools#221",
+      "validation": "Native six-tuple and x64 floor evidence; cache policy regression tests."
+    }
+  ]
+}
