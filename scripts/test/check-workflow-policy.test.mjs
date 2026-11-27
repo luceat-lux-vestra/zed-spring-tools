@@ -3,6 +3,7 @@
 // to reject exactly the drift that could otherwise make a gate disappear.
 
 import { test } from "node:test";
+import { validateLiveRuleset, validateEventPolicies } from "../check-live-ruleset.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -95,23 +96,49 @@ test("ephemeral workflow without retirement condition is rejected", () => {
   assert.match(result.output, /lacks non-empty # lifecycle-retire:/);
 });
 
-test("retired Actions event policy 5154 remains tracked", () => {
-  const policy = JSON.parse(
-    readFileSync(join(REPOSITORY, ".github/merge-gate-policy.json"), "utf8"),
-  );
-  assert.deepEqual(policy.retired_actions_event_policy_ids, [5154]);
+const livePolicy = JSON.parse(readFileSync(join(REPOSITORY, ".github/merge-gate-policy.json"), "utf8"));
+const liveRuleset = () => ({
+  name:"main", target:"branch", source_type:"Repository", source:"luceat-lux-vestra/zed-spring-tools", enforcement:"active",
+  conditions:{ref_name:{include:["~DEFAULT_BRANCH"],exclude:[]}}, bypass_actors:[],
+  rules:[
+    {type:"deletion"}, {type:"non_fast_forward"}, {type:"required_linear_history"},
+    {type:"pull_request",parameters:{required_approving_review_count:0,dismiss_stale_reviews_on_push:true,required_reviewers:[],require_code_owner_review:false,require_last_push_approval:false,required_review_thread_resolution:true,require_extra_approval_for_unattributed_changes:true,allowed_merge_methods:["squash"]}},
+    {type:"required_status_checks",parameters:{strict_required_status_checks_policy:false,do_not_enforce_on_create:false,required_status_checks:[{context:"Merge Gate",integration_id:15368}]}}
+  ]
 });
 
-test("retired Actions event policy ids must be positive and unique", () => {
-  const root = fixture();
-  const path = join(root, ".github/merge-gate-policy.json");
-  const policy = JSON.parse(readFileSync(path, "utf8"));
-  policy.retired_actions_event_policy_ids = [5154, 5154, 0];
-  writeFileSync(path, JSON.stringify(policy, null, 2) + "\n");
-  const result = run(root);
-  assert.equal(result.code, 1, result.output);
-  assert.match(result.output, /lists retired Actions event policy id 5154 more than once/);
-  assert.match(result.output, /not a positive integer/);
+test("live ruleset accepts independently recorded desired state", () => {
+  assert.deepEqual(validateLiveRuleset(livePolicy, liveRuleset()), []);
+});
+test("live ruleset fails closed on scope, producer, missing fields and bypass drift", () => {
+  for (const mutate of [
+    x => x.conditions.ref_name.exclude.push("refs/heads/main"),
+    x => x.conditions.ref_name.include = ["refs/heads/unrelated"],
+    x => delete x.bypass_actors,
+    x => x.bypass_actors.push({actor_id:1}),
+    x => x.source = "other/repo",
+    x => x.rules[4].parameters.required_status_checks[0].integration_id = 1,
+    x => delete x.rules[4].parameters.required_status_checks[0].integration_id,
+    x => x.rules[4].parameters.do_not_enforce_on_create = true,
+    x => delete x.rules[3].parameters.required_reviewers,
+    x => x.rules[3].parameters.require_last_push_approval = true,
+    x => x.rules.push(x.rules[4]),
+    x => x.rules.splice(0,1)
+  ]) {
+    const actual = liveRuleset(); mutate(actual);
+    assert.ok(validateLiveRuleset(livePolicy, actual).length, JSON.stringify(actual));
+  }
+});
+test("repository event exceptions must remain absent regardless of identity", () => {
+  assert.deepEqual(validateEventPolicies(livePolicy,{total_count:0,policies:[]}),[]);
+  for (const observed of [{total_count:1,policies:[{id:9876}]},{total_count:1,policies:[]},{policies:[]},{total_count:0}]) {
+    assert.ok(validateEventPolicies(livePolicy,observed).length);
+  }
+  const root=fixture(), path=join(root,".github/merge-gate-policy.json");
+  const policy=JSON.parse(readFileSync(path,"utf8")); policy.actions_event_policies=[{id:9876}];
+  writeFileSync(path,JSON.stringify(policy,null,2)+"\n");
+  const result=run(root); assert.equal(result.code,1,result.output);
+  assert.match(result.output,/Expected zero repository Actions event exceptions/);
 });
 
 test("a renamed required producer is rejected", () => {

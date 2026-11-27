@@ -5,8 +5,8 @@ version: 2
 # in .github/dependency-update-policy.json. The Cargo tree is statically linked into the `extension.wasm`
 # that the Zed extension registry builds and serves to every user
 # (THIRD_PARTY_NOTICES.md), and the workflow actions run with repository
-# credentials. The coordinator and the Java bridge have no third-party
-# dependency to update, by design.
+# credentials. The standalone coordinator has no third-party dependency to
+# update; the former Java bridge is retired by D007.
 #
 # Every direct Cargo requirement is an exact `=` pin, which is deliberate: a
 # pin never moves on its own, so without this file the pinned set silently ages.

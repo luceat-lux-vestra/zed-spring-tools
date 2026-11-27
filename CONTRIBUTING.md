@@ -73,8 +73,10 @@ for the docs-only shortcut because CI validates them against repository state.
 
 ## Branching
 
-The project follows GitHub Flow, and `main` is protected: it accepts no direct
-pushes, no force pushes, and no non-linear history.
+The desired GitHub Flow contract is PR-gated, squash-only linear history on
+`main`; reconcile actual settings and ruleset against
+[the merge policy](.github/merge-gate-policy.json) at consequential decisions.
+Do not infer current enforcement from this document.
 
 - Branch from `main`, one branch per change, kept short-lived.
 - Name the branch for the Conventional Commit type it carries, followed by a
@@ -123,10 +125,9 @@ information.
 - `state:*` and `area:*` remain manual for issues because a title or body cannot
   prove inventory state or component ownership.
 
-The responsible human remains the Git author. Material Codex assistance may be
-recorded with `Co-authored-by: OpenAI Codex (GPT-5.6 Sol) <noreply@openai.com>`.
-GitHub currently resolves this trailer to the `codex` account. Update the model
-label when the active Codex model changes.
+Record actual authorship and material assistance accurately using the applicable
+Git author/co-author metadata. Do not invent a model identity or reuse stale
+model-specific trailers.
 
 ## Research and spikes
 
@@ -154,15 +155,22 @@ Research, experiment, migration, and temporary GitHub Actions workflows should s
   dependency table or the locked package count in `THIRD_PARTY_NOTICES.md` fails
   `node scripts/check-third-party-notices.mjs` until the notice is updated,
   license reading included.
-- Keep paths and process launching platform-neutral from the first product
-  scaffold. Untested platforms must remain labeled `untested`.
+- Keep paths and process launching platform-neutral. Untested platforms remain
+  `untested`; six native headless tuples do not establish Zed desktop support.
+  Remote/WSL support requires a separate decision and driven evidence.
+- Keep D007 standalone Spring acquisition and Java editor ownership within
+  the accepted runtime boundary. New integration or distribution surfaces need
+  a recorded decision and evidence, not a preservation or compatibility shim.
 - Preserve upstream attribution for research patches and do not imply that this
   project redistributes third-party runtime binaries.
 
 ## Validation and pull requests
 
-Run the smallest relevant source, contract, build, and runtime checks for the
-change. A pull request should list changed files, validation performed,
+Use the [portable execution policy](docs/engineering/agent-execution-policy.md)
+for comprehensive audit, consolidated replacement and evidence boundaries.
+Run the relevant independent source, contract, build, and runtime checks for the
+change. Do not constrain work to one micro-step or retain obsolete behavior solely
+because it exists. A pull request should list changed files, validation performed,
 unverified items, platform/JDK coverage, and the next follow-up. Runtime evidence
 must state its exact host tuple.
 

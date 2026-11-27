@@ -1,6 +1,6 @@
 # D007 standalone acceptance and isolated Zed desktop validation
 
-## One-shot macOS gate
+## Diagnostic manual-install gate
 
 The normal gate automates dev-extension installation. The manual-install
 variant below is retained only as a diagnostic fallback if macOS Accessibility

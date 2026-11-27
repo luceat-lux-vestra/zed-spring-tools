@@ -25,6 +25,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { validateLiveRuleset, validateEventPolicies } from "./check-live-ruleset.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -753,21 +754,11 @@ for (const workflow of workflows.values()) {
 
 // --- live repository state ----------------------------------------------
 
-const retiredActionsEventPolicyIds = policy.retired_actions_event_policy_ids ?? [];
-if (!Array.isArray(retiredActionsEventPolicyIds)) {
-  fail(`${POLICY_FILE} retired_actions_event_policy_ids must be an array.`);
-} else {
-  const seen = new Set();
-  for (const id of retiredActionsEventPolicyIds) {
-    if (!Number.isInteger(id) || id <= 0) {
-      fail(`${POLICY_FILE} retired Actions event policy id ${JSON.stringify(id)} is not a positive integer.`);
-      continue;
-    }
-    if (seen.has(id)) {
-      fail(`${POLICY_FILE} lists retired Actions event policy id ${id} more than once.`);
-    }
-    seen.add(id);
-  }
+if (!Array.isArray(policy.actions_event_policies) || policy.actions_event_policies.length !== 0) {
+  fail("Expected zero repository Actions event exceptions");
+}
+for (const entry of contexts.filter(entry => entry.class === "required")) {
+  if (!Number.isSafeInteger(entry.integration_id) || entry.integration_id <= 0) fail("Required check producer identity missing or invalid");
 }
 
 function gh(path) {
@@ -795,16 +786,7 @@ if (live) {
   const actions = gh(`repos/${repository}/actions/permissions`);
   const workflowPermissions = gh(`repos/${repository}/actions/permissions/workflow`);
   const actionsEventPolicies = gh(`repos/${repository}/actions/policies`);
-  if (!Array.isArray(actionsEventPolicies.policies)) {
-    fail("Live Actions event-policy readback returned no policies array.");
-  } else {
-    const liveEventPolicyIds = new Set(actionsEventPolicies.policies.map((entry) => entry.id));
-    for (const id of retiredActionsEventPolicyIds) {
-      if (liveEventPolicyIds.has(id)) {
-        fail(`Retired Actions event policy ${id} still exists; remove the obsolete repository-level exception.`);
-      }
-    }
-  }
+  for (const error of validateEventPolicies(policy, actionsEventPolicies)) fail(error);
   for (const [key, expected] of Object.entries(policy.actions_policy ?? {})) {
     const observed = key in actions ? actions[key] : workflowPermissions[key];
     if (observed !== expected) {
@@ -819,59 +801,12 @@ if (live) {
     }
   }
 
-  const wanted = policy.ruleset ?? {};
-  const summary = rulesets.find((entry) => entry.name === wanted.name && entry.target === "branch");
-  if (!summary) {
-    fail(`No branch ruleset named \`${wanted.name}\` exists on ${repository}.`);
+  const matches = rulesets.filter(entry => entry.name === policy.ruleset?.name && entry.target === "branch");
+  if (matches.length !== 1) {
+    fail("Expected exactly one repository branch ruleset matching the canonical policy");
   } else {
-    const ruleset = gh(`repos/${repository}/rulesets/${summary.id}`);
-    if (ruleset.enforcement !== wanted.enforcement) {
-      fail(`Ruleset \`${wanted.name}\` enforcement is \`${ruleset.enforcement}\`; ${POLICY_FILE} accepts \`${wanted.enforcement}\`.`);
-    }
-    if ((ruleset.bypass_actors ?? []).length !== (wanted.bypass_actors ?? []).length) {
-      fail(`Ruleset \`${wanted.name}\` has ${(ruleset.bypass_actors ?? []).length} bypass actor(s); ${POLICY_FILE} accepts none.`);
-    }
-
-    const byType = new Map(ruleset.rules.map((rule) => [rule.type, rule.parameters ?? {}]));
-    for (const type of wanted.required_rule_types ?? []) {
-      if (!byType.has(type)) fail(`Ruleset \`${wanted.name}\` is missing the \`${type}\` rule.`);
-    }
-
-    const pullRequest = byType.get("pull_request");
-    if (pullRequest) {
-      const sorted = (list) => [...(list ?? [])].sort().join(",");
-      if (sorted(pullRequest.allowed_merge_methods) !== sorted(wanted.allowed_merge_methods)) {
-        fail(`Ruleset \`${wanted.name}\` allows merge methods [${sorted(pullRequest.allowed_merge_methods)}]; ${POLICY_FILE} accepts [${sorted(wanted.allowed_merge_methods)}].`);
-      }
-      for (const key of [
-        "required_approving_review_count",
-        "required_review_thread_resolution",
-        "require_extra_approval_for_unattributed_changes",
-      ]) {
-        if (key in wanted && pullRequest[key] !== wanted[key]) {
-          fail(`Ruleset \`${wanted.name}\` pull-request rule has \`${key}\` = ${JSON.stringify(pullRequest[key])}; ${POLICY_FILE} accepts ${JSON.stringify(wanted[key])}.`);
-        }
-      }
-    }
-
-    const checks = byType.get("required_status_checks");
-    if (checks) {
-      if (checks.strict_required_status_checks_policy !== wanted.strict_required_status_checks_policy) {
-        fail(`Ruleset \`${wanted.name}\` has \`strict_required_status_checks_policy\` = ${checks.strict_required_status_checks_policy}; ${POLICY_FILE} accepts ${wanted.strict_required_status_checks_policy}.`);
-      }
-      const liveContexts = new Set((checks.required_status_checks ?? []).map((check) => check.context));
-      const policyRequired = new Set(contexts.filter((entry) => entry.class === "required").map((entry) => entry.context));
-      for (const context of liveContexts) {
-        if (!policyRequired.has(context)) {
-          fail(`Ruleset \`${wanted.name}\` requires context \`${context}\`, which ${POLICY_FILE} does not list as required.`);
-        }
-      }
-      for (const context of policyRequired) {
-        if (!liveContexts.has(context)) {
-          fail(`${POLICY_FILE} lists \`${context}\` as required but the live ruleset does not require it.`);
-        }
-      }
-    }
+    const ruleset = gh(`repos/${repository}/rulesets/${matches[0].id}`);
+    for (const error of validateLiveRuleset(policy, ruleset)) fail(error);
   }
 }
 

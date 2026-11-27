@@ -108,6 +108,16 @@ Historical JDT/bridge gates remain in research/spike records and
 `COMPATIBILITY.md` for regression history; they are not current standalone
 runtime evidence.
 
+## Cache ownership
+
+Rust follows rust-toolchain.toml's stable channel. Protected-main cache writers
+are rust-main-cache-seed.yml (Linux ARM64 shared main-ci-rust-arm64 family) and
+rust-platform-main-cache-seed.yml (the other five families). PR consumers are
+read-only; misses must still compile. Producer/consumer OS, architecture and
+RUST_TOOLCHAIN inputs must agree. Existing #176 owns first-PR warmup and reuse
+measurement; do not create another producer for the same cache identity without
+measured evidence. Cache hits never substitute for the real product gates.
+
 ## Evidence artifacts
 
 Each native platform job uploads `platform-evidence.json` and

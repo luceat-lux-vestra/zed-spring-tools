@@ -44,7 +44,7 @@ timeouts, and policy reconciliation. No second hardening framework is added.
 
 ### PASS — CodeQL authority
 
-The repository already runs custom CodeQL across Actions, JavaScript/TypeScript, Java/Kotlin, and Rust. The bridge currently contains Java rather than Kotlin, so the existing `java-kotlin` `build-mode:none` analyzes the Java source without a Kotlin build requirement.
+The repository already runs custom CodeQL across Actions, JavaScript/TypeScript, Java/Kotlin, and Rust. At the time of this reassessment the then-existing bridge contained Java rather than Kotlin. D007 subsequently retired that bridge; current scan scope and Kotlin fail-closed behavior are owned by the current CodeQL workflow and merge policy.
 
 CodeQL remains advisory because its PR trigger intentionally ignores documentation-only changes. A disappearing context must not be made required.
 
